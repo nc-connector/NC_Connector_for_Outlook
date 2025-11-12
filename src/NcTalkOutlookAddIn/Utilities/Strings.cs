@@ -64,6 +64,7 @@ namespace NcTalkOutlookAddIn.Utilities
             german["TabGeneral"] = "Allgemein";
             german["TabIfb"] = "IFB";
             german["TabAdvanced"] = "Erweitert";
+            german["TabInvitations"] = "Einladungen";
             german["TabDebug"] = "Debug";
             german["TabAbout"] = "Über";
             german["TabFileLink"] = "Filelink";
@@ -78,6 +79,7 @@ namespace NcTalkOutlookAddIn.Utilities
             german["GroupMuzzle"] = "Maulkorb fuer Outlook";
             german["CheckMuzzle"] = "Outlook-Einladungen unterdruecken (Versand erfolgt ueber Nextcloud)";
             german["LabelMuzzleHint"] = "Hinweis: Antworten auf Einladungen sowie normale E-Mails werden weiterhin versendet.";
+            german["LabelMuzzleAccountsHint"] = "Waehlen Sie die Konten aus, deren Outlook-Einladungen unterdrueckt werden sollen.";
             german["CheckIfbEnabled"] = "IFB-Endpunkt aktivieren";
             german["LabelIfbDays"] = "Zeitraum (Tage):";
             german["LabelIfbCacheHours"] = "Adressbuch-Cache (Stunden):";
@@ -168,6 +170,7 @@ namespace NcTalkOutlookAddIn.Utilities
             french["TabGeneral"] = "General";
             french["TabIfb"] = "IFB";
             french["TabAdvanced"] = "Avance";
+            french["TabInvitations"] = "Invitations";
             french["TabDebug"] = "Debogage";
             french["TabAbout"] = "À propos";
             french["TabFileLink"] = "Lien fichier";
@@ -182,6 +185,7 @@ namespace NcTalkOutlookAddIn.Utilities
             french["GroupMuzzle"] = "Mode silence Outlook";
             french["CheckMuzzle"] = "Bloquer les invitations Outlook (envoyees via Nextcloud)";
             french["LabelMuzzleHint"] = "Remarque : les reponses et e-mails ordinaires sont toujours envoyes.";
+            french["LabelMuzzleAccountsHint"] = "Selectionnez les comptes dont il faut bloquer les invitations Outlook.";
             french["CheckIfbEnabled"] = "Activer l'endpoint IFB";
             french["LabelIfbDays"] = "Periode (jours) :";
             french["LabelIfbCacheHours"] = "Cache du carnet (heures) :";
@@ -296,6 +300,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TabGeneral { get { return Get("TabGeneral", "General"); } }
         internal static string TabIfb { get { return Get("TabIfb", "IFB"); } }
         internal static string TabAdvanced { get { return Get("TabAdvanced", "Advanced"); } }
+        internal static string TabInvitations { get { return Get("TabInvitations", "Invitations"); } }
         internal static string TabDebug { get { return Get("TabDebug", "Debug"); } }
         internal static string TabAbout { get { return Get("TabAbout", "About"); } }
         internal static string TabFileLink { get { return Get("TabFileLink", "Filelink"); } }
@@ -310,6 +315,10 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string GroupMuzzle { get { return Get("GroupMuzzle", "Outlook muzzle"); } }
         internal static string CheckMuzzle { get { return Get("CheckMuzzle", "Suppress Outlook invitations (Nextcloud sends them)"); } }
         internal static string LabelMuzzleHint { get { return Get("LabelMuzzleHint", "Note: Responses to invitations and regular e-mails are still sent."); } }
+        internal static string LabelMuzzleAccounts { get { return Get("LabelMuzzleAccounts", "Accounts"); } }
+        internal static string LabelMuzzleAccountsHint { get { return Get("LabelMuzzleAccountsHint", "Select the accounts whose Outlook invitations should be suppressed."); } }
+        internal static string LabelMuzzleNoAccounts { get { return Get("LabelMuzzleNoAccounts", "No Outlook mail accounts were detected."); } }
+        internal static string LabelMuzzleUnknownAccount { get { return Get("LabelMuzzleUnknownAccount", "(Unknown account)"); } }
         internal static string CheckIfbEnabled { get { return Get("CheckIfbEnabled", "Enable IFB endpoint"); } }
         internal static string LabelIfbDays { get { return Get("LabelIfbDays", "Range (days):"); } }
         internal static string LabelIfbCacheHours { get { return Get("LabelIfbCacheHours", "Address book cache (hours):"); } }

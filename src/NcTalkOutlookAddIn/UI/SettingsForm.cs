@@ -5,15 +5,18 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Utilities;
+using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.UI
 {
@@ -23,6 +26,7 @@ namespace NcTalkOutlookAddIn.UI
      */
     internal sealed class SettingsForm : Form
     {
+        private readonly Outlook.Application _outlookApplication;
         private readonly Panel _headerPanel = new Panel();
         private readonly PictureBox _headerLogo = new PictureBox();
         private const int HeaderHeight = 34;
@@ -30,6 +34,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly TabControl _tabControl = new TabControl();
         private readonly TabPage _generalTab = new TabPage(Strings.TabGeneral);
         private readonly TabPage _ifbTab = new TabPage(Strings.TabIfb);
+        private readonly TabPage _invitationsTab = new TabPage(Strings.TabInvitations);
         private readonly TabPage _advancedTab = new TabPage(Strings.TabAdvanced);
         private readonly TabPage _debugTab = new TabPage(Strings.TabDebug);
         private readonly TabPage _aboutTab = new TabPage(Strings.TabAbout);
@@ -44,6 +49,9 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _testButton = new Button();
 
         private readonly CheckBox _muzzleCheckBox = new CheckBox();
+        private readonly CheckedListBox _muzzleAccountsList = new CheckedListBox();
+        private readonly Label _muzzleAccountsLabel = new Label();
+        private readonly Label _muzzleAccountsInfoLabel = new Label();
         private readonly CheckBox _ifbEnabledCheckBox = new CheckBox();
         private readonly ComboBox _ifbDaysCombo = new ComboBox();
         private readonly Label _ifbDaysLabel = new Label();
@@ -62,6 +70,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _saveButton = new Button();
         private readonly Button _cancelButton = new Button();
 
+        private readonly List<MuzzleAccountOption> _muzzleAccountOptions = new List<MuzzleAccountOption>();
         private bool _isBusy;
         private AddinSettings _result;
         private string _lastKnownServerVersion = string.Empty;
@@ -74,8 +83,9 @@ namespace NcTalkOutlookAddIn.UI
             private set { _result = value; }
         }
 
-        internal SettingsForm(AddinSettings settings)
+        internal SettingsForm(AddinSettings settings, Outlook.Application outlookApplication)
         {
+            _outlookApplication = outlookApplication;
             AutoScaleMode = AutoScaleMode.Dpi;
             AutoScaleDimensions = new SizeF(96F, 96F);
             Text = Strings.SettingsFormTitle;
@@ -101,6 +111,7 @@ namespace NcTalkOutlookAddIn.UI
             _tabControl.TabPages.Add(_generalTab);
             _tabControl.TabPages.Add(_fileLinkTab);
             _tabControl.TabPages.Add(_ifbTab);
+            _tabControl.TabPages.Add(_invitationsTab);
             _tabControl.TabPages.Add(_advancedTab);
             _tabControl.TabPages.Add(_debugTab);
             _tabControl.TabPages.Add(_aboutTab);
@@ -108,6 +119,7 @@ namespace NcTalkOutlookAddIn.UI
 
             InitializeGeneralTab();
             InitializeIfbTab();
+            InitializeInvitationsTab();
             InitializeAdvancedTab();
             InitializeDebugTab();
             InitializeAboutTab();
@@ -257,39 +269,66 @@ namespace NcTalkOutlookAddIn.UI
             _ifbTab.Controls.Add(_ifbDaysCombo);
         }
 
-        private void InitializeAdvancedTab()
+        private void InitializeInvitationsTab()
         {
-            _advancedTab.AutoScroll = true;
+            _invitationsTab.AutoScroll = true;
+            _invitationsTab.Padding = new Padding(12);
+
             var muzzleGroup = new GroupBox
             {
                 Text = Strings.GroupMuzzle,
                 Location = new Point(18, 20),
-                Size = new Size(440, 120),
+                Size = new Size(440, 230),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            _advancedTab.Controls.Add(muzzleGroup);
+            _invitationsTab.Controls.Add(muzzleGroup);
 
             _muzzleCheckBox.Text = Strings.CheckMuzzle;
             _muzzleCheckBox.AutoSize = true;
             _muzzleCheckBox.Location = new Point(12, 25);
             _muzzleCheckBox.Checked = true;
+            _muzzleCheckBox.CheckedChanged += OnMuzzleCheckChanged;
             muzzleGroup.Controls.Add(_muzzleCheckBox);
+
+            _muzzleAccountsLabel.Text = Strings.LabelMuzzleAccounts;
+            _muzzleAccountsLabel.Location = new Point(12, 55);
+            _muzzleAccountsLabel.AutoSize = true;
+            muzzleGroup.Controls.Add(_muzzleAccountsLabel);
+
+            _muzzleAccountsList.Location = new Point(12, 75);
+            _muzzleAccountsList.Size = new Size(400, 90);
+            _muzzleAccountsList.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            _muzzleAccountsList.CheckOnClick = true;
+            _muzzleAccountsList.HorizontalScrollbar = true;
+            muzzleGroup.Controls.Add(_muzzleAccountsList);
+
+            _muzzleAccountsInfoLabel.Text = Strings.LabelMuzzleNoAccounts;
+            _muzzleAccountsInfoLabel.Location = new Point(12, 75);
+            _muzzleAccountsInfoLabel.Size = new Size(400, 40);
+            _muzzleAccountsInfoLabel.Visible = false;
+            muzzleGroup.Controls.Add(_muzzleAccountsInfoLabel);
 
             var muzzleHintLabel = new Label
             {
-                Text = Strings.LabelMuzzleHint,
-                Location = new Point(12, 60),
-                Size = new Size(400, 40)
+                Text = Strings.LabelMuzzleAccountsHint + Environment.NewLine + Strings.LabelMuzzleHint,
+                Location = new Point(12, 170),
+                Size = new Size(400, 50)
             };
             muzzleGroup.Controls.Add(muzzleHintLabel);
+        }
+
+        private void InitializeAdvancedTab()
+        {
+            _advancedTab.AutoScroll = true;
+            _advancedTab.Padding = new Padding(12);
 
             _ifbCacheHoursLabel.Text = Strings.LabelIfbCacheHours;
-            _ifbCacheHoursLabel.Location = new Point(24, 140);
+            _ifbCacheHoursLabel.Location = new Point(24, 24);
             _ifbCacheHoursLabel.Size = new Size(220, 20);
             _advancedTab.Controls.Add(_ifbCacheHoursLabel);
 
             _ifbCacheHoursCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            _ifbCacheHoursCombo.Location = new Point(260, 138);
+            _ifbCacheHoursCombo.Location = new Point(260, 22);
             _ifbCacheHoursCombo.Width = 80;
             _ifbCacheHoursCombo.Anchor = AnchorStyles.Top | AnchorStyles.Left;
             for (int i = 1; i <= 24; i++)
@@ -469,6 +508,7 @@ namespace NcTalkOutlookAddIn.UI
             _manualRadio.Checked = Result.AuthMode == AuthenticationMode.Manual;
             _loginFlowRadio.Checked = !_manualRadio.Checked;
             _muzzleCheckBox.Checked = Result.OutlookMuzzleEnabled;
+            LoadMuzzleAccounts();
             _ifbEnabledCheckBox.Checked = Result.IfbEnabled;
             SelectComboValue(_ifbDaysCombo, Result.IfbDays, 30);
             SelectComboValue(_ifbCacheHoursCombo, Result.IfbCacheHours, 24);
@@ -478,6 +518,194 @@ namespace NcTalkOutlookAddIn.UI
             UpdateAboutTab();
         }
 
+        private void LoadMuzzleAccounts()
+        {
+            _muzzleAccountOptions.Clear();
+            _muzzleAccountsList.Items.Clear();
+
+            if (_outlookApplication == null)
+            {
+                ShowMuzzleAccountsInfo(Strings.LabelMuzzleNoAccounts);
+                UpdateControlState();
+                return;
+            }
+
+            try
+            {
+                var session = _outlookApplication.Session;
+                if (session == null)
+                {
+                    DiagnosticsLogger.Log("Muzzle", "Settings: Outlook session not available.");
+                    ShowMuzzleAccountsInfo(Strings.LabelMuzzleNoAccounts);
+                    UpdateControlState();
+                    return;
+                }
+
+                var accounts = session.Accounts;
+                if (accounts == null || accounts.Count == 0)
+                {
+                    DiagnosticsLogger.Log("Muzzle", "Settings: keine Outlook-Accounts gefunden.");
+                    ShowMuzzleAccountsInfo(Strings.LabelMuzzleNoAccounts);
+                    UpdateControlState();
+                    return;
+                }
+
+                for (int i = 1; i <= accounts.Count; i++)
+                {
+                    Outlook.Account account = null;
+                    try
+                    {
+                        account = accounts[i];
+                        var option = new MuzzleAccountOption(
+                            OutlookAccountHelper.NormalizeAccountIdentifier(account),
+                            BuildAccountDisplay(account));
+                        _muzzleAccountOptions.Add(option);
+                        int index = _muzzleAccountsList.Items.Add(option);
+                        bool enabled = ResolveMuzzleAccountState(option.Key);
+                        _muzzleAccountsList.SetItemChecked(index, enabled);
+                        DiagnosticsLogger.Log("Muzzle", "Settings: Account " + option.Key + " loaded (enabled=" + enabled + ").");
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        ReleaseCom(account);
+                    }
+                }
+
+                bool hasAccounts = _muzzleAccountOptions.Count > 0;
+                _muzzleAccountsInfoLabel.Visible = !hasAccounts;
+                _muzzleAccountsList.Visible = hasAccounts;
+                DiagnosticsLogger.Log("Muzzle", "Settings: Gesamtanzahl Accounts = " + _muzzleAccountOptions.Count + ".");
+            }
+            catch
+            {
+                ShowMuzzleAccountsInfo(Strings.LabelMuzzleNoAccounts);
+            }
+
+            UpdateControlState();
+        }
+
+        private void ShowMuzzleAccountsInfo(string message)
+        {
+            _muzzleAccountsInfoLabel.Text = message;
+            _muzzleAccountsInfoLabel.Visible = true;
+            _muzzleAccountsList.Visible = false;
+        }
+
+        private bool ResolveMuzzleAccountState(string key)
+        {
+            if (Result == null)
+            {
+                return true;
+            }
+
+            return Result.IsMuzzleEnabledForAccount(key);
+        }
+
+        private Dictionary<string, bool> CollectMuzzleAccountStates()
+        {
+            var map = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < _muzzleAccountOptions.Count && i < _muzzleAccountsList.Items.Count; i++)
+            {
+                var option = _muzzleAccountOptions[i];
+                if (string.IsNullOrWhiteSpace(option.Key))
+                {
+                    continue;
+                }
+
+                map[option.Key] = _muzzleAccountsList.GetItemChecked(i);
+            }
+
+            return map;
+        }
+
+        private static string BuildAccountDisplay(Outlook.Account account)
+        {
+            if (account == null)
+            {
+                return Strings.LabelMuzzleUnknownAccount;
+            }
+
+            string smtp = TryGetAccountProperty(() => account.SmtpAddress);
+            string display = TryGetAccountProperty(() => account.DisplayName);
+            string user = TryGetAccountProperty(() => account.UserName);
+
+            if (!string.IsNullOrWhiteSpace(display) &&
+                !string.IsNullOrWhiteSpace(smtp) &&
+                !string.Equals(display, smtp, StringComparison.OrdinalIgnoreCase))
+            {
+                return display + " (" + smtp + ")";
+            }
+
+            if (!string.IsNullOrWhiteSpace(smtp))
+            {
+                return smtp;
+            }
+
+            if (!string.IsNullOrWhiteSpace(display))
+            {
+                return display;
+            }
+
+            if (!string.IsNullOrWhiteSpace(user))
+            {
+                return user;
+            }
+
+            return Strings.LabelMuzzleUnknownAccount;
+        }
+
+        private static string TryGetAccountProperty(Func<string> getter)
+        {
+            try
+            {
+                return getter();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static void ReleaseCom(object comObject)
+        {
+            if (comObject == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (Marshal.IsComObject(comObject))
+                {
+                    Marshal.ReleaseComObject(comObject);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private sealed class MuzzleAccountOption
+        {
+            internal MuzzleAccountOption(string key, string display)
+            {
+                Key = key ?? string.Empty;
+                Display = display ?? string.Empty;
+            }
+
+            internal string Key { get; private set; }
+
+            private string Display { get; set; }
+
+            public override string ToString()
+            {
+                return Display;
+            }
+        }
+
         private void OnSaveButtonClick(object sender, EventArgs e)
         {
             Result.ServerUrl = _serverUrlTextBox.Text.Trim();
@@ -485,6 +713,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.AppPassword = _appPasswordTextBox.Text;
             Result.AuthMode = _loginFlowRadio.Checked ? AuthenticationMode.LoginFlow : AuthenticationMode.Manual;
             Result.OutlookMuzzleEnabled = _muzzleCheckBox.Checked;
+            Result.OutlookMuzzleAccounts = CollectMuzzleAccountStates();
             Result.IfbEnabled = _ifbEnabledCheckBox.Checked;
             Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
             Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
@@ -650,6 +879,16 @@ namespace NcTalkOutlookAddIn.UI
             UpdateControlState();
         }
 
+        private void OnMuzzleCheckChanged(object sender, EventArgs e)
+        {
+            if (_isBusy)
+            {
+                return;
+            }
+
+            UpdateControlState();
+        }
+
         private void OnGeneralValueChanged(object sender, EventArgs e)
         {
             if (_isBusy)
@@ -758,6 +997,11 @@ namespace NcTalkOutlookAddIn.UI
             _loginFlowButton.Enabled = !manual && !_isBusy;
             _testButton.Enabled = !_isBusy;
             _muzzleCheckBox.Enabled = !_isBusy;
+            bool muzzleAccountsAvailable = _muzzleAccountOptions.Count > 0 && !_muzzleAccountsInfoLabel.Visible;
+            bool muzzleControlsEnabled = _muzzleCheckBox.Checked && !_isBusy && muzzleAccountsAvailable;
+            _muzzleAccountsLabel.Enabled = muzzleControlsEnabled || (_muzzleAccountOptions.Count > 0 && _muzzleCheckBox.Checked && !_isBusy);
+            _muzzleAccountsList.Enabled = muzzleControlsEnabled;
+            _muzzleAccountsInfoLabel.Enabled = _muzzleCheckBox.Checked && !_isBusy;
 
             bool credentialsAvailable =
                 !string.IsNullOrWhiteSpace(_serverUrlTextBox.Text) &&

@@ -81,6 +81,7 @@
     <Compile Include="Utilities\NextcloudVersionHelper.cs" />
     <Compile Include="Utilities\Strings.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
+    <Compile Include="Utilities\OutlookAccountHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

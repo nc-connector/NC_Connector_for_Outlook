@@ -6,7 +6,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
+using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Settings
 {
@@ -144,6 +146,9 @@ namespace NcTalkOutlookAddIn.Settings
                     case "FileLinkBasePath":
                         settings.FileLinkBasePath = value;
                         break;
+                    case "OutlookMuzzleAccounts":
+                        settings.OutlookMuzzleAccounts = ParseMuzzleAccounts(value);
+                        break;
                     default:
                         break;
                 }
@@ -162,6 +167,7 @@ namespace NcTalkOutlookAddIn.Settings
             entries.Add("AppPassword=" + Safe(settings.AppPassword));
             entries.Add("AuthMode=" + settings.AuthMode);
             entries.Add("OutlookMuzzleEnabled=" + settings.OutlookMuzzleEnabled);
+            entries.Add("OutlookMuzzleAccounts=" + SerializeMuzzleAccounts(settings.OutlookMuzzleAccounts));
             entries.Add("IfbEnabled=" + settings.IfbEnabled);
             entries.Add("IfbDays=" + settings.IfbDays);
             entries.Add("IfbCacheHours=" + settings.IfbCacheHours);
@@ -181,6 +187,47 @@ namespace NcTalkOutlookAddIn.Settings
         private static string Safe(string value)
         {
             return value ?? string.Empty;
+        }
+
+        private static Dictionary<string, bool> ParseMuzzleAccounts(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            var entries = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var entry in entries)
+            {
+                var pair = entry.Split(new[] { ':' }, 2);
+                var key = pair[0].Trim();
+                bool enabled = true;
+                if (pair.Length == 2)
+                {
+                    bool.TryParse(pair[1], out enabled);
+                }
+
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    result[OutlookAccountHelper.NormalizeAccountIdentifier(key)] = enabled;
+                }
+            }
+
+            return result;
+        }
+
+        private static string SerializeMuzzleAccounts(Dictionary<string, bool> accounts)
+        {
+            if (accounts == null || accounts.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var parts = accounts
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
+                .Select(kv => kv.Key + ":" + kv.Value);
+            return string.Join(";", parts);
         }
     }
 }

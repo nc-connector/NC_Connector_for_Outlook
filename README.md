@@ -1,11 +1,11 @@
-# Nextcloud Enterprise for Outlook
+﻿# Nextcloud Enterprise for Outlook
 
 Nextcloud Enterprise for Outlook verbindet Outlook nahtlos mit Ihrer Nextcloud. Das Add-in automatisiert Talk-Raeume fuer Termine, stellt einen lokalen Free/Busy-Proxy bereit und liefert einen leistungsfaehigen Filelink-Assistenten fuer E-Mails. Ziel ist ein professioneller Workflow vom Kalender bis zur Dateiablage -- ohne Medienbruch und mit klarer Administrierbarkeit.
 
 ## Kernfunktionen
 
 - **Outlook Ribbon & Explorer-Tab**  
-  Eigener Ribbon *Nextcloud Enterprise* mit den Aktionen *Talk-Link einfuegen*, *Einstellungen* sowie *Nextcloud Freigabe hinzufuegen*. Die Einstellungen sind in Tabs gegliedert (Allgemein, Filelink, IFB, Erweitert, Debug, Ueber) und decken alle Optionen ab.
+  Eigener Ribbon *Nextcloud Enterprise* mit den Aktionen *Talk-Link einfuegen*, *Einstellungen* sowie *Nextcloud Freigabe hinzufuegen*. Die Einstellungen sind in Tabs gegliedert (Allgemein, Filelink, IFB, Einladungen, Erweitert, Debug, Ueber) und decken alle Optionen ab.
 
 - **Talk-Link Workflow fuer Kalender**  
   Erstellt wahlweise Event-Konversationen (Nextcloud >= 31) oder Standardraeume. Der Dialog deckt Lobby bis Start (Standard aktiv), Sichtbarkeit in der Suche (Standard aktiv) und ein optionales Passwort (>= 5 Zeichen) ab. Nach dem Speichern uebernimmt Outlook Link, Passwort und Hilfetext. Raumtitel und Beschreibung werden zwischen Outlook und Nextcloud synchronisiert; Terminabsagen loeschen verwaiste Raeume automatisch.
@@ -15,6 +15,9 @@ Nextcloud Enterprise for Outlook verbindet Outlook nahtlos mit Ihrer Nextcloud. 
 
 - **Komfortable Authentifizierung**  
   Manuelles Login (Benutzername, App-Passwort) oder Login Flow v2 *Mit Nextcloud anmelden*. Letzterer oeffnet den Standardbrowser, registriert das Geraet als *Nextcloud Enterprise for Outlook* und uebernimmt das App-Passwort automatisch. Der Verbindungstest prueft Erreichbarkeit, Credentials sowie die Nextcloud-Version.
+
+- **Outlook-Maulkorb pro Konto**  
+  Im Tab *Einladungen* laesst sich pro Outlook-Konto festlegen, ob klassische Einladungen blockiert und stattdessen die Nextcloud-Benachrichtigungen genutzt werden. Konten ohne Maulkorb bleiben unberuehrt, waehrend aktivierte Konten dank Store-spezifischer Outbox-Listener und EntryID-Fallbacks zuverlaessig gebremst werden. Das Debug-Log zeichnet jeden Schritt (Hook-Status, Kontoerkennung, Block-Entscheidung) nach, damit Fehlersuche ohne Raetselraten funktioniert.
 
 - **Internet Free/Busy Gateway (IFB)**  
   Lokaler HTTP-Listener beantwortet Outlook-Free/Busy-Anfragen direkt aus Nextcloud. Registry-Werte fuer Suchpfad und Read-URL werden gesetzt. Bei HTTP 404 faellt das Add-in auf Scheduling-POST zurueck, sodass Verfuegbarkeiten bereitstehen.
@@ -41,7 +44,7 @@ Nextcloud Enterprise for Outlook verbindet Outlook nahtlos mit Ihrer Nextcloud. 
 ## Installation und Updates
 
 1. Outlook schliessen.  
-2. Aktuelle MSI (z.B. `NextcloudEnterpriseForOutlookAddin-0.0.75.msi` oder neuer) ausfuehren; das Setup richtet URLACL sowie alle benoetigten Registry-Schluessel fuer IFB ein.  
+2. Aktuelle MSI (z.B. `NextcloudEnterpriseForOutlookAddin-0.0.91.msi` oder neuer) ausfuehren; das Setup richtet URLACL sowie alle benoetigten Registry-Schluessel fuer IFB ein.  
 3. Outlook starten und im Ribbon **Nextcloud Enterprise** auf **Einstellungen** klicken.  
 4. Login-Modus waehlen, Verbindungstest ausfuehren, Einstellungen speichern. Bei erfolgreichem Test bleibt IFB automatisch aktiv.  
 5. Filelink-Basisverzeichnis pruefen und Debug-Logging bei Bedarf aktivieren.
@@ -109,3 +112,11 @@ Updates erfolgen durch Installation einer hoeheren MSI-Version. Persoenliche Ein
 
 GNU Affero General Public License v3.0  
 Copyright (c) 2025 Bastian Kleinschmidt
+
+## Unterstuetzung
+
+Wenn dir das Projekt gefaellt, kannst du es hier unterstuetzen: [paypal.me/debaschdi](https://paypal.me/debaschdi)
+
+
+
+

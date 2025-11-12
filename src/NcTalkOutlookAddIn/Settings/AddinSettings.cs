@@ -4,6 +4,9 @@
  * See LICENSE.txt for details.
  */
 
+using System;
+using System.Collections.Generic;
+
 namespace NcTalkOutlookAddIn.Settings
 {
     /**
@@ -25,6 +28,7 @@ namespace NcTalkOutlookAddIn.Settings
             DebugLoggingEnabled = false;
             LastKnownServerVersion = string.Empty;
             FileLinkBasePath = "90 Freigaben - extern";
+            OutlookMuzzleAccounts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         }
 
         public string ServerUrl { get; set; }
@@ -36,6 +40,8 @@ namespace NcTalkOutlookAddIn.Settings
         public AuthenticationMode AuthMode { get; set; }
 
         public bool OutlookMuzzleEnabled { get; set; }
+
+        public Dictionary<string, bool> OutlookMuzzleAccounts { get; set; }
 
         public bool IfbEnabled { get; set; }
 
@@ -53,7 +59,77 @@ namespace NcTalkOutlookAddIn.Settings
 
         public AddinSettings Clone()
         {
-            return (AddinSettings)MemberwiseClone();
+            var copy = (AddinSettings)MemberwiseClone();
+            if (OutlookMuzzleAccounts != null)
+            {
+                copy.OutlookMuzzleAccounts = new Dictionary<string, bool>(OutlookMuzzleAccounts, StringComparer.OrdinalIgnoreCase);
+            }
+            return copy;
+        }
+
+        public bool IsMuzzleEnabledForAccount(string accountKey)
+        {
+            if (!OutlookMuzzleEnabled)
+            {
+                return false;
+            }
+
+            bool hasPerAccount = OutlookMuzzleAccounts != null && OutlookMuzzleAccounts.Count > 0;
+            if (!hasPerAccount)
+            {
+                return OutlookMuzzleEnabled;
+            }
+
+            if (string.IsNullOrWhiteSpace(accountKey))
+            {
+                return false;
+            }
+
+            bool enabled;
+            if (OutlookMuzzleAccounts.TryGetValue(accountKey, out enabled))
+            {
+                return enabled;
+            }
+
+            return false;
+        }
+
+        public void SetMuzzleStateForAccount(string accountKey, bool enabled)
+        {
+            if (string.IsNullOrWhiteSpace(accountKey))
+            {
+                return;
+            }
+
+            if (OutlookMuzzleAccounts == null)
+            {
+                OutlookMuzzleAccounts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            OutlookMuzzleAccounts[accountKey] = enabled;
+        }
+
+        public bool HasAnyMuzzleAccountEnabled()
+        {
+            if (!OutlookMuzzleEnabled)
+            {
+                return false;
+            }
+
+            if (OutlookMuzzleAccounts == null || OutlookMuzzleAccounts.Count == 0)
+            {
+                return OutlookMuzzleEnabled;
+            }
+
+            foreach (var pair in OutlookMuzzleAccounts)
+            {
+                if (pair.Value)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

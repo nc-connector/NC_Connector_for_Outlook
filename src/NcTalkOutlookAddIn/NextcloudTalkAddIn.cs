@@ -34,6 +34,10 @@ namespace NcTalkOutlookAddIn
     [ProgId("NcTalkOutlook.AddIn")]
     public sealed class NextcloudTalkAddIn : IDTExtensibility2, IRibbonExtensibility
     {
+        private const string SenderAddressProperty = "http://schemas.microsoft.com/mapi/proptag/0x0C1F001E";
+        private const string AlternateSenderProperty = "http://schemas.microsoft.com/mapi/proptag/0x0065001E";
+        private const string MuzzleAccountProperty = "NcMuzzleAccountKey";
+
         private Outlook.Application _outlookApplication;
         private SettingsStorage _settingsStorage;
         private AddinSettings _currentSettings;
@@ -43,12 +47,14 @@ namespace NcTalkOutlookAddIn
         private FreeBusyManager _freeBusyManager;
         private bool _itemSendHooked;
         private bool _itemLoadHooked;
-        private Outlook.Items _outboxItems;
+        private readonly List<OutboxSubscription> _outboxSubscriptions = new List<OutboxSubscription>();
         private Outlook.Inspectors _inspectors;
         private Outlook.Explorers _explorers;
         private readonly List<ExplorerSubscription> _explorerSubscriptions = new List<ExplorerSubscription>();
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByEntryId = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private bool _initialScanPerformed;
+        private readonly Queue<MuzzlePendingInfo> _pendingMuzzleItems = new Queue<MuzzlePendingInfo>();
+        private readonly object _pendingMuzzleLock = new object();
 
         private const string PropertyToken = "NcTalkRoomToken";
         private const string PropertyRoomType = "NcTalkRoomType";
@@ -411,7 +417,7 @@ namespace NcTalkOutlookAddIn
             EnsureSettingsLoaded();
             LogSettings("Einstellungsdialog geoeffnet.");
 
-            using (var form = new SettingsForm(_currentSettings))
+            using (var form = new SettingsForm(_currentSettings, _outlookApplication))
             {
                 if (form.ShowDialog() == DialogResult.OK)
                 {
@@ -1596,61 +1602,257 @@ namespace NcTalkOutlookAddIn
          */
         private void EnsureOutboxHook()
         {
-            if (_outlookApplication == null || _outboxItems != null)
+            if (_outlookApplication == null)
             {
                 return;
             }
 
-            Outlook.MAPIFolder outbox = null;
+            Outlook.NameSpace session = null;
+            Outlook.Stores stores = null;
 
             try
             {
-                var session = _outlookApplication.Session;
+                session = _outlookApplication.Session;
                 if (session == null)
                 {
+                    DiagnosticsLogger.Log("Muzzle", "EnsureOutboxHook: session unavailable.");
                     return;
                 }
 
-                try
-                {
-                    outbox = session.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderOutbox);
-                }
-                catch
-                {
-                    outbox = null;
-                }
+                var blockedStoreIds = GetBlockedStoreIds(session);
+                CleanupOutboxSubscriptions(blockedStoreIds);
 
-                if (outbox == null)
+                if (blockedStoreIds.Count == 0)
                 {
+                    DiagnosticsLogger.Log("Muzzle", "EnsureOutboxHook: kein Konto fuer den Maulkorb aktiviert – keine Outbox-Listener noetig.");
                     return;
                 }
 
-                var items = outbox.Items;
-                if (items == null)
+                stores = session.Stores;
+                if (stores == null || stores.Count == 0)
                 {
+                    DiagnosticsLogger.Log("Muzzle", "EnsureOutboxHook: no stores available.");
                     return;
                 }
 
-                _outboxItems = items;
-                _outboxItems.ItemAdd += OnOutboxItemAdd;
+                foreach (Outlook.Store store in stores)
+                {
+                    if (store == null)
+                    {
+                        continue;
+                    }
+
+                    string storeId = SafeGetString(() => store.StoreID) ?? string.Empty;
+                    if (!blockedStoreIds.Contains(storeId))
+                    {
+                        continue;
+                    }
+
+                    if (IsOutboxSubscriptionActive(storeId))
+                    {
+                        continue;
+                    }
+
+                    AttachOutboxForStore(store, storeId);
+                }
+
+                if (_outboxSubscriptions.Count == 0)
+                {
+                    DiagnosticsLogger.Log("Muzzle", "EnsureOutboxHook: keine Outbox-Subscriptions konnten erstellt werden.");
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                ReleaseOutboxItems();
+                DiagnosticsLogger.Log("Muzzle", "EnsureOutboxHook failed: " + ex.Message);
             }
             finally
             {
-                if (outbox != null)
+                ReleaseComReference(stores);
+                ReleaseComReference(session);
+            }
+        }
+
+        private HashSet<string> GetBlockedStoreIds(Outlook.NameSpace session)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (session == null || _currentSettings == null)
+            {
+                return result;
+            }
+
+            Outlook.Accounts accounts = null;
+            try
+            {
+                accounts = session.Accounts;
+                if (accounts == null || accounts.Count == 0)
                 {
+                    return result;
+                }
+
+                bool globalEnabled = _currentSettings.OutlookMuzzleEnabled;
+                bool hasPerAccount = _currentSettings.OutlookMuzzleAccounts != null && _currentSettings.OutlookMuzzleAccounts.Count > 0;
+
+                foreach (Outlook.Account account in accounts)
+                {
+                    if (account == null)
+                    {
+                        continue;
+                    }
+
+                    Outlook.Store accountStore = null;
+                    string storeId = string.Empty;
                     try
                     {
-                        Marshal.ReleaseComObject(outbox);
+                        accountStore = account.DeliveryStore;
+                        if (accountStore != null)
+                        {
+                            storeId = SafeGetString(() => accountStore.StoreID);
+                        }
                     }
                     catch
                     {
+                        storeId = string.Empty;
+                    }
+                    finally
+                    {
+                        ReleaseComReference(accountStore);
+                    }
+
+                    if (string.IsNullOrEmpty(storeId))
+                    {
+                        continue;
+                    }
+
+                    string normalized = OutlookAccountHelper.NormalizeAccountIdentifier(account);
+                    bool enabled = _currentSettings.IsMuzzleEnabledForAccount(normalized);
+
+                    if (!hasPerAccount && globalEnabled)
+                    {
+                        result.Add(storeId);
+                        continue;
+                    }
+
+                    if (enabled)
+                    {
+                        result.Add(storeId);
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "GetBlockedStoreIds failed: " + ex.Message);
+            }
+            finally
+            {
+                ReleaseComReference(accounts);
+            }
+
+            return result;
+        }
+
+        private void CleanupOutboxSubscriptions(HashSet<string> activeStoreIds)
+        {
+            if (_outboxSubscriptions.Count == 0)
+            {
+                return;
+            }
+
+            var stillActive = new List<OutboxSubscription>(_outboxSubscriptions.Count);
+            foreach (var subscription in _outboxSubscriptions)
+            {
+                if (subscription == null)
+                {
+                    continue;
+                }
+
+                if (activeStoreIds.Contains(subscription.StoreId))
+                {
+                    stillActive.Add(subscription);
+                }
+                else
+                {
+                    subscription.Dispose(OnOutboxItemAdd);
+                }
+            }
+
+            _outboxSubscriptions.Clear();
+            _outboxSubscriptions.AddRange(stillActive);
+        }
+
+        private void AttachOutboxForStore(Outlook.Store store, string storeId)
+        {
+            Outlook.MAPIFolder outbox = null;
+            Outlook.Items items = null;
+            string storeName = SafeGetString(() => store.DisplayName);
+            string storeLabel = string.IsNullOrEmpty(storeName) ? (string.IsNullOrEmpty(storeId) ? "<unknown store>" : storeId) : storeName;
+
+            try
+            {
+                outbox = store.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderOutbox);
+            }
+            catch
+            {
+                outbox = null;
+            }
+
+            if (outbox == null)
+            {
+                DiagnosticsLogger.Log("Muzzle", "Outbox hook skipped (Store=" + storeLabel + "): kein Outbox-Ordner.");
+                return;
+            }
+
+            try
+            {
+                items = outbox.Items;
+            }
+            catch
+            {
+                items = null;
+            }
+
+            if (items == null)
+            {
+                DiagnosticsLogger.Log("Muzzle", "Outbox hook skipped (Store=" + storeLabel + "): Items-Auflistung fehlt.");
+                ReleaseComReference(outbox);
+                return;
+            }
+
+            try
+            {
+                items.ItemAdd += OnOutboxItemAdd;
+                _outboxSubscriptions.Add(new OutboxSubscription(storeId, storeLabel, items));
+                DiagnosticsLogger.Log("Muzzle", "Outbox hook attached (Store=" + storeLabel + ").");
+                items = null; // Ownership transfer to subscription
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "Outbox hook failed (Store=" + storeLabel + "): " + ex.Message);
+                try
+                {
+                    items.ItemAdd -= OnOutboxItemAdd;
+                }
+                catch
+                {
+                }
+                ReleaseComReference(items);
+            }
+            finally
+            {
+                ReleaseComReference(outbox);
+            }
+        }
+
+        private bool IsOutboxSubscriptionActive(string storeId)
+        {
+            foreach (var subscription in _outboxSubscriptions)
+            {
+                if (subscription.IsForStore(storeId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /**
@@ -1658,22 +1860,12 @@ namespace NcTalkOutlookAddIn
          */
         private void UnhookOutbox()
         {
-            if (_outboxItems == null)
+            if (_outboxSubscriptions.Count == 0)
             {
                 return;
             }
 
-            try
-            {
-                _outboxItems.ItemAdd -= OnOutboxItemAdd;
-            }
-            catch
-            {
-            }
-            finally
-            {
-                ReleaseOutboxItems();
-            }
+            ReleaseOutboxItems();
         }
 
         /**
@@ -1681,22 +1873,17 @@ namespace NcTalkOutlookAddIn
          */
         private void ReleaseOutboxItems()
         {
-            if (_outboxItems == null)
+            if (_outboxSubscriptions.Count == 0)
             {
                 return;
             }
 
-            try
+            foreach (var subscription in _outboxSubscriptions)
             {
-                Marshal.FinalReleaseComObject(_outboxItems);
+                subscription.Dispose(OnOutboxItemAdd);
             }
-            catch
-            {
-            }
-            finally
-            {
-                _outboxItems = null;
-            }
+
+            _outboxSubscriptions.Clear();
         }
 
         private void EnsureInspectorHook()
@@ -1982,12 +2169,44 @@ namespace NcTalkOutlookAddIn
 
         private void OnItemSend(object item, ref bool cancel)
         {
-            if (_currentSettings == null || !_currentSettings.OutlookMuzzleEnabled)
+            if (!IsMuzzleFeatureActive())
             {
                 return;
             }
 
+            string messageClass = TryGetMessageClass(item);
+            if (!ShouldTrackMuzzleForSend(item, messageClass))
+            {
+                DiagnosticsLogger.Log("Muzzle", "OnItemSend ignored (MessageClass=" + (messageClass ?? "<unknown>") + ").");
+                return;
+            }
+
+            DiagnosticsLogger.Log("Muzzle", "OnItemSend triggered.");
             EnsureOutboxHook();
+
+            string accountKey = GetAccountKeyForItem(item);
+            if (string.IsNullOrEmpty(accountKey))
+            {
+                DiagnosticsLogger.Log("Muzzle", "Could not resolve account for ItemSend.");
+                return;
+            }
+
+            if (_currentSettings == null || !_currentSettings.IsMuzzleEnabledForAccount(accountKey))
+            {
+                DiagnosticsLogger.Log("Muzzle", "Account '" + accountKey + "' nicht fuer den Maulkorb aktiviert - ItemSend wird nicht blockiert.");
+                return;
+            }
+
+            string stampedAccount = StampMuzzleAccount(item, accountKey);
+            if (string.IsNullOrEmpty(stampedAccount))
+            {
+                DiagnosticsLogger.Log("Muzzle", "Could not stamp muzzle account (resolution failed).");
+                return;
+            }
+
+            string entryId = CaptureEntryIdForMuzzle(item);
+            DiagnosticsLogger.Log("Muzzle", "Stamped muzzle account '" + stampedAccount + "' onto pending item (EntryID=" + (string.IsNullOrEmpty(entryId) ? "<empty>" : entryId) + ").");
+            EnqueuePendingMuzzleItem(stampedAccount, entryId);
         }
 
         /**
@@ -2002,21 +2221,51 @@ namespace NcTalkOutlookAddIn
 
             try
             {
-                if (_currentSettings == null || !_currentSettings.OutlookMuzzleEnabled)
+                DiagnosticsLogger.Log("Muzzle", "OnOutboxItemAdd (" + item.GetType().Name + ").");
+
+                if (!IsMuzzleFeatureActive())
                 {
+                    DiagnosticsLogger.Log("Muzzle", "Muzzle inactive -> skipping.");
                     return;
                 }
 
                 var messageClass = TryGetMessageClass(item);
                 if (!IsMuzzleTarget(messageClass))
                 {
+                    DiagnosticsLogger.Log("Muzzle", "MessageClass " + (messageClass ?? "<empty>") + " not targeted.");
                     return;
                 }
 
-                DeleteItem(item);
+                MuzzlePendingInfo pending = DequeuePendingMuzzleItem();
+                string queuedAccount = pending != null ? pending.AccountKey : string.Empty;
+                string queuedEntryId = pending != null ? pending.EntryId : string.Empty;
+                if (!string.IsNullOrEmpty(queuedAccount))
+                {
+                    DiagnosticsLogger.Log("Muzzle", "Using queued account '" + queuedAccount + "' (EntryID=" + (string.IsNullOrEmpty(queuedEntryId) ? "<empty>" : queuedEntryId) + ").");
+                }
+                else
+                {
+                    DiagnosticsLogger.Log("Muzzle", "No queued account available for Outbox item.");
+                }
+
+                if (!ShouldMuzzleItem(item, queuedAccount))
+                {
+                    DiagnosticsLogger.Log("Muzzle", "Account not configured for blocking.");
+                    return;
+                }
+
+                if (TryDeleteMuzzleItem(item, queuedEntryId))
+                {
+                    DiagnosticsLogger.Log("Muzzle", "Item deleted from Outbox.");
+                }
+                else
+                {
+                    DiagnosticsLogger.Log("Muzzle", "Failed to delete Outbox item – invite may be sent.");
+                }
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.Log("Muzzle", "OnOutboxItemAdd error: " + ex.Message);
             }
             finally
             {
@@ -2176,6 +2425,12 @@ namespace NcTalkOutlookAddIn
                     return meeting.MessageClass;
                 }
 
+                Outlook.AppointmentItem appointment = item as Outlook.AppointmentItem;
+                if (appointment != null)
+                {
+                    return appointment.MessageClass;
+                }
+
                 Outlook._MailItem mailInterface = item as Outlook._MailItem;
                 if (mailInterface != null)
                 {
@@ -2187,12 +2442,155 @@ namespace NcTalkOutlookAddIn
                 {
                     return meetingInterface.MessageClass;
                 }
+
+                Outlook._AppointmentItem appointmentInterface = item as Outlook._AppointmentItem;
+                if (appointmentInterface != null)
+                {
+                    return appointmentInterface.MessageClass;
+                }
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.Log("Muzzle", "TryGetSendUsingAccount exception: " + ex.Message);
             }
 
             return null;
+        }
+
+        /**
+         * Liest die EntryID eines Items (falls vorhanden) aus.
+         */
+        private static string TryGetEntryId(object item)
+        {
+            try
+            {
+                Outlook.MailItem mail = item as Outlook.MailItem;
+                if (mail != null)
+                {
+                    return mail.EntryID ?? string.Empty;
+                }
+
+                Outlook.MeetingItem meeting = item as Outlook.MeetingItem;
+                if (meeting != null)
+                {
+                    return meeting.EntryID ?? string.Empty;
+                }
+
+                Outlook.AppointmentItem appointment = item as Outlook.AppointmentItem;
+                if (appointment != null)
+                {
+                    return appointment.EntryID ?? string.Empty;
+                }
+
+                Outlook._MailItem mailInterface = item as Outlook._MailItem;
+                if (mailInterface != null)
+                {
+                    return mailInterface.EntryID ?? string.Empty;
+                }
+
+                Outlook._MeetingItem meetingInterface = item as Outlook._MeetingItem;
+                if (meetingInterface != null)
+                {
+                    return meetingInterface.EntryID ?? string.Empty;
+                }
+
+                Outlook._AppointmentItem appointmentInterface = item as Outlook._AppointmentItem;
+                if (appointmentInterface != null)
+                {
+                    return appointmentInterface.EntryID ?? string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "TryGetEntryId failed: " + ex.Message);
+            }
+
+            return string.Empty;
+        }
+
+        /**
+         * Versucht eine stabile EntryID fuer den Maulkorb zu erfassen. Falls sie noch fehlt, wird das Item zunaechst gespeichert.
+         */
+        private string CaptureEntryIdForMuzzle(object item)
+        {
+            string entryId = TryGetEntryId(item);
+            if (!string.IsNullOrEmpty(entryId))
+            {
+                return entryId;
+            }
+
+            if (TryPersistItemForEntryId(item))
+            {
+                entryId = TryGetEntryId(item);
+                if (!string.IsNullOrEmpty(entryId))
+                {
+                    DiagnosticsLogger.Log("Muzzle", "EntryID nach Save ermittelt: " + entryId);
+                    return entryId;
+                }
+            }
+
+            DiagnosticsLogger.Log("Muzzle", "EntryID bleibt leer (Item konnte nicht gespeichert werden).");
+            return string.Empty;
+            }
+
+        private static bool TryPersistItemForEntryId(object item)
+        {
+            try
+            {
+                Outlook.MailItem mail = item as Outlook.MailItem;
+                if (mail != null)
+                {
+                    mail.Save();
+                    DiagnosticsLogger.Log("Muzzle", "MailItem fuer EntryID gespeichert.");
+                    return true;
+                }
+
+                Outlook.MeetingItem meeting = item as Outlook.MeetingItem;
+                if (meeting != null)
+                {
+                    meeting.Save();
+                    DiagnosticsLogger.Log("Muzzle", "MeetingItem fuer EntryID gespeichert.");
+                    return true;
+                }
+
+                Outlook.AppointmentItem appointment = item as Outlook.AppointmentItem;
+                if (appointment != null)
+                {
+                    appointment.Save();
+                    DiagnosticsLogger.Log("Muzzle", "AppointmentItem fuer EntryID gespeichert.");
+                    return true;
+                }
+
+                Outlook._MailItem mailInterface = item as Outlook._MailItem;
+                if (mailInterface != null)
+                {
+                    mailInterface.Save();
+                    DiagnosticsLogger.Log("Muzzle", "_MailItem fuer EntryID gespeichert.");
+                    return true;
+                }
+
+                Outlook._MeetingItem meetingInterface = item as Outlook._MeetingItem;
+                if (meetingInterface != null)
+                {
+                    meetingInterface.Save();
+                    DiagnosticsLogger.Log("Muzzle", "_MeetingItem fuer EntryID gespeichert.");
+                    return true;
+                }
+
+                Outlook._AppointmentItem appointmentInterface = item as Outlook._AppointmentItem;
+                if (appointmentInterface != null)
+                {
+                    appointmentInterface.Save();
+                    DiagnosticsLogger.Log("Muzzle", "_AppointmentItem fuer EntryID gespeichert.");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "EntryID-Save fehlgeschlagen: " + ex.Message);
+            }
+
+            return false;
         }
 
         private Outlook.MailItem GetActiveMailItem()
@@ -2251,6 +2649,341 @@ namespace NcTalkOutlookAddIn
             mail.HTMLBody = fragmentWithSpacing + body;
         }
 
+        private bool IsMuzzleFeatureActive()
+        {
+            return _currentSettings != null && _currentSettings.HasAnyMuzzleAccountEnabled();
+        }
+
+        private static bool ShouldTrackMuzzleForSend(object item, string messageClass)
+        {
+            if (item is Outlook.AppointmentItem || item is Outlook._AppointmentItem)
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(messageClass))
+            {
+                return false;
+            }
+
+            string normalized = messageClass.Trim().ToUpperInvariant();
+            if (normalized == "IPM.APPOINTMENT")
+            {
+                return true;
+            }
+
+            return IsMuzzleTarget(normalized);
+        }
+
+        private bool ShouldMuzzleItem(object item, string queuedAccountKey = null)
+        {
+            if (!IsMuzzleFeatureActive())
+            {
+                return false;
+            }
+
+            string accountKey = !string.IsNullOrEmpty(queuedAccountKey) ? queuedAccountKey : TryGetStampedAccount(item);
+            if (string.IsNullOrEmpty(accountKey))
+            {
+                accountKey = GetAccountKeyForItem(item);
+            }
+
+            bool enabled = _currentSettings.IsMuzzleEnabledForAccount(accountKey);
+            DiagnosticsLogger.Log("Muzzle", "Outbox item inspected (Account='" + (accountKey ?? "<empty>") + "', Enabled=" + enabled + ").");
+            return enabled;
+        }
+
+        private string GetAccountKeyForItem(object item)
+        {
+            Outlook.Account account = null;
+            try
+            {
+                account = TryGetSendUsingAccount(item);
+                if (account != null)
+                {
+                    string normalized = OutlookAccountHelper.NormalizeAccountIdentifier(account);
+                    DiagnosticsLogger.Log("Muzzle", "SendUsingAccount resolved: " + normalized);
+                    return normalized;
+                }
+
+                string sender = TryGetSenderAddress(item);
+                if (!string.IsNullOrWhiteSpace(sender))
+                {
+                    string normalized = OutlookAccountHelper.NormalizeAccountIdentifier(sender);
+                    DiagnosticsLogger.Log("Muzzle", "Sender address fallback: " + normalized);
+                    return normalized;
+                }
+
+                DiagnosticsLogger.Log("Muzzle", "Account resolution failed – empty key.");
+                return string.Empty;
+            }
+            finally
+            {
+                ReleaseComReference(account);
+            }
+        }
+
+        private string StampMuzzleAccount(object item, string accountKey)
+        {
+            if (string.IsNullOrEmpty(accountKey))
+            {
+                return string.Empty;
+            }
+
+            Outlook.UserProperties properties = null;
+            Outlook.UserProperty property = null;
+            try
+            {
+                properties = TryGetUserProperties(item);
+                if (properties == null)
+                {
+                    DiagnosticsLogger.Log("Muzzle", "StampMuzzleAccount: UserProperties unavailable.");
+                    return accountKey;
+                }
+
+                property = properties.Find(MuzzleAccountProperty);
+                if (property == null)
+                {
+                    property = properties.Add(MuzzleAccountProperty, Outlook.OlUserPropertyType.olText);
+                }
+                property.Value = accountKey;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "StampMuzzleAccount failed: " + ex.Message);
+            }
+            finally
+            {
+                ReleaseComReference(property);
+                ReleaseComReference(properties);
+            }
+
+            return accountKey;
+        }
+
+        private void EnqueuePendingMuzzleItem(string accountKey, string entryId)
+        {
+            if (string.IsNullOrWhiteSpace(accountKey) && string.IsNullOrWhiteSpace(entryId))
+            {
+                DiagnosticsLogger.Log("Muzzle", "Pending queue not updated (empty account + EntryID).");
+                return;
+            }
+
+            lock (_pendingMuzzleLock)
+            {
+                _pendingMuzzleItems.Enqueue(new MuzzlePendingInfo(accountKey, entryId));
+                const int maxPending = 10;
+                while (_pendingMuzzleItems.Count > maxPending)
+                {
+                    MuzzlePendingInfo removed = _pendingMuzzleItems.Dequeue();
+                    string removedAccount = removed != null ? removed.AccountKey : string.Empty;
+                    string removedEntry = removed != null ? removed.EntryId : string.Empty;
+                    DiagnosticsLogger.Log("Muzzle", "Pending queue trimmed, discarded '" + (string.IsNullOrEmpty(removedAccount) ? "<empty>" : removedAccount) + "' (EntryID=" + (string.IsNullOrEmpty(removedEntry) ? "<empty>" : removedEntry) + ").");
+                }
+            }
+        }
+
+        private MuzzlePendingInfo DequeuePendingMuzzleItem()
+        {
+            lock (_pendingMuzzleLock)
+            {
+                while (_pendingMuzzleItems.Count > 0)
+                {
+                    MuzzlePendingInfo candidate = _pendingMuzzleItems.Dequeue();
+                    if (candidate != null && (!string.IsNullOrWhiteSpace(candidate.AccountKey) || !string.IsNullOrWhiteSpace(candidate.EntryId)))
+                    {
+                        return candidate;
+                    }
+
+                    DiagnosticsLogger.Log("Muzzle", "Discarded empty pending entry (Account/EntryID fehlten).");
+                }
+            }
+
+            return null;
+        }
+
+        private string TryGetStampedAccount(object item)
+        {
+            Outlook.UserProperties properties = null;
+            Outlook.UserProperty property = null;
+            try
+            {
+                properties = TryGetUserProperties(item);
+                if (properties == null)
+                {
+                    return string.Empty;
+                }
+
+                property = properties.Find(MuzzleAccountProperty);
+                if (property == null)
+                {
+                    return string.Empty;
+                }
+
+                var value = property.Value as string;
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    DiagnosticsLogger.Log("Muzzle", "Stamped account restored: " + value.Trim());
+                    return value.Trim();
+                }
+
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "TryGetStampedAccount failed: " + ex.Message);
+                return string.Empty;
+            }
+            finally
+            {
+                ReleaseComReference(property);
+                ReleaseComReference(properties);
+            }
+        }
+
+        private static Outlook.UserProperties TryGetUserProperties(object item)
+        {
+            try
+            {
+                var mail = item as Outlook.MailItem;
+                if (mail != null)
+                {
+                    return mail.UserProperties;
+                }
+
+                var meeting = item as Outlook.MeetingItem;
+                if (meeting != null)
+                {
+                    return meeting.UserProperties;
+                }
+
+                var mailInterface = item as Outlook._MailItem;
+                if (mailInterface != null)
+                {
+                    return mailInterface.UserProperties;
+                }
+
+                var meetingInterface = item as Outlook._MeetingItem;
+                if (meetingInterface != null)
+                {
+                    return meetingInterface.UserProperties;
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private static Outlook.Account TryGetSendUsingAccount(object item)
+        {
+            try
+            {
+                var mail = item as Outlook.MailItem;
+                if (mail != null)
+                {
+                    return mail.SendUsingAccount;
+                }
+
+                var mailInterface = item as Outlook._MailItem;
+                if (mailInterface != null)
+                {
+                    return mailInterface.SendUsingAccount;
+                }
+
+                var meeting = item as Outlook.MeetingItem;
+                if (meeting != null)
+                {
+                    return meeting.SendUsingAccount;
+                }
+
+                var meetingInterface = item as Outlook._MeetingItem;
+                if (meetingInterface != null)
+                {
+                    return meetingInterface.SendUsingAccount;
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "TryGetSendUsingAccount exception: " + ex.Message);
+            }
+
+            return null;
+        }
+
+        private static string TryGetSenderAddress(object item)
+        {
+            Outlook.PropertyAccessor accessor = null;
+            try
+            {
+                var mail = item as Outlook.MailItem;
+                var meeting = item as Outlook.MeetingItem;
+                var mailInterface = item as Outlook._MailItem;
+                var meetingInterface = item as Outlook._MeetingItem;
+                if (mail != null)
+                {
+                    accessor = mail.PropertyAccessor;
+                }
+                else if (meeting != null)
+                {
+                    accessor = meeting.PropertyAccessor;
+                }
+                else if (mailInterface != null)
+                {
+                    accessor = mailInterface.PropertyAccessor;
+                }
+                else if (meetingInterface != null)
+                {
+                    accessor = meetingInterface.PropertyAccessor;
+                }
+
+                if (accessor == null)
+                {
+                    return string.Empty;
+                }
+
+                string address = SafeGetAddressFromAccessor(accessor, SenderAddressProperty);
+                if (string.IsNullOrWhiteSpace(address))
+                {
+                    address = SafeGetAddressFromAccessor(accessor, "http://schemas.microsoft.com/mapi/proptag/0x0065001E");
+                }
+
+                if (string.IsNullOrWhiteSpace(address) && mail != null)
+                {
+                    address = SafeGetString(() => mail.SenderEmailAddress);
+                }
+                else if (string.IsNullOrWhiteSpace(address) && mailInterface != null)
+                {
+                    address = SafeGetString(() => mailInterface.SenderEmailAddress);
+                }
+
+                if (string.IsNullOrWhiteSpace(address) && meeting != null)
+                {
+                    address = SafeGetString(() => meeting.SenderEmailAddress);
+                }
+                else if (string.IsNullOrWhiteSpace(address) && meetingInterface != null)
+                {
+                    address = SafeGetString(() => meetingInterface.SenderEmailAddress);
+                }
+
+                if (string.IsNullOrWhiteSpace(address))
+                {
+                    return string.Empty;
+                }
+
+                return address.Trim();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+            finally
+            {
+                ReleaseComReference(accessor);
+            }
+        }
+
         /**
          * Prueft, ob ein Item vom Maulkorb betroffen ist.
          */
@@ -2269,9 +3002,72 @@ namespace NcTalkOutlookAddIn
         }
 
         /**
-         * Entfernt das gekennzeichnete Item endgültig aus dem Postausgang.
+         * Entfernt das gekennzeichnete Item endgueltig aus dem Postausgang (direkt oder via EntryID-Fallback).
          */
-        private static void DeleteItem(object item)
+        private bool TryDeleteMuzzleItem(object item, string fallbackEntryId = null)
+        {
+            if (item == null)
+            {
+                return false;
+            }
+
+            if (TryDeleteDirect(item))
+            {
+                return true;
+            }
+
+            string entryId = TryGetEntryId(item);
+            if (string.IsNullOrEmpty(entryId) && !string.IsNullOrEmpty(fallbackEntryId))
+            {
+                entryId = fallbackEntryId;
+                DiagnosticsLogger.Log("Muzzle", "DeleteItem: nutze gespeicherte EntryID " + entryId + ".");
+            }
+            if (string.IsNullOrEmpty(entryId) || _outlookApplication == null)
+            {
+                DiagnosticsLogger.Log("Muzzle", "DeleteItem: kein EntryID-Fallback moeglich.");
+                return false;
+            }
+
+            Outlook.NameSpace session = null;
+            object fetched = null;
+            try
+            {
+                session = _outlookApplication.Session;
+                if (session == null)
+                {
+                    DiagnosticsLogger.Log("Muzzle", "DeleteItem: Outlook-Session nicht verfuegbar.");
+                    return false;
+                }
+
+                fetched = session.GetItemFromID(entryId);
+                if (fetched == null)
+                {
+                    DiagnosticsLogger.Log("Muzzle", "DeleteItem: EntryID " + entryId + " nicht gefunden.");
+                    return false;
+                }
+
+                if (TryDeleteDirect(fetched))
+                {
+                    DiagnosticsLogger.Log("Muzzle", "DeleteItem ueber EntryID erfolgreich.");
+                    return true;
+                }
+
+                DiagnosticsLogger.Log("Muzzle", "DeleteItem ueber EntryID ohne Wirkung.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.Log("Muzzle", "DeleteItem via EntryID fehlgeschlagen: " + ex.Message);
+                return false;
+            }
+            finally
+            {
+                ReleaseComReference(fetched);
+                ReleaseComReference(session);
+            }
+        }
+
+        private static bool TryDeleteDirect(object item)
         {
             try
             {
@@ -2279,37 +3075,41 @@ namespace NcTalkOutlookAddIn
                 if (mail != null)
                 {
                     mail.Delete();
-                    return;
+                    DiagnosticsLogger.Log("Muzzle", "DeleteItem: MailItem deleted.");
+                    return true;
                 }
 
                 Outlook.MeetingItem meeting = item as Outlook.MeetingItem;
                 if (meeting != null)
                 {
                     meeting.Delete();
-                    return;
+                    DiagnosticsLogger.Log("Muzzle", "DeleteItem: MeetingItem deleted.");
+                    return true;
                 }
 
                 Outlook._MailItem mailInterfaceOnly = item as Outlook._MailItem;
                 if (mailInterfaceOnly != null)
                 {
                     mailInterfaceOnly.Delete();
-                    return;
+                    DiagnosticsLogger.Log("Muzzle", "DeleteItem: _MailItem deleted.");
+                    return true;
                 }
 
                 Outlook._MeetingItem meetingInterfaceOnly = item as Outlook._MeetingItem;
                 if (meetingInterfaceOnly != null)
                 {
                     meetingInterfaceOnly.Delete();
+                    DiagnosticsLogger.Log("Muzzle", "DeleteItem: _MeetingItem deleted.");
+                    return true;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.Log("Muzzle", "DeleteItem direct failed: " + ex.Message);
             }
-        }
 
-        /**
-         * Helfer zum Freigeben beliebiger COM-Referenzen.
-         */
+            return false;
+        }
         private static void ReleaseComReference(object comObject)
         {
             if (comObject == null)
@@ -2325,8 +3125,107 @@ namespace NcTalkOutlookAddIn
             {
             }
         }
-    }
+
+        private static string SafeGetAddressFromAccessor(Outlook.PropertyAccessor accessor, string uri)
+        {
+            if (accessor == null || string.IsNullOrEmpty(uri))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var result = accessor.GetProperty(uri);
+                return result as string ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string SafeGetString(Func<string> getter)
+        {
+            try
+            {
+                return getter();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /**
+         * Puffer fuer OnItemSend -> OnOutboxItemAdd, haelt Account + EntryID.
+         */
+        private sealed class MuzzlePendingInfo
+        {
+            public string AccountKey { get; private set; }
+            public string EntryId { get; private set; }
+
+            public MuzzlePendingInfo(string accountKey, string entryId)
+            {
+                AccountKey = accountKey ?? string.Empty;
+                EntryId = entryId ?? string.Empty;
+            }
+        }
+
+        /**
+         * Haelt eine Outbox-Subscription pro Store, damit ItemAdd pro Postausgang aktiv bleibt.
+         */
+        private sealed class OutboxSubscription
+        {
+            public string StoreId { get; private set; }
+            public string StoreLabel { get; private set; }
+            public Outlook.Items Items { get; private set; }
+
+            public OutboxSubscription(string storeId, string storeLabel, Outlook.Items items)
+            {
+                StoreId = storeId ?? string.Empty;
+                StoreLabel = storeLabel ?? string.Empty;
+                Items = items;
+            }
+
+            public bool IsForStore(string storeId)
+            {
+                if (string.IsNullOrEmpty(StoreId) && string.IsNullOrEmpty(storeId))
+                {
+                    return true;
+                }
+
+                return string.Equals(StoreId, storeId ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public void Dispose(Outlook.ItemsEvents_ItemAddEventHandler handler)
+            {
+                if (Items == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    Items.ItemAdd -= handler;
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    Marshal.FinalReleaseComObject(Items);
+                }
+                catch
+                {
+                }
+            }
+        }
 }
+
+}
+
+
 
 
 
