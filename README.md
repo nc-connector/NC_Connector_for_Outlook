@@ -1,4 +1,4 @@
-﻿# Nextcloud Enterprise for Outlook
+﻿# NC Connector for Outlook
 
 Nextcloud Enterprise for Outlook verbindet Outlook nahtlos mit Ihrer Nextcloud. Das Add-in automatisiert Talk-Raeume fuer Termine, stellt einen lokalen Free/Busy-Proxy bereit und liefert einen leistungsfaehigen Filelink-Assistenten fuer E-Mails. Ziel ist ein professioneller Workflow vom Kalender bis zur Dateiablage -- ohne Medienbruch und mit klarer Administrierbarkeit.
 
@@ -14,7 +14,7 @@ Nextcloud Enterprise for Outlook verbindet Outlook nahtlos mit Ihrer Nextcloud. 
   Lobby-Updates und Loeschbefehle erfolgen nur, wenn der angemeldete Benutzer Veranstalter ist. Terminverschiebungen aktualisieren automatisch die Lobby-bis-Startzeit; Serien- und Einzeltermine werden sauber unterschieden.
 
 - **Komfortable Authentifizierung**  
-  Manuelles Login (Benutzername, App-Passwort) oder Login Flow v2 *Mit Nextcloud anmelden*. Letzterer oeffnet den Standardbrowser, registriert das Geraet als *Nextcloud Enterprise for Outlook* und uebernimmt das App-Passwort automatisch. Der Verbindungstest prueft Erreichbarkeit, Credentials sowie die Nextcloud-Version.
+  Manuelles Login (Benutzername, App-Passwort) oder Login Flow v2 *Mit Nextcloud anmelden*. Letzterer oeffnet den Standardbrowser, registriert das Geraet als *NC Connector for Outlook* und uebernimmt das App-Passwort automatisch. Der Verbindungstest prueft Erreichbarkeit, Credentials sowie die Nextcloud-Version.
 
 - **Outlook-Maulkorb pro Konto**  
   Im Tab *Einladungen* laesst sich pro Outlook-Konto festlegen, ob klassische Einladungen blockiert und stattdessen die Nextcloud-Benachrichtigungen genutzt werden. Konten ohne Maulkorb bleiben unberuehrt, waehrend aktivierte Konten dank Store-spezifischer Outbox-Listener und EntryID-Fallbacks zuverlaessig gebremst werden. Das Debug-Log zeichnet jeden Schritt (Hook-Status, Kontoerkennung, Block-Entscheidung) nach, damit Fehlersuche ohne Raetselraten funktioniert.
@@ -116,6 +116,7 @@ Copyright (c) 2025 Bastian Kleinschmidt
 ## Unterstuetzung
 
 Wenn dir das Projekt gefaellt, kannst du es hier unterstuetzen: [paypal.me/debaschdi](https://paypal.me/debaschdi)
+
 
 
 
