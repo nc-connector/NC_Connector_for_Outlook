@@ -10,7 +10,7 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 namespace NcTalkOutlookAddIn.Utilities
 {
     /**
-     * Gemeinsame Hilfsfunktionen fuer die Arbeit mit Outlook-Accounts (Identifier normalisieren).
+     * Helper functions for working with Outlook accounts (normalize identifiers).
      */
     internal static class OutlookAccountHelper
     {
@@ -51,8 +51,9 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return getter();
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook account property.", ex);
                 return string.Empty;
             }
         }

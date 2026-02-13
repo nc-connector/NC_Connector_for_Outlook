@@ -9,7 +9,7 @@ using System;
 namespace NcTalkOutlookAddIn.Utilities
 {
     /**
-     * Hilfsfunktionen zur Interpretation von Nextcloud-Versionsstrings.
+     * Helper functions for parsing Nextcloud version strings.
      */
     internal static class NextcloudVersionHelper
     {
