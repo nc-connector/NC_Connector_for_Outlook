@@ -17,7 +17,7 @@ using NcTalkOutlookAddIn.Utilities;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Fuehrt die HTTP-Aufrufe gegen die Nextcloud Talk REST-API aus.
+     * Performs HTTP calls against the Nextcloud Talk REST API.
      */
     internal sealed class TalkService
     {
@@ -25,11 +25,19 @@ namespace NcTalkOutlookAddIn.Services
         private const int ListableNone = 0;
         private const int ListableUsers = 1;
 
+        private const string ActorTypeUsers = "users";
+        private const string ActorTypeEmails = "emails";
+
         private readonly TalkServiceConfiguration _configuration;
         private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
         private static void LogApi(string message)
         {
-            DiagnosticsLogger.Log("API", message);
+            DiagnosticsLogger.Log(LogCategories.Api, message);
+        }
+
+        private static void LogTalk(string message)
+        {
+            DiagnosticsLogger.Log(LogCategories.Talk, message);
         }
 
         internal TalkService(TalkServiceConfiguration configuration)
@@ -43,7 +51,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         /**
-         * Erstellt einen Talk-Raum entsprechend der Nutzereingaben und liefert Token + Link zurueck.
+         * Creates a Talk room based on user input and returns token + URL.
          */
         internal TalkRoomCreationResult CreateRoom(TalkRoomRequest request)
         {
@@ -74,6 +82,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 try
                 {
+                    LogTalk("CreateRoom attempt includeEvent=" + includeEvent + " lobby=" + request.LobbyEnabled + " listable=" + request.SearchVisible + " addUsers=" + request.AddUsers + " addGuests=" + request.AddGuests);
                     IDictionary<string, object> payload = BuildCreatePayload(request, includeEvent);
                     string payloadJson = _serializer.Serialize(payload);
 
@@ -95,14 +104,16 @@ namespace NcTalkOutlookAddIn.Services
                     string token = ExtractRoomToken(responseData);
                     if (string.IsNullOrEmpty(token))
                     {
-                        throw new TalkServiceException("Antwort enthaelt kein Raum-Token.", false, statusCode, responseText);
+                        throw new TalkServiceException("Response did not contain a room token.", false, statusCode, responseText);
                     }
 
                     string roomUrl = baseUrl + "/call/" + token;
 
                     if (request.LobbyEnabled)
                     {
-                        TryUpdateLobbyInternal(token, request.AppointmentStart, baseUrl, includeEvent);
+                        // Lobby updates must not abort room creation. If this fails, the room still exists and
+                        // Outlook will retry on appointment save (Write event) when the tracking subscription runs.
+                        TryUpdateLobbyInternal(token, request.AppointmentStart, baseUrl, true);
                     }
 
                     if (!includeEvent)
@@ -117,8 +128,10 @@ namespace NcTalkOutlookAddIn.Services
                 catch (TalkServiceException ex)
                 {
                     lastError = ex;
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "CreateRoom failed (includeEvent=" + includeEvent + ", status=" + (int)ex.StatusCode + ").", ex);
                     if (includeEvent && !ex.IsAuthenticationError && ShouldFallbackToStandard(ex.StatusCode, null))
                     {
+                        LogTalk("CreateRoom falling back to standard room due to status=" + (int)ex.StatusCode + ".");
                         continue;
                     }
 
@@ -127,6 +140,7 @@ namespace NcTalkOutlookAddIn.Services
                 catch (Exception ex)
                 {
                     lastError = ex;
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "CreateRoom failed unexpectedly (includeEvent=" + includeEvent + ").", ex);
                     throw;
                 }
             }
@@ -136,11 +150,11 @@ namespace NcTalkOutlookAddIn.Services
                 throw lastError;
             }
 
-            throw new TalkServiceException("Talk-Raum konnte nicht erstellt werden.", false, HttpStatusCode.InternalServerError, null);
+            throw new TalkServiceException("Talk room could not be created.", false, HttpStatusCode.InternalServerError, null);
         }
 
         /**
-         * Aktualisiert die Lobby-Zeit eines bestehenden Talk-Raums.
+         * Updates the lobby time of an existing Talk room.
          */
         internal void UpdateLobby(string roomToken, DateTime start, DateTime end, bool isEventConversation)
         {
@@ -162,16 +176,19 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     if (!IsRecoverableEventBindingStatus(ex.StatusCode))
                     {
+                        DiagnosticsLogger.LogException(LogCategories.Talk, "UpdateLobby event binding failed (status=" + (int)ex.StatusCode + ").", ex);
                         throw;
                     }
+
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "UpdateLobby event binding not supported/recoverable (status=" + (int)ex.StatusCode + ").", ex);
                 }
             }
 
-            TryUpdateLobbyInternal(roomToken, start, baseUrl, isEventConversation);
+            TryUpdateLobbyInternal(roomToken, start, baseUrl, false);
         }
 
         /**
-         * Loescht den Talk-Raum (Teilnehmer self) und ignoriert 404.
+         * Deletes the Talk room (removes the current participant) and ignores 404.
          */
         internal void DeleteRoom(string roomToken, bool isEventConversation)
         {
@@ -199,7 +216,7 @@ namespace NcTalkOutlookAddIn.Services
                 statusCode != HttpStatusCode.NoContent &&
                 statusCode != HttpStatusCode.NotFound)
             {
-                throw new TalkServiceException("Talk-Raum konnte nicht geloescht werden (Status " + (int)statusCode + ").", false, statusCode, null);
+                throw new TalkServiceException("Talk room could not be deleted (status " + (int)statusCode + ").", false, statusCode, null);
             }
         }
 
@@ -247,7 +264,7 @@ namespace NcTalkOutlookAddIn.Services
             Dictionary<string, object> payload = new Dictionary<string, object>();
             payload["roomType"] = RoomTypePublic;
             payload["type"] = RoomTypePublic;
-            payload["roomName"] = string.IsNullOrWhiteSpace(request.Title) ? "Besprechung" : request.Title.Trim();
+            payload["roomName"] = string.IsNullOrWhiteSpace(request.Title) ? "Meeting" : request.Title.Trim();
             payload["listable"] = request.SearchVisible ? ListableUsers : ListableNone;
             payload["participants"] = new Dictionary<string, object>();
 
@@ -274,29 +291,22 @@ namespace NcTalkOutlookAddIn.Services
             return payload;
         }
 
-        private void TryUpdateLobbyInternal(string token, DateTime? start, string baseUrl, bool isEventConversation)
+        private void TryUpdateLobbyInternal(string token, DateTime? start, string baseUrl, bool silent)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
                 return;
             }
 
-            if (isEventConversation)
-            {
-                if (TrySendLobbyRequest(token, baseUrl, 1, null, true))
-                {
-                    TrySendLobbyRequest(token, baseUrl, 1, start, true);
-                }
-            }
-            else
-            {
-                TrySendLobbyRequest(token, baseUrl, 1, start, false);
-            }
+            // Send a single lobby update request with an optional timer.
+            // Some servers react poorly to two-stage calls (first without timer, then with timer) and may keep a
+            // wrong start time.
+            TrySendLobbyRequest(token, baseUrl, 1, start, silent);
         }
 
         private bool TrySendLobbyRequest(string token, string baseUrl, int state, DateTime? start, bool silent)
         {
-            long? unixStart = ConvertToUnixTimestamp(start);
+            long? unixStart = TimeUtilities.ToUnixTimeSeconds(start);
 
             Dictionary<string, object> payload = new Dictionary<string, object>();
             payload["state"] = state;
@@ -315,13 +325,14 @@ namespace NcTalkOutlookAddIn.Services
                 ExecuteJsonRequest("PUT", lobbyUrl, payload, out statusCode, out parsed);
                 if (!IsSuccessStatus(statusCode) && !silent)
                 {
-                    throw new TalkServiceException("Lobby-Zeit konnte nicht gesetzt werden (Status " + (int)statusCode + ").", false, statusCode, null);
+                    throw new TalkServiceException("Lobby time could not be set (status " + (int)statusCode + ").", false, statusCode, null);
                 }
 
                 return IsSuccessStatus(statusCode);
             }
-            catch (TalkServiceException)
+            catch (TalkServiceException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Lobby update failed (silent=" + silent + ").", ex);
                 if (!silent)
                 {
                     throw;
@@ -376,9 +387,9 @@ namespace NcTalkOutlookAddIn.Services
                                    out statusCode,
                                    out parsed);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignorieren: Aufraeumvorgang darf nicht abbrechen.
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to clear active participants (best-effort cleanup).", ex);
             }
         }
 
@@ -394,9 +405,9 @@ namespace NcTalkOutlookAddIn.Services
                                    out statusCode,
                                    out parsed);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignorieren: Event-Bindung ist optional, Fehler hier sind unkritisch.
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to detach event binding (best-effort cleanup).", ex);
             }
         }
 
@@ -425,6 +436,164 @@ namespace NcTalkOutlookAddIn.Services
             EnsureConfiguration();
             string baseUrl = _configuration.GetNormalizedBaseUrl();
             TryUpdateDescription(token, description, isEventConversation, baseUrl);
+        }
+
+        internal bool AddUserParticipant(string token, string userId)
+        {
+            return AddParticipant(token, ActorTypeUsers, userId);
+        }
+
+        internal bool AddGuestParticipant(string token, string email)
+        {
+            return AddParticipant(token, ActorTypeEmails, email);
+        }
+
+        internal bool AddParticipant(string token, string actorType, string actorId)
+        {
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(actorType) || string.IsNullOrWhiteSpace(actorId))
+            {
+                return false;
+            }
+
+            EnsureConfiguration();
+            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            string url = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token.Trim()) + "/participants";
+
+            var payload = new Dictionary<string, object>();
+            // The OCS API expects "newParticipant" + "source".
+            // "source" matches Talk actor types such as "users" and "emails".
+            payload["newParticipant"] = actorId.Trim();
+            payload["source"] = actorType.Trim();
+
+            HttpStatusCode statusCode;
+            IDictionary<string, object> parsed;
+            string responseText = ExecuteJsonRequest("POST", url, payload, out statusCode, out parsed);
+
+            if (IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.Conflict)
+            {
+                return true;
+            }
+
+            ThrowServiceError(statusCode, responseText, parsed);
+            return false;
+        }
+
+        internal List<TalkParticipant> GetParticipants(string token)
+        {
+            var participants = new List<TalkParticipant>();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return participants;
+            }
+
+            EnsureConfiguration();
+            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            string url = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token.Trim()) + "/participants?includeStatus=true";
+
+            HttpStatusCode statusCode;
+            IDictionary<string, object> parsed;
+            string responseText = ExecuteJsonRequest("GET", url, (string)null, out statusCode, out parsed);
+
+            if (!IsSuccessStatus(statusCode))
+            {
+                ThrowServiceError(statusCode, responseText, parsed);
+                return participants;
+            }
+
+            object listObj = null;
+            IDictionary<string, object> ocs = GetDictionary(parsed, "ocs");
+            if (ocs != null)
+            {
+                ocs.TryGetValue("data", out listObj);
+            }
+
+            object[] list = listObj as object[];
+            if (list == null)
+            {
+                // Some Talk versions wrap the list under { data: { participants: [...] } }.
+                var dataDict = listObj as IDictionary<string, object>;
+                if (dataDict != null)
+                {
+                    object participantsObj;
+                    if (dataDict.TryGetValue("participants", out participantsObj))
+                    {
+                        list = participantsObj as object[];
+                    }
+                }
+            }
+
+            if (list == null)
+            {
+                return participants;
+            }
+
+            foreach (object entry in list)
+            {
+                var dict = entry as IDictionary<string, object>;
+                if (dict == null)
+                {
+                    continue;
+                }
+
+                string actorType = GetString(dict, "actorType") ?? string.Empty;
+                string actorId = GetString(dict, "actorId") ?? string.Empty;
+                int attendeeId = GetInt(dict, "attendeeId");
+                participants.Add(new TalkParticipant(actorType, actorId, attendeeId));
+            }
+
+            return participants;
+        }
+
+        internal bool PromoteModerator(string token, int attendeeId, out string errorMessage)
+        {
+            errorMessage = null;
+            if (string.IsNullOrWhiteSpace(token) || attendeeId <= 0)
+            {
+                return false;
+            }
+
+            EnsureConfiguration();
+            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            string url = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token.Trim()) + "/moderators";
+
+            var payload = new Dictionary<string, object>();
+            payload["attendeeId"] = attendeeId;
+
+            HttpStatusCode statusCode;
+            IDictionary<string, object> parsed;
+            string responseText = ExecuteJsonRequest("POST", url, payload, out statusCode, out parsed);
+
+            if (IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.Conflict)
+            {
+                return true;
+            }
+
+            string message = ExtractOcsMessage(parsed);
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                message = "HTTP " + (int)statusCode;
+            }
+
+            errorMessage = message;
+            return false;
+        }
+
+        internal bool LeaveRoom(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            EnsureConfiguration();
+            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            string url = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token.Trim()) + "/participants/self";
+
+            HttpStatusCode statusCode;
+            IDictionary<string, object> parsed;
+            ExecuteJsonRequest("DELETE", url, (string)null, out statusCode, out parsed);
+
+            return IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.NotFound;
         }
 
         private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
@@ -456,11 +625,24 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
+        private static string ExtractOcsMessage(IDictionary<string, object> responseData)
+        {
+            IDictionary<string, object> meta = GetDictionary(GetDictionary(responseData, "ocs"), "meta");
+            IDictionary<string, object> payload = GetDictionary(GetDictionary(responseData, "ocs"), "data");
+            string message = GetString(meta, "message");
+            if (string.IsNullOrEmpty(message))
+            {
+                message = GetString(payload, "error");
+            }
+
+            return message;
+        }
+
         private void EnsureConfiguration()
         {
             if (!_configuration.IsComplete())
             {
-                throw new TalkServiceException("Zugangsdaten sind unvollstaendig.", true, HttpStatusCode.BadRequest, null);
+                throw new TalkServiceException("Credentials are incomplete.", true, HttpStatusCode.BadRequest, null);
             }
         }
 
@@ -490,7 +672,7 @@ namespace NcTalkOutlookAddIn.Services
                 request.Method = method;
                 request.Accept = "application/json";
                 request.Headers["OCS-APIRequest"] = "true";
-                request.Headers["Authorization"] = "Basic " + EncodeBasicAuth(_configuration.Username, _configuration.AppPassword);
+                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
                 request.Timeout = 60000;
 
                 bool hasBody = !string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
@@ -522,7 +704,8 @@ namespace NcTalkOutlookAddIn.Services
                     response = ex.Response as HttpWebResponse;
                     if (response == null)
                     {
-                        throw new TalkServiceException("HTTP-Verbindungsfehler: " + ex.Message, false, 0, null);
+                        DiagnosticsLogger.LogException(LogCategories.Api, "HTTP connection error.", ex);
+                        throw new TalkServiceException("HTTP connection error: " + ex.Message, false, 0, null);
                     }
                 }
 
@@ -541,9 +724,10 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         parsedData = _serializer.DeserializeObject(responseText) as IDictionary<string, object>;
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         parsedData = null;
+                        DiagnosticsLogger.LogException(LogCategories.Api, "Failed to parse JSON response.", ex);
                     }
                 }
 
@@ -561,12 +745,6 @@ namespace NcTalkOutlookAddIn.Services
         private static bool IsSuccessStatus(HttpStatusCode statusCode)
         {
             return statusCode >= HttpStatusCode.OK && statusCode < HttpStatusCode.MultipleChoices;
-        }
-
-        private static string EncodeBasicAuth(string username, string password)
-        {
-            string raw = (username ?? string.Empty) + ":" + (password ?? string.Empty);
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
         }
 
         private static string ExtractRoomToken(IDictionary<string, object> responseData)
@@ -635,6 +813,31 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             return null;
+        }
+
+        private static int GetInt(IDictionary<string, object> parent, string key)
+        {
+            if (parent == null)
+            {
+                return 0;
+            }
+
+            object value;
+            if (parent.TryGetValue(key, out value) && value != null)
+            {
+                if (value is int)
+                {
+                    return (int)value;
+                }
+
+                int parsed;
+                if (int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return 0;
         }
 
         private static string ExtractVersion(IDictionary<string, object> payload)
@@ -825,8 +1028,8 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string BuildEventObjectId(DateTime? start, DateTime? end)
         {
-            long? startEpoch = ConvertToUnixTimestamp(start);
-            long? endEpoch = ConvertToUnixTimestamp(end);
+            long? startEpoch = TimeUtilities.ToUnixTimeSeconds(start);
+            long? endEpoch = TimeUtilities.ToUnixTimeSeconds(end);
 
             if (!startEpoch.HasValue || !endEpoch.HasValue)
             {
@@ -836,22 +1039,7 @@ namespace NcTalkOutlookAddIn.Services
             return startEpoch.Value + "#" + endEpoch.Value;
         }
 
-        private static long? ConvertToUnixTimestamp(DateTime? value)
-        {
-            if (!value.HasValue)
-            {
-                return null;
-            }
-
-            DateTime date = value.Value;
-            if (date.Kind == DateTimeKind.Unspecified)
-            {
-                date = DateTime.SpecifyKind(date, DateTimeKind.Local);
-            }
-
-            DateTimeOffset offset = new DateTimeOffset(date);
-            return offset.ToUnixTimeSeconds();
-        }
+        
     }
 }
 

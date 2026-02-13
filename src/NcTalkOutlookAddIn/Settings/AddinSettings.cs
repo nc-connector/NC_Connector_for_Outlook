@@ -6,11 +6,13 @@
 
 using System;
 using System.Collections.Generic;
+using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Settings
 {
     /**
-     * Persistente Einstellungen des Add-ins (Anmeldedaten, Filelink/IFB-Optionen etc.).
+     * Persistent add-in settings (credentials, sharing/IFB options, etc.).
      */
     internal class AddinSettings
     {
@@ -20,7 +22,6 @@ namespace NcTalkOutlookAddIn.Settings
             Username = string.Empty;
             AppPassword = string.Empty;
             AuthMode = AuthenticationMode.LoginFlow;
-            OutlookMuzzleEnabled = true;
             IfbEnabled = false;
             IfbDays = 30;
             IfbCacheHours = 24;
@@ -28,7 +29,20 @@ namespace NcTalkOutlookAddIn.Settings
             DebugLoggingEnabled = false;
             LastKnownServerVersion = string.Empty;
             FileLinkBasePath = "90 Freigaben - extern";
-            OutlookMuzzleAccounts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            SharingDefaultShareName = Strings.SharingDefaultShareNameLabel;
+            SharingDefaultPermCreate = false;
+            SharingDefaultPermWrite = false;
+            SharingDefaultPermDelete = false;
+            SharingDefaultPasswordEnabled = true;
+            SharingDefaultExpireDays = 7;
+            ShareBlockLang = "default";
+            EventDescriptionLang = "default";
+            TalkDefaultLobbyEnabled = true;
+            TalkDefaultSearchVisible = true;
+            TalkDefaultRoomType = TalkRoomType.EventConversation;
+            TalkDefaultPasswordEnabled = true;
+            TalkDefaultAddUsers = true;
+            TalkDefaultAddGuests = false;
         }
 
         public string ServerUrl { get; set; }
@@ -38,10 +52,6 @@ namespace NcTalkOutlookAddIn.Settings
         public string AppPassword { get; set; }
 
         public AuthenticationMode AuthMode { get; set; }
-
-        public bool OutlookMuzzleEnabled { get; set; }
-
-        public Dictionary<string, bool> OutlookMuzzleAccounts { get; set; }
 
         public bool IfbEnabled { get; set; }
 
@@ -57,79 +67,38 @@ namespace NcTalkOutlookAddIn.Settings
 
         public string FileLinkBasePath { get; set; }
 
+        public string SharingDefaultShareName { get; set; }
+
+        public bool SharingDefaultPermCreate { get; set; }
+
+        public bool SharingDefaultPermWrite { get; set; }
+
+        public bool SharingDefaultPermDelete { get; set; }
+
+        public bool SharingDefaultPasswordEnabled { get; set; }
+
+        public int SharingDefaultExpireDays { get; set; }
+
+        public string ShareBlockLang { get; set; }
+
+        public string EventDescriptionLang { get; set; }
+
+        public bool TalkDefaultLobbyEnabled { get; set; }
+
+        public bool TalkDefaultSearchVisible { get; set; }
+
+        public TalkRoomType TalkDefaultRoomType { get; set; }
+
+        public bool TalkDefaultPasswordEnabled { get; set; }
+
+        public bool TalkDefaultAddUsers { get; set; }
+
+        public bool TalkDefaultAddGuests { get; set; }
+
         public AddinSettings Clone()
         {
             var copy = (AddinSettings)MemberwiseClone();
-            if (OutlookMuzzleAccounts != null)
-            {
-                copy.OutlookMuzzleAccounts = new Dictionary<string, bool>(OutlookMuzzleAccounts, StringComparer.OrdinalIgnoreCase);
-            }
             return copy;
-        }
-
-        public bool IsMuzzleEnabledForAccount(string accountKey)
-        {
-            if (!OutlookMuzzleEnabled)
-            {
-                return false;
-            }
-
-            bool hasPerAccount = OutlookMuzzleAccounts != null && OutlookMuzzleAccounts.Count > 0;
-            if (!hasPerAccount)
-            {
-                return OutlookMuzzleEnabled;
-            }
-
-            if (string.IsNullOrWhiteSpace(accountKey))
-            {
-                return false;
-            }
-
-            bool enabled;
-            if (OutlookMuzzleAccounts.TryGetValue(accountKey, out enabled))
-            {
-                return enabled;
-            }
-
-            return false;
-        }
-
-        public void SetMuzzleStateForAccount(string accountKey, bool enabled)
-        {
-            if (string.IsNullOrWhiteSpace(accountKey))
-            {
-                return;
-            }
-
-            if (OutlookMuzzleAccounts == null)
-            {
-                OutlookMuzzleAccounts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            OutlookMuzzleAccounts[accountKey] = enabled;
-        }
-
-        public bool HasAnyMuzzleAccountEnabled()
-        {
-            if (!OutlookMuzzleEnabled)
-            {
-                return false;
-            }
-
-            if (OutlookMuzzleAccounts == null || OutlookMuzzleAccounts.Count == 0)
-            {
-                return OutlookMuzzleEnabled;
-            }
-
-            foreach (var pair in OutlookMuzzleAccounts)
-            {
-                if (pair.Value)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

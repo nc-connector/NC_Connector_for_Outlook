@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under der GNU Affero General Public License v3.0.
+ * Licensed under the GNU Affero General Public License v3.0.
  * See LICENSE.txt for details.
  */
 
@@ -14,7 +14,7 @@ using NcTalkOutlookAddIn.Utilities;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Koordiniert den lokalen IFB-Server sowie die Outlook-spezifischen Einstellungen.
+     * Coordinates the local IFB server and Outlook-specific registry settings.
      */
     internal sealed class FreeBusyManager : IDisposable
     {
@@ -67,7 +67,7 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException("IFB-Server konnte nicht gestartet werden: " + ex.Message, ex);
+                throw new InvalidOperationException("IFB server could not be started: " + ex.Message, ex);
             }
 
             EnsureFreeBusyPath(settings);
@@ -80,7 +80,7 @@ namespace NcTalkOutlookAddIn.Services
             bool primaryUpdated = TryUpdateKey(BuildCalendarOptionsKey(), "FreeBusySearchPath", desired, settings, true);
             if (!primaryUpdated)
             {
-                throw new InvalidOperationException("IFB-Pfad konnte nicht gesetzt werden: Zugriff verweigert oder Schlüssel nicht verfügbar.");
+                throw new InvalidOperationException("IFB path could not be set: access denied or key not available.");
             }
 
             TryUpdateKey(BuildPolicyCalendarOptionsKey(), "FreeBusySearchPath", desired, settings, false);
@@ -137,8 +137,9 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to read Outlook version. Falling back to default version segment.", ex);
                 version = "16.0";
             }
 
@@ -179,8 +180,9 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 return host;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to derive IFB default domain from server URL.", ex);
                 return string.Empty;
             }
         }
@@ -214,10 +216,10 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     if (key == null)
                     {
-                        DiagnosticsLogger.Log("IFB", "Kein Zugriff auf Registry '" + path + "' (Value '" + valueName + "').");
+                        DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "' (Value '" + valueName + "').");
                         if (critical)
                         {
-                            throw new InvalidOperationException("IFB-Pfad konnte nicht gesetzt werden: Zugriff auf '" + path + "' verweigert.");
+                            throw new InvalidOperationException("IFB path could not be set: access to '" + path + "' denied.");
                         }
                         return false;
                     }
@@ -238,28 +240,28 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (UnauthorizedAccessException ex)
             {
-                DiagnosticsLogger.Log("IFB", "Kein Zugriff auf Registry '" + path + "': " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "': " + ex.Message);
                 if (critical)
                 {
-                    throw new InvalidOperationException("IFB-Pfad konnte nicht gesetzt werden: Zugriff verweigert.", ex);
+                    throw new InvalidOperationException("IFB path could not be set: access denied.", ex);
                 }
                 return false;
             }
             catch (System.Security.SecurityException ex)
             {
-                DiagnosticsLogger.Log("IFB", "Sicherheitsausnahme bei Registry '" + path + "': " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Sicherheitsausnahme bei Registry '" + path + "': " + ex.Message);
                 if (critical)
                 {
-                    throw new InvalidOperationException("IFB-Pfad konnte nicht gesetzt werden: Sicherheitsrichtlinie verhindert Zugriff.", ex);
+                    throw new InvalidOperationException("IFB path could not be set: a security policy prevented access.", ex);
                 }
                 return false;
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.Log("IFB", "Registry '" + path + "' konnte nicht aktualisiert werden: " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Registry '" + path + "' konnte nicht aktualisiert werden: " + ex.Message);
                 if (critical)
                 {
-                    throw new InvalidOperationException("IFB-Pfad konnte nicht gesetzt werden: " + ex.Message, ex);
+                    throw new InvalidOperationException("IFB path could not be set: " + ex.Message, ex);
                 }
                 return false;
             }
@@ -294,7 +296,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     if (key == null)
                     {
-                        DiagnosticsLogger.Log("IFB", "Kein Zugriff auf Registry '" + path + "' beim Wiederherstellen.");
+                        DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "' beim Wiederherstellen.");
                         return;
                     }
 
@@ -308,8 +310,9 @@ namespace NcTalkOutlookAddIn.Services
                         {
                             key.DeleteValue(valueName, false);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to delete registry value '" + valueName + "' at '" + path + "'. Falling back to setting empty string.", ex);
                             key.SetValue(valueName, string.Empty, RegistryValueKind.String);
                         }
                     }
@@ -317,15 +320,15 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (UnauthorizedAccessException ex)
             {
-                DiagnosticsLogger.Log("IFB", "Kein Zugriff auf Registry '" + path + "' beim Wiederherstellen: " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "' beim Wiederherstellen: " + ex.Message);
             }
             catch (System.Security.SecurityException ex)
             {
-                DiagnosticsLogger.Log("IFB", "Sicherheitsausnahme bei Registry '" + path + "' beim Wiederherstellen: " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Sicherheitsausnahme bei Registry '" + path + "' beim Wiederherstellen: " + ex.Message);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignorieren
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to restore registry value '" + valueName + "' at '" + path + "'.", ex);
             }
         }
 
@@ -351,16 +354,19 @@ namespace NcTalkOutlookAddIn.Services
                     return true;
                 }
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "No access to registry '" + path + "' while reading '" + valueName + "'.", ex);
                 return false;
             }
-            catch (System.Security.SecurityException)
+            catch (System.Security.SecurityException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Security exception while reading registry '" + path + "' value '" + valueName + "'.", ex);
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to read registry '" + path + "' value '" + valueName + "'.", ex);
                 return false;
             }
         }
@@ -377,12 +383,14 @@ namespace NcTalkOutlookAddIn.Services
 
                 return Registry.CurrentUser.CreateSubKey(path);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "No access to registry '" + path + "' (open/create).", ex);
                 return null;
             }
-            catch (System.Security.SecurityException)
+            catch (System.Security.SecurityException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Security exception for registry '" + path + "' (open/create).", ex);
                 return null;
             }
         }

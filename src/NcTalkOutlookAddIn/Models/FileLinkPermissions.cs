@@ -9,7 +9,7 @@ using System;
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Bitmaske der Nextcloud-Share-Berechtigungen, damit UI und Service identische Flags nutzen.
+     * Bitmask of Nextcloud share permissions so UI and services use the same flags.
      */
     [Flags]
     internal enum FileLinkPermissionFlags

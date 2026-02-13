@@ -12,17 +12,23 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
+using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Implementiert den Nextcloud Login Flow v2, um App-Passwoerter automatisch zu beziehen.
+     * Implements Nextcloud Login Flow v2 to automatically obtain app passwords.
      */
     internal sealed class TalkLoginFlowService
     {
-        private const string DeviceName = "Nextcloud Enterprise for Outlook";
+        private const string DeviceName = "NC Connector for Outlook";
         private readonly string _baseUrl;
         private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
+
+        private static void LogApi(string message)
+        {
+            DiagnosticsLogger.Log(LogCategories.Api, message);
+        }
 
         internal TalkLoginFlowService(string baseUrl)
         {
@@ -33,16 +39,25 @@ namespace NcTalkOutlookAddIn.Services
         {
             if (string.IsNullOrWhiteSpace(_baseUrl))
             {
-                throw new TalkServiceException("Server-URL ist leer.", false, HttpStatusCode.BadRequest, null);
+                throw new TalkServiceException("Server URL is empty.", false, HttpStatusCode.BadRequest, null);
             }
 
-            string url = _baseUrl + "/index.php/login/v2";
+            using (DiagnosticsLogger.BeginOperation(LogCategories.Api, "LoginFlow.Start"))
+            {
+                string url = _baseUrl + "/index.php/login/v2";
+                LogApi("POST " + url);
 
             var payloadObject = new Dictionary<string, object>();
             payloadObject["name"] = DeviceName;
 
             string payload = _serializer.Serialize(payloadObject);
-            IDictionary<string, object> data = ExecuteRequest(url, "POST", payload, HttpStatusCode.OK);
+            HttpStatusCode statusCode;
+            string responseText;
+            IDictionary<string, object> data = ExecuteRequest(url, "POST", payload, out statusCode, out responseText);
+            if (statusCode != HttpStatusCode.OK)
+            {
+                throw new TalkServiceException("HTTP " + (int)statusCode, statusCode == HttpStatusCode.Unauthorized, statusCode, responseText);
+            }
 
             string loginUrl = GetString(data, "login");
             IDictionary<string, object> poll = GetDictionary(data, "poll");
@@ -51,7 +66,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (string.IsNullOrEmpty(loginUrl) || string.IsNullOrEmpty(pollEndpoint) || string.IsNullOrEmpty(pollToken))
             {
-                throw new TalkServiceException("Login-Flow Antwort unvollstaendig.", false, HttpStatusCode.InternalServerError, null);
+                throw new TalkServiceException("Login flow response is incomplete.", false, HttpStatusCode.InternalServerError, null);
             }
 
             if (!pollEndpoint.StartsWith("http", StringComparison.OrdinalIgnoreCase))
@@ -60,6 +75,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             return new LoginFlowStart(loginUrl, pollEndpoint, pollToken);
+            }
         }
 
         internal LoginFlowCredentials CompleteLoginFlow(LoginFlowStart start, TimeSpan timeout, TimeSpan pollInterval)
@@ -69,49 +85,51 @@ namespace NcTalkOutlookAddIn.Services
                 throw new ArgumentNullException("start");
             }
 
-            DateTime expire = DateTime.UtcNow + (timeout <= TimeSpan.Zero ? TimeSpan.FromMinutes(2) : timeout);
-            TimeSpan interval = pollInterval <= TimeSpan.Zero ? TimeSpan.FromSeconds(2) : pollInterval;
-
-            while (DateTime.UtcNow < expire)
+            using (DiagnosticsLogger.BeginOperation(LogCategories.Api, "LoginFlow.Complete"))
             {
-                try
+                DateTime expire = DateTime.UtcNow + (timeout <= TimeSpan.Zero ? TimeSpan.FromMinutes(2) : timeout);
+                TimeSpan interval = pollInterval <= TimeSpan.Zero ? TimeSpan.FromSeconds(2) : pollInterval;
+
+                while (DateTime.UtcNow < expire)
                 {
                     var payloadObject = new Dictionary<string, object>();
                     payloadObject["token"] = start.Token;
                     payloadObject["deviceName"] = DeviceName;
 
                     string payload = _serializer.Serialize(payloadObject);
-                    IDictionary<string, object> response = ExecuteRequest(start.PollEndpoint, "POST", payload, HttpStatusCode.OK);
+                    HttpStatusCode statusCode;
+                    string responseText;
+                    IDictionary<string, object> response = ExecuteRequest(start.PollEndpoint, "POST", payload, out statusCode, out responseText);
+
+                    if (statusCode == HttpStatusCode.NotFound)
+                    {
+                        Thread.Sleep(interval);
+                        continue;
+                    }
+                    if (statusCode != HttpStatusCode.OK)
+                    {
+                        throw new TalkServiceException("HTTP " + (int)statusCode, statusCode == HttpStatusCode.Unauthorized, statusCode, responseText);
+                    }
 
                     string appPassword = GetString(response, "appPassword") ?? GetString(GetDictionary(response, "ocs"), "token");
                     string loginName = GetString(response, "loginName");
 
                     if (string.IsNullOrEmpty(appPassword) || string.IsNullOrEmpty(loginName))
                     {
-                        throw new TalkServiceException("Login-Flow liefert kein App-Passwort.", false, HttpStatusCode.InternalServerError, null);
+                        throw new TalkServiceException("Login flow did not return an app password.", false, HttpStatusCode.InternalServerError, null);
                     }
 
                     return new LoginFlowCredentials(loginName, appPassword);
                 }
-                catch (TalkServiceException ex)
-                {
-                    if (ex.StatusCode == HttpStatusCode.NotFound)
-                    {
-                        Thread.Sleep(interval);
-                        continue;
-                    }
 
-                    throw;
-                }
+                throw new TalkServiceException("Login flow did not complete (timeout).", false, HttpStatusCode.RequestTimeout, null);
             }
-
-            throw new TalkServiceException("Login-Flow wurde nicht abgeschlossen (Timeout).", false, HttpStatusCode.RequestTimeout, null);
         }
 
-        private IDictionary<string, object> ExecuteRequest(string url, string method, string payload, HttpStatusCode expected)
+        private IDictionary<string, object> ExecuteRequest(string url, string method, string payload, out HttpStatusCode statusCode, out string responseText)
         {
+            statusCode = 0;
             HttpWebResponse response = null;
-            string responseText = null;
             try
             {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -145,19 +163,16 @@ namespace NcTalkOutlookAddIn.Services
                     response = ex.Response as HttpWebResponse;
                     if (response == null)
                     {
-                        throw new TalkServiceException("HTTP-Verbindungsfehler: " + ex.Message, false, 0, null);
+                        DiagnosticsLogger.LogException(LogCategories.Api, "Login flow request failed without HTTP response.", ex);
+                        throw new TalkServiceException("HTTP connection error: " + ex.Message, false, 0, null);
                     }
                 }
 
+                statusCode = response.StatusCode;
                 using (Stream stream = response.GetResponseStream())
                 using (StreamReader reader = new StreamReader(stream ?? Stream.Null))
                 {
                     responseText = reader.ReadToEnd();
-                }
-
-                if (response.StatusCode != expected)
-                {
-                    throw new TalkServiceException("HTTP " + (int)response.StatusCode, response.StatusCode == HttpStatusCode.Unauthorized, response.StatusCode, responseText);
                 }
 
                 if (string.IsNullOrWhiteSpace(responseText))
@@ -171,7 +186,8 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 catch (Exception ex)
                 {
-                    throw new TalkServiceException("JSON konnte nicht gelesen werden: " + ex.Message, false, response.StatusCode, responseText);
+                    DiagnosticsLogger.LogException(LogCategories.Api, "Login flow JSON parsing failed.", ex);
+                    throw new TalkServiceException("Could not parse JSON: " + ex.Message, false, response.StatusCode, responseText);
                 }
             }
             finally
@@ -213,7 +229,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             return null;
-    }
+        }
 
         private static string BuildUserAgent()
         {
@@ -224,12 +240,13 @@ namespace NcTalkOutlookAddIn.Services
                 string os = Environment.OSVersion.VersionString;
                 return DeviceName + "/" + versionString + " (" + os + ")";
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Api, "Failed to build user agent string.", ex);
                 return DeviceName;
             }
         }
-}
+    }
 
     internal sealed class LoginFlowStart
     {

@@ -7,7 +7,7 @@
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Repräsentiert die unterstützten Raumtypen der Nextcloud Talk API.
+     * Represents the supported room types of the Nextcloud Talk API.
      */
     internal enum TalkRoomType
     {

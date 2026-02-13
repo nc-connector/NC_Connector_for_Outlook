@@ -1,125 +1,122 @@
-﻿<div align="center" style="background:#0082C9; padding:1px 0;"><img src="assets/header-solid-blue-1920x480.png" alt="Addon" height="80"></div>
+<div align="center" style="background:#0082C9; padding:1px 0;"><img src="assets/header-solid-blue-1920x480.png" alt="Add-in" height="80"></div>
+
+[English](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/README.md) | [Deutsch](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/README.de.md)
+[Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md) | [Development Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md) | [Translations](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md)
 
 # NC Connector for Outlook
 
-Nextcloud Enterprise for Outlook verbindet Outlook nahtlos mit Ihrer Nextcloud. Das Add-in automatisiert Talk-Raeume fuer Termine, stellt einen lokalen Free/Busy-Proxy bereit und liefert einen leistungsfaehigen Filelink-Assistenten fuer E-Mails. Ziel ist ein professioneller Workflow vom Kalender bis zur Dateiablage -- ohne Medienbruch und mit klarer Administrierbarkeit.
+NC Connector for Outlook connects Outlook seamlessly with your Nextcloud. The add-in automates Talk rooms for appointments, provides a local free/busy proxy, and ships a powerful filelink wizard for emails. The goal is a professional workflow from calendar to file storage — without context switching and with clear admin controls.
 
-## Kernfunktionen
+This is a community project and is not an official Nextcloud GmbH product.
 
-- **Outlook Ribbon & Explorer-Tab**  
-  Eigener Ribbon *Nextcloud Enterprise* mit den Aktionen *Talk-Link einfuegen*, *Einstellungen* sowie *Nextcloud Freigabe hinzufuegen*. Die Einstellungen sind in Tabs gegliedert (Allgemein, Filelink, IFB, Einladungen, Erweitert, Debug, Ueber) und decken alle Optionen ab.
+## Highlights
 
-- **Talk-Link Workflow fuer Kalender**  
-  Erstellt wahlweise Event-Konversationen (Nextcloud >= 31) oder Standardraeume. Der Dialog deckt Lobby bis Start (Standard aktiv), Sichtbarkeit in der Suche (Standard aktiv) und ein optionales Passwort (>= 5 Zeichen) ab. Nach dem Speichern uebernimmt Outlook Link, Passwort und Hilfetext. Raumtitel und Beschreibung werden zwischen Outlook und Nextcloud synchronisiert; Terminabsagen loeschen verwaiste Raeume automatisch.
-
-- **Intelligentes Lifecycle-Management**  
-  Lobby-Updates und Loeschbefehle erfolgen nur, wenn der angemeldete Benutzer Veranstalter ist. Terminverschiebungen aktualisieren automatisch die Lobby-bis-Startzeit; Serien- und Einzeltermine werden sauber unterschieden.
-
-- **Komfortable Authentifizierung**  
-  Manuelles Login (Benutzername, App-Passwort) oder Login Flow v2 *Mit Nextcloud anmelden*. Letzterer oeffnet den Standardbrowser, registriert das Geraet als *NC Connector for Outlook* und uebernimmt das App-Passwort automatisch. Der Verbindungstest prueft Erreichbarkeit, Credentials sowie die Nextcloud-Version.
-
-- **Outlook-Maulkorb pro Konto**  
-  Im Tab *Einladungen* laesst sich pro Outlook-Konto festlegen, ob klassische Einladungen blockiert und stattdessen die Nextcloud-Benachrichtigungen genutzt werden. Konten ohne Maulkorb bleiben unberuehrt, waehrend aktivierte Konten dank Store-spezifischer Outbox-Listener und EntryID-Fallbacks zuverlaessig gebremst werden. Das Debug-Log zeichnet jeden Schritt (Hook-Status, Kontoerkennung, Block-Entscheidung) nach, damit Fehlersuche ohne Raetselraten funktioniert.
-
+- **One-click Nextcloud Talk**  
+Open an appointment, choose Nextcloud Talk, configure the room, and select a moderator. Optionally, invited attendees can be added to the room automatically (separately for internal Nextcloud users and external email guests). The wizard writes title, location, and a description block (including help link) into the appointment.
+- **Sharing deluxe**  
+The compose button “Insert Nextcloud share” starts the sharing wizard with upload queue, password generator, expiration date, and note field. The finished share is inserted as formatted HTML directly into the email.
+- **Enterprise-grade security**  
+Lobby until start time, moderator delegation, automatic cleanup of discarded appointments, mandatory passwords, and expiration policies help protect sensitive meetings and files.
 - **Internet Free/Busy Gateway (IFB)**  
-  Lokaler HTTP-Listener beantwortet Outlook-Free/Busy-Anfragen direkt aus Nextcloud. Registry-Werte fuer Suchpfad und Read-URL werden gesetzt. Bei HTTP 404 faellt das Add-in auf Scheduling-POST zurueck, sodass Verfuegbarkeiten bereitstehen.
+A local HTTP listener answers Outlook free/busy requests directly from Nextcloud. The installer configures registry values for search path and read URL. If the direct fetch returns HTTP 404, the add-in falls back to a scheduling POST so availability data is still provided.
+- **Debug logging at the press of a button**  
+Enable it in the Debug tab. Writes structured logs (authentication, appointment and filelink flows, IFB) to `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\addin-runtime.log`. The path is displayed in the UI.
 
-- **Debug-Logging auf Knopfdruck**  
-  Im Debug-Tab aktivierbar. Schreibt strukturierte Logs (Authentifizierung, Termin- und Filelink-Flows, IFB) nach `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\addin-runtime.log`. Der Speicherort wird im UI angezeigt.
+## Changelog
 
-- **Mehrsprachige Oberflaeche**  
-  Saemtliche sichtbaren Texte sind in Deutsch, Englisch und Franzoesisch verfuegbar. Die Sprache richtet sich nach der Windows-Anzeigesprache.
+See [`CHANGELOG.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/CHANGELOG.md).
 
-- **Filelink-Assistent fuer E-Mails**  
-  Ribbon-Button *Nextcloud Freigabe hinzufuegen* in der Mail-Komposition. Ein vierstufiger Wizard fuehrt durch Freigabename, Berechtigungen (Lesen/Erstellen/Bearbeiten/Loeschen), Passwort (>= 10 Zeichen inkl. Gross/Klein, Zahl, Sonderzeichen, Generator-Button) und Ablaufdatum (Standard aktiv) plus optionaler Notiz. Dateien und Ordner lassen sich mehrfach auswaehlen; Uploads landen in `/{Base}/YYYYMMDD_Freigabename/`. Bei gesetzter Berechtigung *Erstellen* kann eine Freigabe auch ohne initiale Dateien angelegt werden, sodass Empfaenger selbst Inhalte hochladen. Der HTML-Block uebernimmt Downloadlink, Passwort, Ablaufdatum und Rechte in einem festen Layout mit Nextcloud-Branding.
+## Feature overview
 
-- **Filelink-Einstellungen**  
-  Tab *Filelink* verwaltet das Basisverzeichnis (Standard `90 Freigaben - extern`). Uploads und Share-Berechtigungen orientieren sich an diesen Vorgaben.
+### Nextcloud Talk directly from the appointment
+- Talk dialog with lobby, password, listable scope, room type, and moderator search.
+- Automatically writes title, location and a description block (incl. help link and password) into the appointment.
+- Room tracking, lobby updates, delegation workflow, and cleanup when an appointment is discarded or moved.
+- Calendar changes (drag & drop or dialog edits) keep the Talk room lobby/start time in sync.
+- Optional participant sync after saving the appointment:
+  - **Users:** internal Nextcloud users are added to the room.
+  - **Guests:** external email addresses are invited as guests (Nextcloud may also send an additional invitation email).
 
-## Systemanforderungen
+### Nextcloud Sharing in the compose window
+- Four steps (share, expiration date, files, note) with a password-protected upload folder.
+- Upload queue with duplicate checks, progress display and optional share creation.
+- Automatic HTML block with link, password, expiration date and optional note.
 
-- Windows 10 oder Windows 11 (64 Bit)  
-- Microsoft Outlook classic >=2019  
+### Administration & compliance
+- Login Flow V2 (app password is created automatically) and central options (base URL, debug mode, sharing paths, defaults for Sharing/Talk).
+- Full localization (see [`Translations.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md)) and structured debug logs for support cases.
+
+## Language & translations
+
+- The UI language follows the Outlook/Office UI language. If Outlook is set to **Use system settings**, this usually matches the Windows display language.
+- Supported languages are documented in [`Translations.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md). Fallback is `de`, then `en`.
+
+### Language overrides (text blocks)
+
+In Settings under **Advanced**, you can choose the language for inserted text blocks independently of the UI language:
+
+- **Sharing HTML block** (email): language of the formatted HTML block inserted when sharing.
+- **Talk description text** (appointment): language of the inserted text (e.g., password line / help link).
+
+Option `Default (UI)` uses the current UI language (including fallbacks).
+
+## System requirements
+
+- Windows 10 or Windows 11 (64-bit)  
+- Microsoft Outlook classic >= 2019  
 - .NET Framework 4.7.2 Runtime  
-- Nextcloud Server mit Talk- und Filesharing-App
+- Nextcloud Server with Talk and Files Sharing apps
 
-## Installation und Updates
+## Installation and updates
 
-1. Outlook schliessen.  
-2. Aktuelle MSI (z.B. `NextcloudEnterpriseForOutlookAddin-0.0.91.msi` oder neuer) ausfuehren; das Setup richtet URLACL sowie alle benoetigten Registry-Schluessel fuer IFB ein.  
-3. Outlook starten und im Ribbon **Nextcloud Enterprise** auf **Einstellungen** klicken.  
-4. Login-Modus waehlen, Verbindungstest ausfuehren, Einstellungen speichern. Bei erfolgreichem Test bleibt IFB automatisch aktiv.  
-5. Filelink-Basisverzeichnis pruefen und Debug-Logging bei Bedarf aktivieren.
+1. Close Outlook.  
+2. Run the latest MSI (for example `NCConnectorForOutlook-2.2.7.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.  
+3. Start Outlook and click **NC Connector → Settings** in the ribbon.  
+4. Choose the login mode, run the connection test, and save. If the test succeeds, IFB is active automatically.  
+5. Verify the filelink base directory and enable debug logging if needed.
 
-Updates erfolgen durch Installation einer hoeheren MSI-Version. Persoenliche Einstellungen (`settings.ini`) bleiben erhalten. Die Deinstallation entfernt das Add-in, stoppt den IFB-Listener und setzt die Registry-Werte zurueck.
-
-## Typische Workflows
-
-- **Talk-Link einfuegen**: Termin oeffnen -> *Talk-Link einfuegen* -> Raumtyp und Optionen setzen -> Raum erstellen. Outlook uebernimmt Link, Passwort und Hilfetext; Nextcloud enthaelt den vorbereiteten Raum.  
-- **Termin aendern**: Zeiten oder Beschreibung anpassen und speichern. Das Add-in aktualisiert Lobby-Zeit und Raumbeschreibung automatisch.  
-- **Termin loeschen**: Entfernt der Organisator den Termin, wird der verknuepfte Raum geloescht.  
-- **Mail mit Filelink**: Mail verfassen -> *Nextcloud Freigabe hinzufuegen* -> Wizard durchlaufen -> Upload abwarten -> HTML-Block erscheint im Mail-Body, Dateien liegen strukturiert im Zielverzeichnis.  
-- **Free/Busy nutzen**: Einstellungen -> IFB. Outlook ruft danach Verfuegbarkeiten ueber `http://127.0.0.1:7777/nc-ifb/...` aus Nextcloud ab.
+Updates are applied by installing a higher MSI version. Personal settings (`settings.ini`) are kept. Uninstall removes the add-in, stops the IFB listener, and resets the registry values.
 
 ## Troubleshooting
 
-- **Debug-Log**: Tab *Debug* aktivieren. Log-Datei: `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\addin-runtime.log`.  
-- **IFB testen**: `powershell -Command "Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. Bei Abweichungen Registry unter `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar` pruefen.  
-- **TLS/Proxy pruefen**: `powershell -Command "Test-NetConnection <Ihre-Domain> -Port 443"`. Bei SSL-Warnungen Zertifikate/Proxy kontrollieren.  
-- **Filelink-Fehler**: Debug-Log liefert HTTP-Statuscodes und Exception-Meldungen. Pflichtfelder im Wizard sind validiert.
+- **Debug log**: enable it in the *Debug* tab. Log file: `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\addin-runtime.log`.  
+- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-2.2.7.msi" ADDLOCAL=ALL`.  
+- **Test IFB**: `powershell -Command "Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. If behavior differs, verify the registry under `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar`.  
+- **Check TLS/proxy**: `powershell -Command "Test-NetConnection <your-domain> -Port 443"`. If you see SSL warnings, verify certificates/proxy settings.  
+- **Sharing errors**: the debug log includes HTTP status codes and exception details. Required wizard fields are validated.
 
 ## Screenshots
 
 <details>
 <summary><strong>Settings</strong></summary>
 
-| <a href="Screenshots/settings.jpg"><img src="Screenshots/settings.jpg" alt="Settings Dialog" width="230"></a> |
+| <a href="Screenshots/settings.jpg"><img src="Screenshots/settings.jpg" alt="Settings dialog" width="230"></a> |
 | --- |
 
 </details>
 
 <details>
-<summary><strong>Talk-Link Workflow</strong></summary>
+<summary><strong>Talk link workflow</strong></summary>
 
-| <a href="Screenshots/1_talk.jpg"><img src="Screenshots/1_talk.jpg" alt="Talk Schritt 1" width="230"></a> | <a href="Screenshots/2_talk.jpg"><img src="Screenshots/2_talk.jpg" alt="Talk Schritt 2" width="230"></a> |
+| <a href="Screenshots/1_talk.jpg"><img src="Screenshots/1_talk.jpg" alt="Talk step 1" width="230"></a> | <a href="Screenshots/2_talk.jpg"><img src="Screenshots/2_talk.jpg" alt="Talk step 2" width="230"></a> |
 | --- | --- |
 
 </details>
 
 <details open>
-<summary><strong>Filelink Wizard</strong></summary>
+<summary><strong>Sharing wizard</strong></summary>
 
-| <a href="Screenshots/1_filelink.jpg"><img src="Screenshots/1_filelink.jpg" alt="Filelink Schritt 1" width="230"></a> | <a href="Screenshots/2_filelink.jpg"><img src="Screenshots/2_filelink.jpg" alt="Filelink Schritt 2" width="230"></a> |
+| <a href="Screenshots/1_filelink.jpg"><img src="Screenshots/1_filelink.jpg" alt="Sharing step 1" width="230"></a> | <a href="Screenshots/2_filelink.jpg"><img src="Screenshots/2_filelink.jpg" alt="Sharing step 2" width="230"></a> |
 | --- | --- |
-| <a href="Screenshots/3_filelink.jpg"><img src="Screenshots/3_filelink.jpg" alt="Filelink Schritt 3" width="230"></a> | <a href="Screenshots/4_filelink.jpg"><img src="Screenshots/4_filelink.jpg" alt="Filelink Schritt 4" width="230"></a> |
-| <a href="Screenshots/5_filelink.jpg"><img src="Screenshots/5_filelink.jpg" alt="Filelink Schritt 5" width="230"></a> | |
+| <a href="Screenshots/3_filelink.jpg"><img src="Screenshots/3_filelink.jpg" alt="Sharing step 3" width="230"></a> | <a href="Screenshots/4_filelink.jpg"><img src="Screenshots/4_filelink.jpg" alt="Sharing step 4" width="230"></a> |
+| <a href="Screenshots/5_filelink.jpg"><img src="Screenshots/5_filelink.jpg" alt="Sharing step 5" width="230"></a> | |
 
 </details>
 
 <details>
 <summary><strong>Internet Free/Busy</strong></summary>
 
-| <a href="Screenshots/ifb.jpg"><img src="Screenshots/ifb.jpg" alt="IFB Einstellungen" width="230"></a> |
+| <a href="Screenshots/ifb.jpg"><img src="Screenshots/ifb.jpg" alt="IFB settings" width="230"></a> |
 | --- |
 
 </details>
-
-## Roadmap (Auszug)
-
-1. Delegationsszenarien (Assistentenmodus) fuer gemeinsam genutzte / Freigegebene Kalender mit zuweisungen zu Identitäten und Moderationsübergabe 
-2. Sicherer Credential-Speicher (Windows Credential Locker oder DPAPI).  
-3. Logrotation und automatisierte Diagnosepakete.  
-
-## Lizenz
-
-GNU Affero General Public License v3.0  
-Copyright (c) 2025 Bastian Kleinschmidt
-
-## Unterstuetzung
-
-Wenn dir das Projekt gefaellt, kannst du es hier unterstuetzen: [paypal.me/debaschdi](https://paypal.me/debaschdi)
-
-
-
-
-

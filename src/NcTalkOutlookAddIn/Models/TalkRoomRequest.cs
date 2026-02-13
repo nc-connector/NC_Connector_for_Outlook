@@ -9,7 +9,7 @@ using System;
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Beschreibt die Nutzereingaben für das Anlegen eines Talk-Raums.
+     * Describes user input for creating a Talk room.
      */
     internal sealed class TalkRoomRequest
     {
@@ -28,5 +28,13 @@ namespace NcTalkOutlookAddIn.Models
         public DateTime? AppointmentEnd { get; set; }
 
         public string Description { get; set; }
+
+        public bool AddUsers { get; set; }
+
+        public bool AddGuests { get; set; }
+
+        public string DelegateModeratorId { get; set; }
+
+        public string DelegateModeratorName { get; set; }
     }
 }

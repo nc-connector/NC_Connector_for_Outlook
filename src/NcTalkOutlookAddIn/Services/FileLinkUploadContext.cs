@@ -10,8 +10,8 @@ using System.Collections.Generic;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Transportiert vorberechnete Pfade/Metadaten vom Upload-Setup in den eigentlichen Uploadprozess.
-     * Verhindert doppelte Verzeichnisanlage und hält Benutzer-/Pfadparameter zentral.
+     * Carries precomputed paths/metadata from the upload setup into the actual upload process.
+     * Avoids duplicate directory creation and keeps user/path parameters centralized.
      */
     internal sealed class FileLinkUploadContext
     {
@@ -29,7 +29,7 @@ namespace NcTalkOutlookAddIn.Services
 
             NormalizedBaseUrl = normalizedBaseUrl;
             Username = username ?? string.Empty;
-             SanitizedShareName = sanitizedShareName ?? string.Empty;
+            SanitizedShareName = sanitizedShareName ?? string.Empty;
             FolderName = folderName ?? string.Empty;
             RelativeFolderPath = relativeFolderPath ?? string.Empty;
             KnownFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

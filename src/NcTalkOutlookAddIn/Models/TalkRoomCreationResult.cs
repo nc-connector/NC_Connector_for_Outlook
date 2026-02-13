@@ -7,7 +7,7 @@
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Ergebnisdaten eines erfolgreich erzeugten Talk-Raums.
+     * Result data of a successfully created Talk room.
      */
     internal sealed class TalkRoomCreationResult
     {

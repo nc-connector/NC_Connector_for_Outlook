@@ -14,21 +14,27 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Reflection;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
+using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
 {
     /**
-     * Mehrseitiger Wizard zum Anlegen einer Nextcloud-Freigabe (Berechtigungen, Ablaufdatum,
-     * Datei/Ordner-Auswahl, Notiz sowie Uploadfortschritt).
+     * Multi-step wizard for creating a Nextcloud share (permissions, expiration date,
+     * file/folder selection, note, and upload progress).
      */
     internal sealed class FileLinkWizardForm : Form
     {
+        private const int DefaultMinPasswordLength = 8;
+        private readonly UiThemePalette _themePalette = UiThemeManager.DetectPalette();
+
         private readonly FileLinkService _service;
         private readonly FileLinkRequest _request = new FileLinkRequest();
+        private readonly TalkServiceConfiguration _configuration;
+        private readonly PasswordPolicyInfo _passwordPolicy;
+        private readonly AddinSettings _defaults;
         private readonly List<Panel> _steps = new List<Panel>();
         private readonly Label _titleLabel = new Label();
         private readonly Button _backButton = new Button();
@@ -36,8 +42,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _finishButton = new Button();
         private readonly Button _cancelButton = new Button();
         private readonly Button _uploadButton = new Button();
-        private readonly Panel _headerPanel = new Panel();
-        private readonly PictureBox _headerLogo = new PictureBox();
+        private readonly BrandedHeader _headerPanel = new BrandedHeader();
         private Panel _stepHost;
         private readonly Panel _progressPanel = new Panel();
         private readonly ProgressBar _progressBar = new ProgressBar();
@@ -70,17 +75,21 @@ namespace NcTalkOutlookAddIn.UI
         private bool _allowEmptyUpload;
         private FileLinkRequest _requestSnapshot;
 
-        internal FileLinkWizardForm(TalkServiceConfiguration configuration, string basePath)
+        internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, string basePath)
         {
+            _defaults = defaults ?? new AddinSettings();
+            _configuration = configuration;
+            _passwordPolicy = passwordPolicy;
             _service = new FileLinkService(configuration);
             _request.BasePath = basePath ?? string.Empty;
 
-            Text = "Nextcloud Freigabe";
+            Text = Strings.FileLinkWizardTitle;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(640, 480);
+            Icon = BrandingAssets.GetAppIcon(32);
 
             InitializeHeader();
             InitializeWizardLayout();
@@ -89,6 +98,8 @@ namespace NcTalkOutlookAddIn.UI
             InitializeStepFiles();
             InitializeStepNote();
             InitializeProgressPanel();
+
+            UiThemeManager.ApplyToForm(this);
 
             ShowStep(0);
         }
@@ -113,24 +124,15 @@ namespace NcTalkOutlookAddIn.UI
                 _stepHost.Size = new Size(ClientSize.Width - 40, ClientSize.Height - _stepHost.Top - 120);
             }
             PositionProgressBars();
-            UpdateHeaderLayout();
         }
 
         private void InitializeHeader()
         {
-            _headerPanel.Height = 34;
+            _headerPanel.Height = 48;
             _headerPanel.Dock = DockStyle.Top;
-            _headerPanel.BackColor = Color.FromArgb(0, 120, 212);
             _headerPanel.Padding = new Padding(0);
 
-            _headerLogo.Size = new Size(22, 22);
-            _headerLogo.SizeMode = PictureBoxSizeMode.Zoom;
-            _headerLogo.Image = LoadEmbeddedLogo("NcTalkOutlookAddIn.Resources.logo-nextcloud.png");
-            _headerPanel.Controls.Add(_headerLogo);
-            _headerPanel.Resize += (s, e) => UpdateHeaderLayout();
-
             Controls.Add(_headerPanel);
-            UpdateHeaderLayout();
         }
 
         private void InitializeWizardLayout()
@@ -149,29 +151,29 @@ namespace NcTalkOutlookAddIn.UI
             };
             Controls.Add(_stepHost);
 
-            _backButton.Text = "Zur\u00fcck";
+            _backButton.Text = Strings.ButtonBack;
             _backButton.AutoSize = true;
             _backButton.Click += (s, e) => Navigate(-1);
             Controls.Add(_backButton);
 
-            _uploadButton.Text = "Upload";
+            _uploadButton.Text = Strings.FileLinkWizardUploadButton;
             _uploadButton.AutoSize = true;
             _uploadButton.Enabled = false;
             _uploadButton.Visible = false;
             _uploadButton.Click += async (s, e) => await StartUploadAsync();
             Controls.Add(_uploadButton);
 
-            _nextButton.Text = "Weiter";
+            _nextButton.Text = Strings.ButtonNext;
             _nextButton.AutoSize = true;
             _nextButton.Click += (s, e) => Navigate(1);
             Controls.Add(_nextButton);
 
-            _finishButton.Text = "Fertigstellen";
+            _finishButton.Text = Strings.FileLinkWizardFinishButton;
             _finishButton.AutoSize = true;
             _finishButton.Click += async (s, e) => await FinishAsync();
             Controls.Add(_finishButton);
 
-            _cancelButton.Text = "Abbrechen";
+            _cancelButton.Text = Strings.ButtonCancel;
             _cancelButton.AutoSize = true;
             _cancelButton.Click += (s, e) => Close();
             Controls.Add(_cancelButton);
@@ -185,7 +187,7 @@ namespace NcTalkOutlookAddIn.UI
 
             var nameLabel = new Label
             {
-                Text = "Freigabename",
+                Text = Strings.FileLinkWizardShareNameLabel,
                 Location = new Point(12, 12),
                 AutoSize = true
             };
@@ -193,40 +195,45 @@ namespace NcTalkOutlookAddIn.UI
 
             _shareNameTextBox.Location = new Point(12, 36);
             _shareNameTextBox.Width = 360;
-            _shareNameTextBox.Text = "Freigabe";
+            _shareNameTextBox.Text = string.IsNullOrWhiteSpace(_defaults.SharingDefaultShareName)
+                ? Strings.FileLinkWizardFallbackShareName
+                : _defaults.SharingDefaultShareName;
             _shareNameTextBox.TextChanged += (s, e) => InvalidateUpload();
             panel.Controls.Add(_shareNameTextBox);
 
             var permissionsLabel = new Label
             {
-                Text = "Berechtigungen",
+                Text = Strings.FileLinkWizardPermissionsLabel,
                 Location = new Point(12, 76),
                 AutoSize = true
             };
             panel.Controls.Add(permissionsLabel);
 
-            _permissionReadCheckBox.Text = "Lesen";
+            _permissionReadCheckBox.Text = Strings.FileLinkPermissionRead;
             _permissionReadCheckBox.Location = new Point(18, 100);
             _permissionReadCheckBox.Checked = true;
             _permissionReadCheckBox.Enabled = false;
             panel.Controls.Add(_permissionReadCheckBox);
 
-            _permissionCreateCheckBox.Text = "Erstellen";
+            _permissionCreateCheckBox.Text = Strings.FileLinkPermissionCreate;
             _permissionCreateCheckBox.Location = new Point(18, 128);
+            _permissionCreateCheckBox.Checked = _defaults.SharingDefaultPermCreate;
             panel.Controls.Add(_permissionCreateCheckBox);
 
-            _permissionWriteCheckBox.Text = "Bearbeiten";
+            _permissionWriteCheckBox.Text = Strings.FileLinkPermissionWrite;
             _permissionWriteCheckBox.Location = new Point(18, 156);
+            _permissionWriteCheckBox.Checked = _defaults.SharingDefaultPermWrite;
             panel.Controls.Add(_permissionWriteCheckBox);
 
-            _permissionDeleteCheckBox.Text = "L\u00f6schen";
+            _permissionDeleteCheckBox.Text = Strings.FileLinkPermissionDelete;
             _permissionDeleteCheckBox.Location = new Point(18, 184);
+            _permissionDeleteCheckBox.Checked = _defaults.SharingDefaultPermDelete;
             panel.Controls.Add(_permissionDeleteCheckBox);
 
-            _passwordToggleCheckBox.Text = "Freigabe-Passwort setzen";
+            _passwordToggleCheckBox.Text = Strings.FileLinkWizardPasswordToggle;
             _passwordToggleCheckBox.AutoSize = true;
             _passwordToggleCheckBox.Location = new Point(12, 228);
-            _passwordToggleCheckBox.Checked = true;
+            _passwordToggleCheckBox.Checked = _defaults.SharingDefaultPasswordEnabled;
             _passwordToggleCheckBox.CheckedChanged += (s, e) => UpdatePasswordState();
             panel.Controls.Add(_passwordToggleCheckBox);
 
@@ -235,13 +242,18 @@ namespace NcTalkOutlookAddIn.UI
             _passwordTextBox.Location = new Point(_passwordToggleCheckBox.Left + toggleWidth + 12, _passwordToggleCheckBox.Top - 2);
             panel.Controls.Add(_passwordTextBox);
 
-            _passwordGenerateButton.Text = "Generieren";
+            _passwordGenerateButton.Text = Strings.TalkPasswordGenerate;
             _passwordGenerateButton.AutoSize = true;
             _passwordGenerateButton.Location = new Point(_passwordTextBox.Right + 8, _passwordToggleCheckBox.Top - 4);
             _passwordGenerateButton.Click += (s, e) => GeneratePassword();
             panel.Controls.Add(_passwordGenerateButton);
 
-            GeneratePassword();
+            if (_passwordToggleCheckBox.Checked)
+            {
+                _passwordTextBox.Text = GenerateLocalPassword(GetMinPasswordLength());
+            }
+
+            UpdatePasswordState();
 
             _steps.Add(panel);
         }
@@ -250,25 +262,27 @@ namespace NcTalkOutlookAddIn.UI
         {
             var panel = CreateStepPanel();
 
-            _expireToggleCheckBox.Text = "Ablaufdatum setzen";
+            _expireToggleCheckBox.Text = Strings.FileLinkWizardExpireToggle;
             _expireToggleCheckBox.AutoSize = true;
             _expireToggleCheckBox.Location = new Point(12, 12);
-            _expireToggleCheckBox.Checked = true;
+            _expireToggleCheckBox.Checked = _defaults.SharingDefaultExpireDays > 0;
             _expireToggleCheckBox.CheckedChanged += (s, e) => UpdateExpireState();
             panel.Controls.Add(_expireToggleCheckBox);
 
             _expireDatePicker.Width = 160;
             _expireDatePicker.Format = DateTimePickerFormat.Short;
-            _expireDatePicker.Value = DateTime.Today.AddDays(7);
+            int expireDays = _defaults.SharingDefaultExpireDays > 0 ? _defaults.SharingDefaultExpireDays : 7;
+            _expireDatePicker.Value = DateTime.Today.AddDays(expireDays);
             _expireDatePicker.Location = new Point(_expireToggleCheckBox.Left + _expireToggleCheckBox.PreferredSize.Width + 12, _expireToggleCheckBox.Top - 2);
             panel.Controls.Add(_expireDatePicker);
 
-            _expireHintLabel.Text = "Nach Ablauf ist der Link nicht mehr abrufbar.";
+            _expireHintLabel.Text = Strings.FileLinkWizardExpireHint;
             _expireHintLabel.Location = new Point(12, _expireToggleCheckBox.Bottom + 24);
             _expireHintLabel.AutoSize = true;
             _expireHintLabel.ForeColor = Color.DimGray;
             panel.Controls.Add(_expireHintLabel);
 
+            UpdateExpireState();
             _steps.Add(panel);
         }
 
@@ -277,7 +291,7 @@ namespace NcTalkOutlookAddIn.UI
             var panel = CreateStepPanel();
             panel.SuspendLayout();
 
-            _basePathLabel.Text = "Basisverzeichnis: " + (_request.BasePath ?? string.Empty);
+            _basePathLabel.Text = Strings.FileLinkWizardBasePathPrefix + (_request.BasePath ?? string.Empty);
             _basePathLabel.Location = new Point(12, 12);
             _basePathLabel.AutoSize = true;
             panel.Controls.Add(_basePathLabel);
@@ -289,25 +303,25 @@ namespace NcTalkOutlookAddIn.UI
             _fileListView.HideSelection = false;
             _fileListView.Scrollable = true;
             _fileListView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            _fileListView.Columns.Add("Pfad", 240);
-            _fileListView.Columns.Add("Typ", 100);
-            _fileListView.Columns.Add("Status", 120);
+            _fileListView.Columns.Add(Strings.FileLinkWizardColumnPath, 240);
+            _fileListView.Columns.Add(Strings.FileLinkWizardColumnType, 100);
+            _fileListView.Columns.Add(Strings.FileLinkWizardColumnStatus, 120);
             _fileListView.Resize += (s, e) => PositionProgressBars();
             panel.Controls.Add(_fileListView);
 
-            _addFilesButton.Text = "Dateien hinzuf\u00fcgen...";
+            _addFilesButton.Text = Strings.FileLinkWizardAddFilesButton;
             _addFilesButton.Size = new Size(150, 28);
             _addFilesButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _addFilesButton.Click += (s, e) => AddFiles();
             panel.Controls.Add(_addFilesButton);
 
-            _addFolderButton.Text = "Ordner hinzuf\u00fcgen...";
+            _addFolderButton.Text = Strings.FileLinkWizardAddFolderButton;
             _addFolderButton.Size = new Size(150, 28);
             _addFolderButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _addFolderButton.Click += (s, e) => AddFolder();
             panel.Controls.Add(_addFolderButton);
 
-            _removeItemButton.Text = "Entfernen";
+            _removeItemButton.Text = Strings.FileLinkWizardRemoveButton;
             _removeItemButton.Size = new Size(150, 28);
             _removeItemButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _removeItemButton.Click += (s, e) => RemoveSelection();
@@ -350,7 +364,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             var panel = CreateStepPanel();
 
-            _noteToggleCheckBox.Text = "Notiz an Empf\u00e4nger hinzuf\u00fcgen";
+            _noteToggleCheckBox.Text = Strings.FileLinkWizardNoteToggle;
             _noteToggleCheckBox.AutoSize = true;
             _noteToggleCheckBox.Location = new Point(12, 12);
             _noteToggleCheckBox.CheckedChanged += (s, e) => UpdateNoteState();
@@ -401,30 +415,6 @@ namespace NcTalkOutlookAddIn.UI
             return panel;
         }
 
-        private void UpdateHeaderLayout()
-        {
-            if (_headerPanel == null || _headerLogo == null)
-            {
-                return;
-            }
-            int x = (_headerPanel.Width - _headerLogo.Width) / 2;
-            int y = (_headerPanel.Height - _headerLogo.Height) / 2;
-            _headerLogo.Location = new Point(Math.Max(0, x), Math.Max(0, y));
-        }
-
-        private static Image LoadEmbeddedLogo(string resourceName)
-        {
-            var assembly = Assembly.GetExecutingAssembly();
-            using (var stream = assembly.GetManifestResourceStream(resourceName))
-            {
-                if (stream == null)
-                {
-                    return null;
-                }
-                return Image.FromStream(stream);
-            }
-        }
-
         private void ShowStep(int index)
         {
             if (index < 0 || index >= _steps.Count)
@@ -444,16 +434,16 @@ namespace NcTalkOutlookAddIn.UI
             switch (index)
             {
                 case 0:
-                    title = "Freigabeeinstellungen";
+                    title = Strings.FileLinkWizardStepShare;
                     break;
                 case 1:
-                    title = "Ablaufdatum";
+                    title = Strings.FileLinkWizardStepExpire;
                     break;
                 case 2:
-                    title = "Dateien oder Ordner ausw\u00e4hlen";
+                    title = Strings.FileLinkWizardStepFiles;
                     break;
                 case 3:
-                    title = "Notiz an Empf\u00e4nger";
+                    title = Strings.FileLinkWizardStepNote;
                     break;
                 default:
                     title = string.Empty;
@@ -483,14 +473,18 @@ namespace NcTalkOutlookAddIn.UI
             {
                 if (string.IsNullOrWhiteSpace(_shareNameTextBox.Text))
                 {
-                    MessageBox.Show("Bitte einen Freigabenamen angeben.", Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(Strings.FileLinkWizardShareNameRequired, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     _shareNameTextBox.Focus();
                     return false;
                 }
 
                 if (_passwordToggleCheckBox.Checked && !IsPasswordValid(_passwordTextBox.Text))
                 {
-                    MessageBox.Show("Das Passwort muss mindestens 10 Zeichen lang sein und je einen Gro\u00dfbuchstaben, einen Kleinbuchstaben, eine Ziffer sowie ein Sonderzeichen enthalten.", Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        string.Format(CultureInfo.CurrentCulture, Strings.TalkPasswordTooShort, GetMinPasswordLength()),
+                        Strings.DialogTitle,
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                     _passwordTextBox.Focus();
                     return false;
                 }
@@ -504,7 +498,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 if (_expireToggleCheckBox.Checked && _expireDatePicker.Value.Date < DateTime.Today)
                 {
-                    MessageBox.Show("Das Ablaufdatum muss in der Zukunft liegen.", Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(Strings.FileLinkWizardExpireMustBeFuture, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }
             }
@@ -523,7 +517,7 @@ namespace NcTalkOutlookAddIn.UI
                     }
                     else
                     {
-                        MessageBox.Show("Bitte mindestens eine Datei oder einen Ordner ausw\u00e4hlen.", Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(Strings.FileLinkWizardSelectFileOrFolder, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return false;
                     }
                 }
@@ -533,7 +527,7 @@ namespace NcTalkOutlookAddIn.UI
                 }
                 if (!_uploadCompleted)
                 {
-                    MessageBox.Show("Bitte laden Sie die ausgew\u00e4hlten Dateien zuerst hoch.", Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(Strings.FileLinkWizardUploadFirst, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }
             }
@@ -580,7 +574,7 @@ namespace NcTalkOutlookAddIn.UI
             if (_uploadContext == null || !_uploadCompleted)
             {
                 MessageBox.Show(
-                    "Bitte laden Sie die ausgew\u00e4hlten Dateien zuerst hoch.",
+                    Strings.FileLinkWizardUploadFirst,
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -593,7 +587,7 @@ namespace NcTalkOutlookAddIn.UI
             _cancelButton.Enabled = false;
             _progressPanel.Visible = true;
             _progressBar.Style = ProgressBarStyle.Marquee;
-            _progressLabel.Text = "Freigabe wird erstellt...";
+            _progressLabel.Text = Strings.FileLinkWizardCreatingShare;
 
             _cancellationSource = new CancellationTokenSource();
 
@@ -611,8 +605,9 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Share creation failed.", ex);
                 MessageBox.Show(
-                    "Freigabe konnte nicht erstellt werden: " + ex.Message,
+                    string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardCreateFailedFormat, ex.Message),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     ex.IsAuthenticationError ? MessageBoxIcon.Warning : MessageBoxIcon.Error);
@@ -621,8 +616,9 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Share creation failed unexpectedly.", ex);
                 MessageBox.Show(
-                    "Freigabe konnte nicht erstellt werden: " + ex.Message,
+                    string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardCreateFailedFormat, ex.Message),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -703,7 +699,7 @@ namespace NcTalkOutlookAddIn.UI
             string sanitizedShareName = FileLinkService.SanitizeComponent(shareNameInput);
             if (string.IsNullOrWhiteSpace(sanitizedShareName))
             {
-                sanitizedShareName = "Freigabe";
+                sanitizedShareName = Strings.FileLinkWizardFallbackShareName;
             }
 
             string folderName = DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + "_" + sanitizedShareName;
@@ -717,7 +713,7 @@ namespace NcTalkOutlookAddIn.UI
                 if (_service.FolderExists(_request.BasePath, folderName, CancellationToken.None))
                 {
                     MessageBox.Show(
-                        "Der Freigabeordner \"" + folderName + "\" existiert bereits. Bitte vergeben Sie einen anderen Freigabenamen.",
+                        string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardFolderExistsFormat, folderName),
                         Strings.DialogTitle,
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
@@ -728,8 +724,9 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Share folder existence check failed.", ex);
                 MessageBox.Show(
-                    "Der Freigabeordner konnte nicht überprüft werden: " + ex.Message,
+                    string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardFolderCheckFailedFormat, ex.Message),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     ex.IsAuthenticationError ? MessageBoxIcon.Warning : MessageBoxIcon.Error);
@@ -861,7 +858,7 @@ namespace NcTalkOutlookAddIn.UI
                 Tag = selection
             };
             listViewItem.UseItemStyleForSubItems = false;
-            listViewItem.SubItems.Add(selection.SelectionType == FileLinkSelectionType.File ? "Datei" : "Ordner");
+            listViewItem.SubItems.Add(selection.SelectionType == FileLinkSelectionType.File ? Strings.FileLinkWizardTypeFile : Strings.FileLinkWizardTypeFolder);
             listViewItem.SubItems.Add(string.Empty);
             _fileListView.Items.Add(listViewItem);
 
@@ -911,7 +908,7 @@ namespace NcTalkOutlookAddIn.UI
                 if (state.Item.SubItems.Count >= 3)
                 {
                     state.Item.SubItems[2].Text = string.Empty;
-                    state.Item.SubItems[2].ForeColor = SystemColors.ControlText;
+                    state.Item.SubItems[2].ForeColor = _themePalette.Text;
                 }
             }
 
@@ -986,8 +983,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         /**
-         * Positioniert oder blendet die individuellen Fortschrittsbalken neben jedem Listen-Eintrag.
-         * Bei fehlenden Items werden bestehende Balken ausgeblendet, um Ausnahmen zu vermeiden.
+         * Positions or hides the per-item progress bars next to each list entry.
+         * If items are missing, existing bars are hidden to avoid exceptions.
          */
         private void PositionProgressBars()
         {
@@ -1090,6 +1087,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (OperationCanceledException)
             {
+                DiagnosticsLogger.Log(LogCategories.FileLink, "Upload cancelled.");
                 foreach (var state in _selectionStates.Values)
                 {
                     state.Status = FileLinkUploadStatus.Failed;
@@ -1100,18 +1098,20 @@ namespace NcTalkOutlookAddIn.UI
                     }
                     if (state.Item.SubItems.Count >= 3)
                     {
-                        state.Item.SubItems[2].Text = "Abgebrochen";
-                        state.Item.SubItems[2].ForeColor = Color.Firebrick;
+                        state.Item.SubItems[2].Text = Strings.FileLinkWizardStatusCancelled;
+                        state.Item.SubItems[2].ForeColor = _themePalette.ErrorText;
                     }
                 }
-                ShowUploadError("Upload wurde abgebrochen.");
+                ShowUploadError(Strings.FileLinkWizardUploadCancelledMessage);
             }
             catch (TalkServiceException ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed with service error.", ex);
                 ShowUploadError(ex.Message);
             }
             catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed unexpectedly.", ex);
                 ShowUploadError(ex.Message);
             }
             finally
@@ -1137,7 +1137,7 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         /**
-         * Fragt nach, ob ohne vorbereitete Uploads fortgefahren werden soll.
+         * Asks whether to continue without prepared uploads.
          */
         private bool ConfirmEmptyUploadProceed()
         {
@@ -1149,6 +1149,7 @@ namespace NcTalkOutlookAddIn.UI
                 dialog.ClientSize = new Size(420, 150);
                 dialog.MaximizeBox = false;
                 dialog.MinimizeBox = false;
+                dialog.Icon = BrandingAssets.GetAppIcon(32);
 
                 var label = new Label
                 {
@@ -1178,6 +1179,8 @@ namespace NcTalkOutlookAddIn.UI
                 dialog.Controls.Add(backButton);
                 dialog.AcceptButton = continueButton;
                 dialog.CancelButton = backButton;
+
+                UiThemeManager.ApplyToForm(dialog);
 
                 bool result = dialog.ShowDialog(this) == DialogResult.OK;
                 if (!result)
@@ -1223,7 +1226,7 @@ namespace NcTalkOutlookAddIn.UI
                 if (state.Item.SubItems.Count >= 3)
                 {
                     state.Item.SubItems[2].Text = percent.ToString(CultureInfo.InvariantCulture) + "%";
-                    state.Item.SubItems[2].ForeColor = Color.FromArgb(64, 64, 64);
+                    state.Item.SubItems[2].ForeColor = _themePalette.MutedText;
                 }
             }
             else if (progress.Status == FileLinkUploadStatus.Completed)
@@ -1233,7 +1236,7 @@ namespace NcTalkOutlookAddIn.UI
                     state.ProgressBar.Visible = false;
                     state.ProgressBar.Value = 100;
                 }
-                string statusText = "\u2714 Erfolgreich";
+                string statusText = Strings.FileLinkWizardStatusSuccess;
                 if (!string.IsNullOrEmpty(state.RenamedTo))
                 {
                     statusText += " \u2192 " + state.RenamedTo;
@@ -1241,7 +1244,7 @@ namespace NcTalkOutlookAddIn.UI
                 if (state.Item.SubItems.Count >= 3)
                 {
                     state.Item.SubItems[2].Text = statusText;
-                    state.Item.SubItems[2].ForeColor = Color.SeaGreen;
+                    state.Item.SubItems[2].ForeColor = _themePalette.SuccessText;
                 }
             }
             else if (progress.Status == FileLinkUploadStatus.Failed)
@@ -1253,8 +1256,8 @@ namespace NcTalkOutlookAddIn.UI
                 string message = string.IsNullOrWhiteSpace(progress.Message) ? string.Empty : " (" + progress.Message + ")";
                 if (state.Item.SubItems.Count >= 3)
                 {
-                    state.Item.SubItems[2].Text = "\u2716 Fehler" + message;
-                    state.Item.SubItems[2].ForeColor = Color.Firebrick;
+                    state.Item.SubItems[2].Text = Strings.FileLinkWizardStatusError + message;
+                    state.Item.SubItems[2].ForeColor = _themePalette.ErrorText;
                 }
             }
 
@@ -1277,7 +1280,7 @@ namespace NcTalkOutlookAddIn.UI
                     }
                     if (state.Item.SubItems.Count >= 3)
                     {
-                        state.Item.SubItems[2].Text = "\u2716 Fehler";
+                        state.Item.SubItems[2].Text = Strings.FileLinkWizardStatusError;
                     }
                 }
             }
@@ -1286,8 +1289,8 @@ namespace NcTalkOutlookAddIn.UI
             UpdateUploadButtonState();
 
             string text = string.IsNullOrWhiteSpace(message)
-                ? "Upload fehlgeschlagen."
-                : "Upload fehlgeschlagen: " + message;
+                ? Strings.FileLinkWizardUploadFailed
+                : string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardUploadFailedFormat, message);
 
             MessageBox.Show(
                 text,
@@ -1317,20 +1320,21 @@ namespace NcTalkOutlookAddIn.UI
         {
             using (var form = new Form())
             {
-                form.Text = info.IsDirectory ? "Ordner umbenennen" : "Datei umbenennen";
+                form.Text = info.IsDirectory ? Strings.FileLinkWizardRenameFolderTitle : Strings.FileLinkWizardRenameFileTitle;
                 form.FormBorderStyle = FormBorderStyle.FixedDialog;
                 form.ClientSize = new Size(360, 140);
                 form.MaximizeBox = false;
                 form.MinimizeBox = false;
                 form.StartPosition = FormStartPosition.CenterParent;
                 form.ShowInTaskbar = false;
+                form.Icon = BrandingAssets.GetAppIcon(32);
 
                 var label = new Label
                 {
                     AutoSize = true,
                     Text = info.IsDirectory
-                        ? "Bitte neuen Ordnernamen eingeben:"
-                        : "Bitte neuen Dateinamen eingeben:",
+                        ? Strings.FileLinkWizardRenameFolderPrompt
+                        : Strings.FileLinkWizardRenameFilePrompt,
                     Location = new Point(12, 12)
                 };
                 form.Controls.Add(label);
@@ -1343,12 +1347,14 @@ namespace NcTalkOutlookAddIn.UI
                 };
                 form.Controls.Add(textBox);
 
-                var okButton = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(188, 88) };
-                var cancelButton = new Button { Text = "Abbrechen", DialogResult = DialogResult.Cancel, Location = new Point(270, 88) };
+                var okButton = new Button { Text = Strings.DialogOk, DialogResult = DialogResult.OK, Location = new Point(188, 88) };
+                var cancelButton = new Button { Text = Strings.DialogCancel, DialogResult = DialogResult.Cancel, Location = new Point(270, 88) };
                 form.Controls.Add(okButton);
                 form.Controls.Add(cancelButton);
                 form.AcceptButton = okButton;
                 form.CancelButton = cancelButton;
+
+                UiThemeManager.ApplyToForm(form);
 
                 if (form.ShowDialog(this) == DialogResult.OK)
                 {
@@ -1380,84 +1386,77 @@ namespace NcTalkOutlookAddIn.UI
             return null;
         }
 
+        private int GetMinPasswordLength()
+        {
+            if (_passwordPolicy != null && _passwordPolicy.MinLength > 0)
+            {
+                return _passwordPolicy.MinLength;
+            }
+
+            return DefaultMinPasswordLength;
+        }
+
         private void GeneratePassword()
         {
-            const int length = 12;
-            const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-            const string lower = "abcdefghijkmnopqrstuvwxyz";
-            const string digits = "23456789";
-            const string special = "!@$%&*-_+?";
-            string all = upper + lower + digits + special;
+            if (!_passwordToggleCheckBox.Checked)
+            {
+                return;
+            }
 
-            var chars = new List<char>(length);
+            int minLength = GetMinPasswordLength();
+            string generated = null;
+
+            try
+            {
+                if (_configuration != null && _passwordPolicy != null && _passwordPolicy.HasPolicy)
+                {
+                    var policyService = new PasswordPolicyService(_configuration);
+                    generated = policyService.GeneratePassword(_passwordPolicy);
+                }
+            }
+            catch (Exception ex)
+            {
+                generated = null;
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Password generation via server policy failed; falling back to local generator.", ex);
+            }
+
+            if (string.IsNullOrWhiteSpace(generated) || generated.Trim().Length < minLength)
+            {
+                generated = GenerateLocalPassword(minLength);
+            }
+
+            _passwordTextBox.Text = generated;
+        }
+
+        private static string GenerateLocalPassword(int minLength)
+        {
+            const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+            int length = Math.Max(8, minLength);
+            var chars = new char[length];
             using (var rng = RandomNumberGenerator.Create())
             {
-                chars.Add(GetRandomChar(rng, upper));
-                chars.Add(GetRandomChar(rng, lower));
-                chars.Add(GetRandomChar(rng, digits));
-                chars.Add(GetRandomChar(rng, special));
-
-                while (chars.Count < length)
-                {
-                    chars.Add(GetRandomChar(rng, all));
-                }
-
-                Shuffle(chars, rng);
-            }
-
-            _passwordTextBox.Text = new string(chars.ToArray());
-        }
-
-        private static char GetRandomChar(RandomNumberGenerator rng, string source)
-        {
-            byte[] data = new byte[4];
-            rng.GetBytes(data);
-            int index = (int)(BitConverter.ToUInt32(data, 0) % source.Length);
-            return source[index];
-        }
-
-        private static void Shuffle(IList<char> list, RandomNumberGenerator rng)
-        {
-            for (int i = list.Count - 1; i > 0; i--)
-            {
                 byte[] data = new byte[4];
-                rng.GetBytes(data);
-                int j = (int)(BitConverter.ToUInt32(data, 0) % (i + 1));
-                char temp = list[i];
-                list[i] = list[j];
-                list[j] = temp;
+                for (int i = 0; i < chars.Length; i++)
+                {
+                    rng.GetBytes(data);
+                    int index = (int)(BitConverter.ToUInt32(data, 0) % alphabet.Length);
+                    chars[i] = alphabet[index];
+                }
             }
+
+            return new string(chars);
         }
 
-        private static bool IsPasswordValid(string password)
+        private bool IsPasswordValid(string password)
         {
-            if (string.IsNullOrEmpty(password) || password.Length < 10)
+            if (string.IsNullOrWhiteSpace(password))
             {
                 return false;
             }
 
-            bool hasUpper = false, hasLower = false, hasDigit = false, hasSpecial = false;
-            foreach (char c in password)
-            {
-                if (char.IsUpper(c))
-                {
-                    hasUpper = true;
-                }
-                else if (char.IsLower(c))
-                {
-                    hasLower = true;
-                }
-                else if (char.IsDigit(c))
-                {
-                    hasDigit = true;
-                }
-                else
-                {
-                    hasSpecial = true;
-                }
-            }
-
-            return hasUpper && hasLower && hasDigit && hasSpecial;
+            string trimmed = password.Trim();
+            int minLength = GetMinPasswordLength();
+            return trimmed.Length >= minLength;
         }
     }
 }

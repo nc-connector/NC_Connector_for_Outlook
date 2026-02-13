@@ -11,12 +11,14 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Web.Script.Serialization;
+using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Laedt das Nextcloud System-Adressbuch (z-server-generated--system) und cached die Zuordnung
-     * von E-Mail-Adressen zu Kalender-UIDs (.vcf).
+     * Loads the Nextcloud system address book (z-server-generated--system) and caches mappings
+     * from email addresses to calendar UIDs (.vcf).
      */
     internal sealed class IfbAddressBookCache
     {
@@ -121,6 +123,33 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
+        internal List<NextcloudUser> GetUsers(TalkServiceConfiguration configuration, int cacheHours)
+        {
+            var users = new List<NextcloudUser>();
+            if (configuration == null || !configuration.IsComplete())
+            {
+                return users;
+            }
+
+            lock (_syncRoot)
+            {
+                EnsureCache(configuration, cacheHours);
+
+                foreach (var pair in _uidToEmail)
+                {
+                    if (string.IsNullOrWhiteSpace(pair.Key))
+                    {
+                        continue;
+                    }
+
+                    users.Add(new NextcloudUser(pair.Key.Trim(), pair.Value ?? string.Empty));
+                }
+            }
+
+            users.Sort((a, b) => string.Compare(a.UserId, b.UserId, StringComparison.OrdinalIgnoreCase));
+            return users;
+        }
+
         private void EnsureCache(TalkServiceConfiguration configuration, int cacheHours)
         {
             if (cacheHours < 1)
@@ -194,8 +223,9 @@ namespace NcTalkOutlookAddIn.Services
                 _generatedUtc = data.GeneratedUtc;
                 return map.Count > 0;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to load IFB address book cache from disk.", ex);
                 return false;
             }
         }
@@ -205,7 +235,7 @@ namespace NcTalkOutlookAddIn.Services
             string baseUrl = configuration.GetNormalizedBaseUrl();
             if (string.IsNullOrEmpty(baseUrl))
             {
-                throw new InvalidOperationException("Server-URL ist nicht konfiguriert.");
+                throw new InvalidOperationException("Server URL is not configured.");
             }
 
             string addressBookUrl = string.Format(CultureInfo.InvariantCulture,
@@ -221,7 +251,7 @@ namespace NcTalkOutlookAddIn.Services
                 var request = (HttpWebRequest)WebRequest.Create(addressBookUrl);
                 request.Method = "GET";
                 request.Accept = "text/vcard,text/x-vcard,text/plain,*/*";
-                request.Headers["Authorization"] = "Basic " + EncodeBasicAuth(configuration.Username, configuration.AppPassword);
+                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(configuration.Username, configuration.AppPassword);
                 request.Timeout = 60000;
 
                 response = (HttpWebResponse)request.GetResponse();
@@ -243,7 +273,8 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
 
-                throw new InvalidOperationException("Adressbuch konnte nicht geladen werden: " + ex.Message, ex);
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Address book could not be loaded from server.", ex);
+                throw new InvalidOperationException("Address book could not be loaded: " + ex.Message, ex);
             }
             finally
             {
@@ -255,7 +286,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (string.IsNullOrEmpty(responseText))
             {
-                throw new InvalidOperationException("Adressbuch-Antwort war leer.");
+                throw new InvalidOperationException("Address book response was empty.");
             }
 
             var entries = ParseAddressBook(responseText);
@@ -325,9 +356,10 @@ namespace NcTalkOutlookAddIn.Services
                 string json = _serializer.Serialize(data);
                 File.WriteAllText(_cacheFilePath, json, Encoding.UTF8);
             }
-            catch
+            catch (Exception ex)
             {
-                // Cache-Schreiben darf nicht zum Fehler werden.
+                // Cache writes must never fail the request.
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to write IFB address book cache to disk.", ex);
             }
         }
 
@@ -412,12 +444,6 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             return result;
-        }
-
-        private static string EncodeBasicAuth(string username, string password)
-        {
-            string raw = (username ?? string.Empty) + ":" + (password ?? string.Empty);
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
         }
 
         private sealed class CacheContainer

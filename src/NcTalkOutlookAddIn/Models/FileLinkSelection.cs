@@ -7,7 +7,7 @@
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Unterscheidet zwischen Einzeldatei und Ordner (inkl. rekursivem Upload).
+     * Distinguishes between a single file and a directory (including recursive upload).
      */
     internal enum FileLinkSelectionType
     {
@@ -16,7 +16,7 @@ namespace NcTalkOutlookAddIn.Models
     }
 
     /**
-     * Kapselt Pfad + Typ einer vom Benutzer ausgewaehlten Ressource.
+     * Wraps the path and type of a user-selected resource.
      */
     internal sealed class FileLinkSelection
     {

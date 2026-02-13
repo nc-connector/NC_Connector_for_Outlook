@@ -9,7 +9,7 @@ using System;
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Rueckgabestruktur des Filelink-Services mit allen Infos fuer HTML-Block und Nachbearbeitung.
+     * Result returned by the sharing service with all data required for the HTML block and follow-up actions.
      */
     internal sealed class FileLinkResult
     {

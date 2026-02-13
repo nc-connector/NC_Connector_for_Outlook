@@ -7,7 +7,7 @@
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Statuswerte, die der Upload-Thread mit dem UI-Thread austauscht.
+     * Status values exchanged between the upload worker and the UI thread.
      */
     internal enum FileLinkUploadStatus
     {

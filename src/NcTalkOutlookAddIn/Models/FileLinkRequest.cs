@@ -10,8 +10,8 @@ using System.Collections.Generic;
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Aggregiert alle Eingaben aus dem Filelink-Wizard (Basispfad, Berechtigungen, Ablaufdaten,
-     * optionaler Hinweis sowie die zu übertragenden Dateien). Dient als Parameterobjekt für den Service.
+     * Aggregates all inputs from the sharing wizard (base path, permissions, expiration,
+     * optional note, and the selected files). Used as a parameter object for the service layer.
      */
     internal sealed class FileLinkRequest
     {

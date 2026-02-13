@@ -19,8 +19,8 @@ using NcTalkOutlookAddIn.Utilities;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Verantwortlich für das Erstellen von Nextcloud-Shares inklusive Upload der lokalen Dateien.
-     * Kapselt die komplette Workflowkette (Ordner anlegen, Upload, Freigabe erzeugen, Ergebnis zurückgeben).
+     * Creates Nextcloud shares including uploading local files.
+     * Encapsulates the full workflow (create folder, upload, create share, return result).
      */
     internal sealed class FileLinkService
     {
@@ -29,7 +29,11 @@ namespace NcTalkOutlookAddIn.Services
         private readonly JavaScriptSerializerExtended _serializer = new JavaScriptSerializerExtended();
         private static void LogApi(string message)
         {
-            DiagnosticsLogger.Log("API", message);
+            DiagnosticsLogger.Log(LogCategories.Api, message);
+        }
+        private static void LogFileLink(string message)
+        {
+            DiagnosticsLogger.Log(LogCategories.FileLink, message);
         }
 
         internal FileLinkService(TalkServiceConfiguration configuration)
@@ -87,7 +91,7 @@ namespace NcTalkOutlookAddIn.Services
             string sanitizedShareName = SanitizeComponent(request.ShareName);
             if (string.IsNullOrWhiteSpace(sanitizedShareName))
             {
-                sanitizedShareName = "Freigabe";
+                sanitizedShareName = "Share";
             }
 
             string folderName = DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + "_" + sanitizedShareName;
@@ -161,6 +165,7 @@ namespace NcTalkOutlookAddIn.Services
                 catch (Exception ex)
                 {
                     ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Failed, ex.Message, 0);
+                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed for '" + (selection != null ? selection.LocalPath : string.Empty) + "'.", ex);
                     throw;
                 }
             }
@@ -207,7 +212,7 @@ namespace NcTalkOutlookAddIn.Services
             request.Method = "PROPFIND";
             request.Headers["Depth"] = "0";
             request.Timeout = 60000;
-            request.Headers["Authorization"] = "Basic " + EncodeBasicAuth(_configuration.Username, _configuration.AppPassword);
+            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
             request.ContentLength = 0;
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -228,16 +233,19 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     if (httpResponse.StatusCode == HttpStatusCode.NotFound)
                     {
+                        LogFileLink("DAV folder not found: " + url);
                         return false;
                     }
 
                     bool authError = httpResponse.StatusCode == HttpStatusCode.Unauthorized
                                      || httpResponse.StatusCode == HttpStatusCode.Forbidden;
 
-                    throw new TalkServiceException("Ordnerpruefung fehlgeschlagen: " + ex.Message, authError, httpResponse.StatusCode, null);
+                    DiagnosticsLogger.LogException(LogCategories.Api, "DAV folder check failed (" + url + ", status=" + (int)httpResponse.StatusCode + ").", ex);
+                    throw new TalkServiceException("Folder check failed: " + ex.Message, authError, httpResponse.StatusCode, null);
                 }
 
-                throw new TalkServiceException("Ordnerpruefung fehlgeschlagen: " + ex.Message, false, 0, null);
+                DiagnosticsLogger.LogException(LogCategories.Api, "DAV folder check failed (" + url + ").", ex);
+                throw new TalkServiceException("Folder check failed: " + ex.Message, false, 0, null);
             }
         }
 
@@ -303,7 +311,7 @@ namespace NcTalkOutlookAddIn.Services
             string fileName = SanitizeComponent(Path.GetFileName(selection.LocalPath));
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                throw new TalkServiceException("Datei besitzt keinen gueltigen Namen: " + selection.LocalPath, false, 0, null);
+                throw new TalkServiceException("File has no valid name: " + selection.LocalPath, false, 0, null);
             }
 
             string uniqueName = EnsureUniqueName(context, remoteFolder, fileName, duplicateResolver, selection, false, cancellationToken);
@@ -328,7 +336,7 @@ namespace NcTalkOutlookAddIn.Services
             string relativeRoot = SanitizeComponent(Path.GetFileName(selection.LocalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
             if (string.IsNullOrWhiteSpace(relativeRoot))
             {
-                relativeRoot = "Ordner";
+                relativeRoot = "Folder";
             }
 
             string uniqueRoot = EnsureUniqueName(context, context.RelativeFolderPath, relativeRoot, duplicateResolver, selection, true, cancellationToken);
@@ -356,7 +364,7 @@ namespace NcTalkOutlookAddIn.Services
                 string remoteFileName = SanitizeComponent(Path.GetFileName(relativeFile));
                 if (string.IsNullOrWhiteSpace(remoteFileName))
                 {
-                    remoteFileName = "Datei";
+                    remoteFileName = "File";
                 }
                 string uniqueName = EnsureUniqueName(context, remoteFolder, remoteFileName, duplicateResolver, selection, false, cancellationToken);
                 string remotePath = CombineRelativePath(remoteFolder, uniqueName);
@@ -384,7 +392,7 @@ namespace NcTalkOutlookAddIn.Services
             var request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "PUT";
             request.Timeout = 120000;
-            request.Headers["Authorization"] = "Basic " + EncodeBasicAuth(_configuration.Username, _configuration.AppPassword);
+            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
             LogApi("PUT " + url);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -407,7 +415,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.NoContent)
                 {
-                    throw new TalkServiceException("Datei konnte nicht hochgeladen werden: " + localPath, false, response.StatusCode, null);
+                    throw new TalkServiceException("File could not be uploaded: " + localPath, false, response.StatusCode, null);
                 }
                 LogApi("PUT " + url + " -> " + response.StatusCode);
             }
@@ -431,13 +439,13 @@ namespace NcTalkOutlookAddIn.Services
             {
                 if (duplicateResolver == null)
                 {
-                    throw new TalkServiceException("Doppelter Name im Zielverzeichnis: " + sanitizedName, false, 0, null);
+                    throw new TalkServiceException("Duplicate name in target directory: " + sanitizedName, false, 0, null);
                 }
 
                 string newName = duplicateResolver(new FileLinkDuplicateInfo(selection, remoteFolder, sanitizedName, isDirectory));
                 if (string.IsNullOrWhiteSpace(newName))
                 {
-                    throw new OperationCanceledException("Upload abgebrochen: Keine eindeutige Benennung vorhanden.");
+                    throw new OperationCanceledException("Upload cancelled: no unique name available.");
                 }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -445,7 +453,7 @@ namespace NcTalkOutlookAddIn.Services
                 sanitizedName = SanitizeComponent(newName);
                 if (string.IsNullOrWhiteSpace(sanitizedName))
                 {
-                    throw new TalkServiceException("Ungueltiger Name nach Umbenennung.", false, 0, null);
+                    throw new TalkServiceException("Invalid name after rename.", false, 0, null);
                 }
 
                 fullPath = CombineRelativePath(folderKey, sanitizedName);
@@ -484,7 +492,7 @@ namespace NcTalkOutlookAddIn.Services
                 var request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "MKCOL";
                 request.Timeout = 60000;
-                request.Headers["Authorization"] = "Basic " + EncodeBasicAuth(_configuration.Username, _configuration.AppPassword);
+                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
                 LogApi("MKCOL " + url);
                 try
                 {
@@ -492,7 +500,7 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.MethodNotAllowed)
                         {
-                            throw new TalkServiceException("Verzeichnis konnte nicht erstellt werden: " + path, false, response.StatusCode, null);
+                            throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, null);
                         }
                         LogApi("MKCOL " + url + " -> " + response.StatusCode);
                     }
@@ -502,12 +510,14 @@ namespace NcTalkOutlookAddIn.Services
                     var response = ex.Response as HttpWebResponse;
                     if (response == null)
                     {
-                        throw new TalkServiceException("Verzeichnis konnte nicht erstellt werden: " + ex.Message, false, 0, null);
+                        DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ").", ex);
+                        throw new TalkServiceException("Directory could not be created: " + ex.Message, false, 0, null);
                     }
 
                     if (response.StatusCode != HttpStatusCode.MethodNotAllowed && response.StatusCode != HttpStatusCode.Conflict)
                     {
-                        throw new TalkServiceException("Verzeichnis konnte nicht erstellt werden: " + path, false, response.StatusCode, null);
+                        DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ", status=" + (int)response.StatusCode + ").", ex);
+                        throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, null);
                     }
                     LogApi("MKCOL " + url + " -> " + response.StatusCode);
                 }
@@ -523,7 +533,7 @@ namespace NcTalkOutlookAddIn.Services
             httpRequest.Accept = "application/json";
             httpRequest.ContentType = "application/x-www-form-urlencoded";
             httpRequest.Headers["OCS-APIRequest"] = "true";
-            httpRequest.Headers["Authorization"] = "Basic " + EncodeBasicAuth(_configuration.Username, _configuration.AppPassword);
+            httpRequest.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
 
             var builder = new StringBuilder();
             builder.Append("path=").Append(Uri.EscapeDataString("/" + relativeFolderPath));
@@ -708,12 +718,6 @@ namespace NcTalkOutlookAddIn.Services
             return total;
         }
 
-        private static string EncodeBasicAuth(string username, string password)
-        {
-            string raw = (username ?? string.Empty) + ":" + (password ?? string.Empty);
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
-        }
-
         private sealed class SelectionUploadTracker
         {
             internal SelectionUploadTracker(long totalBytes)
@@ -778,7 +782,7 @@ namespace NcTalkOutlookAddIn.Services
                 var decoded = DeserializeObject(content) as IDictionary<string, object>;
                 if (decoded == null)
                 {
-                    throw new TalkServiceException("Share-Erstellung fehlgeschlagen: Ungueltige Antwort.", false, 0, content);
+                    throw new TalkServiceException("Share creation failed: invalid response.", false, 0, content);
                 }
 
                 var ocs = GetDictionary(decoded, "ocs");

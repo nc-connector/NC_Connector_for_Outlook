@@ -9,7 +9,7 @@ using System;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Kapselt die fuer die Nextcloud Talk REST-Aufrufe benoetigten Verbindungsdaten.
+     * Encapsulates connection details required for Nextcloud Talk REST calls.
      */
     internal sealed class TalkServiceConfiguration
     {
@@ -25,7 +25,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         /**
-         * Entfernt ueberfluessige Slashes und liefert eine kanonische Basis-URL zurueck.
+         * Removes redundant slashes and returns a canonical base URL.
          */
         public string GetNormalizedBaseUrl()
         {

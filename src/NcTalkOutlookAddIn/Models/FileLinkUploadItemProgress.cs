@@ -7,7 +7,7 @@
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Detailfortschritt für ein einzelnes Upload-Item; dient der UI-Anzeige im Wizard.
+     * Detailed progress for a single upload item; used for UI display in the wizard.
      */
     internal sealed class FileLinkUploadItemProgress
     {

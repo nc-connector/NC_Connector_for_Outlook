@@ -6,16 +6,16 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
+using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Settings
 {
     /// <summary>
-    /// Einfache Persistenz fuer Add-in Einstellungen. Die Daten werden aktuell
-    /// unverschluesselt in einer INI-aehnlichen Struktur gespeichert.
-    /// TODO: App-Passwort sicher ablegen (Credential Locker oder DPAPI).
+    /// Simple persistence for add-in settings. The data is currently stored
+    /// unencrypted in an INI-like structure.
+    /// TODO: Store the app password securely (Credential Locker or DPAPI).
     /// </summary>
     internal sealed class SettingsStorage
     {
@@ -46,9 +46,10 @@ namespace NcTalkOutlookAddIn.Settings
                 {
                     File.Copy(_legacyFilePath, _filePath, true);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Falls Kopie misslingt, lesen wir spaeter direkt aus dem Legacy-Pfad.
+                    // If the copy fails, we will read directly from the legacy path later.
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to copy legacy settings file to new location.", ex);
                 }
             }
         }
@@ -102,13 +103,6 @@ namespace NcTalkOutlookAddIn.Settings
                             settings.AuthMode = mode;
                         }
                         break;
-                    case "OutlookMuzzleEnabled":
-                        bool muzzle;
-                        if (bool.TryParse(value, out muzzle))
-                        {
-                            settings.OutlookMuzzleEnabled = muzzle;
-                        }
-                        break;
                     case "IfbEnabled":
                         bool ifbEnabled;
                         if (bool.TryParse(value, out ifbEnabled))
@@ -146,8 +140,91 @@ namespace NcTalkOutlookAddIn.Settings
                     case "FileLinkBasePath":
                         settings.FileLinkBasePath = value;
                         break;
-                    case "OutlookMuzzleAccounts":
-                        settings.OutlookMuzzleAccounts = ParseMuzzleAccounts(value);
+                    case "SharingDefaultShareName":
+                        settings.SharingDefaultShareName = value;
+                        break;
+                    case "SharingDefaultPermCreate":
+                        bool permCreate;
+                        if (bool.TryParse(value, out permCreate))
+                        {
+                            settings.SharingDefaultPermCreate = permCreate;
+                        }
+                        break;
+                    case "SharingDefaultPermWrite":
+                        bool permWrite;
+                        if (bool.TryParse(value, out permWrite))
+                        {
+                            settings.SharingDefaultPermWrite = permWrite;
+                        }
+                        break;
+                    case "SharingDefaultPermDelete":
+                        bool permDelete;
+                        if (bool.TryParse(value, out permDelete))
+                        {
+                            settings.SharingDefaultPermDelete = permDelete;
+                        }
+                        break;
+                    case "SharingDefaultPasswordEnabled":
+                        bool sharingPassword;
+                        if (bool.TryParse(value, out sharingPassword))
+                        {
+                            settings.SharingDefaultPasswordEnabled = sharingPassword;
+                        }
+                        break;
+                    case "SharingDefaultExpireDays":
+                        int expireDays;
+                        if (int.TryParse(value, out expireDays))
+                        {
+                            settings.SharingDefaultExpireDays = expireDays;
+                        }
+                        break;
+                    case "ShareBlockLang":
+                        settings.ShareBlockLang = string.IsNullOrWhiteSpace(value) ? "default" : value.Trim();
+                        break;
+                    case "EventDescriptionLang":
+                        settings.EventDescriptionLang = string.IsNullOrWhiteSpace(value) ? "default" : value.Trim();
+                        break;
+                    case "TalkDefaultLobbyEnabled":
+                        bool talkLobby;
+                        if (bool.TryParse(value, out talkLobby))
+                        {
+                            settings.TalkDefaultLobbyEnabled = talkLobby;
+                        }
+                        break;
+                    case "TalkDefaultSearchVisible":
+                        bool talkSearch;
+                        if (bool.TryParse(value, out talkSearch))
+                        {
+                            settings.TalkDefaultSearchVisible = talkSearch;
+                        }
+                        break;
+                    case "TalkDefaultRoomType":
+                        TalkRoomType roomType;
+                        if (Enum.TryParse<TalkRoomType>(value, out roomType))
+                        {
+                            settings.TalkDefaultRoomType = roomType;
+                        }
+                        break;
+                    case "TalkDefaultPasswordEnabled":
+                        bool talkPasswordEnabled;
+                        if (bool.TryParse(value, out talkPasswordEnabled))
+                        {
+                            settings.TalkDefaultPasswordEnabled = talkPasswordEnabled;
+                        }
+                        break;
+                    case "TalkDefaultAddUsers":
+                        bool talkAddUsers;
+                        if (bool.TryParse(value, out talkAddUsers))
+                        {
+                            settings.TalkDefaultAddUsers = talkAddUsers;
+                        }
+                        break;
+                    case "TalkDefaultAddGuests":
+                        bool talkAddGuests;
+                        if (bool.TryParse(value, out talkAddGuests))
+                        {
+                            settings.TalkDefaultAddGuests = talkAddGuests;
+                        }
                         break;
                     default:
                         break;
@@ -160,14 +237,12 @@ namespace NcTalkOutlookAddIn.Settings
         internal void Save(AddinSettings settings)
         {
             var entries = new List<string>();
-            entries.Add("# Nextcloud Talk Direkt Outlook Add-in Einstellungen");
-            entries.Add("# TODO: App-Passwort sicher speichern (Credential Locker / DPAPI).");
+            entries.Add("# NC Connector for Outlook settings");
+            entries.Add("# TODO: Store the app password securely (Credential Locker / DPAPI).");
             entries.Add("ServerUrl=" + Safe(settings.ServerUrl));
             entries.Add("Username=" + Safe(settings.Username));
             entries.Add("AppPassword=" + Safe(settings.AppPassword));
             entries.Add("AuthMode=" + settings.AuthMode);
-            entries.Add("OutlookMuzzleEnabled=" + settings.OutlookMuzzleEnabled);
-            entries.Add("OutlookMuzzleAccounts=" + SerializeMuzzleAccounts(settings.OutlookMuzzleAccounts));
             entries.Add("IfbEnabled=" + settings.IfbEnabled);
             entries.Add("IfbDays=" + settings.IfbDays);
             entries.Add("IfbCacheHours=" + settings.IfbCacheHours);
@@ -175,6 +250,20 @@ namespace NcTalkOutlookAddIn.Settings
             entries.Add("DebugLoggingEnabled=" + settings.DebugLoggingEnabled);
             entries.Add("LastKnownServerVersion=" + Safe(settings.LastKnownServerVersion));
             entries.Add("FileLinkBasePath=" + Safe(settings.FileLinkBasePath));
+            entries.Add("SharingDefaultShareName=" + Safe(settings.SharingDefaultShareName));
+            entries.Add("SharingDefaultPermCreate=" + settings.SharingDefaultPermCreate);
+            entries.Add("SharingDefaultPermWrite=" + settings.SharingDefaultPermWrite);
+            entries.Add("SharingDefaultPermDelete=" + settings.SharingDefaultPermDelete);
+            entries.Add("SharingDefaultPasswordEnabled=" + settings.SharingDefaultPasswordEnabled);
+            entries.Add("SharingDefaultExpireDays=" + settings.SharingDefaultExpireDays);
+            entries.Add("ShareBlockLang=" + Safe(settings.ShareBlockLang));
+            entries.Add("EventDescriptionLang=" + Safe(settings.EventDescriptionLang));
+            entries.Add("TalkDefaultLobbyEnabled=" + settings.TalkDefaultLobbyEnabled);
+            entries.Add("TalkDefaultSearchVisible=" + settings.TalkDefaultSearchVisible);
+            entries.Add("TalkDefaultRoomType=" + settings.TalkDefaultRoomType);
+            entries.Add("TalkDefaultPasswordEnabled=" + settings.TalkDefaultPasswordEnabled);
+            entries.Add("TalkDefaultAddUsers=" + settings.TalkDefaultAddUsers);
+            entries.Add("TalkDefaultAddGuests=" + settings.TalkDefaultAddGuests);
 
             var dir = Path.GetDirectoryName(_filePath);
             if (!string.IsNullOrEmpty(dir))
@@ -187,47 +276,6 @@ namespace NcTalkOutlookAddIn.Settings
         private static string Safe(string value)
         {
             return value ?? string.Empty;
-        }
-
-        private static Dictionary<string, bool> ParseMuzzleAccounts(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-            var entries = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var entry in entries)
-            {
-                var pair = entry.Split(new[] { ':' }, 2);
-                var key = pair[0].Trim();
-                bool enabled = true;
-                if (pair.Length == 2)
-                {
-                    bool.TryParse(pair[1], out enabled);
-                }
-
-                if (!string.IsNullOrWhiteSpace(key))
-                {
-                    result[OutlookAccountHelper.NormalizeAccountIdentifier(key)] = enabled;
-                }
-            }
-
-            return result;
-        }
-
-        private static string SerializeMuzzleAccounts(Dictionary<string, bool> accounts)
-        {
-            if (accounts == null || accounts.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            var parts = accounts
-                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
-                .Select(kv => kv.Key + ":" + kv.Value);
-            return string.Join(";", parts);
         }
     }
 }

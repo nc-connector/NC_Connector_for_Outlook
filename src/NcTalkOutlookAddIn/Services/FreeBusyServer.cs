@@ -16,12 +16,12 @@ using NcTalkOutlookAddIn.Utilities;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Lokaler HTTP-Endpunkt fuer Outlook, der Frei/Gebucht-Daten an Nextcloud durchreicht.
+     * Local HTTP endpoint for Outlook that proxies free/busy data to Nextcloud.
      */
     internal sealed class FreeBusyServer : IDisposable
     {
         private const string Prefix = "http://127.0.0.1:7777/nc-ifb/";
-        private const string LogCategory = "IFB";
+        private const string LogCategory = LogCategories.Ifb;
         private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
 
         private readonly object _syncRoot = new object();
@@ -66,7 +66,7 @@ namespace NcTalkOutlookAddIn.Services
 
                 if (_configuration == null || !_configuration.IsComplete())
                 {
-                    throw new InvalidOperationException("IFB kann nicht gestartet werden: Zugangsdaten sind unvollstaendig.");
+                    throw new InvalidOperationException("IFB cannot be started: credentials are incomplete.");
                 }
 
                 _listener = new HttpListener();
@@ -99,9 +99,9 @@ namespace NcTalkOutlookAddIn.Services
                         _listener.Stop();
                         _listener.Close();
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // ignorieren
+                        DiagnosticsLogger.LogException(LogCategory, "Failed to stop IFB listener.", ex);
                     }
                     finally
                     {
@@ -115,9 +115,9 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         _listenerTask.Wait(1000);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // ignorieren
+                        DiagnosticsLogger.LogException(LogCategory, "Failed while waiting for IFB listener task shutdown.", ex);
                     }
                     finally
                     {
@@ -140,15 +140,19 @@ namespace NcTalkOutlookAddIn.Services
                         DiagnosticsLogger.Log(LogCategory, "HTTP " + context.Request.HttpMethod + " " + context.Request.RawUrl);
                     }
                 }
-                catch (HttpListenerException)
+                catch (HttpListenerException ex)
                 {
                     if (token.IsCancellationRequested)
                     {
+                        DiagnosticsLogger.Log(LogCategory, "Listener loop cancelled.");
                         return;
                     }
+
+                    DiagnosticsLogger.LogException(LogCategory, "IFB listener failed while accepting request.", ex);
                 }
-                catch (ObjectDisposedException)
+                catch (ObjectDisposedException ex)
                 {
+                    DiagnosticsLogger.LogException(LogCategory, "IFB listener disposed while accepting request.", ex);
                     return;
                 }
 
@@ -296,9 +300,9 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     context.Response.OutputStream.Close();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // ignorieren
+                    DiagnosticsLogger.LogException(LogCategory, "Failed to close response output stream.", ex);
                 }
             }
         }
@@ -328,7 +332,7 @@ namespace NcTalkOutlookAddIn.Services
                 request.Method = "REPORT";
                 request.ContentType = "application/xml; charset=utf-8";
                 request.Headers["Depth"] = "1";
-                request.Headers["Authorization"] = "Basic " + EncodeBasicAuth(_configuration.Username, _configuration.AppPassword);
+                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
                 request.Timeout = 60000;
 
                 using (var stream = request.GetRequestStream())
@@ -376,7 +380,8 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
 
-                throw new FreeBusyRequestException("Free/Busy-Abfrage fehlgeschlagen: " + ex.Message, statusCode, ShouldFallback(statusCode));
+                DiagnosticsLogger.LogException(LogCategory, "Free/busy REPORT request failed (status=" + (statusCode.HasValue ? ((int)statusCode.Value).ToString(CultureInfo.InvariantCulture) : "unknown") + ").", ex);
+                throw new FreeBusyRequestException("Free/busy request failed: " + ex.Message, statusCode, ShouldFallback(statusCode));
             }
             finally
             {
@@ -391,7 +396,7 @@ namespace NcTalkOutlookAddIn.Services
         {
             if (string.IsNullOrEmpty(originatorEmail) || string.IsNullOrEmpty(attendeeEmail))
             {
-                throw new FreeBusyRequestException("Ungueltige E-Mail-Adresse fuer Scheduling.", HttpStatusCode.BadRequest, false);
+                throw new FreeBusyRequestException("Invalid email address for scheduling.", HttpStatusCode.BadRequest, false);
             }
 
             DateTime startUtc = DateTime.UtcNow;
@@ -414,7 +419,7 @@ namespace NcTalkOutlookAddIn.Services
                 request.Method = "POST";
                 request.ContentType = "text/calendar; charset=\"UTF-8\"";
                 request.Headers["Depth"] = "0";
-                request.Headers["Authorization"] = "Basic " + EncodeBasicAuth(_configuration.Username, _configuration.AppPassword);
+                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
                 request.Headers["Originator"] = "mailto:" + originatorEmail;
                 request.Headers["Recipient"] = "mailto:" + attendeeEmail;
                 request.Timeout = 60000;
@@ -448,7 +453,8 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
 
-                throw new FreeBusyRequestException("CalDAV Scheduling fehlgeschlagen: " + ex.Message, statusCode, false, responseText);
+                DiagnosticsLogger.LogException(LogCategory, "CalDAV scheduling request failed (status=" + (statusCode.HasValue ? ((int)statusCode.Value).ToString(CultureInfo.InvariantCulture) : "unknown") + ").", ex);
+                throw new FreeBusyRequestException("CalDAV scheduling failed: " + ex.Message, statusCode, false, responseText);
             }
             finally
             {
@@ -530,9 +536,9 @@ namespace NcTalkOutlookAddIn.Services
                     index = endTag + endToken.Length;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // ignorieren
+                DiagnosticsLogger.LogException(LogCategory, "Failed to extract free/busy data from scheduling response.", ex);
             }
 
             return null;
@@ -613,8 +619,9 @@ namespace NcTalkOutlookAddIn.Services
                 string data = payload.Substring(closing + 1, end - closing - 1);
                 return WebUtility.HtmlDecode(data).Trim();
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticsLogger.LogException(LogCategory, "Failed to extract calendar-data from DAV payload.", ex);
                 return null;
             }
         }
@@ -660,16 +667,10 @@ namespace NcTalkOutlookAddIn.Services
                     writer.Write(message ?? string.Empty);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // ignorieren
+                DiagnosticsLogger.LogException(LogCategory, "Failed to write error response (status=" + (int)statusCode + ").", ex);
             }
-        }
-
-        private static string EncodeBasicAuth(string username, string password)
-        {
-            string raw = (username ?? string.Empty) + ":" + (password ?? string.Empty);
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
         }
 
         public void Dispose()

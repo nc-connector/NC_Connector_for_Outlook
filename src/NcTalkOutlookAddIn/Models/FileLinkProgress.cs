@@ -7,7 +7,7 @@
 namespace NcTalkOutlookAddIn.Models
 {
     /**
-     * Beschreibt den Upload-Fortschritt über alle Dateien hinweg (für UI-Sammelanzeige).
+     * Describes the overall upload progress across all files (for aggregated UI display).
      */
     internal sealed class FileLinkProgress
     {

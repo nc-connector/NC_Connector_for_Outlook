@@ -9,7 +9,7 @@ using NcTalkOutlookAddIn.Models;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Beschreibt einen Namenskonflikt waehrend des Uploads und ermoeglicht dem Wizard eine Entscheidung.
+     * Describes a naming conflict during upload and allows the wizard to decide.
      */
     internal sealed class FileLinkDuplicateInfo
     {

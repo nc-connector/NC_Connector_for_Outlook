@@ -32,3 +32,17 @@ C:\Users\Bastian\VS-Code\Outlook Addon Nextcloud Talk\nc-enterprise-ol-0.0.5x\sr
 C:\Users\Bastian\VS-Code\Outlook Addon Nextcloud Talk\nc-enterprise-ol-0.0.5x\src\NcTalkOutlookAddIn\obj\Release\NcTalkOutlookAddIn.csprojResolveAssemblyReference.cache
 C:\Users\Bastian\VS-Code\Outlook Addon Nextcloud Talk\nc-enterprise-ol-0.0.5x\src\NcTalkOutlookAddIn\obj\Release\NcTalkOutlookAddIn.dll
 C:\Users\Bastian\VS-Code\Outlook Addon Nextcloud Talk\nc-enterprise-ol-0.0.5x\src\NcTalkOutlookAddIn\obj\Release\NcTalkOutlookAddIn.pdb
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\obj\Release\NcTalkOutlookAddIn.csprojResolveAssemblyReference.cache
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\obj\Release\NcTalkOutlookAddIn.dll
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\LICENSE.txt
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\NcTalkOutlookAddIn.dll.config
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\NcTalkOutlookAddIn.dll
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\NcTalkOutlookAddIn.pdb
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\mscorlib.dll
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\de\mscorlib.resources.dll
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\normidna.nlp
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\normnfc.nlp
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\normnfd.nlp
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\normnfkc.nlp
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\bin\Release\normnfkd.nlp
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7\src\NcTalkOutlookAddIn\obj\Release\NcTalkOutlookAddIn.pdb

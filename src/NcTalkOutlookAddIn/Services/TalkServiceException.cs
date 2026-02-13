@@ -10,7 +10,7 @@ using System.Net;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Spezialisierte Exception fuer Fehler der Nextcloud Talk REST-Schnittstelle.
+     * Specialized exception for errors returned by the Nextcloud Talk REST API.
      */
     internal sealed class TalkServiceException : Exception
     {

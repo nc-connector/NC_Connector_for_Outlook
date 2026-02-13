@@ -64,6 +64,9 @@
     <Compile Include="Models\FileLinkProgress.cs" />
     <Compile Include="Models\FileLinkUploadStatus.cs" />
     <Compile Include="Models\FileLinkUploadItemProgress.cs" />
+    <Compile Include="Models\NextcloudUser.cs" />
+    <Compile Include="Models\PasswordPolicyInfo.cs" />
+    <Compile Include="Models\TalkParticipant.cs" />
     <Compile Include="Services\FreeBusyManager.cs" />
     <Compile Include="Services\FreeBusyServer.cs" />
     <Compile Include="Services\IfbAddressBookCache.cs" />
@@ -74,20 +77,28 @@
     <Compile Include="Services\FileLinkDuplicateInfo.cs" />
     <Compile Include="Services\FileLinkUploadContext.cs" />
     <Compile Include="Services\FileLinkService.cs" />
+    <Compile Include="Services\PasswordPolicyService.cs" />
     <Compile Include="UI\SettingsForm.cs" />
+    <Compile Include="UI\SettingsTabControl.cs" />
     <Compile Include="UI\TalkLinkForm.cs" />
     <Compile Include="UI\FileLinkWizardForm.cs" />
     <Compile Include="Utilities\DiagnosticsLogger.cs" />
+    <Compile Include="Utilities\LogCategories.cs" />
+    <Compile Include="Utilities\HttpAuthUtilities.cs" />
+    <Compile Include="Utilities\BrandingAssets.cs" />
     <Compile Include="Utilities\NextcloudVersionHelper.cs" />
     <Compile Include="Utilities\Strings.cs" />
+    <Compile Include="Utilities\TimeUtilities.cs" />
+    <Compile Include="Utilities\UiThemeManager.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
     <Compile Include="Utilities\OutlookAccountHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UI\BrandedHeader.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\talk-96.png" />
-    <EmbeddedResource Include="Resources\nextcloud-filelink.png" />
-    <EmbeddedResource Include="Resources\logo-nextcloud.png" />
+    <EmbeddedResource Include="Resources\app.png" />
+    <EmbeddedResource Include="Resources\header-solid-blue-164x48.png" />
+    <EmbeddedResource Include="Resources\_locales\**\messages.json" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
