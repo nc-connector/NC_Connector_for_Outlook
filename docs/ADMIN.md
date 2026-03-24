@@ -6,8 +6,9 @@ This document describes installation, rollout and operation of **NC Connector fo
 - [Installation (MSI)](#installation-msi)
 - [Updates / upgrade behavior](#updates--upgrade-behavior)
 - [Files & registry](#files--registry)
-- [Settings (`settings.ini`)](#settings-settingsini)
+- [Settings (profile XML)](#settings-profile-xml)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
+- [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
 - [Logging / support](#logging--support)
 - [Troubleshooting](#troubleshooting)
 
@@ -18,13 +19,13 @@ This document describes installation, rollout and operation of **NC Connector fo
 Silent install example:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-2.2.7.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-2.2.9.msi" /qn /norestart
 ```
 
 Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).
 
 ## Updates / upgrade behavior
-- Updates are performed by installing a **newer MSI version**.
+- Updates/reinstalls are performed by installing an MSI package over the existing installation (same, older, or newer version).
 - The MSI is configured as a **major upgrade** (stable `UpgradeCode`) so an existing installation is replaced automatically.
 - User settings are kept because they are stored in the user profile.
 
@@ -32,7 +33,7 @@ Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon 
 
 ### Installation path
 Default (x64):
-- `C:\Program Files\NextcloudTalkOutlookAddIn\`
+- `C:\Program Files\NC4OL\`
 
 Important files:
 - `NcTalkOutlookAddIn.dll` (COM add-in)
@@ -50,53 +51,49 @@ Common values:
 
 COM registration is handled via `HKLM\Software\Classes\CLSID\{...}` including `CodeBase` pointing to the installed DLL.
 
-## Settings (`settings.ini`)
+Installer marker key for the IFB URL reservation:
+- `HKLM\Software\NC4OL\HttpUrl`
+
+## Settings (profile XML)
 
 ### Location
-Settings are stored per user:
-- `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\settings.ini`
+Settings are stored per user and per Outlook profile:
+- `%LOCALAPPDATA%\NC4OL\settings_<OutlookProfile>.xml`
+- Fallback profile file (when no profile name is available): `%LOCALAPPDATA%\NC4OL\settings_default.xml`
 
-Legacy migration:
-- If present, `%LOCALAPPDATA%\NextcloudTalkOutlookAddIn\settings.ini` is migrated on first start.
+Password handling:
+- `AppPasswordProtected` is stored encrypted via Windows DPAPI (`CurrentUser` scope).
+- Plaintext `AppPassword` is not persisted in the new format.
+
+Legacy migration on first start:
+- `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\settings.ini`
+- `%LOCALAPPDATA%\NextcloudTalkOutlookAddIn\settings.ini`
+- Legacy INI files are removed after successful migration.
 
 ### Important keys (excerpt)
 
-```ini
-ServerUrl=https://cloud.example.com
-Username=max
-AppPassword=xxxxxx
-AuthMode=LoginFlow
-IfbEnabled=true
-IfbDays=30
-IfbCacheHours=24
-DebugLoggingEnabled=false
-FileLinkBasePath=90 Freigaben - extern
-SharingDefaultShareName=Share name
-SharingDefaultPermCreate=false
-SharingDefaultPermWrite=false
-SharingDefaultPermDelete=false
-SharingDefaultPasswordEnabled=true
-SharingDefaultExpireDays=7
-ShareBlockLang=default
-EventDescriptionLang=default
-TalkDefaultLobbyEnabled=true
-TalkDefaultSearchVisible=true
-TalkDefaultRoomType=EventConversation
-TalkDefaultPasswordEnabled=true
-TalkDefaultAddUsers=true
-TalkDefaultAddGuests=false
+```xml
+<Settings SchemaVersion="1" Profile="Outlook">
+  <ServerUrl>https://cloud.example.com</ServerUrl>
+  <Username>max</Username>
+  <AppPasswordProtected>BASE64_DPAPI_BLOB</AppPasswordProtected>
+  <AuthMode>LoginFlow</AuthMode>
+  <IfbEnabled>true</IfbEnabled>
+  <IfbDays>30</IfbDays>
+  <IfbCacheHours>24</IfbCacheHours>
+  <DebugLoggingEnabled>false</DebugLoggingEnabled>
+  <FileLinkBasePath>90 Freigaben - extern</FileLinkBasePath>
+</Settings>
 ```
 
-Note: the app password is currently stored in clear text (planned improvement: Windows Credential Locker / DPAPI).
-
 ### Rollout / pre-seed
-Because `settings.ini` lives in the user profile, common rollout approaches are:
-- **Login Script / Intune / SCCM**: copy the file to `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\settings.ini` (only if not present).
+Because profile XML settings live in the user profile, common rollout approaches are:
+- **Login Script / Intune / SCCM**: copy a prepared `settings_<OutlookProfile>.xml` to `%LOCALAPPDATA%\NC4OL\` (only if not present).
 - **Group Policy Preferences**: distribute the file into the user profile.
 
 Recommendation:
 - Pre-seed only base URL and defaults.
-- Let users fetch credentials via Login Flow v2 or enter them manually.
+- Let users fetch credentials via Login Flow v2 or enter them manually (recommended for DPAPI compatibility).
 
 ## Internet Free/Busy Gateway (IFB)
 
@@ -122,11 +119,38 @@ Notes:
 - IFB is optional (toggle in Settings).
 - Without IFB, the add-in still works for Talk + Sharing.
 
+## System address book required for user search and moderator selection
+
+The following features require a reachable **Nextcloud system address book**:
+- Moderator selection in the Talk wizard
+- `Add users` default in add-in settings
+- `Add guests` default in add-in settings
+
+If the system address book is unavailable, these controls are disabled in the UI and show a warning with a setup link.
+
+Nextcloud 31 activation:
+- `sudo -E -u www-data php occ config:app:set dav system_addressbook_exposed --value="yes"`
+
+Nextcloud >= 32 activation:
+- Nextcloud -> Admin Settings -> Groupware -> System Address Book (enable it)
+
+Required in both versions:
+- Nextcloud Admin Settings -> Sharing: enable username autocompletion / system address book access.
+
+Repair hint (if Admin UI shows enabled but the system address book is still unavailable):
+1. Reset + re-enable:
+   - `sudo -E -u www-data php occ config:app:delete dav system_addressbook_exposed`
+   - `sudo -E -u www-data php occ config:app:set dav system_addressbook_exposed --value="yes"`
+2. Rebuild the generated address book:
+   - `sudo -E -u www-data php occ dav:sync-system-addressbook`
+3. Verify endpoint:
+   - `https://<cloud>/remote.php/dav/addressbooks/users/<user>/z-server-generated--system/?export`
+
 ## Logging / support
 Enable debug logging in Settings → **Debug**.
 
 Log file:
-- `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\addin-runtime.log`
+- `%LOCALAPPDATA%\NC4OL\addin-runtime.log`
 
 Logs are categorized (e.g. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) and help with support cases.
 
@@ -158,3 +182,5 @@ netstat -ano | Select-String ":7777"
 - App password valid?
 - Talk installed/enabled?
 - Password Policy app optional: if missing, passwords are generated locally (fallback)
+
+

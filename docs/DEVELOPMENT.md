@@ -38,7 +38,7 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-0.2.7"
+cd "C:\\path\\to\\nc4ol-2.2.9"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -120,6 +120,30 @@ Key code locations:
 4. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
 5. `NextcloudTalkAddIn.InsertHtmlIntoMailItem(...)` inserts the HTML into the message body.
 
+Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`):
+
+- Debounced attachment evaluation (`ComposeAttachmentEvalDebounceMs`) after compose attachment changes.
+- Attachment automation modes:
+  - always route attachments into NC sharing flow, or
+  - threshold mode with a two-action prompt (`Share with NC Connector` / `Remove last selected attachments`).
+- Runtime host guard checks (live large-attachment setting) at:
+  - pre-evaluation
+  - pre-prompt-action handling
+  - wizard finalize (enforced in `UI/FileLinkWizardForm.cs`).
+- Attachment-mode wizard launch:
+  - removes selected compose attachments
+  - queues files as initial wizard selections
+  - opens directly in file-step-equivalent mode.
+- Compose share cleanup lifecycle:
+  - arm immediately after share creation
+  - clear only after successful send
+  - delete server folder artifacts on unsent close (with send/close grace timer).
+- Separate password-mail dispatch:
+  - queue password-only HTML after share creation
+  - capture recipients on send
+  - dispatch only after successful primary send
+  - auto-send first, then manual fallback draft on failure.
+
 #### IFB flow
 
 1. User enables IFB in Settings.
@@ -173,7 +197,7 @@ See `Translations.md` for the full language list and maintenance workflow.
 Debug logging is optional and is intended to make support cases reproducible.
 
 - Enable: Settings → **Debug** → “Write debug log file”
-- Log file: `%LOCALAPPDATA%\\NextcloudTalkOutlookAddInData\\addin-runtime.log`
+- Log file: `%LOCALAPPDATA%\\NC4OL\\addin-runtime.log`
 
 Format:
 
@@ -294,7 +318,7 @@ Primary write location:
 | `X-NCTALK-TOKEN` | Talk room token | `string` | `a1b2c3d4` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Read is preferred over legacy token storage. |
 | `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
 | `X-NCTALK-LOBBY` | Lobby enabled flag | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Used to decide whether lobby updates run on save. |
-| `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | (not read by add-in) | Updated when lobby is enabled and the start time changes. |
+| `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | `TryReadRequiredIcalStartEpoch(...)`, `TryUpdateLobby(...)` | Authoritative lobby timer source on appointment save; updated when lobby is enabled and the start time changes. |
 | `X-NCTALK-EVENT` | Room creation mode marker | `event` \| `standard` | `event` | `ApplyRoomToAppointment(...)` | `GetRoomType(...)` | Fallback exists via `NcTalkRoomType` user property. |
 | `X-NCTALK-OBJECTID` | Time-window identifier | `"<start>#<end>"` | `1739750400#1739754000` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
 | `X-NCTALK-ADD-USERS` | Participant sync: internal users | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Preferred over legacy `X-NCTALK-ADD-PARTICIPANTS`. |
@@ -328,3 +352,5 @@ Primary write location:
 1. Add a property to `src/NcTalkOutlookAddIn/Utilities/Strings.cs`.
 2. Add the key to all locale files under `src/NcTalkOutlookAddIn/Resources/_locales/`.
 3. Rebuild and verify the UI.
+
+

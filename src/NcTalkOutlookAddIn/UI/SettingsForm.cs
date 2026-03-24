@@ -39,6 +39,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly TabPage _advancedTab = new TabPage(Strings.TabAdvanced);
         private readonly TabPage _debugTab = new TabPage(Strings.TabDebug);
         private readonly TabPage _aboutTab = new TabPage(Strings.TabAbout);
+        private const string NcConnectorHomepageUrl = "https://nc-connector.de";
         private readonly TabPage _fileLinkTab = new TabPage(Strings.TabFileLink);
         private readonly TabPage _talkTab = new TabPage(Strings.TabTalkLink);
         private readonly ToolTip _toolTip = new ToolTip();
@@ -60,7 +61,16 @@ namespace NcTalkOutlookAddIn.UI
         private readonly LinkLabel _debugOpenLink = new LinkLabel();
         private readonly Label _aboutVersionLabel = new Label();
         private readonly Label _aboutCopyrightLabel = new Label();
+        private readonly Label _aboutLicenseLabel = new Label();
         private readonly LinkLabel _aboutLicenseLink = new LinkLabel();
+        private readonly Label _aboutHomepageLabel = new Label();
+        private readonly LinkLabel _aboutHomepageLink = new LinkLabel();
+        private readonly Label _aboutOverviewLabel = new Label();
+        private readonly Label _aboutMoreInfoLabel = new Label();
+        private readonly LinkLabel _aboutMoreInfoLink = new LinkLabel();
+        private readonly Label _aboutSupportNoteLabel = new Label();
+        private readonly Label _aboutSupportHeadingLabel = new Label();
+        private readonly LinkLabel _aboutSupportLink = new LinkLabel();
         private readonly TextBox _fileLinkBaseTextBox = new TextBox();
         private readonly Label _fileLinkBaseHintLabel = new Label();
         private readonly GroupBox _sharingDefaultsGroup = new GroupBox();
@@ -71,8 +81,16 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _sharingDefaultPermWriteCheckBox = new CheckBox();
         private readonly CheckBox _sharingDefaultPermDeleteCheckBox = new CheckBox();
         private readonly CheckBox _sharingDefaultPasswordCheckBox = new CheckBox();
+        private readonly CheckBox _sharingDefaultPasswordSeparateCheckBox = new CheckBox();
         private readonly Label _sharingDefaultExpireDaysLabel = new Label();
         private readonly NumericUpDown _sharingDefaultExpireDaysUpDown = new NumericUpDown();
+        private readonly GroupBox _sharingAttachmentAutomationGroup = new GroupBox();
+        private readonly Label _sharingAttachmentLockHintLabel = new Label();
+        private readonly Label _sharingAttachmentLockStepsLabel = new Label();
+        private readonly CheckBox _sharingAttachmentsAlwaysCheckBox = new CheckBox();
+        private readonly CheckBox _sharingAttachmentsOfferAboveCheckBox = new CheckBox();
+        private readonly NumericUpDown _sharingAttachmentsOfferAboveMbUpDown = new NumericUpDown();
+        private readonly Label _sharingAttachmentsOfferAboveUnitLabel = new Label();
         private readonly GroupBox _talkDefaultsGroup = new GroupBox();
         private readonly Label _talkDefaultRoomTypeLabel = new Label();
         private readonly ComboBox _talkDefaultRoomTypeCombo = new ComboBox();
@@ -81,6 +99,10 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _talkDefaultAddGuestsCheckBox = new CheckBox();
         private readonly CheckBox _talkDefaultLobbyCheckBox = new CheckBox();
         private readonly CheckBox _talkDefaultSearchCheckBox = new CheckBox();
+        private readonly Panel _talkAddressbookWarningPanel = new Panel();
+        private readonly Label _talkAddressbookWarningTitleLabel = new Label();
+        private readonly Label _talkAddressbookWarningTextLabel = new Label();
+        private readonly LinkLabel _talkAddressbookWarningLinkLabel = new LinkLabel();
         private readonly Label _shareBlockLangLabel = new Label();
         private readonly ComboBox _shareBlockLangCombo = new ComboBox();
         private readonly Label _eventDescriptionLangLabel = new Label();
@@ -94,6 +116,12 @@ namespace NcTalkOutlookAddIn.UI
         private string _lastKnownServerVersion = string.Empty;
         private bool _initialIfbEnabled;
         private bool _ifbDefaultApplied;
+        private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
+        private bool _sharingAttachmentLockActive;
+        private int _sharingAttachmentLockThresholdMb = 5;
+        private bool _talkAddressbookLockActive;
+        private string _talkAddressbookLockDetail = string.Empty;
+        private bool _layoutApplying;
 
         internal AddinSettings Result
         {
@@ -107,11 +135,12 @@ namespace NcTalkOutlookAddIn.UI
             AutoScaleMode = AutoScaleMode.Dpi;
             AutoScaleDimensions = new SizeF(96F, 96F);
             Text = Strings.SettingsFormTitle;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = true;
+            MinimizeBox = true;
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(720, 620);
+            MinimumSize = new Size(ScaleLogical(780), ScaleLogical(680));
             Icon = BrandingAssets.GetAppIcon(32);
 
             InitializeHeader();
@@ -119,24 +148,16 @@ namespace NcTalkOutlookAddIn.UI
             ApplySettings(settings);
             UpdateAboutTab();
             UpdateControlState();
+            ApplyResponsiveLayout(true);
 
             UiThemeManager.ApplyToForm(this, _toolTip);
         }
 
         private void InitializeComponents()
         {
-            const int outerPadding = 12;
-            const int buttonRowHeight = 32;
-            const int statusHeight = 36;
-            const int footerGap = 8;
-
-            int tabTop = HeaderHeight + outerPadding;
-            int buttonTop = ClientSize.Height - outerPadding - buttonRowHeight;
-            int statusTop = buttonTop - footerGap - statusHeight;
-
-            _tabControl.Location = new Point(outerPadding, tabTop);
-            _tabControl.Size = new Size(ClientSize.Width - (outerPadding * 2), statusTop - tabTop - outerPadding);
-            _tabControl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+            _tabControl.Location = new Point(12, HeaderHeight + 12);
+            _tabControl.Size = new Size(ClientSize.Width - 24, ClientSize.Height - HeaderHeight - 110);
+            _tabControl.Anchor = AnchorStyles.None;
             _tabControl.TabPages.Add(_generalTab);
             _tabControl.TabPages.Add(_fileLinkTab);
             _tabControl.TabPages.Add(_talkTab);
@@ -144,6 +165,7 @@ namespace NcTalkOutlookAddIn.UI
             _tabControl.TabPages.Add(_advancedTab);
             _tabControl.TabPages.Add(_debugTab);
             _tabControl.TabPages.Add(_aboutTab);
+            _tabControl.SelectedIndexChanged += OnSelectedTabChanged;
             Controls.Add(_tabControl);
 
             InitializeGeneralTab();
@@ -155,26 +177,31 @@ namespace NcTalkOutlookAddIn.UI
             InitializeFileLinkTab();
 
             _statusLabel.AutoSize = false;
-            _statusLabel.Location = new Point(outerPadding, statusTop);
-            _statusLabel.Size = new Size(ClientSize.Width - (outerPadding * 2), statusHeight);
+            _statusLabel.Location = new Point(12, ClientSize.Height - 80);
+            _statusLabel.Size = new Size(ClientSize.Width - 24, 36);
             _statusLabel.ForeColor = Color.Black;
-            _statusLabel.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+            _statusLabel.Anchor = AnchorStyles.None;
             Controls.Add(_statusLabel);
 
             _saveButton.Text = Strings.ButtonSave;
-            _saveButton.Size = new Size(120, buttonRowHeight);
-            _saveButton.Location = new Point(ClientSize.Width - outerPadding - 120 - 120 - 10, buttonTop);
-            _saveButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            _saveButton.Size = new Size(120, 32);
+            _saveButton.Location = new Point(ClientSize.Width - 262, ClientSize.Height - 44);
+            _saveButton.Anchor = AnchorStyles.None;
             _saveButton.DialogResult = DialogResult.OK;
             _saveButton.Click += OnSaveButtonClick;
             Controls.Add(_saveButton);
 
             _cancelButton.Text = Strings.ButtonCancel;
-            _cancelButton.Size = new Size(120, buttonRowHeight);
-            _cancelButton.Location = new Point(ClientSize.Width - outerPadding - 120, buttonTop);
-            _cancelButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            _cancelButton.Size = new Size(120, 32);
+            _cancelButton.Location = new Point(ClientSize.Width - 132, ClientSize.Height - 44);
+            _cancelButton.Anchor = AnchorStyles.None;
             _cancelButton.DialogResult = DialogResult.Cancel;
             Controls.Add(_cancelButton);
+
+            Resize += (s, e) => ApplyResponsiveLayout(false);
+            _generalTab.Resize += (s, e) => ApplyResponsiveLayout(false);
+            _fileLinkTab.Resize += (s, e) => ApplyResponsiveLayout(false);
+            _talkTab.Resize += (s, e) => ApplyResponsiveLayout(false);
 
             AcceptButton = _saveButton;
             CancelButton = _cancelButton;
@@ -267,23 +294,16 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyGeneralTabFieldSizing()
         {
-            try
-            {
-                const int fieldLeft = 150;
-                const int rightMargin = 24;
-                const int minWidth = 260;
+            const int fieldLeft = 150;
+            const int rightMargin = 24;
+            const int minWidth = 260;
 
-                int availableWidth = _generalTab.ClientSize.Width - fieldLeft - rightMargin;
-                int width = Math.Max(minWidth, availableWidth);
+            int availableWidth = _generalTab.ClientSize.Width - fieldLeft - rightMargin;
+            int width = Math.Max(minWidth, availableWidth);
 
-                _serverUrlTextBox.Width = width;
-                _usernameTextBox.Width = width;
-                _appPasswordTextBox.Width = width;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to apply settings General tab field sizing.", ex);
-            }
+            _serverUrlTextBox.Width = width;
+            _usernameTextBox.Width = width;
+            _appPasswordTextBox.Width = width;
         }
 
         private void InitializeHeader()
@@ -292,6 +312,284 @@ namespace NcTalkOutlookAddIn.UI
             _headerPanel.Dock = DockStyle.Top;
 
             Controls.Add(_headerPanel);
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            ApplyResponsiveLayout(true);
+        }
+
+        private void ApplyResponsiveLayout(bool ensureClientWidth)
+        {
+            if (_layoutApplying || IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            _layoutApplying = true;
+            try
+            {
+                int outerPadding = ScaleLogical(12);
+                int footerGap = ScaleLogical(4);
+                int footerBottomPadding = ScaleLogical(8);
+                var footerButtons = new List<Button> { _saveButton, _cancelButton };
+
+                int requiredClientWidth = FooterButtonLayoutHelper.LayoutCentered(
+                    this,
+                    footerButtons,
+                    FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                    footerBottomPadding,
+                    FooterButtonLayoutHelper.DefaultSpacing);
+                if (ensureClientWidth && requiredClientWidth > ClientSize.Width)
+                {
+                    ClientSize = new Size(requiredClientWidth, ClientSize.Height);
+                }
+
+                FooterButtonLayoutHelper.LayoutCentered(
+                    this,
+                    footerButtons,
+                    FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                    footerBottomPadding,
+                    FooterButtonLayoutHelper.DefaultSpacing);
+                int buttonTop = Math.Min(_saveButton.Top, _cancelButton.Top);
+
+                bool hasStatus = !string.IsNullOrWhiteSpace(_statusLabel.Text);
+                int statusTop = buttonTop - ScaleLogical(2);
+                if (hasStatus)
+                {
+                    int statusHeight = Math.Max(ScaleLogical(22), _statusLabel.Font.Height + ScaleLogical(8));
+                    statusTop = Math.Max(outerPadding, buttonTop - footerGap - statusHeight);
+                    _statusLabel.SetBounds(
+                        outerPadding,
+                        statusTop,
+                        Math.Max(1, ClientSize.Width - (outerPadding * 2)),
+                        statusHeight);
+                    _statusLabel.Visible = true;
+                }
+                else
+                {
+                    _statusLabel.Visible = false;
+                    _statusLabel.SetBounds(outerPadding, statusTop, 0, 0);
+                }
+
+                int tabTop = HeaderHeight + outerPadding;
+                int tabBottom = hasStatus
+                    ? Math.Max(tabTop + ScaleLogical(220), statusTop - ScaleLogical(4))
+                    : Math.Max(tabTop + ScaleLogical(220), buttonTop - ScaleLogical(4));
+                int tabHeight = Math.Max(ScaleLogical(220), tabBottom - tabTop);
+                _tabControl.SetBounds(
+                    outerPadding,
+                    tabTop,
+                    Math.Max(ScaleLogical(420), ClientSize.Width - (outerPadding * 2)),
+                    tabHeight);
+
+                ApplyGeneralTabFieldSizing();
+                ApplyTalkDefaultsTabLayout();
+                ApplyIfbTabLayout();
+                ApplyAdvancedTabLayout();
+                ApplyDebugTabLayout();
+                ApplyAboutTabLayout();
+                ApplyFileLinkTabLayout();
+            }
+            finally
+            {
+                _layoutApplying = false;
+            }
+        }
+
+        private void ApplyTalkDefaultsTabLayout()
+        {
+            int groupLeft = ScaleLogical(24);
+            int groupWidth = Math.Max(ScaleLogical(360), _talkTab.ClientSize.Width - (groupLeft * 2));
+            _talkDefaultsGroup.SetBounds(groupLeft, _talkDefaultsGroup.Top, groupWidth, _talkDefaultsGroup.Height);
+
+            int innerPadding = ScaleLogical(12);
+            int y = ScaleLogical(26);
+            int rowGap = ScaleLogical(10);
+            int checkGap = ScaleLogical(6);
+            int contentWidth = Math.Max(ScaleLogical(180), _talkDefaultsGroup.ClientSize.Width - (innerPadding * 2));
+
+            int comboLeft = Math.Max(ScaleLogical(180), _talkDefaultRoomTypeLabel.PreferredSize.Width + ScaleLogical(28));
+            int comboWidth = Math.Max(ScaleLogical(160), _talkDefaultsGroup.ClientSize.Width - comboLeft - ScaleLogical(12));
+            int comboHeight = Math.Max(_talkDefaultRoomTypeCombo.Height, _talkDefaultRoomTypeCombo.PreferredHeight + ScaleLogical(2));
+            _talkDefaultRoomTypeCombo.SetBounds(comboLeft, y - ScaleLogical(2), comboWidth, comboHeight);
+            _talkDefaultRoomTypeLabel.Location = new Point(innerPadding, _talkDefaultRoomTypeCombo.Top + Math.Max(0, (comboHeight - _talkDefaultRoomTypeLabel.PreferredHeight) / 2));
+            y = Math.Max(_talkDefaultRoomTypeLabel.Bottom, _talkDefaultRoomTypeCombo.Bottom) + rowGap;
+
+            _talkDefaultPasswordCheckBox.Location = new Point(innerPadding, y);
+            y = _talkDefaultPasswordCheckBox.Bottom + checkGap;
+
+            _talkDefaultAddUsersCheckBox.Location = new Point(innerPadding, y);
+            y = _talkDefaultAddUsersCheckBox.Bottom + checkGap;
+
+            _talkDefaultAddGuestsCheckBox.Location = new Point(innerPadding, y);
+            y = _talkDefaultAddGuestsCheckBox.Bottom + checkGap;
+
+            _talkDefaultLobbyCheckBox.Location = new Point(innerPadding, y);
+            y = _talkDefaultLobbyCheckBox.Bottom + checkGap;
+
+            _talkDefaultSearchCheckBox.Location = new Point(innerPadding, y);
+            y = _talkDefaultSearchCheckBox.Bottom + rowGap;
+
+            if (_talkAddressbookWarningPanel.Visible)
+            {
+                int warningPadding = ScaleLogical(8);
+                int warningWidth = Math.Max(ScaleLogical(160), contentWidth);
+                int warningTextWidth = Math.Max(ScaleLogical(120), warningWidth - (warningPadding * 2));
+
+                _talkAddressbookWarningTitleLabel.Location = new Point(warningPadding, warningPadding);
+                _talkAddressbookWarningTitleLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                int warningTextTop = _talkAddressbookWarningTitleLabel.Bottom + ScaleLogical(4);
+                _talkAddressbookWarningTextLabel.Location = new Point(warningPadding, warningTextTop);
+                _talkAddressbookWarningTextLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                int warningLinkTop = _talkAddressbookWarningTextLabel.Bottom + ScaleLogical(6);
+                _talkAddressbookWarningLinkLabel.Location = new Point(warningPadding, warningLinkTop);
+
+                int warningHeight = _talkAddressbookWarningLinkLabel.Bottom + warningPadding;
+                _talkAddressbookWarningPanel.SetBounds(innerPadding, y, warningWidth, warningHeight);
+                y = _talkAddressbookWarningPanel.Bottom + innerPadding;
+            }
+            else
+            {
+                _talkAddressbookWarningPanel.SetBounds(innerPadding, y, contentWidth, 0);
+                y += innerPadding;
+            }
+
+            _talkDefaultsGroup.Height = Math.Max(ScaleLogical(200), y);
+        }
+
+        private void ApplyIfbTabLayout()
+        {
+            int left = ScaleLogical(24);
+            int top = ScaleLogical(20);
+            int rowGap = ScaleLogical(18);
+            int labelToComboGap = ScaleLogical(14);
+
+            _ifbEnabledCheckBox.Location = new Point(left, top);
+
+            int daysLabelTop = _ifbEnabledCheckBox.Bottom + rowGap;
+            _ifbDaysLabel.Location = new Point(left, daysLabelTop);
+
+            int comboLeft = _ifbDaysLabel.Right + labelToComboGap;
+            int comboHeight = Math.Max(_ifbDaysCombo.Height, _ifbDaysCombo.PreferredHeight + ScaleLogical(2));
+            _ifbDaysCombo.SetBounds(comboLeft, daysLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbDaysCombo.Width), comboHeight);
+        }
+
+        private void ApplyAdvancedTabLayout()
+        {
+            int left = ScaleLogical(24);
+            int labelToComboGap = ScaleLogical(16);
+            int comboLeft = left + Math.Max(_ifbCacheHoursLabel.PreferredSize.Width, Math.Max(_shareBlockLangLabel.PreferredSize.Width, _eventDescriptionLangLabel.PreferredSize.Width)) + labelToComboGap;
+            int rightMargin = ScaleLogical(24);
+            int comboWidth = Math.Max(ScaleLogical(160), _advancedTab.ClientSize.Width - comboLeft - rightMargin);
+            int rowTop = ScaleLogical(24);
+            int rowGap = ScaleLogical(34);
+
+            int ifbComboHeight = Math.Max(_ifbCacheHoursCombo.Height, _ifbCacheHoursCombo.PreferredHeight + ScaleLogical(2));
+            _ifbCacheHoursLabel.Location = new Point(left, rowTop);
+            _ifbCacheHoursCombo.SetBounds(comboLeft, rowTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbCacheHoursCombo.Width), ifbComboHeight);
+
+            int shareLabelTop = rowTop + rowGap + ScaleLogical(12);
+            int shareComboHeight = Math.Max(_shareBlockLangCombo.Height, _shareBlockLangCombo.PreferredHeight + ScaleLogical(2));
+            _shareBlockLangLabel.Location = new Point(left, shareLabelTop);
+            _shareBlockLangCombo.SetBounds(comboLeft, shareLabelTop - ScaleLogical(2), comboWidth, shareComboHeight);
+
+            int eventLabelTop = _shareBlockLangLabel.Bottom + rowGap;
+            int eventComboHeight = Math.Max(_eventDescriptionLangCombo.Height, _eventDescriptionLangCombo.PreferredHeight + ScaleLogical(2));
+            _eventDescriptionLangLabel.Location = new Point(left, eventLabelTop);
+            _eventDescriptionLangCombo.SetBounds(comboLeft, eventLabelTop - ScaleLogical(2), comboWidth, eventComboHeight);
+        }
+
+        private void ApplyDebugTabLayout()
+        {
+            int rightMargin = ScaleLogical(24);
+            int width = Math.Max(ScaleLogical(220), _debugTab.ClientSize.Width - rightMargin - _debugPathLabel.Left);
+            _debugPathLabel.MaximumSize = new Size(width, 0);
+            _debugPathLabel.AutoSize = true;
+            _debugOpenLink.Location = new Point(_debugOpenLink.Left, _debugPathLabel.Bottom + ScaleLogical(10));
+        }
+
+        private void ApplyAboutTabLayout()
+        {
+            int left = ScaleLogical(18);
+            int right = ScaleLogical(18);
+            int top = ScaleLogical(20);
+            int gap = ScaleLogical(10);
+            int contentWidth = Math.Max(ScaleLogical(220), _aboutTab.ClientSize.Width - left - right);
+
+            _aboutVersionLabel.Location = new Point(left, top);
+            _aboutCopyrightLabel.Location = new Point(left, _aboutVersionLabel.Bottom + gap);
+
+            _aboutLicenseLabel.Location = new Point(left, _aboutCopyrightLabel.Bottom + gap);
+            _aboutLicenseLink.Location = new Point(_aboutLicenseLabel.Right + ScaleLogical(8), _aboutLicenseLabel.Top);
+
+            _aboutHomepageLabel.Location = new Point(left, _aboutLicenseLabel.Bottom + gap);
+            _aboutHomepageLink.Location = new Point(_aboutHomepageLabel.Right + ScaleLogical(8), _aboutHomepageLabel.Top);
+
+            _aboutOverviewLabel.Location = new Point(left, _aboutHomepageLabel.Bottom + ScaleLogical(16));
+            _aboutOverviewLabel.MaximumSize = new Size(contentWidth, 0);
+            _aboutOverviewLabel.AutoSize = true;
+
+            _aboutMoreInfoLabel.Location = new Point(left, _aboutOverviewLabel.Bottom + gap);
+            _aboutMoreInfoLink.Location = new Point(left, _aboutMoreInfoLabel.Bottom + ScaleLogical(6));
+
+            _aboutSupportNoteLabel.Location = new Point(left, _aboutMoreInfoLink.Bottom + ScaleLogical(16));
+            _aboutSupportNoteLabel.MaximumSize = new Size(contentWidth, 0);
+            _aboutSupportNoteLabel.AutoSize = true;
+
+            _aboutSupportHeadingLabel.Location = new Point(left, _aboutSupportNoteLabel.Bottom + gap);
+            _aboutSupportLink.Location = new Point(left, _aboutSupportHeadingLabel.Bottom + ScaleLogical(8));
+        }
+
+        private void ApplyFileLinkTabLayout()
+        {
+            int left = ScaleLogical(18);
+            int tabContentWidth = Math.Max(ScaleLogical(420), _fileLinkTab.ClientSize.Width - (left * 2));
+
+            _fileLinkBaseTextBox.Width = tabContentWidth;
+            _fileLinkBaseHintLabel.MaximumSize = new Size(tabContentWidth, 0);
+            _fileLinkBaseHintLabel.AutoSize = true;
+
+            int sharingGroupTop = _fileLinkBaseHintLabel.Bottom + ScaleLogical(12);
+            _sharingDefaultsGroup.SetBounds(left, sharingGroupTop, tabContentWidth, _sharingDefaultsGroup.Height);
+
+            int groupWidth = _sharingDefaultsGroup.ClientSize.Width;
+            _sharingDefaultShareNameTextBox.Width = Math.Max(ScaleLogical(220), groupWidth - ScaleLogical(24));
+
+            int leftColumnX = ScaleLogical(18);
+            int rightColumnX = Math.Max(ScaleLogical(260), (groupWidth / 2) + ScaleLogical(8));
+            int rightColumnRequired = Math.Max(
+                Math.Max(_sharingDefaultPasswordCheckBox.PreferredSize.Width, _sharingDefaultPasswordSeparateCheckBox.PreferredSize.Width),
+                _sharingDefaultExpireDaysLabel.PreferredSize.Width + _sharingDefaultExpireDaysUpDown.Width + ScaleLogical(12));
+            bool stackRightColumn = rightColumnX + rightColumnRequired + ScaleLogical(12) > groupWidth;
+            int rightColumnTop = ScaleLogical(114);
+            if (stackRightColumn)
+            {
+                rightColumnX = leftColumnX;
+                rightColumnTop = _sharingDefaultPermDeleteCheckBox.Bottom + ScaleLogical(14);
+            }
+
+            _sharingDefaultPasswordCheckBox.Location = new Point(rightColumnX, rightColumnTop);
+            _sharingDefaultPasswordSeparateCheckBox.Location = new Point(rightColumnX, _sharingDefaultPasswordCheckBox.Bottom + ScaleLogical(12));
+            _sharingDefaultExpireDaysLabel.Location = new Point(rightColumnX, _sharingDefaultPasswordSeparateCheckBox.Bottom + ScaleLogical(12));
+            _sharingDefaultExpireDaysUpDown.Location = new Point(rightColumnX, _sharingDefaultExpireDaysLabel.Bottom + ScaleLogical(6));
+
+            int columnsBottom = Math.Max(_sharingDefaultPermDeleteCheckBox.Bottom, _sharingDefaultExpireDaysUpDown.Bottom);
+            int automationTop = columnsBottom + ScaleLogical(18);
+            int automationWidth = Math.Max(ScaleLogical(320), groupWidth - ScaleLogical(24));
+            _sharingAttachmentAutomationGroup.SetBounds(ScaleLogical(12), automationTop, automationWidth, _sharingAttachmentAutomationGroup.Height);
+            int lockTextWidth = Math.Max(ScaleLogical(180), automationWidth - ScaleLogical(24));
+            _sharingAttachmentLockHintLabel.MaximumSize = new Size(lockTextWidth, 0);
+            _sharingAttachmentLockStepsLabel.MaximumSize = new Size(lockTextWidth, 0);
+            _sharingAttachmentLockHintLabel.AutoSize = true;
+            _sharingAttachmentLockStepsLabel.AutoSize = true;
+
+            UpdateSharingAttachmentOptionsState();
+            int sharingDefaultsHeight = _sharingAttachmentAutomationGroup.Bottom + ScaleLogical(12);
+            _sharingDefaultsGroup.Height = Math.Max(ScaleLogical(300), sharingDefaultsHeight);
         }
 
         private void InitializeIfbTab()
@@ -307,10 +605,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _ifbDaysLabel.Text = Strings.LabelIfbDays;
             _ifbDaysLabel.Location = new Point(24, 60);
-            _ifbDaysLabel.Size = new Size(160, 20);
+            _ifbDaysLabel.AutoSize = true;
             _ifbTab.Controls.Add(_ifbDaysLabel);
 
             _ifbDaysCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _ifbDaysCombo.IntegralHeight = false;
             _ifbDaysCombo.Location = new Point(200, 58);
             _ifbDaysCombo.Width = 100;
             _ifbDaysCombo.Items.AddRange(new object[] { "10", "30", "60", "90" });
@@ -324,10 +623,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _ifbCacheHoursLabel.Text = Strings.LabelIfbCacheHours;
             _ifbCacheHoursLabel.Location = new Point(24, 24);
-            _ifbCacheHoursLabel.Size = new Size(220, 20);
+            _ifbCacheHoursLabel.AutoSize = true;
             _advancedTab.Controls.Add(_ifbCacheHoursLabel);
 
             _ifbCacheHoursCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _ifbCacheHoursCombo.IntegralHeight = false;
             _ifbCacheHoursCombo.Location = new Point(260, 22);
             _ifbCacheHoursCombo.Width = 80;
             _ifbCacheHoursCombo.Anchor = AnchorStyles.Top | AnchorStyles.Left;
@@ -341,10 +641,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _shareBlockLangLabel.Text = Strings.AdvancedShareBlockLangLabel;
             _shareBlockLangLabel.Location = new Point(24, langTop);
-            _shareBlockLangLabel.Size = new Size(220, 20);
+            _shareBlockLangLabel.AutoSize = true;
             _advancedTab.Controls.Add(_shareBlockLangLabel);
 
             _shareBlockLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _shareBlockLangCombo.IntegralHeight = false;
             _shareBlockLangCombo.Location = new Point(260, langTop - 2);
             _shareBlockLangCombo.Width = 240;
             PopulateLanguageOverrideCombo(_shareBlockLangCombo);
@@ -352,10 +653,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _eventDescriptionLangLabel.Text = Strings.AdvancedEventDescriptionLangLabel;
             _eventDescriptionLangLabel.Location = new Point(24, langTop + 32);
-            _eventDescriptionLangLabel.Size = new Size(220, 20);
+            _eventDescriptionLangLabel.AutoSize = true;
             _advancedTab.Controls.Add(_eventDescriptionLangLabel);
 
             _eventDescriptionLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _eventDescriptionLangCombo.IntegralHeight = false;
             _eventDescriptionLangCombo.Location = new Point(260, langTop + 30);
             _eventDescriptionLangCombo.Width = 240;
             PopulateLanguageOverrideCombo(_eventDescriptionLangCombo);
@@ -369,15 +671,16 @@ namespace NcTalkOutlookAddIn.UI
 
             _talkDefaultsGroup.Text = Strings.SettingsTalkDefaultsGroup;
             _talkDefaultsGroup.Location = new Point(24, 20);
-            _talkDefaultsGroup.Size = new Size(480, 180);
+            _talkDefaultsGroup.Size = new Size(480, 248);
             _talkTab.Controls.Add(_talkDefaultsGroup);
 
             _talkDefaultRoomTypeLabel.Text = Strings.TalkRoomGroup;
             _talkDefaultRoomTypeLabel.Location = new Point(12, 28);
-            _talkDefaultRoomTypeLabel.Size = new Size(160, 20);
+            _talkDefaultRoomTypeLabel.AutoSize = true;
             _talkDefaultsGroup.Controls.Add(_talkDefaultRoomTypeLabel);
 
             _talkDefaultRoomTypeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _talkDefaultRoomTypeCombo.IntegralHeight = false;
             _talkDefaultRoomTypeCombo.Location = new Point(200, 26);
             _talkDefaultRoomTypeCombo.Width = 240;
             _talkDefaultRoomTypeCombo.Items.Add(new TalkRoomTypeOption(TalkRoomType.EventConversation, Strings.TalkEventRadio));
@@ -410,6 +713,38 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultSearchCheckBox.Location = new Point(12, 156);
             _talkDefaultsGroup.Controls.Add(_talkDefaultSearchCheckBox);
 
+            _talkAddressbookWarningPanel.Visible = false;
+            _talkAddressbookWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
+            _talkAddressbookWarningPanel.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(
+                    e.Graphics,
+                    _talkAddressbookWarningPanel.ClientRectangle,
+                    Color.FromArgb(176, 0, 32),
+                    ButtonBorderStyle.Solid);
+            };
+            _talkDefaultsGroup.Controls.Add(_talkAddressbookWarningPanel);
+
+            _talkAddressbookWarningTitleLabel.AutoSize = true;
+            _talkAddressbookWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
+            _talkAddressbookWarningTitleLabel.Font = new Font(
+                _talkAddressbookWarningTitleLabel.Font,
+                FontStyle.Bold);
+            _talkAddressbookWarningTitleLabel.Text = "\u26a0 " + Strings.TalkSystemAddressbookRequiredShort;
+            _talkAddressbookWarningPanel.Controls.Add(_talkAddressbookWarningTitleLabel);
+
+            _talkAddressbookWarningTextLabel.AutoSize = true;
+            _talkAddressbookWarningTextLabel.Text = Strings.TalkSystemAddressbookRequiredMessage;
+            _talkAddressbookWarningPanel.Controls.Add(_talkAddressbookWarningTextLabel);
+
+            _talkAddressbookWarningLinkLabel.AutoSize = true;
+            _talkAddressbookWarningLinkLabel.Text = Strings.TalkSystemAddressbookAdminLinkLabel;
+            _talkAddressbookWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
+            _talkAddressbookWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
+            _talkAddressbookWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
+            _talkAddressbookWarningLinkLabel.LinkClicked += (s, e) => OpenBrowser(Strings.TalkSystemAddressbookAdminGuideUrl);
+            _talkAddressbookWarningPanel.Controls.Add(_talkAddressbookWarningLinkLabel);
+
             _toolTip.SetToolTip(_talkDefaultAddUsersCheckBox, Strings.TooltipAddUsers);
             _toolTip.SetToolTip(_talkDefaultAddGuestsCheckBox, Strings.TooltipAddGuests);
             _toolTip.SetToolTip(_talkDefaultLobbyCheckBox, Strings.TooltipLobby);
@@ -427,9 +762,9 @@ namespace NcTalkOutlookAddIn.UI
             _debugLogCheckBox.Location = new Point(24, 20);
             _debugTab.Controls.Add(_debugLogCheckBox);
 
-            _debugPathLabel.AutoSize = false;
+            _debugPathLabel.AutoSize = true;
             _debugPathLabel.Location = new Point(24, 60);
-            _debugPathLabel.Size = new Size(420, 40);
+            _debugPathLabel.MaximumSize = new Size(420, 0);
             _debugTab.Controls.Add(_debugPathLabel);
 
             _debugOpenLink.Text = Strings.DebugOpenLog;
@@ -444,57 +779,64 @@ namespace NcTalkOutlookAddIn.UI
         private void InitializeAboutTab()
         {
             _aboutTab.Padding = new Padding(12);
+            _aboutTab.AutoScroll = true;
 
             _aboutVersionLabel.AutoSize = true;
-            _aboutVersionLabel.Location = new Point(18, 20);
             _aboutTab.Controls.Add(_aboutVersionLabel);
 
             _aboutCopyrightLabel.AutoSize = true;
-            _aboutCopyrightLabel.Location = new Point(18, 50);
             _aboutTab.Controls.Add(_aboutCopyrightLabel);
 
-            var licenseLabel = new Label
-            {
-                Text = Strings.AboutLicenseLabel,
-                Location = new Point(18, 80),
-                AutoSize = true
-            };
-            _aboutTab.Controls.Add(licenseLabel);
+            _aboutLicenseLabel.Text = Strings.AboutLicenseLabel;
+            _aboutLicenseLabel.AutoSize = true;
+            _aboutTab.Controls.Add(_aboutLicenseLabel);
 
             _aboutLicenseLink.AutoSize = true;
-            _aboutLicenseLink.Location = new Point(80, 80);
             _aboutLicenseLink.Text = Strings.AboutLicenseLink;
+            _aboutLicenseLink.Padding = new Padding(1, 0, 0, 0);
             _aboutLicenseLink.LinkClicked += OnAboutLicenseLinkClicked;
             _aboutTab.Controls.Add(_aboutLicenseLink);
 
-            var supportNoteLabel = new Label
-            {
-                Text = Strings.AboutSupportNote,
-                Location = new Point(18, 110),
-                MaximumSize = new Size(640, 0),
-                AutoSize = true,
-                ForeColor = Color.DimGray
-            };
-            supportNoteLabel.Size = supportNoteLabel.PreferredSize;
-            _aboutTab.Controls.Add(supportNoteLabel);
+            _aboutHomepageLabel.Text = Strings.AboutHomepageLabel;
+            _aboutHomepageLabel.AutoSize = true;
+            _aboutTab.Controls.Add(_aboutHomepageLabel);
 
-            var supportHeadingLabel = new Label
-            {
-                Text = Strings.AboutSupportHeading,
-                Location = new Point(18, supportNoteLabel.Bottom + 12),
-                AutoSize = true
-            };
-            supportHeadingLabel.Font = new Font(supportHeadingLabel.Font, FontStyle.Bold);
-            _aboutTab.Controls.Add(supportHeadingLabel);
+            _aboutHomepageLink.Text = Strings.AboutHomepageLink;
+            _aboutHomepageLink.AutoSize = true;
+            _aboutHomepageLink.LinkClicked += (sender, args) => OpenBrowser(NcConnectorHomepageUrl);
+            _aboutTab.Controls.Add(_aboutHomepageLink);
 
-            var paypalLink = new LinkLabel
-            {
-                Text = Strings.AboutSupportLink,
-                Location = new Point(18, supportHeadingLabel.Bottom + 8),
-                AutoSize = true
-            };
-            paypalLink.LinkClicked += (sender, args) => OpenBrowser("https://www.paypal.com/donate/?hosted_button_id=FTZWNRNKVKUN6");
-            _aboutTab.Controls.Add(paypalLink);
+            _aboutOverviewLabel.Text = Strings.AboutOverviewText;
+            _aboutOverviewLabel.AutoSize = true;
+            _aboutOverviewLabel.MaximumSize = new Size(Math.Max(ScaleLogical(220), _aboutTab.ClientSize.Width - ScaleLogical(36)), 0);
+            _aboutTab.Controls.Add(_aboutOverviewLabel);
+
+            _aboutMoreInfoLabel.Text = Strings.AboutMoreInfoLabel;
+            _aboutMoreInfoLabel.AutoSize = true;
+            _aboutMoreInfoLabel.Font = new Font(_aboutMoreInfoLabel.Font, FontStyle.Bold);
+            _aboutTab.Controls.Add(_aboutMoreInfoLabel);
+
+            _aboutMoreInfoLink.Text = Strings.AboutMoreInfoLink;
+            _aboutMoreInfoLink.AutoSize = true;
+            _aboutMoreInfoLink.LinkClicked += (sender, args) => OpenBrowser(NcConnectorHomepageUrl);
+            _aboutTab.Controls.Add(_aboutMoreInfoLink);
+
+            _aboutSupportNoteLabel.Text = Strings.AboutSupportNote;
+            _aboutSupportNoteLabel.AutoSize = true;
+            _aboutSupportNoteLabel.ForeColor = Color.DimGray;
+            _aboutTab.Controls.Add(_aboutSupportNoteLabel);
+
+            _aboutSupportHeadingLabel.Text = Strings.AboutSupportHeading;
+            _aboutSupportHeadingLabel.AutoSize = true;
+            _aboutSupportHeadingLabel.Font = new Font(_aboutSupportHeadingLabel.Font, FontStyle.Bold);
+            _aboutTab.Controls.Add(_aboutSupportHeadingLabel);
+
+            _aboutSupportLink.Text = Strings.AboutSupportLink;
+            _aboutSupportLink.AutoSize = true;
+            _aboutSupportLink.LinkClicked += (sender, args) => OpenBrowser("https://www.paypal.com/donate/?hosted_button_id=FTZWNRNKVKUN6");
+            _aboutTab.Controls.Add(_aboutSupportLink);
+
+            ApplyAboutTabLayout();
         }
 
         private void UpdateDebugPathLabel()
@@ -629,6 +971,9 @@ namespace NcTalkOutlookAddIn.UI
             _sharingDefaultPermWriteCheckBox.Checked = Result.SharingDefaultPermWrite;
             _sharingDefaultPermDeleteCheckBox.Checked = Result.SharingDefaultPermDelete;
             _sharingDefaultPasswordCheckBox.Checked = Result.SharingDefaultPasswordEnabled;
+            _sharingDefaultPasswordSeparateCheckBox.Checked =
+                AddinSettings.SeparatePasswordFeatureEnabled
+                && Result.SharingDefaultPasswordSeparateEnabled;
             int expireDays = Result.SharingDefaultExpireDays;
             if (expireDays <= 0)
             {
@@ -639,6 +984,13 @@ namespace NcTalkOutlookAddIn.UI
                 expireDays = 3650;
             }
             _sharingDefaultExpireDaysUpDown.Value = expireDays;
+            _sharingAttachmentsAlwaysCheckBox.Checked = Result.SharingAttachmentsAlwaysConnector;
+            _sharingAttachmentsOfferAboveCheckBox.Checked = Result.SharingAttachmentsOfferAboveEnabled;
+            int offerAboveMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(Result.SharingAttachmentsOfferAboveMb);
+            decimal clampedOfferAbove = Math.Max(
+                _sharingAttachmentsOfferAboveMbUpDown.Minimum,
+                Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
+            _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
             _talkDefaultPasswordCheckBox.Checked = Result.TalkDefaultPasswordEnabled;
             _talkDefaultAddUsersCheckBox.Checked = Result.TalkDefaultAddUsers;
             _talkDefaultAddGuestsCheckBox.Checked = Result.TalkDefaultAddGuests;
@@ -650,10 +1002,16 @@ namespace NcTalkOutlookAddIn.UI
             SelectLanguageChoice(_eventDescriptionLangCombo, Result.EventDescriptionLang);
             UpdateDebugPathLabel();
             UpdateAboutTab();
+            RefreshSharingAttachmentLockState();
+            UpdateSharingAttachmentOptionsState();
+            ApplySharingPasswordSeparateAvailability();
+            RefreshTalkSystemAddressbookState(true, "settings_open");
         }
 
         private void OnSaveButtonClick(object sender, EventArgs e)
         {
+            RefreshTalkSystemAddressbookState(true, "settings_save");
+
             Result.ServerUrl = _serverUrlTextBox.Text.Trim();
             Result.Username = _usernameTextBox.Text.Trim();
             Result.AppPassword = _appPasswordTextBox.Text;
@@ -669,7 +1027,14 @@ namespace NcTalkOutlookAddIn.UI
             Result.SharingDefaultPermWrite = _sharingDefaultPermWriteCheckBox.Checked;
             Result.SharingDefaultPermDelete = _sharingDefaultPermDeleteCheckBox.Checked;
             Result.SharingDefaultPasswordEnabled = _sharingDefaultPasswordCheckBox.Checked;
+            Result.SharingDefaultPasswordSeparateEnabled =
+                AddinSettings.SeparatePasswordFeatureEnabled
+                && _sharingDefaultPasswordCheckBox.Checked
+                && _sharingDefaultPasswordSeparateCheckBox.Checked;
             Result.SharingDefaultExpireDays = (int)_sharingDefaultExpireDaysUpDown.Value;
+            Result.SharingAttachmentsAlwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
+            Result.SharingAttachmentsOfferAboveEnabled = _sharingAttachmentsOfferAboveCheckBox.Checked;
+            Result.SharingAttachmentsOfferAboveMb = (int)_sharingAttachmentsOfferAboveMbUpDown.Value;
             Result.TalkDefaultPasswordEnabled = _talkDefaultPasswordCheckBox.Checked;
             Result.TalkDefaultAddUsers = _talkDefaultAddUsersCheckBox.Checked;
             Result.TalkDefaultAddGuests = _talkDefaultAddGuestsCheckBox.Checked;
@@ -848,6 +1213,175 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             UpdateControlState();
+        }
+
+        private void OnSelectedTabChanged(object sender, EventArgs e)
+        {
+            if (_tabControl.SelectedTab == _fileLinkTab)
+            {
+                RefreshSharingAttachmentLockState();
+                UpdateSharingAttachmentOptionsState();
+                return;
+            }
+
+            if (_tabControl.SelectedTab == _talkTab)
+            {
+                RefreshTalkSystemAddressbookState(true, "settings_tab_talk");
+            }
+        }
+
+        private void RefreshSharingAttachmentLockState()
+        {
+            try
+            {
+                var state = _attachmentGuardService.ReadLiveState();
+                _sharingAttachmentLockActive = state != null && state.LockActive;
+                _sharingAttachmentLockThresholdMb = state != null
+                    ? OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(state.ThresholdMb)
+                    : 5;
+            }
+            catch (Exception ex)
+            {
+                _sharingAttachmentLockActive = false;
+                _sharingAttachmentLockThresholdMb = 5;
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read live host attachment automation guard state.", ex);
+            }
+        }
+
+        private void UpdateSharingAttachmentOptionsState()
+        {
+            bool alwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
+            bool lockActive = _sharingAttachmentLockActive;
+            bool uiBusy = _isBusy;
+
+            _sharingAttachmentLockHintLabel.Visible = lockActive;
+            _sharingAttachmentLockStepsLabel.Visible = lockActive;
+            int innerPadding = ScaleLogical(12);
+            int y = ScaleLogical(24);
+            int rowGap = ScaleLogical(8);
+            int lockTextWidth = Math.Max(ScaleLogical(180), _sharingAttachmentAutomationGroup.ClientSize.Width - (innerPadding * 2));
+
+            if (lockActive)
+            {
+                _sharingAttachmentLockHintLabel.Text = string.Format(
+                    CultureInfo.CurrentCulture,
+                    Strings.SharingAttachmentsLockText,
+                    _sharingAttachmentLockThresholdMb.ToString(CultureInfo.CurrentCulture));
+                _sharingAttachmentLockStepsLabel.Text = string.Join(
+                    Environment.NewLine,
+                    Strings.SharingAttachmentsLockStep1,
+                    Strings.SharingAttachmentsLockStep2,
+                    Strings.SharingAttachmentsLockStep3);
+
+                _sharingAttachmentLockHintLabel.MaximumSize = new Size(lockTextWidth, 0);
+                _sharingAttachmentLockHintLabel.Location = new Point(innerPadding, y);
+                y = _sharingAttachmentLockHintLabel.Bottom + rowGap;
+
+                _sharingAttachmentLockStepsLabel.MaximumSize = new Size(lockTextWidth, 0);
+                _sharingAttachmentLockStepsLabel.Location = new Point(innerPadding, y);
+                y = _sharingAttachmentLockStepsLabel.Bottom + ScaleLogical(12);
+            }
+            else
+            {
+                _sharingAttachmentLockHintLabel.Text = string.Empty;
+                _sharingAttachmentLockStepsLabel.Text = string.Empty;
+            }
+
+            _sharingAttachmentsAlwaysCheckBox.Location = new Point(innerPadding, y);
+            int offerTop = _sharingAttachmentsAlwaysCheckBox.Bottom + rowGap;
+            _sharingAttachmentsOfferAboveCheckBox.Location = new Point(innerPadding, offerTop);
+
+            int spinnerLeft = _sharingAttachmentsOfferAboveCheckBox.Right + ScaleLogical(10);
+            int spinnerTop = offerTop - ScaleLogical(2);
+            int unitWidth = _sharingAttachmentsOfferAboveUnitLabel.PreferredSize.Width;
+            int rightLimit = _sharingAttachmentAutomationGroup.ClientSize.Width - innerPadding;
+            int inlineRequiredRight = spinnerLeft + _sharingAttachmentsOfferAboveMbUpDown.Width + ScaleLogical(8) + unitWidth;
+            if (inlineRequiredRight > rightLimit)
+            {
+                spinnerLeft = innerPadding + ScaleLogical(24);
+                spinnerTop = _sharingAttachmentsOfferAboveCheckBox.Bottom + ScaleLogical(6);
+            }
+
+            _sharingAttachmentsOfferAboveMbUpDown.Location = new Point(spinnerLeft, spinnerTop);
+            _sharingAttachmentsOfferAboveUnitLabel.Location = new Point(_sharingAttachmentsOfferAboveMbUpDown.Right + ScaleLogical(8), spinnerTop + ScaleLogical(2));
+
+            int contentBottom = Math.Max(
+                _sharingAttachmentsOfferAboveCheckBox.Bottom,
+                Math.Max(_sharingAttachmentsOfferAboveMbUpDown.Bottom, _sharingAttachmentsOfferAboveUnitLabel.Bottom));
+            if (lockActive)
+            {
+                contentBottom = Math.Max(contentBottom, _sharingAttachmentLockStepsLabel.Bottom);
+            }
+            int requiredGroupHeight = Math.Max(ScaleLogical(110), contentBottom + innerPadding);
+            if (_sharingAttachmentAutomationGroup.Height != requiredGroupHeight)
+            {
+                _sharingAttachmentAutomationGroup.Height = requiredGroupHeight;
+            }
+
+            _sharingAttachmentsAlwaysCheckBox.Enabled = !lockActive && !uiBusy;
+            _sharingAttachmentsOfferAboveCheckBox.Enabled = !lockActive && !alwaysConnector && !uiBusy;
+
+            bool thresholdInputEnabled = !lockActive && !alwaysConnector && _sharingAttachmentsOfferAboveCheckBox.Checked && !uiBusy;
+            _sharingAttachmentsOfferAboveMbUpDown.Enabled = thresholdInputEnabled;
+            _sharingAttachmentsOfferAboveUnitLabel.Enabled = !lockActive && !alwaysConnector && !uiBusy;
+        }
+
+        private void RefreshTalkSystemAddressbookState(bool forceRefresh, string trigger)
+        {
+            string serverUrl = _serverUrlTextBox.Text.Trim();
+            string username = _usernameTextBox.Text.Trim();
+            string appPassword = _appPasswordTextBox.Text ?? string.Empty;
+            int cacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
+            var configuration = new TalkServiceConfiguration(serverUrl, username, appPassword);
+            var cache = new IfbAddressBookCache(AppDataPaths.EnsureLocalRootDirectory());
+
+            DiagnosticsLogger.Log(
+                LogCategories.Talk,
+                "System address book status check requested from settings (trigger=" + (trigger ?? "n/a") +
+                ", forceRefresh=" + forceRefresh + ").");
+
+            var status = cache.GetSystemAddressbookStatus(configuration, cacheHours, forceRefresh);
+            bool lockActive = !status.Available;
+            string detail = lockActive ? Strings.TalkSystemAddressbookRequiredMessage : string.Empty;
+            if (lockActive && !string.IsNullOrWhiteSpace(status.Error))
+            {
+                DiagnosticsLogger.Log(
+                    LogCategories.Talk,
+                    "System address book unavailable in settings (trigger=" + (trigger ?? "n/a") + ", error=" + status.Error + ").");
+            }
+
+            ApplyTalkSystemAddressbookLockState(lockActive, detail, trigger, status);
+        }
+
+        private void ApplyTalkSystemAddressbookLockState(
+            bool lockActive,
+            string detail,
+            string trigger,
+            IfbAddressBookCache.SystemAddressbookStatus status)
+        {
+            _talkAddressbookLockActive = lockActive;
+            _talkAddressbookLockDetail = lockActive ? (detail ?? Strings.TalkSystemAddressbookRequiredMessage) : string.Empty;
+
+            _talkDefaultAddUsersCheckBox.Enabled = !lockActive && !_isBusy;
+            _talkDefaultAddGuestsCheckBox.Enabled = !lockActive && !_isBusy;
+            _talkAddressbookWarningPanel.Visible = lockActive;
+            _talkAddressbookWarningTextLabel.Text = lockActive ? _talkAddressbookLockDetail : string.Empty;
+
+            _toolTip.SetToolTip(_talkDefaultAddUsersCheckBox, lockActive ? Strings.TooltipAddUsersLocked : Strings.TooltipAddUsers);
+            _toolTip.SetToolTip(_talkDefaultAddGuestsCheckBox, lockActive ? Strings.TooltipAddGuestsLocked : Strings.TooltipAddGuests);
+
+            DiagnosticsLogger.Log(
+                LogCategories.Talk,
+                "System address book lock state applied in settings (trigger=" + (trigger ?? "n/a") +
+                ", locked=" + lockActive +
+                ", available=" + (status != null && status.Available) +
+                ", count=" + (status != null ? status.Count : 0) +
+                ", hasError=" + (status != null && !string.IsNullOrWhiteSpace(status.Error)) + ").");
+
+            if (!_layoutApplying)
+            {
+                ApplyTalkDefaultsTabLayout();
+            }
         }
 
         private static void SelectComboValue(ComboBox combo, int value, int fallback)
@@ -1129,6 +1663,25 @@ namespace NcTalkOutlookAddIn.UI
             _ifbCacheHoursLabel.Enabled = !_isBusy;
             _debugLogCheckBox.Enabled = !_isBusy;
             _debugOpenLink.Enabled = !_isBusy;
+            _talkDefaultAddUsersCheckBox.Enabled = !_talkAddressbookLockActive && !_isBusy;
+            _talkDefaultAddGuestsCheckBox.Enabled = !_talkAddressbookLockActive && !_isBusy;
+            UpdateSharingAttachmentOptionsState();
+            ApplySharingPasswordSeparateAvailability();
+        }
+
+        private void ApplySharingPasswordSeparateAvailability()
+        {
+            bool featureEnabled = AddinSettings.SeparatePasswordFeatureEnabled;
+            bool interactive = featureEnabled && _sharingDefaultPasswordCheckBox.Checked && !_isBusy;
+
+            _sharingDefaultPasswordSeparateCheckBox.AutoCheck = interactive;
+            _sharingDefaultPasswordSeparateCheckBox.TabStop = interactive;
+            _sharingDefaultPasswordSeparateCheckBox.ForeColor = interactive ? _themePalette.Text : _themePalette.DisabledText;
+
+            if (!interactive)
+            {
+                _sharingDefaultPasswordSeparateCheckBox.Checked = false;
+            }
         }
 
         private void SetBusy(bool busy)
@@ -1145,6 +1698,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             _statusLabel.Text = message;
             _statusLabel.ForeColor = isError ? _themePalette.ErrorText : _themePalette.SuccessText;
+            ApplyResponsiveLayout(false);
         }
 
         private static void OpenBrowser(string url)
@@ -1188,14 +1742,14 @@ namespace NcTalkOutlookAddIn.UI
 
             _fileLinkBaseHintLabel.Text = Strings.FileLinkBaseHint;
             _fileLinkBaseHintLabel.Location = new Point(18, 82);
-            _fileLinkBaseHintLabel.Size = new Size(420, 40);
-            _fileLinkBaseHintLabel.AutoSize = false;
+            _fileLinkBaseHintLabel.MaximumSize = new Size(420, 0);
+            _fileLinkBaseHintLabel.AutoSize = true;
             _fileLinkBaseHintLabel.ForeColor = Color.DimGray;
             _fileLinkTab.Controls.Add(_fileLinkBaseHintLabel);
 
             _sharingDefaultsGroup.Text = Strings.SharingDefaultsHeading;
             _sharingDefaultsGroup.Location = new Point(18, 134);
-            _sharingDefaultsGroup.Size = new Size(480, 210);
+            _sharingDefaultsGroup.Size = new Size(500, 394);
             _fileLinkTab.Controls.Add(_sharingDefaultsGroup);
 
             _sharingDefaultShareNameLabel.Text = Strings.SharingDefaultShareNameLabel;
@@ -1230,18 +1784,71 @@ namespace NcTalkOutlookAddIn.UI
             _sharingDefaultPasswordCheckBox.Text = Strings.SharingDefaultPasswordLabel;
             _sharingDefaultPasswordCheckBox.Location = new Point(260, 114);
             _sharingDefaultPasswordCheckBox.AutoSize = true;
+            _sharingDefaultPasswordCheckBox.CheckedChanged += (s, e) => ApplySharingPasswordSeparateAvailability();
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultPasswordCheckBox);
 
+            _sharingDefaultPasswordSeparateCheckBox.Text = Strings.SharingDefaultPasswordSeparateLabel;
+            _sharingDefaultPasswordSeparateCheckBox.Location = new Point(260, 138);
+            _sharingDefaultPasswordSeparateCheckBox.AutoSize = true;
+            _sharingDefaultsGroup.Controls.Add(_sharingDefaultPasswordSeparateCheckBox);
+
             _sharingDefaultExpireDaysLabel.Text = Strings.SharingDefaultExpireDaysLabel;
-            _sharingDefaultExpireDaysLabel.Location = new Point(260, 144);
+            _sharingDefaultExpireDaysLabel.Location = new Point(260, 170);
             _sharingDefaultExpireDaysLabel.AutoSize = true;
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultExpireDaysLabel);
 
             _sharingDefaultExpireDaysUpDown.Minimum = 1;
             _sharingDefaultExpireDaysUpDown.Maximum = 3650;
-            _sharingDefaultExpireDaysUpDown.Location = new Point(260, 168);
+            _sharingDefaultExpireDaysUpDown.Location = new Point(260, 194);
             _sharingDefaultExpireDaysUpDown.Width = 90;
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultExpireDaysUpDown);
+
+            _sharingAttachmentAutomationGroup.Text = Strings.SharingAttachmentAutomationHeading;
+            _sharingAttachmentAutomationGroup.Location = new Point(12, 230);
+            _sharingAttachmentAutomationGroup.Size = new Size(472, 150);
+            _sharingDefaultsGroup.Controls.Add(_sharingAttachmentAutomationGroup);
+
+            _sharingAttachmentLockHintLabel.AutoSize = true;
+            _sharingAttachmentLockHintLabel.Location = new Point(12, 20);
+            _sharingAttachmentLockHintLabel.MaximumSize = new Size(448, 0);
+            _sharingAttachmentLockHintLabel.ForeColor = Color.Maroon;
+            _sharingAttachmentLockHintLabel.Visible = false;
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentLockHintLabel);
+
+            _sharingAttachmentLockStepsLabel.AutoSize = true;
+            _sharingAttachmentLockStepsLabel.Location = new Point(12, 52);
+            _sharingAttachmentLockStepsLabel.MaximumSize = new Size(448, 0);
+            _sharingAttachmentLockStepsLabel.ForeColor = Color.DimGray;
+            _sharingAttachmentLockStepsLabel.Visible = false;
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentLockStepsLabel);
+
+            _sharingAttachmentsAlwaysCheckBox.Text = Strings.SharingAttachmentsAlwaysConnectorLabel;
+            _sharingAttachmentsAlwaysCheckBox.Location = new Point(12, 24);
+            _sharingAttachmentsAlwaysCheckBox.AutoSize = true;
+            _sharingAttachmentsAlwaysCheckBox.CheckedChanged += (s, e) => UpdateSharingAttachmentOptionsState();
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentsAlwaysCheckBox);
+
+            _sharingAttachmentsOfferAboveCheckBox.Text = Strings.SharingAttachmentsOfferAboveLabel;
+            _sharingAttachmentsOfferAboveCheckBox.Location = new Point(12, 52);
+            _sharingAttachmentsOfferAboveCheckBox.AutoSize = true;
+            _sharingAttachmentsOfferAboveCheckBox.CheckedChanged += (s, e) => UpdateSharingAttachmentOptionsState();
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentsOfferAboveCheckBox);
+
+            _sharingAttachmentsOfferAboveMbUpDown.Minimum = 1;
+            _sharingAttachmentsOfferAboveMbUpDown.Maximum = 10240;
+            _sharingAttachmentsOfferAboveMbUpDown.Location = new Point(236, 50);
+            _sharingAttachmentsOfferAboveMbUpDown.Width = 72;
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentsOfferAboveMbUpDown);
+
+            _sharingAttachmentsOfferAboveUnitLabel.Text = Strings.SharingAttachmentsOfferAboveUnit;
+            _sharingAttachmentsOfferAboveUnitLabel.Location = new Point(316, 52);
+            _sharingAttachmentsOfferAboveUnitLabel.AutoSize = true;
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentsOfferAboveUnitLabel);
+
+            _toolTip.SetToolTip(_sharingDefaultPermissionsLabel, Strings.TooltipSharingPermissions);
+            _toolTip.SetToolTip(_sharingDefaultPasswordSeparateCheckBox, Strings.TooltipSharingPasswordSeparate);
+            _toolTip.SetToolTip(_sharingAttachmentsAlwaysCheckBox, Strings.TooltipSharingAttachmentsAlways);
+            _toolTip.SetToolTip(_sharingAttachmentsOfferAboveCheckBox, Strings.TooltipSharingAttachmentsOffer);
         }
 
         private void UpdateKnownServerVersion(string candidate)
@@ -1251,6 +1858,12 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _lastKnownServerVersion = parsed.ToString();
             }
+        }
+
+        private int ScaleLogical(int value)
+        {
+            int dpi = DeviceDpi > 0 ? DeviceDpi : 96;
+            return (int)Math.Round(value * (dpi / 96f));
         }
     }
 }

@@ -20,6 +20,7 @@ namespace NcTalkOutlookAddIn.Utilities
      */
     internal static class FileLinkHtmlBuilder
     {
+        private const string HomepageUrl = "https://nc-connector.de";
         private static readonly Lazy<string> HeaderBase64 = new Lazy<string>(LoadHeaderBase64);
 
         /**
@@ -31,6 +32,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 throw new ArgumentNullException("result");
             }
+
+            bool attachmentMode = request != null && request.AttachmentMode;
+            bool separatePassword = request != null
+                && request.PasswordSeparateEnabled
+                && !string.IsNullOrWhiteSpace(result.Password);
 
             string intro = Strings.GetInLanguage(
                 languageOverride,
@@ -46,6 +52,7 @@ namespace NcTalkOutlookAddIn.Utilities
             string passwordLabel = Strings.GetInLanguage(languageOverride, "sharing_html_password_label", "Password");
             string expireLabel = Strings.GetInLanguage(languageOverride, "sharing_html_expire_label", "Expiration date");
             string permissionsLabel = Strings.GetInLanguage(languageOverride, "sharing_html_permissions_label", "Your permissions");
+            string passwordSeparateHint = Strings.GetInLanguage(languageOverride, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
 
             string permissionRead = Strings.GetInLanguage(languageOverride, "sharing_permission_read", "Read");
             string permissionCreate = Strings.GetInLanguage(languageOverride, "sharing_permission_create", "Upload");
@@ -63,10 +70,14 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.AppendLine("<tr>");
             builder.AppendFormat(CultureInfo.InvariantCulture, "<td height=\"32\" bgcolor=\"{0}\" style=\"padding:0;background-color:{0};text-align:center;height:32px;line-height:0;font-size:0;mso-line-height-rule:exactly;\">", brandBlue);
             builder.AppendLine();
-            builder.AppendLine("<a href=\"https://github.com/nc-connector/NC_Connector_for_Outlook\" style=\"display:block;text-decoration:none;line-height:0;font-size:0;\" target=\"_blank\" rel=\"noopener\">");
             builder.AppendFormat(
                 CultureInfo.InvariantCulture,
-                "<img alt=\"NC Connector\" height=\"32\" style=\"display:block;width:auto;height:32px;max-width:164px;object-fit:contain;border:0;margin:0 auto;\" src=\"data:image/png;base64,{0}\" />",
+                "<a href=\"{0}\" style=\"display:block;text-decoration:none;line-height:0;font-size:0;\" target=\"_blank\" rel=\"noopener\">",
+                HomepageUrl);
+            builder.AppendLine();
+            builder.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "<img alt=\"\" height=\"32\" style=\"display:block;width:auto;height:32px;max-width:164px;object-fit:contain;border:0;margin:0 auto;\" src=\"data:image/png;base64,{0}\" />",
                 HeaderBase64.Value);
             builder.AppendLine("</a>");
             builder.AppendLine("</td>");
@@ -83,20 +94,22 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.AppendLine("<p style=\"margin:0 0 14px 0;line-height:1.4;\">" + HttpUtility.HtmlEncode(intro) + "<br /></p>");
             builder.AppendLine("<table style=\"width:100%;border-collapse:collapse;margin-bottom:10px;\">");
 
+            string downloadUrl = attachmentMode
+                ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
+                : (result.ShareUrl ?? string.Empty);
             AppendRow(builder, downloadLabel, string.Format(
                 CultureInfo.InvariantCulture,
                 "<a href=\"{0}\" style=\"color:{1};text-decoration:none;\">{0}</a>",
-                HttpUtility.HtmlEncode(result.ShareUrl),
+                HttpUtility.HtmlEncode(downloadUrl),
                 brandBlue));
 
-            if (!string.IsNullOrEmpty(result.Password))
+            if (!string.IsNullOrEmpty(result.Password) && !separatePassword)
             {
-                var passwordBuilder = new StringBuilder();
-                passwordBuilder.Append("<span style=\"display:inline-block;font-family:'Consolas','Courier New',monospace;padding:2px 6px;border:1px solid #c7c7c7;border-radius:3px;-ms-user-select:all;user-select:all;\" ondblclick=\"try{window.getSelection().selectAllChildren(this);}catch(e){}\" onclick=\"try{window.getSelection().selectAllChildren(this);}catch(e){}\">");
-                passwordBuilder.Append(HttpUtility.HtmlEncode(result.Password));
-                passwordBuilder.Append("</span>");
-                string passwordHtml = passwordBuilder.ToString();
-                AppendRow(builder, passwordLabel, passwordHtml);
+                AppendRow(builder, passwordLabel, BuildPasswordValueHtml(result.Password));
+            }
+            else if (separatePassword)
+            {
+                AppendRow(builder, passwordLabel, HttpUtility.HtmlEncode(passwordSeparateHint));
             }
 
             if (result.ExpireDate.HasValue)
@@ -104,13 +117,69 @@ namespace NcTalkOutlookAddIn.Utilities
                 AppendRow(builder, expireLabel, HttpUtility.HtmlEncode(result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
             }
 
-            AppendRow(builder, permissionsLabel, BuildPermissions(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete));
+            if (!attachmentMode)
+            {
+                AppendRow(builder, permissionsLabel, BuildPermissions(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete));
+            }
 
             builder.AppendLine("</table>");
             builder.AppendLine("</div>");
             builder.AppendLine("<div style=\"padding:10px 18px 16px 18px;font-size:9pt;font-style:italic;\">");
             string nextcloudLink = string.Format(CultureInfo.InvariantCulture, "<a href=\"https://nextcloud.com/\" style=\"color:{0};text-decoration:none;\">Nextcloud</a>", brandBlue);
             builder.AppendLine(string.Format(CultureInfo.InvariantCulture, footerFormat, nextcloudLink));
+            builder.AppendLine("</div>");
+            builder.AppendLine("</td>");
+            builder.AppendLine("</tr>");
+            builder.AppendLine("</table>");
+            builder.AppendLine("</div>");
+            return builder.ToString();
+        }
+
+        /**
+         * Creates the password-only follow-up HTML block.
+         */
+        internal static string BuildPasswordOnly(FileLinkResult result, string languageOverride)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException("result");
+            }
+
+            string intro = Strings.GetInLanguage(
+                languageOverride,
+                "sharing_html_password_mail_intro",
+                "Here is your password for the shared link.");
+            string passwordLabel = Strings.GetInLanguage(languageOverride, "sharing_html_password_label", "Password");
+            string brandBlue = BrandingAssets.BrandBlueHex;
+
+            var builder = new StringBuilder();
+            builder.AppendLine("<div style=\"font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;margin:16px 0;\">");
+            builder.AppendLine("<table role=\"presentation\" width=\"640\" style=\"border-collapse:separate;border-spacing:0;width:640px;margin:0;background-color:transparent;border:1px solid #d7d7db;border-radius:8px;overflow:hidden;\">");
+            builder.AppendLine("<tr>");
+            builder.AppendLine("<td style=\"padding:0;\">");
+            builder.AppendLine("<table role=\"presentation\" width=\"640\" style=\"border-collapse:collapse;width:640px;margin:0;background-color:transparent;\">");
+            builder.AppendLine("<tr>");
+            builder.AppendFormat(CultureInfo.InvariantCulture, "<td height=\"32\" bgcolor=\"{0}\" style=\"padding:0;background-color:{0};text-align:center;height:32px;line-height:0;font-size:0;mso-line-height-rule:exactly;\">", brandBlue);
+            builder.AppendLine();
+            builder.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "<a href=\"{0}\" style=\"display:block;text-decoration:none;line-height:0;font-size:0;\" target=\"_blank\" rel=\"noopener\">",
+                HomepageUrl);
+            builder.AppendLine();
+            builder.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "<img alt=\"\" height=\"32\" style=\"display:block;width:auto;height:32px;max-width:164px;object-fit:contain;border:0;margin:0 auto;\" src=\"data:image/png;base64,{0}\" />",
+                HeaderBase64.Value);
+            builder.AppendLine();
+            builder.AppendLine("</a>");
+            builder.AppendLine("</td>");
+            builder.AppendLine("</tr>");
+            builder.AppendLine("</table>");
+            builder.AppendLine("<div style=\"padding:18px 18px 12px 18px;\">");
+            builder.AppendLine("<p style=\"margin:0 0 14px 0;line-height:1.4;\">" + HttpUtility.HtmlEncode(intro) + "<br /></p>");
+            builder.AppendLine("<table style=\"width:100%;border-collapse:collapse;margin-bottom:10px;\">");
+            AppendRow(builder, passwordLabel, BuildPasswordValueHtml(result.Password));
+            builder.AppendLine("</table>");
             builder.AppendLine("</div>");
             builder.AppendLine("</td>");
             builder.AppendLine("</tr>");
@@ -133,6 +202,43 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.Append(valueHtml ?? string.Empty);
             builder.Append("</td>");
             builder.AppendLine("</tr>");
+        }
+
+        private static string BuildPasswordValueHtml(string password)
+        {
+            var passwordBuilder = new StringBuilder();
+            passwordBuilder.Append("<span style=\"display:inline-block;font-family:'Consolas','Courier New',monospace;padding:2px 6px;border:1px solid #c7c7c7;border-radius:3px;-ms-user-select:all;user-select:all;\" ondblclick=\"try{window.getSelection().selectAllChildren(this);}catch(e){}\" onclick=\"try{window.getSelection().selectAllChildren(this);}catch(e){}\">");
+            passwordBuilder.Append(HttpUtility.HtmlEncode(password ?? string.Empty));
+            passwordBuilder.Append("</span>");
+            return passwordBuilder.ToString();
+        }
+
+        private static string BuildAttachmentZipDownloadUrl(string shareUrl, string shareToken)
+        {
+            if (string.IsNullOrWhiteSpace(shareUrl))
+            {
+                return string.Empty;
+            }
+
+            string token = string.IsNullOrWhiteSpace(shareToken) ? string.Empty : shareToken.Trim();
+            if (string.IsNullOrEmpty(token))
+            {
+                return shareUrl;
+            }
+
+            try
+            {
+                var shareUri = new Uri(shareUrl, UriKind.Absolute);
+                return shareUri.GetLeftPart(UriPartial.Authority).TrimEnd('/')
+                    + "/s/"
+                    + Uri.EscapeDataString(token)
+                    + "/download";
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to build attachment-mode ZIP download URL.", ex);
+                return shareUrl;
+            }
         }
 
         /**

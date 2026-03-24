@@ -73,7 +73,7 @@ namespace NcTalkOutlookAddIn.Services
                 _listener.Prefixes.Add(Prefix);
                 _listener.Start();
 
-                DiagnosticsLogger.Log(LogCategory, "Listener gestartet (Prefix=" + Prefix + ").");
+                DiagnosticsLogger.Log(LogCategory, "Listener started (prefix=" + Prefix + ").");
 
                 _cancellation = new CancellationTokenSource();
                 _listenerTask = Task.Run(() => ListenLoop(_cancellation.Token));
@@ -95,7 +95,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     try
                     {
-                        DiagnosticsLogger.Log(LogCategory, "Listener wird gestoppt.");
+                        DiagnosticsLogger.Log(LogCategory, "Stopping listener.");
                         _listener.Stop();
                         _listener.Close();
                     }
@@ -169,8 +169,8 @@ namespace NcTalkOutlookAddIn.Services
             {
                 if (!string.Equals(context.Request.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
                 {
-                    DiagnosticsLogger.Log(LogCategory, "Methode nicht erlaubt: " + context.Request.HttpMethod);
-                    WriteError(context, HttpStatusCode.MethodNotAllowed, "Nur GET wird unterstuetzt.");
+                    DiagnosticsLogger.Log(LogCategory, "Method not allowed: " + context.Request.HttpMethod);
+                    WriteError(context, HttpStatusCode.MethodNotAllowed, "Only GET is supported.");
                     return;
                 }
 
@@ -178,8 +178,8 @@ namespace NcTalkOutlookAddIn.Services
                 if (!path.StartsWith("/nc-ifb/freebusy/", StringComparison.OrdinalIgnoreCase) ||
                     !path.EndsWith(".vfb", StringComparison.OrdinalIgnoreCase))
                 {
-                    DiagnosticsLogger.Log(LogCategory, "Pfad nicht unterstuetzt: " + path);
-                    WriteError(context, HttpStatusCode.NotFound, "Pfad nicht unterstuetzt.");
+                    DiagnosticsLogger.Log(LogCategory, "Unsupported path: " + path);
+                    WriteError(context, HttpStatusCode.NotFound, "Unsupported path.");
                     return;
                 }
 
@@ -188,8 +188,8 @@ namespace NcTalkOutlookAddIn.Services
                 string email = Uri.UnescapeDataString(namePart ?? string.Empty).Trim().ToLowerInvariant();
                 if (string.IsNullOrEmpty(email))
                 {
-                    DiagnosticsLogger.Log(LogCategory, "Request ohne E-Mail verworfen.");
-                    WriteError(context, HttpStatusCode.BadRequest, "E-Mail-Adresse fehlt.");
+                    DiagnosticsLogger.Log(LogCategory, "Request rejected without email.");
+                    WriteError(context, HttpStatusCode.BadRequest, "Email address is missing.");
                     return;
                 }
 
@@ -207,8 +207,8 @@ namespace NcTalkOutlookAddIn.Services
                 string resolvedEmail;
                 if (!_addressBookCache.TryResolveEmail(_configuration, _cacheHours, email, out resolvedEmail))
                 {
-                    DiagnosticsLogger.Log(LogCategory, "E-Mail konnte nicht aufgeloest werden: " + email);
-                    WriteError(context, HttpStatusCode.NotFound, "Benutzer nicht gefunden.");
+                    DiagnosticsLogger.Log(LogCategory, "Email could not be resolved: " + email);
+                    WriteError(context, HttpStatusCode.NotFound, "User not found.");
                     return;
                 }
 
@@ -218,8 +218,8 @@ namespace NcTalkOutlookAddIn.Services
                 string uid;
                 if (!_addressBookCache.TryGetUid(_configuration, _cacheHours, email, out uid) || string.IsNullOrEmpty(uid))
                 {
-                    DiagnosticsLogger.Log(LogCategory, "E-Mail nicht im Adressbuch gefunden: " + email);
-                    WriteError(context, HttpStatusCode.NotFound, "Benutzer nicht gefunden.");
+                    DiagnosticsLogger.Log(LogCategory, "Email not found in address book: " + email);
+                    WriteError(context, HttpStatusCode.NotFound, "User not found.");
                     return;
                 }
 
@@ -232,7 +232,7 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 catch (FreeBusyRequestException ex)
                 {
-                    DiagnosticsLogger.Log(LogCategory, "REPORT fehlgeschlagen: " + ex.Message);
+                    DiagnosticsLogger.Log(LogCategory, "REPORT failed: " + ex.Message);
                     if (ex.ShouldFallback)
                     {
                         needsFallback = true;
@@ -251,13 +251,13 @@ namespace NcTalkOutlookAddIn.Services
 
                 if (needsFallback)
                 {
-                    DiagnosticsLogger.Log(LogCategory, "Fallback via Scheduling fuer " + email + " gestartet.");
+                    DiagnosticsLogger.Log(LogCategory, "Starting fallback via scheduling for " + email + ".");
                     string originEmail;
                     if (!_addressBookCache.TryGetPrimaryEmailForUid(_configuration, _cacheHours, _configuration.Username, out originEmail) ||
                         string.IsNullOrEmpty(originEmail))
                     {
-                        DiagnosticsLogger.Log(LogCategory, "Eigenes Benutzerkonto im Adressbuch nicht gefunden.");
-                        WriteError(context, HttpStatusCode.PreconditionFailed, "Eigenes Benutzerkonto im Adressbuch nicht gefunden.");
+                        DiagnosticsLogger.Log(LogCategory, "Own user account not found in address book.");
+                        WriteError(context, HttpStatusCode.PreconditionFailed, "Own user account not found in address book.");
                         return;
                     }
 
@@ -267,7 +267,7 @@ namespace NcTalkOutlookAddIn.Services
                     }
                     catch (FreeBusyRequestException ex)
                     {
-                        DiagnosticsLogger.Log(LogCategory, "Scheduling fehlgeschlagen: " + ex.Message);
+                        DiagnosticsLogger.Log(LogCategory, "Scheduling failed: " + ex.Message);
                         WriteError(context, ex.StatusCode ?? HttpStatusCode.InternalServerError, ex.Message);
                         return;
                     }
@@ -275,12 +275,12 @@ namespace NcTalkOutlookAddIn.Services
 
                 if (string.IsNullOrEmpty(freeBusy))
                 {
-                    DiagnosticsLogger.Log(LogCategory, "Keine Frei/Gebucht-Daten verfuegbar fuer " + email);
-                    WriteError(context, HttpStatusCode.NoContent, "Keine Frei/Gebucht-Daten verfuegbar.");
+                    DiagnosticsLogger.Log(LogCategory, "No free/busy data available for " + email);
+                    WriteError(context, HttpStatusCode.NoContent, "No free/busy data available.");
                     return;
                 }
 
-                DiagnosticsLogger.Log(LogCategory, "Antwort ok fuer " + email + " (Len=" + freeBusy.Length + ").");
+                DiagnosticsLogger.Log(LogCategory, "Response ok for " + email + " (len=" + freeBusy.Length + ").");
 
                 context.Response.StatusCode = (int)HttpStatusCode.OK;
                 context.Response.ContentType = "text/calendar; charset=utf-8";
@@ -291,7 +291,7 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.Log(LogCategory, "Fehler bei HandleRequest: " + ex);
+                DiagnosticsLogger.Log(LogCategory, "Error while handling request: " + ex);
                 WriteError(context, HttpStatusCode.InternalServerError, ex.Message);
             }
             finally

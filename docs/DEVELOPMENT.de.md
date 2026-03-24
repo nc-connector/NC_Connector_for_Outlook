@@ -35,7 +35,7 @@ Auf manchen Build-Systemen fehlen die .NET Framework Reference Assemblies für 4
 Beispiel:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9"
 
 # Optional: Reference Assemblies lokal holen (nur wenn nötig)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -48,7 +48,7 @@ $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAsse
 Der empfohlene Build läuft immer über `build.ps1`:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-0.2.7"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9"
 $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2"
 .\build.ps1 -Configuration Release
 ```
@@ -78,7 +78,7 @@ Was das Script macht:
 ## Logging
 
 - Aktivierung: Settings → Tab **Debug**
-- Datei: `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\addin-runtime.log`
+- Datei: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`
 
 Kategorien (Beispiele):
 
@@ -107,7 +107,23 @@ UI:
 - `src/NcTalkOutlookAddIn/UI/SettingsForm.cs`
 - `src/NcTalkOutlookAddIn/UI/TalkLinkForm.cs`
 - `src/NcTalkOutlookAddIn/UI/FileLinkWizardForm.cs`
+- `src/NcTalkOutlookAddIn/UI/ComposeAttachmentPromptForm.cs` (2-Aktions-Prompt fuer Schwellwertmodus)
 - `src/NcTalkOutlookAddIn/UI/BrandedHeader.cs` (Header-Banner)
+
+Compose-Filelink-Paritaet (2.2.9):
+
+- `MailComposeSubscription` in `NextcloudTalkAddIn.cs` steuert den Compose-Lifecycle fuer:
+  - debouncte Anhangsauswertung (`ComposeAttachmentEvalDebounceMs`)
+  - Always-via-NC und Schwellwertmodus
+  - Batch-Entfernung (`Remove last selected attachments`)
+  - Attachment-Mode-Wizardstart direkt im Datei-Schritt
+  - Share-Cleanup bei unsent close inkl. Grace-Timer fuer Send/Close-Race
+  - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand.
+- `OutlookAttachmentAutomationGuardService` erzwingt den Host-Konflikt-Guard live:
+  - vor Auswertung
+  - vor Prompt-Aktionsverarbeitung
+  - vor Wizard-Finalize im Attachment-Modus.
+- `FileLinkHtmlBuilder` erzeugt im Attachment-Modus reduziertes HTML mit ZIP-Link `/s/<token>/download` (ohne `?accept=zip`).
 
 Installer:
 
@@ -138,3 +154,5 @@ Wichtig für Updates:
 3) MSI installieren/upgrade testen (alte Version → neue Version)
 4) Talk + Filelink + IFB Smoke-Test
 5) MSI ggf. signieren (falls in der Umgebung erforderlich)
+
+

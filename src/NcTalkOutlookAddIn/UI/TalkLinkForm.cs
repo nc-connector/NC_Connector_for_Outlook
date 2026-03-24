@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -32,6 +33,11 @@ namespace NcTalkOutlookAddIn.UI
         private const int ModeratorDropdownMargin = 4;
         private readonly UiThemePalette _themePalette = UiThemeManager.DetectPalette();
 
+        private readonly Label _titleLabel = new Label();
+        private readonly Label _roomTypeLabel = new Label();
+        private readonly Label _passwordLabel = new Label();
+        private readonly GroupBox _settingsGroup = new GroupBox();
+        private readonly Label _eventSupportHintLabel = new Label();
         private readonly TextBox _titleTextBox = new TextBox();
         private readonly ComboBox _roomTypeComboBox = new ComboBox();
         private readonly CheckBox _passwordToggleCheckBox = new CheckBox();
@@ -46,6 +52,10 @@ namespace NcTalkOutlookAddIn.UI
         private readonly TextBox _moderatorTextBox = new TextBox();
         private readonly Button _moderatorClearButton = new Button();
         private readonly ListBox _moderatorListBox = new ListBox();
+        private readonly Panel _moderatorAddressbookWarningPanel = new Panel();
+        private readonly Label _moderatorAddressbookWarningTitleLabel = new Label();
+        private readonly Label _moderatorAddressbookWarningTextLabel = new Label();
+        private readonly LinkLabel _moderatorAddressbookWarningLinkLabel = new LinkLabel();
         private readonly Label _moderatorHintLabel = new Label();
         private readonly ToolTip _toolTip = new ToolTip();
         private readonly Button _okButton = new Button();
@@ -57,10 +67,14 @@ namespace NcTalkOutlookAddIn.UI
         private readonly PasswordPolicyInfo _passwordPolicy;
         private readonly TalkServiceConfiguration _configuration;
         private readonly List<NextcloudUser> _userDirectory;
+        private readonly bool _systemAddressbookAvailable;
+        private readonly string _systemAddressbookError;
         private NextcloudUser _selectedModerator;
         private readonly Dictionary<string, Image> _avatarCache = new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _avatarLoading = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _avatarLock = new object();
+        private bool _layoutApplying;
+        private bool _moderatorSearchLockLogged;
 
         private string _talkTitle;
         private string _talkPassword;
@@ -131,6 +145,7 @@ namespace NcTalkOutlookAddIn.UI
             TalkServiceConfiguration configuration,
             PasswordPolicyInfo passwordPolicy,
             List<NextcloudUser> userDirectory,
+            IfbAddressBookCache.SystemAddressbookStatus addressbookStatus,
             string appointmentSubject,
             DateTime startTime,
             DateTime endTime)
@@ -139,18 +154,24 @@ namespace NcTalkOutlookAddIn.UI
             _passwordPolicy = passwordPolicy;
             _configuration = configuration;
             _userDirectory = userDirectory ?? new List<NextcloudUser>();
+            _systemAddressbookAvailable = addressbookStatus != null && addressbookStatus.Available;
+            _systemAddressbookError = addressbookStatus != null ? (addressbookStatus.Error ?? string.Empty) : string.Empty;
 
             Text = Strings.TalkFormTitle;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = true;
+            MinimizeBox = true;
+            ControlBox = true;
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(520, 520);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            MinimumSize = new Size(ScaleLogical(580), ScaleLogical(580));
             Icon = BrandingAssets.GetAppIcon(32);
 
             InitializeHeader();
             InitializeComponents();
             ApplyDefaults(defaults, appointmentSubject);
+            ApplyDialogLayout(true);
 
             UiThemeManager.ApplyToForm(this, _toolTip);
         }
@@ -160,108 +181,99 @@ namespace NcTalkOutlookAddIn.UI
          */
         private void InitializeComponents()
         {
-            int topOffset = _headerPanel.Bottom + 15;
-            int labelX = 15;
-            int inputX = 170;
-            int inputWidth = ClientSize.Width - inputX - 25;
-
-            var titleLabel = new Label
-            {
-                Text = Strings.TalkTitleLabel,
-                Location = new Point(labelX, topOffset),
-                AutoSize = true
-            };
-
-            _titleTextBox.Location = new Point(inputX, topOffset - 4);
-            _titleTextBox.Width = inputWidth;
-
-            var roomTypeLabel = new Label
-            {
-                Text = Strings.TalkRoomGroup,
-                Location = new Point(labelX, topOffset + 40),
-                AutoSize = true
-            };
+            _titleLabel.Text = Strings.TalkTitleLabel;
+            _titleLabel.AutoSize = true;
 
             _roomTypeComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            _roomTypeComboBox.Location = new Point(inputX, topOffset + 36);
-            _roomTypeComboBox.Width = inputWidth;
             _roomTypeComboBox.Items.Add(new RoomTypeOption(TalkRoomType.EventConversation, Strings.TalkEventRadio));
             _roomTypeComboBox.Items.Add(new RoomTypeOption(TalkRoomType.StandardRoom, Strings.TalkStandardRadio));
             _roomTypeComboBox.SelectedIndexChanged += (s, e) => UpdateRoomTypeTooltip();
 
+            _roomTypeLabel.Text = Strings.TalkRoomGroup;
+            _roomTypeLabel.AutoSize = true;
+
             _passwordToggleCheckBox.Text = Strings.TalkPasswordSetCheck;
             _passwordToggleCheckBox.AutoSize = true;
-            _passwordToggleCheckBox.Location = new Point(18, topOffset + 80);
             _passwordToggleCheckBox.CheckedChanged += (s, e) => UpdatePasswordState();
 
-            var passwordLabel = new Label
-            {
-                Text = Strings.TalkPasswordLabel,
-                Location = new Point(labelX, topOffset + 112),
-                AutoSize = true
-            };
+            _passwordLabel.Text = Strings.TalkPasswordLabel;
+            _passwordLabel.AutoSize = true;
 
-            _passwordTextBox.Location = new Point(inputX, topOffset + 108);
-            _passwordTextBox.Width = inputWidth - 110;
             _passwordTextBox.UseSystemPasswordChar = false;
 
             _passwordGenerateButton.Text = Strings.TalkPasswordGenerate;
-            _passwordGenerateButton.Width = 100;
-            _passwordGenerateButton.Location = new Point(_passwordTextBox.Right + 10, _passwordTextBox.Top - 2);
+            _passwordGenerateButton.AutoSize = false;
+            _passwordGenerateButton.TextAlign = ContentAlignment.MiddleCenter;
             _passwordGenerateButton.Click += (s, e) => GeneratePassword();
 
-            var settingsGroup = new GroupBox
-            {
-                Text = Strings.TalkSettingsGroup,
-                Location = new Point(18, topOffset + 150),
-                Size = new Size(ClientSize.Width - 36, 120)
-            };
+            _settingsGroup.Text = Strings.TalkSettingsGroup;
 
             _addUsersCheckBox.Text = Strings.TalkAddUsersCheck;
-            _addUsersCheckBox.Location = new Point(12, 25);
             _addUsersCheckBox.AutoSize = true;
-            settingsGroup.Controls.Add(_addUsersCheckBox);
+            _settingsGroup.Controls.Add(_addUsersCheckBox);
 
             _addGuestsCheckBox.Text = Strings.TalkAddGuestsCheck;
-            _addGuestsCheckBox.Location = new Point(12, 50);
             _addGuestsCheckBox.AutoSize = true;
-            settingsGroup.Controls.Add(_addGuestsCheckBox);
+            _settingsGroup.Controls.Add(_addGuestsCheckBox);
 
             _lobbyCheckBox.Text = Strings.TalkLobbyCheck;
-            _lobbyCheckBox.Location = new Point(12, 75);
             _lobbyCheckBox.AutoSize = true;
-            settingsGroup.Controls.Add(_lobbyCheckBox);
+            _settingsGroup.Controls.Add(_lobbyCheckBox);
 
             _searchCheckBox.Text = Strings.TalkSearchCheck;
-            _searchCheckBox.Location = new Point(12, 100);
             _searchCheckBox.AutoSize = true;
-            settingsGroup.Controls.Add(_searchCheckBox);
+            _settingsGroup.Controls.Add(_searchCheckBox);
 
             _moderatorGroup.Text = Strings.TalkModeratorGroup;
-            _moderatorGroup.Location = new Point(18, settingsGroup.Bottom + 12);
-            _moderatorGroup.Size = new Size(ClientSize.Width - 36, 105);
 
-            _moderatorAvatarBox.Location = new Point(12, 22);
             _moderatorAvatarBox.Size = new Size(32, 32);
             _moderatorAvatarBox.SizeMode = PictureBoxSizeMode.Zoom;
             _moderatorAvatarBox.BackColor = Color.Transparent;
             _moderatorGroup.Controls.Add(_moderatorAvatarBox);
 
-            _moderatorTextBox.Location = new Point(_moderatorAvatarBox.Right + 8, 24);
-            _moderatorTextBox.Width = _moderatorGroup.Width - 120 - _moderatorAvatarBox.Width - 8;
             _moderatorTextBox.TextChanged += (s, e) => UpdateModeratorResults();
             _moderatorTextBox.Enter += (s, e) => UpdateModeratorResults();
             _moderatorTextBox.MouseDown += (s, e) => UpdateModeratorResults();
             _moderatorGroup.Controls.Add(_moderatorTextBox);
 
             _moderatorClearButton.Text = Strings.TalkModeratorClear;
-            _moderatorClearButton.Location = new Point(_moderatorTextBox.Right + 8, 22);
-            _moderatorClearButton.Width = 90;
+            _moderatorClearButton.AutoSize = false;
+            _moderatorClearButton.TextAlign = ContentAlignment.MiddleCenter;
             _moderatorClearButton.Click += (s, e) => ClearModerator();
             _moderatorGroup.Controls.Add(_moderatorClearButton);
 
-            _moderatorListBox.Location = new Point(12, 54);
-            _moderatorListBox.Size = new Size(_moderatorGroup.Width - 24, 44);
+            _moderatorAddressbookWarningPanel.Visible = false;
+            _moderatorAddressbookWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
+            _moderatorAddressbookWarningPanel.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(
+                    e.Graphics,
+                    _moderatorAddressbookWarningPanel.ClientRectangle,
+                    Color.FromArgb(176, 0, 32),
+                    ButtonBorderStyle.Solid);
+            };
+            _moderatorGroup.Controls.Add(_moderatorAddressbookWarningPanel);
+
+            _moderatorAddressbookWarningTitleLabel.AutoSize = true;
+            _moderatorAddressbookWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
+            _moderatorAddressbookWarningTitleLabel.Font = new Font(
+                _moderatorAddressbookWarningTitleLabel.Font,
+                FontStyle.Bold);
+            _moderatorAddressbookWarningTitleLabel.Text = "\u26a0 " + Strings.TalkSystemAddressbookRequiredShort;
+            _moderatorAddressbookWarningPanel.Controls.Add(_moderatorAddressbookWarningTitleLabel);
+
+            _moderatorAddressbookWarningTextLabel.AutoSize = true;
+            _moderatorAddressbookWarningTextLabel.Text = Strings.TalkSystemAddressbookRequiredMessage;
+            _moderatorAddressbookWarningPanel.Controls.Add(_moderatorAddressbookWarningTextLabel);
+
+            _moderatorAddressbookWarningLinkLabel.AutoSize = true;
+            _moderatorAddressbookWarningLinkLabel.Text = Strings.TalkSystemAddressbookAdminLinkLabel;
+            _moderatorAddressbookWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
+            _moderatorAddressbookWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
+            _moderatorAddressbookWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
+            _moderatorAddressbookWarningLinkLabel.LinkClicked += (s, e) => OpenSystemAddressbookSetupGuide();
+            _moderatorAddressbookWarningPanel.Controls.Add(_moderatorAddressbookWarningLinkLabel);
+
             _moderatorListBox.DrawMode = DrawMode.OwnerDrawFixed;
             _moderatorListBox.ItemHeight = 34;
             _moderatorListBox.IntegralHeight = false;
@@ -291,8 +303,6 @@ namespace NcTalkOutlookAddIn.UI
             };
 
             _moderatorHintLabel.Text = Strings.TalkModeratorHint;
-            _moderatorHintLabel.Location = new Point(12, 54);
-            _moderatorHintLabel.Size = new Size(_moderatorGroup.Width - 24, 44);
             _moderatorHintLabel.ForeColor = Color.DimGray;
             _moderatorHintLabel.Click += (s, e) =>
             {
@@ -301,39 +311,35 @@ namespace NcTalkOutlookAddIn.UI
             };
             _moderatorGroup.Controls.Add(_moderatorHintLabel);
 
-            if (!_eventConversationsSupported)
+            _eventSupportHintLabel.AutoSize = true;
+            _eventSupportHintLabel.MaximumSize = new Size(ScaleLogical(260), 0);
+            _eventSupportHintLabel.ForeColor = Color.DimGray;
+            _eventSupportHintLabel.Visible = !_eventConversationsSupported;
+            if (_eventSupportHintLabel.Visible)
             {
                 var versionInfo = string.IsNullOrEmpty(_serverVersionHint) ? Strings.TalkVersionUnknown : _serverVersionHint;
-                var hintLabel = new Label
-                {
-                    Text = string.Format(Strings.TalkEventHint, versionInfo),
-                    Location = new Point(inputX, topOffset + 60),
-                    Size = new Size(inputWidth, 36),
-                    ForeColor = Color.DimGray
-                };
-                Controls.Add(hintLabel);
+                _eventSupportHintLabel.Text = string.Format(Strings.TalkEventHint, versionInfo);
             }
 
             _okButton.Text = Strings.DialogOk;
-            _okButton.Location = new Point(ClientSize.Width - 200, ClientSize.Height - 42);
-            _okButton.Width = 90;
+            _okButton.AutoSize = false;
             _okButton.DialogResult = DialogResult.OK;
             _okButton.Click += OnOkButtonClick;
 
             _cancelButton.Text = Strings.DialogCancel;
-            _cancelButton.Location = new Point(ClientSize.Width - 105, ClientSize.Height - 42);
-            _cancelButton.Width = 90;
+            _cancelButton.AutoSize = false;
             _cancelButton.DialogResult = DialogResult.Cancel;
 
-            Controls.Add(titleLabel);
+            Controls.Add(_titleLabel);
             Controls.Add(_titleTextBox);
-            Controls.Add(roomTypeLabel);
+            Controls.Add(_roomTypeLabel);
             Controls.Add(_roomTypeComboBox);
+            Controls.Add(_eventSupportHintLabel);
             Controls.Add(_passwordToggleCheckBox);
-            Controls.Add(passwordLabel);
+            Controls.Add(_passwordLabel);
             Controls.Add(_passwordTextBox);
             Controls.Add(_passwordGenerateButton);
-            Controls.Add(settingsGroup);
+            Controls.Add(_settingsGroup);
             Controls.Add(_moderatorGroup);
             Controls.Add(_okButton);
             Controls.Add(_cancelButton);
@@ -348,9 +354,12 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.SetToolTip(_addGuestsCheckBox, Strings.TooltipAddGuests);
             _toolTip.SetToolTip(_lobbyCheckBox, Strings.TooltipLobby);
             _toolTip.SetToolTip(_searchCheckBox, Strings.TooltipSearchVisible);
+            _toolTip.SetToolTip(_moderatorTextBox, Strings.TooltipModerator);
+            _toolTip.SetToolTip(_moderatorClearButton, Strings.TooltipModerator);
             UpdateRoomTypeTooltip();
 
             Controls.Add(_moderatorListBox);
+            ApplyDialogLayout(false);
         }
 
         private void InitializeHeader()
@@ -358,6 +367,179 @@ namespace NcTalkOutlookAddIn.UI
             _headerPanel.Height = HeaderHeight;
             _headerPanel.Dock = DockStyle.Top;
             Controls.Add(_headerPanel);
+        }
+
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            base.OnSizeChanged(e);
+            if (_layoutApplying)
+            {
+                return;
+            }
+
+            ApplyDialogLayout(false);
+        }
+
+        private void ApplyDialogLayout(bool ensureClientHeight)
+        {
+            if (_layoutApplying || IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            _layoutApplying = true;
+            try
+            {
+                int outerPadding = ScaleLogical(18);
+                int labelX = ScaleLogical(16);
+                int inputX = ScaleLogical(170);
+                int verticalGap = ScaleLogical(12);
+                int rowGap = ScaleLogical(14);
+
+                int y = _headerPanel.Bottom + ScaleLogical(16);
+                int inputWidth = Math.Max(ScaleLogical(180), ClientSize.Width - inputX - ScaleLogical(18));
+
+                _titleLabel.Location = new Point(labelX, y + ScaleLogical(4));
+                _titleTextBox.SetBounds(inputX, y, inputWidth, _titleTextBox.PreferredHeight + ScaleLogical(2));
+                y = Math.Max(_titleLabel.Bottom, _titleTextBox.Bottom) + rowGap;
+
+                int roomTypeComboHeight = Math.Max(_roomTypeComboBox.PreferredHeight + ScaleLogical(2), _roomTypeComboBox.ItemHeight + ScaleLogical(8));
+                _roomTypeLabel.Location = new Point(labelX, y + Math.Max(0, (roomTypeComboHeight - _roomTypeLabel.PreferredHeight) / 2));
+                _roomTypeComboBox.SetBounds(inputX, y, inputWidth, roomTypeComboHeight);
+                y = Math.Max(_roomTypeLabel.Bottom, _roomTypeComboBox.Bottom) + rowGap;
+
+                _eventSupportHintLabel.Visible = !_eventConversationsSupported;
+                if (_eventSupportHintLabel.Visible)
+                {
+                    _eventSupportHintLabel.Location = new Point(inputX, y - ScaleLogical(2));
+                    _eventSupportHintLabel.MaximumSize = new Size(inputWidth, 0);
+                    y = _eventSupportHintLabel.Bottom + verticalGap;
+                }
+
+                _passwordToggleCheckBox.Location = new Point(outerPadding, y);
+                y = _passwordToggleCheckBox.Bottom + ScaleLogical(10);
+
+                int ignoredGenerateMinWidth;
+                FooterButtonLayoutHelper.ApplyButtonSize(_passwordGenerateButton, out ignoredGenerateMinWidth);
+                int generateButtonWidth = _passwordGenerateButton.Width;
+                int generateButtonHeight = _passwordGenerateButton.Height;
+                int passwordWidth = Math.Max(ScaleLogical(120), inputWidth - generateButtonWidth - ScaleLogical(8));
+
+                _passwordLabel.Location = new Point(labelX, y + ScaleLogical(4));
+                _passwordTextBox.SetBounds(inputX, y, passwordWidth, _passwordTextBox.PreferredHeight + ScaleLogical(2));
+                _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), y - ScaleLogical(2), generateButtonWidth, generateButtonHeight);
+                y = Math.Max(_passwordLabel.Bottom, Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom)) + ScaleLogical(16);
+
+                int groupWidth = Math.Max(ScaleLogical(260), ClientSize.Width - (outerPadding * 2));
+
+                _settingsGroup.SetBounds(outerPadding, y, groupWidth, ScaleLogical(132));
+                int settingsLeft = ScaleLogical(12);
+                int settingsTop = ScaleLogical(24);
+                int settingsLineGap = ScaleLogical(24);
+                _addUsersCheckBox.Location = new Point(settingsLeft, settingsTop);
+                _addGuestsCheckBox.Location = new Point(settingsLeft, settingsTop + settingsLineGap);
+                _lobbyCheckBox.Location = new Point(settingsLeft, settingsTop + (settingsLineGap * 2));
+                _searchCheckBox.Location = new Point(settingsLeft, settingsTop + (settingsLineGap * 3));
+                int settingsGroupHeight = _searchCheckBox.Bottom + ScaleLogical(14);
+                _settingsGroup.Height = Math.Max(ScaleLogical(108), settingsGroupHeight);
+
+                y = _settingsGroup.Bottom + verticalGap;
+                _moderatorGroup.SetBounds(outerPadding, y, groupWidth, ScaleLogical(122));
+                int moderatorGroupHeight = LayoutModeratorGroupControls();
+                if (moderatorGroupHeight > _moderatorGroup.Height)
+                {
+                    _moderatorGroup.Height = moderatorGroupHeight;
+                    LayoutModeratorGroupControls();
+                }
+
+                var footerButtons = new List<Button> { _okButton, _cancelButton };
+                int minClientWidth = FooterButtonLayoutHelper.LayoutCentered(
+                    this,
+                    footerButtons,
+                    FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                    FooterButtonLayoutHelper.DefaultBottomPadding,
+                    FooterButtonLayoutHelper.DefaultSpacing);
+                if (ensureClientHeight && minClientWidth > ClientSize.Width)
+                {
+                    ClientSize = new Size(minClientWidth, ClientSize.Height);
+                }
+
+                int buttonHeight = Math.Max(_okButton.Height, _cancelButton.Height);
+                int minClientHeight = _moderatorGroup.Bottom + ScaleLogical(16) + buttonHeight + FooterButtonLayoutHelper.DefaultBottomPadding;
+                if (ensureClientHeight && minClientHeight > ClientSize.Height)
+                {
+                    ClientSize = new Size(ClientSize.Width, minClientHeight);
+                }
+
+                FooterButtonLayoutHelper.LayoutCentered(
+                    this,
+                    footerButtons,
+                    FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                    FooterButtonLayoutHelper.DefaultBottomPadding,
+                    FooterButtonLayoutHelper.DefaultSpacing);
+
+                PositionModeratorDropdown();
+            }
+            finally
+            {
+                _layoutApplying = false;
+            }
+        }
+
+        private int LayoutModeratorGroupControls()
+        {
+            int innerPadding = ScaleLogical(12);
+            int avatarSize = ScaleLogical(32);
+            int textTop = ScaleLogical(24);
+            int ignoredClearMinWidth;
+            FooterButtonLayoutHelper.ApplyButtonSize(_moderatorClearButton, out ignoredClearMinWidth);
+            int clearButtonWidth = _moderatorClearButton.Width;
+            int clearButtonHeight = _moderatorClearButton.Height;
+
+            _moderatorAvatarBox.SetBounds(innerPadding, ScaleLogical(22), avatarSize, avatarSize);
+
+            int textLeft = _moderatorAvatarBox.Right + ScaleLogical(8);
+            int textWidth = Math.Max(
+                ScaleLogical(120),
+                _moderatorGroup.ClientSize.Width - textLeft - innerPadding - clearButtonWidth - ScaleLogical(8));
+            _moderatorTextBox.SetBounds(textLeft, textTop, textWidth, _moderatorTextBox.PreferredHeight + ScaleLogical(2));
+
+            _moderatorClearButton.SetBounds(
+                _moderatorTextBox.Right + ScaleLogical(8),
+                textTop - ScaleLogical(2),
+                clearButtonWidth,
+                clearButtonHeight);
+
+            int rowBottom = Math.Max(
+                _moderatorAvatarBox.Bottom,
+                Math.Max(_moderatorTextBox.Bottom, _moderatorClearButton.Bottom));
+            int contentTop = rowBottom + ScaleLogical(8);
+
+            if (_moderatorAddressbookWarningPanel.Visible)
+            {
+                int panelPadding = ScaleLogical(8);
+                int panelWidth = Math.Max(ScaleLogical(160), _moderatorGroup.ClientSize.Width - (innerPadding * 2));
+                int warningTextWidth = Math.Max(ScaleLogical(120), panelWidth - (panelPadding * 2));
+
+                _moderatorAddressbookWarningTitleLabel.Location = new Point(panelPadding, panelPadding);
+                _moderatorAddressbookWarningTitleLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                int warningTextTop = _moderatorAddressbookWarningTitleLabel.Bottom + ScaleLogical(4);
+                _moderatorAddressbookWarningTextLabel.Location = new Point(panelPadding, warningTextTop);
+                _moderatorAddressbookWarningTextLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                int warningLinkTop = _moderatorAddressbookWarningTextLabel.Bottom + ScaleLogical(6);
+                _moderatorAddressbookWarningLinkLabel.Location = new Point(panelPadding, warningLinkTop);
+
+                int panelHeight = _moderatorAddressbookWarningLinkLabel.Bottom + panelPadding;
+                _moderatorAddressbookWarningPanel.SetBounds(innerPadding, contentTop, panelWidth, panelHeight);
+                contentTop = _moderatorAddressbookWarningPanel.Bottom + ScaleLogical(8);
+            }
+
+            int hintTop = contentTop;
+            int hintHeight = Math.Max(ScaleLogical(38), _moderatorGroup.ClientSize.Height - hintTop - innerPadding);
+            _moderatorHintLabel.SetBounds(innerPadding, hintTop, Math.Max(ScaleLogical(120), _moderatorGroup.ClientSize.Width - (innerPadding * 2)), hintHeight);
+            return _moderatorHintLabel.Bottom + innerPadding;
         }
 
         /**
@@ -394,7 +576,7 @@ namespace NcTalkOutlookAddIn.UI
             _passwordTextBox.Text = string.Empty;
             if (_passwordToggleCheckBox.Checked)
             {
-                TalkPassword = GenerateLocalPassword(minLength);
+                TalkPassword = GeneratePasswordValue(minLength);
                 _passwordTextBox.Text = TalkPassword;
             }
 
@@ -420,7 +602,71 @@ namespace NcTalkOutlookAddIn.UI
 
             UpdatePasswordState();
             UpdateRoomTypeTooltip();
+            ApplySystemAddressbookLockState();
             UpdateModeratorHint();
+        }
+
+        private void ApplySystemAddressbookLockState()
+        {
+            bool lockActive = !_systemAddressbookAvailable;
+            string lockDetail = lockActive
+                ? (!string.IsNullOrWhiteSpace(_systemAddressbookError) ? _systemAddressbookError : Strings.TalkSystemAddressbookRequiredMessage)
+                : string.Empty;
+
+            if (lockActive)
+            {
+                _addUsersCheckBox.Checked = false;
+                _addGuestsCheckBox.Checked = false;
+                _selectedModerator = null;
+                _moderatorTextBox.Text = string.Empty;
+                _moderatorListBox.Items.Clear();
+                HideModeratorDropdown();
+                _moderatorAvatarBox.Image = null;
+                _moderatorSearchLockLogged = false;
+            }
+
+            _addUsersCheckBox.Enabled = !lockActive;
+            _addGuestsCheckBox.Enabled = !lockActive;
+            _moderatorTextBox.Enabled = !lockActive;
+            _moderatorClearButton.Enabled = !lockActive;
+
+            _moderatorAddressbookWarningPanel.Visible = lockActive;
+            _moderatorAddressbookWarningTextLabel.Text = lockActive
+                ? Strings.TalkSystemAddressbookRequiredMessage
+                : string.Empty;
+
+            _toolTip.SetToolTip(_addUsersCheckBox, lockActive ? Strings.TooltipAddUsersLocked : Strings.TooltipAddUsers);
+            _toolTip.SetToolTip(_addGuestsCheckBox, lockActive ? Strings.TooltipAddGuestsLocked : Strings.TooltipAddGuests);
+            _toolTip.SetToolTip(_moderatorTextBox, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator);
+            _toolTip.SetToolTip(_moderatorClearButton, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator);
+
+            DiagnosticsLogger.Log(
+                LogCategories.Talk,
+                "Talk wizard system address book lock state applied (locked=" + lockActive +
+                ", available=" + _systemAddressbookAvailable +
+                ", hasError=" + (!string.IsNullOrWhiteSpace(lockDetail)) + ").");
+        }
+
+        private static void OpenSystemAddressbookSetupGuide()
+        {
+            string url = Strings.TalkSystemAddressbookAdminGuideUrl;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to open system address book setup guide URL.", ex);
+            }
         }
 
         private void UpdateRoomTypeTooltip()
@@ -493,6 +739,11 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             int minLength = GetMinPasswordLength();
+            _passwordTextBox.Text = GeneratePasswordValue(minLength);
+        }
+
+        private string GeneratePasswordValue(int minLength)
+        {
             string generated = null;
 
             try
@@ -509,12 +760,12 @@ namespace NcTalkOutlookAddIn.UI
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Password generation via server policy failed; falling back to local generator.", ex);
             }
 
-            if (string.IsNullOrWhiteSpace(generated))
+            if (string.IsNullOrWhiteSpace(generated) || generated.Trim().Length < minLength)
             {
                 generated = GenerateLocalPassword(minLength);
             }
 
-            _passwordTextBox.Text = generated;
+            return generated;
         }
 
         private static string GenerateLocalPassword(int minLength)
@@ -538,6 +789,24 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdateModeratorResults()
         {
+            if (!_systemAddressbookAvailable)
+            {
+                if (!_moderatorSearchLockLogged)
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Talk,
+                        "Talk wizard moderator search skipped because system address book is locked.");
+                    _moderatorSearchLockLogged = true;
+                }
+
+                _moderatorListBox.Items.Clear();
+                HideModeratorDropdown();
+                UpdateModeratorHint();
+                return;
+            }
+
+            _moderatorSearchLockLogged = false;
+
             if (_userDirectory.Count == 0)
             {
                 HideModeratorDropdown();
@@ -630,6 +899,12 @@ namespace NcTalkOutlookAddIn.UI
 
         private void PositionModeratorDropdown()
         {
+            if (!_systemAddressbookAvailable)
+            {
+                HideModeratorDropdown();
+                return;
+            }
+
             int width = Math.Max(0, _moderatorGroup.Width - 24);
             int rows = Math.Max(1, Math.Min(ModeratorDropdownMaxRows, _moderatorListBox.Items.Count));
             int desiredHeight = (rows * _moderatorListBox.ItemHeight) + 4;
@@ -903,7 +1178,11 @@ namespace NcTalkOutlookAddIn.UI
         private void UpdateModeratorHint()
         {
             _moderatorHintLabel.Visible = true;
-            if (_userDirectory.Count == 0)
+            if (!_systemAddressbookAvailable)
+            {
+                _moderatorHintLabel.Text = Strings.TalkSystemAddressbookRequiredMessage;
+            }
+            else if (_userDirectory.Count == 0)
             {
                 _moderatorHintLabel.Text = Strings.TalkModeratorHintNoDirectory;
             }
@@ -929,6 +1208,12 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _roomTypeComboBox.SelectedIndex = 0;
             }
+        }
+
+        private int ScaleLogical(int value)
+        {
+            int dpi = DeviceDpi > 0 ? DeviceDpi : 96;
+            return (int)Math.Round(value * (dpi / 96f));
         }
 
         private sealed class RoomTypeOption

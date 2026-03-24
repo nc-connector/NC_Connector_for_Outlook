@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "DUd9tJiBEZU=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-2.2.9\\installer\\NcConnectorOutlookInstaller.wixproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Bastian\\.nuget\\packages\\wixtoolset.http.wixext\\6.0.2\\wixtoolset.http.wixext.6.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -42,6 +42,63 @@ namespace NcTalkOutlookAddIn.Services
             _cacheFilePath = Path.Combine(dataDirectory, "ifb-addressbook-cache.json");
         }
 
+        internal sealed class SystemAddressbookStatus
+        {
+            internal SystemAddressbookStatus(bool available, int count, string error)
+            {
+                Available = available;
+                Count = count;
+                Error = error ?? string.Empty;
+            }
+
+            internal bool Available { get; private set; }
+            internal int Count { get; private set; }
+            internal string Error { get; private set; }
+        }
+
+        internal SystemAddressbookStatus GetSystemAddressbookStatus(TalkServiceConfiguration configuration, int cacheHours, bool forceRefresh)
+        {
+            if (configuration == null || !configuration.IsComplete())
+            {
+                const string detail = "Talk credentials are incomplete.";
+                DiagnosticsLogger.Log(LogCategories.Ifb, "System address book status check failed: " + detail);
+                return new SystemAddressbookStatus(false, 0, detail);
+            }
+
+            lock (_syncRoot)
+            {
+                DiagnosticsLogger.Log(
+                    LogCategories.Ifb,
+                    "System address book status check started (forceRefresh=" + forceRefresh + ").");
+
+                try
+                {
+                    if (forceRefresh)
+                    {
+                        RefreshFromServer(configuration);
+                    }
+                    else
+                    {
+                        EnsureCache(configuration, cacheHours);
+                    }
+
+                    int count = _uidToEmail != null ? _uidToEmail.Count : 0;
+                    DiagnosticsLogger.Log(
+                        LogCategories.Ifb,
+                        "System address book status check completed (available=True, count=" + count + ", forceRefresh=" + forceRefresh + ").");
+                    return new SystemAddressbookStatus(true, count, string.Empty);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Ifb,
+                        "System address book status check failed (forceRefresh=" + forceRefresh + ").",
+                        ex);
+                    return new SystemAddressbookStatus(false, 0, ex.Message ?? "System address book status check failed.");
+                }
+            }
+        }
+
         internal bool TryGetUid(TalkServiceConfiguration configuration, int cacheHours, string email, out string uid)
         {
             uid = null;
@@ -125,6 +182,11 @@ namespace NcTalkOutlookAddIn.Services
 
         internal List<NextcloudUser> GetUsers(TalkServiceConfiguration configuration, int cacheHours)
         {
+            return GetUsers(configuration, cacheHours, false);
+        }
+
+        internal List<NextcloudUser> GetUsers(TalkServiceConfiguration configuration, int cacheHours, bool forceRefresh)
+        {
             var users = new List<NextcloudUser>();
             if (configuration == null || !configuration.IsComplete())
             {
@@ -133,7 +195,14 @@ namespace NcTalkOutlookAddIn.Services
 
             lock (_syncRoot)
             {
-                EnsureCache(configuration, cacheHours);
+                if (forceRefresh)
+                {
+                    RefreshFromServer(configuration);
+                }
+                else
+                {
+                    EnsureCache(configuration, cacheHours);
+                }
 
                 foreach (var pair in _uidToEmail)
                 {

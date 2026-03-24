@@ -94,11 +94,10 @@ namespace NcTalkOutlookAddIn.Services
                 sanitizedShareName = "Share";
             }
 
-            string folderName = DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + "_" + sanitizedShareName;
+            DateTime shareDate = request.ShareDate.HasValue ? request.ShareDate.Value : DateTime.Now;
+            string prefixFormat = NormalizeShareDatePrefixFormat(request.ShareDatePrefixFormat);
+            string folderName = shareDate.ToString(prefixFormat, CultureInfo.InvariantCulture) + "_" + sanitizedShareName;
             string relativeFolderPath = CombineRelativePath(basePath, folderName);
-
-            EnsureFolderExists(normalizedBaseUrl, username, basePath, cancellationToken);
-            EnsureFolderExists(normalizedBaseUrl, username, relativeFolderPath, cancellationToken);
 
             var context = new FileLinkUploadContext(
                 normalizedBaseUrl,
@@ -107,6 +106,8 @@ namespace NcTalkOutlookAddIn.Services
                 folderName,
                 relativeFolderPath);
 
+            EnsureFolderExists(normalizedBaseUrl, username, basePath, cancellationToken, context.KnownFolderPaths);
+            EnsureFolderExists(normalizedBaseUrl, username, relativeFolderPath, cancellationToken, context.KnownFolderPaths);
             context.KnownFolderPaths.Add(relativeFolderPath);
 
             return context;
@@ -122,6 +123,63 @@ namespace NcTalkOutlookAddIn.Services
             string relativePath = CombineRelativePath(normalizedBasePath, folderName);
 
             return FolderExistsInternal(normalizedBaseUrl, username, relativePath, cancellationToken);
+        }
+
+        internal void DeleteShareFolder(string relativeFolderPath, CancellationToken cancellationToken)
+        {
+            string normalizedPath = NormalizeRelativePath(relativeFolderPath);
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                throw new ArgumentException("relativeFolderPath");
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
+            string username = _configuration.Username ?? string.Empty;
+            string url = BuildDavUrl(normalizedBaseUrl, username, normalizedPath);
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "DELETE";
+            request.Timeout = 90000;
+            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
+            LogApi("DELETE " + url);
+
+            try
+            {
+                using (var response = (HttpWebResponse)request.GetResponse())
+                {
+                    if (response.StatusCode != HttpStatusCode.NoContent
+                        && response.StatusCode != HttpStatusCode.OK
+                        && response.StatusCode != HttpStatusCode.Accepted)
+                    {
+                        throw new TalkServiceException("Share folder could not be deleted: " + normalizedPath, false, response.StatusCode, null);
+                    }
+                    LogApi("DELETE " + url + " -> " + response.StatusCode);
+                }
+            }
+            catch (WebException ex)
+            {
+                var httpResponse = ex.Response as HttpWebResponse;
+                if (httpResponse != null)
+                {
+                    if (httpResponse.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        LogFileLink("Share folder delete skipped (already removed): " + normalizedPath);
+                        return;
+                    }
+
+                    bool authError = httpResponse.StatusCode == HttpStatusCode.Unauthorized
+                                     || httpResponse.StatusCode == HttpStatusCode.Forbidden;
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Api,
+                        "Share folder delete failed (" + url + ", status=" + (int)httpResponse.StatusCode + ").",
+                        ex);
+                    throw new TalkServiceException("Share folder delete failed: " + ex.Message, authError, httpResponse.StatusCode, null);
+                }
+
+                DiagnosticsLogger.LogException(LogCategories.Api, "Share folder delete failed (" + url + ").", ex);
+                throw new TalkServiceException("Share folder delete failed: " + ex.Message, false, 0, null);
+            }
         }
 
         internal void UploadSelections(
@@ -341,16 +399,14 @@ namespace NcTalkOutlookAddIn.Services
 
             string uniqueRoot = EnsureUniqueName(context, context.RelativeFolderPath, relativeRoot, duplicateResolver, selection, true, cancellationToken);
             string remoteRoot = CombineRelativePath(context.RelativeFolderPath, uniqueRoot);
-            EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteRoot, cancellationToken);
-            context.KnownFolderPaths.Add(remoteRoot);
+            EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteRoot, cancellationToken, context.KnownFolderPaths);
 
             foreach (string directory in Directory.EnumerateDirectories(selection.LocalPath, "*", SearchOption.AllDirectories))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string relativeSub = ConvertPath(GetRelativePath(selection.LocalPath, directory));
                 string remoteSub = CombineRelativePath(remoteRoot, relativeSub);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteSub, cancellationToken);
-                context.KnownFolderPaths.Add(remoteSub);
+                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteSub, cancellationToken, context.KnownFolderPaths);
             }
 
             foreach (string file in Directory.EnumerateFiles(selection.LocalPath, "*", SearchOption.AllDirectories))
@@ -358,8 +414,7 @@ namespace NcTalkOutlookAddIn.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 string relativeFile = ConvertPath(GetRelativePath(selection.LocalPath, file));
                 string remoteFolder = GetRemoteFolder(remoteRoot, relativeFile);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteFolder, cancellationToken);
-                context.KnownFolderPaths.Add(remoteFolder);
+                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteFolder, cancellationToken, context.KnownFolderPaths);
 
                 string remoteFileName = SanitizeComponent(Path.GetFileName(relativeFile));
                 if (string.IsNullOrWhiteSpace(remoteFileName))
@@ -476,6 +531,16 @@ namespace NcTalkOutlookAddIn.Services
 
         private void EnsureFolderExists(string baseUrl, string username, string relativePath, CancellationToken cancellationToken)
         {
+            EnsureFolderExists(baseUrl, username, relativePath, cancellationToken, null);
+        }
+
+        private void EnsureFolderExists(
+            string baseUrl,
+            string username,
+            string relativePath,
+            CancellationToken cancellationToken,
+            HashSet<string> knownFolderPaths)
+        {
             if (string.IsNullOrEmpty(relativePath))
             {
                 return;
@@ -488,6 +553,11 @@ namespace NcTalkOutlookAddIn.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 current.Add(segment);
                 string path = string.Join("/", current.ToArray());
+                if (knownFolderPaths != null && knownFolderPaths.Contains(path))
+                {
+                    continue;
+                }
+
                 string url = BuildDavUrl(baseUrl, username, path);
                 var request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "MKCOL";
@@ -501,6 +571,10 @@ namespace NcTalkOutlookAddIn.Services
                         if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.MethodNotAllowed)
                         {
                             throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, null);
+                        }
+                        if (knownFolderPaths != null)
+                        {
+                            knownFolderPaths.Add(path);
                         }
                         LogApi("MKCOL " + url + " -> " + response.StatusCode);
                     }
@@ -518,6 +592,10 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ", status=" + (int)response.StatusCode + ").", ex);
                         throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, null);
+                    }
+                    if (knownFolderPaths != null)
+                    {
+                        knownFolderPaths.Add(path);
                     }
                     LogApi("MKCOL " + url + " -> " + response.StatusCode);
                 }
@@ -626,6 +704,11 @@ namespace NcTalkOutlookAddIn.Services
                 builder.Append(invalid.Contains(c) ? '_' : c);
             }
             return builder.ToString().Trim();
+        }
+
+        internal static string NormalizeShareDatePrefixFormat(string value)
+        {
+            return "yyyyMMdd";
         }
 
         private static string ConvertPath(string path)

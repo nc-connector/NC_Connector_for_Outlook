@@ -1,0 +1,17 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>NCConnectorForOutlook</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+
+    <BuildOutputDir Condition=" '$(BuildOutputDir)' == '' ">$(MSBuildProjectDirectory)\..\src\NcTalkOutlookAddIn\bin\Release\</BuildOutputDir>
+    <ProductVersion Condition=" '$(ProductVersion)' == '' ">2.2.9</ProductVersion>
+    <AssemblyVersion Condition=" '$(AssemblyVersion)' == '' ">2.2.9.0</AssemblyVersion>
+
+    <DefineConstants>BuildOutputDir=$(BuildOutputDir);ProductVersion=$(ProductVersion);AssemblyVersion=$(AssemblyVersion)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Http.wixext" Version="6.0.2" />
+  </ItemGroup>
+</Project>

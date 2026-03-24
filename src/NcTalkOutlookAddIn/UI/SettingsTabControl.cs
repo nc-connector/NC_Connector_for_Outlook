@@ -36,6 +36,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 base.WndProc(ref m);
 
+                if (Multiline)
+                {
+                    return;
+                }
+
                 try
                 {
                     var rect = (Rect)Marshal.PtrToStructure(m.LParam, typeof(Rect));
@@ -64,4 +69,3 @@ namespace NcTalkOutlookAddIn.UI
         }
     }
 }
-

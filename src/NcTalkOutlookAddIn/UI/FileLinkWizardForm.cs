@@ -28,13 +28,28 @@ namespace NcTalkOutlookAddIn.UI
     internal sealed class FileLinkWizardForm : Form
     {
         private const int DefaultMinPasswordLength = 8;
+        private const string AttachmentShareNameBase = "email_attachment";
+        private const string AttachmentShareDatePrefixFormat = "yyyyMMdd";
+        private const int PathColumnWheelStepPixels = 48;
+        private const int UploadProgressFlushIntervalMs = 80;
+        private const int StepHostBottomReservedPixels = 88;
+        private const int StepHostMinimumHeightPixels = 180;
+        private const int FileStepPaddingPixels = 12;
+        private const int FileStepButtonGapPixels = 8;
+        private const int FileStepButtonColumnSpacingPixels = 12;
+        private const int FileStepButtonColumnMinWidthPixels = 168;
+        private static readonly Color ActiveQueueItemBackground = BrandingAssets.BrandBlue;
+        private static readonly Color ActiveQueueItemText = Color.White;
         private readonly UiThemePalette _themePalette = UiThemeManager.DetectPalette();
+        private readonly ToolTip _toolTip = new ToolTip();
 
         private readonly FileLinkService _service;
         private readonly FileLinkRequest _request = new FileLinkRequest();
         private readonly TalkServiceConfiguration _configuration;
         private readonly PasswordPolicyInfo _passwordPolicy;
         private readonly AddinSettings _defaults;
+        private readonly FileLinkWizardLaunchOptions _launchOptions;
+        private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
         private readonly List<Panel> _steps = new List<Panel>();
         private readonly Label _titleLabel = new Label();
         private readonly Button _backButton = new Button();
@@ -47,8 +62,13 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Panel _progressPanel = new Panel();
         private readonly ProgressBar _progressBar = new ProgressBar();
         private readonly Label _progressLabel = new Label();
-        private readonly ListView _fileListView = new ListView();
+        private readonly PathScrollableListView _fileListView = new PathScrollableListView();
         private readonly Label _basePathLabel = new Label();
+        private readonly Label _shareNameLabel = new Label();
+        private readonly Label _permissionsLabel = new Label();
+        private readonly TableLayoutPanel _fileStepLayout = new TableLayoutPanel();
+        private readonly TableLayoutPanel _fileStepContentLayout = new TableLayoutPanel();
+        private readonly FlowLayoutPanel _fileStepActionPanel = new FlowLayoutPanel();
         private readonly TextBox _shareNameTextBox = new TextBox();
         private readonly CheckBox _permissionReadCheckBox = new CheckBox();
         private readonly CheckBox _permissionCreateCheckBox = new CheckBox();
@@ -57,38 +77,70 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _passwordToggleCheckBox = new CheckBox();
         private readonly TextBox _passwordTextBox = new TextBox();
         private readonly Button _passwordGenerateButton = new Button();
+        private readonly CheckBox _passwordSeparateToggleCheckBox = new CheckBox();
         private readonly CheckBox _expireToggleCheckBox = new CheckBox();
         private readonly DateTimePicker _expireDatePicker = new DateTimePicker();
         private readonly Label _expireHintLabel = new Label();
         private readonly Button _addFilesButton = new Button();
         private readonly Button _addFolderButton = new Button();
         private readonly Button _removeItemButton = new Button();
+        private readonly Label _attachmentModeInfoLabel = new Label();
         private readonly CheckBox _noteToggleCheckBox = new CheckBox();
         private readonly TextBox _noteTextBox = new TextBox();
         private readonly List<FileLinkSelection> _items = new List<FileLinkSelection>();
         private readonly Dictionary<FileLinkSelection, SelectionUploadState> _selectionStates = new Dictionary<FileLinkSelection, SelectionUploadState>();
+        private readonly System.Windows.Forms.Timer _uploadProgressFlushTimer = new System.Windows.Forms.Timer();
+        private readonly object _uploadProgressSync = new object();
+        private readonly Dictionary<FileLinkSelection, FileLinkUploadItemProgress> _pendingUploadProgress = new Dictionary<FileLinkSelection, FileLinkUploadItemProgress>();
+        private readonly List<FileLinkSelection> _pendingUploadProgressOrder = new List<FileLinkSelection>();
         private int _currentStepIndex;
         private CancellationTokenSource _cancellationSource;
         private FileLinkUploadContext _uploadContext;
         private bool _uploadInProgress;
         private bool _uploadCompleted;
         private bool _allowEmptyUpload;
+        private bool _shareFinalized;
+        private int _pathColumnHorizontalOffset;
+        private int _pathColumnMaxHorizontalOffset;
+        private ListViewItem _lastAutoScrolledUploadItem;
+        private bool _uploadProgressPumpRequested;
         private FileLinkRequest _requestSnapshot;
+        private readonly bool _attachmentMode;
+        private readonly DateTime _shareDate;
+        private bool _layoutAdjustingClientSize;
+        private Panel _generalStepPanel;
+        private Panel _expirationStepPanel;
+        private Panel _noteStepPanel;
 
         internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, string basePath)
+            : this(defaults, configuration, passwordPolicy, basePath, null)
+        {
+        }
+
+        internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, string basePath, FileLinkWizardLaunchOptions launchOptions)
         {
             _defaults = defaults ?? new AddinSettings();
             _configuration = configuration;
             _passwordPolicy = passwordPolicy;
             _service = new FileLinkService(configuration);
+            _launchOptions = launchOptions ?? new FileLinkWizardLaunchOptions();
+            _attachmentMode = _launchOptions.AttachmentMode;
+            _shareDate = DateTime.Now;
             _request.BasePath = basePath ?? string.Empty;
+            _request.AttachmentMode = _attachmentMode;
+            _request.ShareDate = _shareDate;
+            _request.ShareDatePrefixFormat = _attachmentMode ? AttachmentShareDatePrefixFormat : "yyyyMMdd";
 
             Text = Strings.FileLinkWizardTitle;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = true;
+            MinimizeBox = true;
+            ControlBox = true;
+            ShowInTaskbar = true;
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(640, 480);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            MinimumSize = new Size(ScaleLogical(700), ScaleLogical(560));
             Icon = BrandingAssets.GetAppIcon(32);
 
             InitializeHeader();
@@ -98,10 +150,20 @@ namespace NcTalkOutlookAddIn.UI
             InitializeStepFiles();
             InitializeStepNote();
             InitializeProgressPanel();
+            InitializeUploadProgressPump();
+            AdjustInitialDialogSizeForDisplay();
 
-            UiThemeManager.ApplyToForm(this);
+            UiThemeManager.ApplyToForm(this, _toolTip);
 
-            ShowStep(0);
+            LoadInitialSelections();
+            if (_attachmentMode)
+            {
+                ApplyAttachmentModeDefaults();
+            }
+            else
+            {
+                ShowStep(0);
+            }
         }
 
         internal FileLinkResult Result { get; private set; }
@@ -114,16 +176,49 @@ namespace NcTalkOutlookAddIn.UI
         protected override void OnSizeChanged(EventArgs e)
         {
             base.OnSizeChanged(e);
+            if (_layoutAdjustingClientSize)
+            {
+                return;
+            }
+
             LayoutBottomButtons();
-            if (_stepHost != null && _currentStepIndex == 2)
-            {
-                LayoutFileStep(_stepHost.ClientSize);
-            }
-            if (_stepHost != null)
-            {
-                _stepHost.Size = new Size(ClientSize.Width - 40, ClientSize.Height - _stepHost.Top - 120);
-            }
+            UpdateStepHostBounds();
+            LayoutCurrentStep();
+            LayoutProgressPanel();
             PositionProgressBars();
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            AdjustInitialDialogSizeForDisplay();
+            ReflowWizardLayout();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (_uploadInProgress && _cancellationSource != null && !_cancellationSource.IsCancellationRequested)
+            {
+                _cancellationSource.Cancel();
+                e.Cancel = true;
+                return;
+            }
+
+            base.OnFormClosing(e);
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            ResetUploadProgressPump();
+            _uploadProgressFlushTimer.Dispose();
+            TryCleanupUnfinalizedUploadContext("wizard_closed_without_finalize");
+            base.OnFormClosed(e);
+        }
+
+        private void InitializeUploadProgressPump()
+        {
+            _uploadProgressFlushTimer.Interval = UploadProgressFlushIntervalMs;
+            _uploadProgressFlushTimer.Tick += (s, e) => FlushBufferedUploadProgress();
         }
 
         private void InitializeHeader()
@@ -146,54 +241,140 @@ namespace NcTalkOutlookAddIn.UI
             _stepHost = new Panel
             {
                 Location = new Point(20, _titleLabel.Bottom + 16),
-                Size = new Size(ClientSize.Width - 40, ClientSize.Height - (_titleLabel.Bottom + 16) - 120),
+                Size = new Size(ClientSize.Width - 40, ClientSize.Height - (_titleLabel.Bottom + 16) - StepHostBottomReservedPixels),
                 BorderStyle = BorderStyle.None
             };
             Controls.Add(_stepHost);
 
             _backButton.Text = Strings.ButtonBack;
-            _backButton.AutoSize = true;
+            _backButton.AutoSize = false;
             _backButton.Click += (s, e) => Navigate(-1);
             Controls.Add(_backButton);
 
             _uploadButton.Text = Strings.FileLinkWizardUploadButton;
-            _uploadButton.AutoSize = true;
+            _uploadButton.AutoSize = false;
             _uploadButton.Enabled = false;
             _uploadButton.Visible = false;
             _uploadButton.Click += async (s, e) => await StartUploadAsync();
             Controls.Add(_uploadButton);
 
             _nextButton.Text = Strings.ButtonNext;
-            _nextButton.AutoSize = true;
+            _nextButton.AutoSize = false;
             _nextButton.Click += (s, e) => Navigate(1);
             Controls.Add(_nextButton);
 
             _finishButton.Text = Strings.FileLinkWizardFinishButton;
-            _finishButton.AutoSize = true;
+            _finishButton.AutoSize = false;
             _finishButton.Click += async (s, e) => await FinishAsync();
             Controls.Add(_finishButton);
 
             _cancelButton.Text = Strings.ButtonCancel;
-            _cancelButton.AutoSize = true;
+            _cancelButton.AutoSize = false;
             _cancelButton.Click += (s, e) => Close();
             Controls.Add(_cancelButton);
 
             LayoutBottomButtons();
+            UpdateStepHostBounds();
+            LayoutProgressPanel();
+        }
+
+        private void UpdateStepHostBounds()
+        {
+            if (_stepHost == null || IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            int stepHostWidth = Math.Max(0, ClientSize.Width - 40);
+            int stepHostBottom = GetStepHostBottomLimit();
+            int minHeight = ScaleLogical(StepHostMinimumHeightPixels);
+            int stepHostHeight = Math.Max(minHeight, stepHostBottom - _stepHost.Top);
+            _stepHost.Size = new Size(stepHostWidth, stepHostHeight);
+        }
+
+        private void LayoutProgressPanel()
+        {
+            if (_progressPanel == null || _progressPanel.IsDisposed || _progressPanel.Disposing)
+            {
+                return;
+            }
+
+            int left = _stepHost != null ? _stepHost.Left : ScaleLogical(20);
+            int width = _stepHost != null ? _stepHost.Width : Math.Max(ScaleLogical(240), ClientSize.Width - ScaleLogical(40));
+            int top = _stepHost != null ? _stepHost.Bottom + ScaleLogical(8) : ScaleLogical(360);
+            int panelHeight = Math.Max(ScaleLogical(36), _progressBar.Height + ScaleLogical(18));
+            _progressPanel.SetBounds(left, top, width, panelHeight);
+
+            int gap = ScaleLogical(8);
+            int labelWidth = Math.Max(ScaleLogical(120), Math.Min(width / 3, _progressLabel.PreferredWidth + ScaleLogical(10)));
+            int barHeight = Math.Max(ScaleLogical(14), _progressBar.Height);
+            int barTop = Math.Max(0, (_progressPanel.ClientSize.Height - barHeight) / 2);
+            int barWidth = Math.Max(ScaleLogical(120), _progressPanel.ClientSize.Width - labelWidth - gap);
+            _progressBar.SetBounds(0, barTop, barWidth, barHeight);
+
+            int labelTop = Math.Max(0, (_progressPanel.ClientSize.Height - _progressLabel.PreferredHeight) / 2);
+            _progressLabel.Location = new Point(_progressBar.Right + gap, labelTop);
+            _progressLabel.MaximumSize = new Size(Math.Max(ScaleLogical(100), _progressPanel.ClientSize.Width - _progressBar.Right - gap), 0);
+            _progressLabel.AutoEllipsis = true;
+        }
+
+        private void LayoutCurrentStep()
+        {
+            if (_stepHost == null || _stepHost.IsDisposed || _stepHost.Disposing)
+            {
+                return;
+            }
+
+            Size clientSize = _stepHost.ClientSize;
+            switch (_currentStepIndex)
+            {
+                case 0:
+                    LayoutGeneralStep(clientSize);
+                    break;
+                case 1:
+                    LayoutExpirationStep(clientSize);
+                    break;
+                case 2:
+                    LayoutFileStep(clientSize);
+                    break;
+                case 3:
+                    LayoutNoteStep(clientSize);
+                    break;
+            }
+        }
+
+        private int GetStepHostBottomLimit()
+        {
+            int fallbackBottom = ClientSize.Height - StepHostBottomReservedPixels;
+            int topMostButton = int.MaxValue;
+            var buttons = new[] { _backButton, _uploadButton, _nextButton, _finishButton, _cancelButton };
+            foreach (Button button in buttons)
+            {
+                if (button != null && button.Visible)
+                {
+                    topMostButton = Math.Min(topMostButton, button.Top);
+                }
+            }
+
+            if (topMostButton == int.MaxValue)
+            {
+                return fallbackBottom;
+            }
+
+            int safeBottomFromButtons = topMostButton - 12;
+            return Math.Min(fallbackBottom, safeBottomFromButtons);
         }
 
         private void InitializeStepGeneral()
         {
-            var panel = CreateStepPanel();
+            _generalStepPanel = CreateStepPanel();
+            var panel = _generalStepPanel;
 
-            var nameLabel = new Label
-            {
-                Text = Strings.FileLinkWizardShareNameLabel,
-                Location = new Point(12, 12),
-                AutoSize = true
-            };
-            panel.Controls.Add(nameLabel);
+            _shareNameLabel.Text = Strings.FileLinkWizardShareNameLabel;
+            _shareNameLabel.AutoSize = true;
+            _shareNameLabel.MaximumSize = new Size(ScaleLogical(320), 0);
+            panel.Controls.Add(_shareNameLabel);
 
-            _shareNameTextBox.Location = new Point(12, 36);
             _shareNameTextBox.Width = 360;
             _shareNameTextBox.Text = string.IsNullOrWhiteSpace(_defaults.SharingDefaultShareName)
                 ? Strings.FileLinkWizardFallbackShareName
@@ -201,70 +382,86 @@ namespace NcTalkOutlookAddIn.UI
             _shareNameTextBox.TextChanged += (s, e) => InvalidateUpload();
             panel.Controls.Add(_shareNameTextBox);
 
-            var permissionsLabel = new Label
-            {
-                Text = Strings.FileLinkWizardPermissionsLabel,
-                Location = new Point(12, 76),
-                AutoSize = true
-            };
-            panel.Controls.Add(permissionsLabel);
+            _permissionsLabel.Text = Strings.FileLinkWizardPermissionsLabel;
+            _permissionsLabel.AutoSize = true;
+            _permissionsLabel.MaximumSize = new Size(ScaleLogical(320), 0);
+            panel.Controls.Add(_permissionsLabel);
 
             _permissionReadCheckBox.Text = Strings.FileLinkPermissionRead;
-            _permissionReadCheckBox.Location = new Point(18, 100);
+            _permissionReadCheckBox.AutoSize = true;
             _permissionReadCheckBox.Checked = true;
             _permissionReadCheckBox.Enabled = false;
             panel.Controls.Add(_permissionReadCheckBox);
 
             _permissionCreateCheckBox.Text = Strings.FileLinkPermissionCreate;
-            _permissionCreateCheckBox.Location = new Point(18, 128);
+            _permissionCreateCheckBox.AutoSize = true;
             _permissionCreateCheckBox.Checked = _defaults.SharingDefaultPermCreate;
             panel.Controls.Add(_permissionCreateCheckBox);
 
             _permissionWriteCheckBox.Text = Strings.FileLinkPermissionWrite;
-            _permissionWriteCheckBox.Location = new Point(18, 156);
+            _permissionWriteCheckBox.AutoSize = true;
             _permissionWriteCheckBox.Checked = _defaults.SharingDefaultPermWrite;
             panel.Controls.Add(_permissionWriteCheckBox);
 
             _permissionDeleteCheckBox.Text = Strings.FileLinkPermissionDelete;
-            _permissionDeleteCheckBox.Location = new Point(18, 184);
+            _permissionDeleteCheckBox.AutoSize = true;
             _permissionDeleteCheckBox.Checked = _defaults.SharingDefaultPermDelete;
             panel.Controls.Add(_permissionDeleteCheckBox);
 
             _passwordToggleCheckBox.Text = Strings.FileLinkWizardPasswordToggle;
             _passwordToggleCheckBox.AutoSize = true;
-            _passwordToggleCheckBox.Location = new Point(12, 228);
             _passwordToggleCheckBox.Checked = _defaults.SharingDefaultPasswordEnabled;
             _passwordToggleCheckBox.CheckedChanged += (s, e) => UpdatePasswordState();
             panel.Controls.Add(_passwordToggleCheckBox);
 
-            int toggleWidth = _passwordToggleCheckBox.PreferredSize.Width;
             _passwordTextBox.Width = 220;
-            _passwordTextBox.Location = new Point(_passwordToggleCheckBox.Left + toggleWidth + 12, _passwordToggleCheckBox.Top - 2);
             panel.Controls.Add(_passwordTextBox);
 
             _passwordGenerateButton.Text = Strings.TalkPasswordGenerate;
-            _passwordGenerateButton.AutoSize = true;
-            _passwordGenerateButton.Location = new Point(_passwordTextBox.Right + 8, _passwordToggleCheckBox.Top - 4);
+            _passwordGenerateButton.AutoSize = false;
+            int ignoredPasswordGenerateMinWidth;
+            FooterButtonLayoutHelper.ApplyButtonSize(_passwordGenerateButton, out ignoredPasswordGenerateMinWidth);
             _passwordGenerateButton.Click += (s, e) => GeneratePassword();
             panel.Controls.Add(_passwordGenerateButton);
 
+            _passwordSeparateToggleCheckBox.Text = Strings.FileLinkWizardPasswordSeparateToggle;
+            _passwordSeparateToggleCheckBox.AutoSize = true;
+            _passwordSeparateToggleCheckBox.Checked =
+                AddinSettings.SeparatePasswordFeatureEnabled
+                && _defaults.SharingDefaultPasswordSeparateEnabled;
+            _toolTip.SetToolTip(_passwordSeparateToggleCheckBox, Strings.TooltipSharingPasswordSeparate);
+            panel.Controls.Add(_passwordSeparateToggleCheckBox);
+
+            if (_attachmentMode)
+            {
+                _permissionCreateCheckBox.Checked = false;
+                _permissionWriteCheckBox.Checked = false;
+                _permissionDeleteCheckBox.Checked = false;
+                _permissionCreateCheckBox.Enabled = false;
+                _permissionWriteCheckBox.Enabled = false;
+                _permissionDeleteCheckBox.Enabled = false;
+                _shareNameTextBox.ReadOnly = true;
+            }
+
             if (_passwordToggleCheckBox.Checked)
             {
-                _passwordTextBox.Text = GenerateLocalPassword(GetMinPasswordLength());
+                _passwordTextBox.Text = GeneratePasswordValue(GetMinPasswordLength());
             }
 
             UpdatePasswordState();
+            panel.ClientSizeChanged += (s, e) => LayoutGeneralStep(panel.ClientSize);
+            LayoutGeneralStep(panel.ClientSize);
 
             _steps.Add(panel);
         }
 
         private void InitializeStepExpiration()
         {
-            var panel = CreateStepPanel();
+            _expirationStepPanel = CreateStepPanel();
+            var panel = _expirationStepPanel;
 
             _expireToggleCheckBox.Text = Strings.FileLinkWizardExpireToggle;
             _expireToggleCheckBox.AutoSize = true;
-            _expireToggleCheckBox.Location = new Point(12, 12);
             _expireToggleCheckBox.Checked = _defaults.SharingDefaultExpireDays > 0;
             _expireToggleCheckBox.CheckedChanged += (s, e) => UpdateExpireState();
             panel.Controls.Add(_expireToggleCheckBox);
@@ -273,17 +470,141 @@ namespace NcTalkOutlookAddIn.UI
             _expireDatePicker.Format = DateTimePickerFormat.Short;
             int expireDays = _defaults.SharingDefaultExpireDays > 0 ? _defaults.SharingDefaultExpireDays : 7;
             _expireDatePicker.Value = DateTime.Today.AddDays(expireDays);
-            _expireDatePicker.Location = new Point(_expireToggleCheckBox.Left + _expireToggleCheckBox.PreferredSize.Width + 12, _expireToggleCheckBox.Top - 2);
             panel.Controls.Add(_expireDatePicker);
 
             _expireHintLabel.Text = Strings.FileLinkWizardExpireHint;
-            _expireHintLabel.Location = new Point(12, _expireToggleCheckBox.Bottom + 24);
             _expireHintLabel.AutoSize = true;
             _expireHintLabel.ForeColor = Color.DimGray;
+            _expireHintLabel.MaximumSize = new Size(ScaleLogical(360), 0);
             panel.Controls.Add(_expireHintLabel);
 
             UpdateExpireState();
+            panel.ClientSizeChanged += (s, e) => LayoutExpirationStep(panel.ClientSize);
+            LayoutExpirationStep(panel.ClientSize);
             _steps.Add(panel);
+        }
+
+        private void LayoutGeneralStep(Size clientSize)
+        {
+            if (_generalStepPanel == null || _generalStepPanel.IsDisposed || _generalStepPanel.Disposing)
+            {
+                return;
+            }
+
+            int left = ScaleLogical(12);
+            int top = ScaleLogical(12);
+            int indent = ScaleLogical(6);
+            int rowGap = ScaleLogical(8);
+            int sectionGap = ScaleLogical(14);
+            int contentWidth = Math.Max(ScaleLogical(260), clientSize.Width - (left * 2) - ScaleLogical(12));
+
+            _shareNameLabel.MaximumSize = new Size(contentWidth, 0);
+            _shareNameLabel.Location = new Point(left, top);
+
+            int textBoxHeight = Math.Max(ScaleLogical(24), _shareNameTextBox.PreferredHeight + ScaleLogical(2));
+            _shareNameTextBox.SetBounds(left, _shareNameLabel.Bottom + ScaleLogical(6), contentWidth, textBoxHeight);
+
+            _permissionsLabel.MaximumSize = new Size(contentWidth, 0);
+            _permissionsLabel.Location = new Point(left, _shareNameTextBox.Bottom + sectionGap);
+
+            int permissionLeft = left + indent;
+            int permissionTop = _permissionsLabel.Bottom + ScaleLogical(6);
+            _permissionReadCheckBox.Location = new Point(permissionLeft, permissionTop);
+            _permissionCreateCheckBox.Location = new Point(permissionLeft, _permissionReadCheckBox.Bottom + rowGap);
+            _permissionWriteCheckBox.Location = new Point(permissionLeft, _permissionCreateCheckBox.Bottom + rowGap);
+            _permissionDeleteCheckBox.Location = new Point(permissionLeft, _permissionWriteCheckBox.Bottom + rowGap);
+
+            int passwordSectionTop = _permissionDeleteCheckBox.Bottom + sectionGap;
+            _passwordToggleCheckBox.Location = new Point(left, passwordSectionTop);
+
+            int ignoredGenerateMinWidth;
+            FooterButtonLayoutHelper.ApplyButtonSize(_passwordGenerateButton, out ignoredGenerateMinWidth);
+            int generateWidth = _passwordGenerateButton.Width;
+            int generateHeight = _passwordGenerateButton.Height;
+            int passwordHeight = Math.Max(ScaleLogical(24), _passwordTextBox.PreferredHeight + ScaleLogical(2));
+            int passwordMinWidth = ScaleLogical(140);
+            int inlineStartX = _passwordToggleCheckBox.Right + ScaleLogical(10);
+            int inlineAvailable = (left + contentWidth) - inlineStartX;
+
+            int passwordBottom;
+            if (inlineAvailable >= passwordMinWidth + ScaleLogical(8) + generateWidth)
+            {
+                int passwordWidth = Math.Max(passwordMinWidth, inlineAvailable - generateWidth - ScaleLogical(8));
+                int rowY = _passwordToggleCheckBox.Top - ScaleLogical(2);
+                _passwordTextBox.SetBounds(inlineStartX, rowY, passwordWidth, passwordHeight);
+                _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), rowY - ScaleLogical(2), generateWidth, generateHeight);
+                passwordBottom = Math.Max(_passwordToggleCheckBox.Bottom, Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom));
+            }
+            else
+            {
+                int rowY = _passwordToggleCheckBox.Bottom + ScaleLogical(6);
+                int passwordWidth = Math.Max(passwordMinWidth, Math.Max(ScaleLogical(120), contentWidth - generateWidth - ScaleLogical(24)));
+                _passwordTextBox.SetBounds(left + ScaleLogical(16), rowY, passwordWidth, passwordHeight);
+                _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), rowY - ScaleLogical(2), generateWidth, generateHeight);
+                passwordBottom = Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom);
+            }
+
+            _passwordSeparateToggleCheckBox.Location = new Point(left, passwordBottom + sectionGap);
+
+            int requiredHeight = _passwordSeparateToggleCheckBox.Bottom + ScaleLogical(16);
+            _generalStepPanel.AutoScrollMinSize = new Size(0, requiredHeight);
+        }
+
+        private void LayoutExpirationStep(Size clientSize)
+        {
+            if (_expirationStepPanel == null || _expirationStepPanel.IsDisposed || _expirationStepPanel.Disposing)
+            {
+                return;
+            }
+
+            int left = ScaleLogical(12);
+            int top = ScaleLogical(12);
+            int rowGap = ScaleLogical(10);
+            int sectionGap = ScaleLogical(14);
+            int contentWidth = Math.Max(ScaleLogical(260), clientSize.Width - (left * 2) - ScaleLogical(12));
+
+            _expireToggleCheckBox.Location = new Point(left, top);
+
+            int pickerWidth = Math.Max(ScaleLogical(150), _expireDatePicker.Width);
+            int pickerHeight = Math.Max(ScaleLogical(24), _expireDatePicker.PreferredHeight + ScaleLogical(2));
+            int inlineStartX = _expireToggleCheckBox.Right + ScaleLogical(10);
+            int inlineAvailable = (left + contentWidth) - inlineStartX;
+            if (inlineAvailable >= pickerWidth)
+            {
+                _expireDatePicker.SetBounds(inlineStartX, _expireToggleCheckBox.Top - ScaleLogical(2), pickerWidth, pickerHeight);
+            }
+            else
+            {
+                _expireDatePicker.SetBounds(left + ScaleLogical(16), _expireToggleCheckBox.Bottom + rowGap, pickerWidth, pickerHeight);
+            }
+
+            int hintTop = Math.Max(_expireToggleCheckBox.Bottom, _expireDatePicker.Bottom) + sectionGap;
+            _expireHintLabel.MaximumSize = new Size(contentWidth, 0);
+            _expireHintLabel.Location = new Point(left, hintTop);
+
+            int requiredHeight = _expireHintLabel.Bottom + ScaleLogical(16);
+            _expirationStepPanel.AutoScrollMinSize = new Size(0, requiredHeight);
+        }
+
+        private void LayoutNoteStep(Size clientSize)
+        {
+            if (_noteStepPanel == null || _noteStepPanel.IsDisposed || _noteStepPanel.Disposing)
+            {
+                return;
+            }
+
+            int left = ScaleLogical(12);
+            int top = ScaleLogical(12);
+            int rowGap = ScaleLogical(8);
+            int contentWidth = Math.Max(ScaleLogical(260), clientSize.Width - (left * 2) - ScaleLogical(12));
+
+            _noteToggleCheckBox.Location = new Point(left, top);
+            int noteTop = _noteToggleCheckBox.Bottom + rowGap;
+            int noteHeight = Math.Max(ScaleLogical(140), clientSize.Height - noteTop - ScaleLogical(12));
+            _noteTextBox.SetBounds(left, noteTop, contentWidth, noteHeight);
+
+            int requiredHeight = _noteTextBox.Bottom + ScaleLogical(16);
+            _noteStepPanel.AutoScrollMinSize = new Size(0, requiredHeight);
         }
 
         private void InitializeStepFiles()
@@ -291,47 +612,101 @@ namespace NcTalkOutlookAddIn.UI
             var panel = CreateStepPanel();
             panel.SuspendLayout();
 
-            _basePathLabel.Text = Strings.FileLinkWizardBasePathPrefix + (_request.BasePath ?? string.Empty);
-            _basePathLabel.Location = new Point(12, 12);
-            _basePathLabel.AutoSize = true;
-            panel.Controls.Add(_basePathLabel);
+            _fileStepLayout.SuspendLayout();
+            _fileStepLayout.ColumnCount = 1;
+            _fileStepLayout.RowCount = 3;
+            _fileStepLayout.Dock = DockStyle.Fill;
+            _fileStepLayout.Padding = new Padding(FileStepPaddingPixels);
+            _fileStepLayout.Margin = new Padding(0);
+            _fileStepLayout.ColumnStyles.Clear();
+            _fileStepLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            _fileStepLayout.RowStyles.Clear();
+            _fileStepLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            _fileStepLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            _fileStepLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            panel.Controls.Add(_fileStepLayout);
 
-            _fileListView.Location = new Point(12, _basePathLabel.Bottom + 12);
-            _fileListView.Size = new Size(360, 240);
+            _basePathLabel.Text = Strings.FileLinkWizardBasePathPrefix + (_request.BasePath ?? string.Empty);
+            _basePathLabel.AutoSize = true;
+            _basePathLabel.Margin = new Padding(0);
+            _fileStepLayout.Controls.Add(_basePathLabel, 0, 0);
+
+            _attachmentModeInfoLabel.AutoSize = true;
+            _attachmentModeInfoLabel.ForeColor = Color.DimGray;
+            _attachmentModeInfoLabel.Visible = false;
+            _attachmentModeInfoLabel.Margin = new Padding(0, 8, 0, 0);
+            _fileStepLayout.Controls.Add(_attachmentModeInfoLabel, 0, 1);
+
+            _fileStepContentLayout.SuspendLayout();
+            _fileStepContentLayout.ColumnCount = 2;
+            _fileStepContentLayout.RowCount = 1;
+            _fileStepContentLayout.Dock = DockStyle.Fill;
+            _fileStepContentLayout.Margin = new Padding(0, 12, 0, 0);
+            _fileStepContentLayout.ColumnStyles.Clear();
+            _fileStepContentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            _fileStepContentLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, FileStepButtonColumnMinWidthPixels));
+            _fileStepContentLayout.RowStyles.Clear();
+            _fileStepContentLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            _fileStepLayout.Controls.Add(_fileStepContentLayout, 0, 2);
+
+            _fileListView.Dock = DockStyle.Fill;
+            _fileListView.Margin = new Padding(0, 0, FileStepButtonColumnSpacingPixels, 0);
             _fileListView.View = View.Details;
             _fileListView.FullRowSelect = true;
             _fileListView.HideSelection = false;
             _fileListView.Scrollable = true;
-            _fileListView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            _fileListView.OwnerDraw = true;
             _fileListView.Columns.Add(Strings.FileLinkWizardColumnPath, 240);
             _fileListView.Columns.Add(Strings.FileLinkWizardColumnType, 100);
             _fileListView.Columns.Add(Strings.FileLinkWizardColumnStatus, 120);
             _fileListView.Resize += (s, e) => PositionProgressBars();
-            panel.Controls.Add(_fileListView);
+            _fileListView.DrawColumnHeader += HandleFileListViewDrawColumnHeader;
+            _fileListView.DrawItem += HandleFileListViewDrawItem;
+            _fileListView.DrawSubItem += HandleFileListViewDrawSubItem;
+            _fileListView.HorizontalWheelHandler = HandlePathColumnMouseWheel;
+            _fileStepContentLayout.Controls.Add(_fileListView, 0, 0);
+
+            _fileStepActionPanel.FlowDirection = FlowDirection.TopDown;
+            _fileStepActionPanel.WrapContents = false;
+            _fileStepActionPanel.Dock = DockStyle.Fill;
+            _fileStepActionPanel.Margin = new Padding(0);
+            _fileStepActionPanel.Padding = new Padding(0);
+            _fileStepContentLayout.Controls.Add(_fileStepActionPanel, 1, 0);
 
             _addFilesButton.Text = Strings.FileLinkWizardAddFilesButton;
+            _addFilesButton.AutoSize = false;
             _addFilesButton.Size = new Size(150, 28);
-            _addFilesButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _addFilesButton.Margin = new Padding(0, 0, 0, FileStepButtonGapPixels);
+            _addFilesButton.TextAlign = ContentAlignment.MiddleCenter;
             _addFilesButton.Click += (s, e) => AddFiles();
-            panel.Controls.Add(_addFilesButton);
+            _fileStepActionPanel.Controls.Add(_addFilesButton);
 
             _addFolderButton.Text = Strings.FileLinkWizardAddFolderButton;
+            _addFolderButton.AutoSize = false;
             _addFolderButton.Size = new Size(150, 28);
-            _addFolderButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _addFolderButton.Margin = new Padding(0, 0, 0, FileStepButtonGapPixels);
+            _addFolderButton.TextAlign = ContentAlignment.MiddleCenter;
             _addFolderButton.Click += (s, e) => AddFolder();
-            panel.Controls.Add(_addFolderButton);
+            _fileStepActionPanel.Controls.Add(_addFolderButton);
 
             _removeItemButton.Text = Strings.FileLinkWizardRemoveButton;
+            _removeItemButton.AutoSize = false;
             _removeItemButton.Size = new Size(150, 28);
-            _removeItemButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _removeItemButton.Margin = new Padding(0);
+            _removeItemButton.TextAlign = ContentAlignment.MiddleCenter;
             _removeItemButton.Click += (s, e) => RemoveSelection();
-            panel.Controls.Add(_removeItemButton);
+            _fileStepActionPanel.Controls.Add(_removeItemButton);
+
+            _fileStepContentLayout.ResumeLayout(false);
+            _fileStepLayout.ResumeLayout(false);
+            _fileStepLayout.PerformLayout();
 
             panel.ResumeLayout(false);
             panel.PerformLayout();
 
             panel.ClientSizeChanged += (s, e) => LayoutFileStep(panel.ClientSize);
             LayoutFileStep(panel.ClientSize);
+            UpdateQueueColumnWidths();
             PositionProgressBars();
 
             _steps.Add(panel);
@@ -339,45 +714,65 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LayoutFileStep(Size clientSize)
         {
-            int width = Math.Max(360, clientSize.Width);
-            int height = Math.Max(260, clientSize.Height);
+            if (_fileStepContentLayout.ColumnStyles.Count >= 2)
+            {
+                int actionColumnWidth = CalculateFileStepButtonColumnWidth();
+                _fileStepContentLayout.ColumnStyles[1].Width = actionColumnWidth;
+                ApplyFileStepButtonSize(_addFilesButton, actionColumnWidth);
+                ApplyFileStepButtonSize(_addFolderButton, actionColumnWidth);
+                ApplyFileStepButtonSize(_removeItemButton, actionColumnWidth);
+            }
 
-            int listTop = _basePathLabel.Bottom + 12;
-            int buttonWidth = _addFilesButton.Width;
-            int buttonLeft = Math.Max(_fileListView.Left + 260, width - 12 - buttonWidth);
+            int maxInfoWidth = Math.Max(120, clientSize.Width - (FileStepPaddingPixels * 2));
+            _attachmentModeInfoLabel.MaximumSize = new Size(maxInfoWidth, 0);
 
-            int availableWidth = buttonLeft - _fileListView.Left - 12;
-            int listWidth = Math.Max(260, availableWidth);
-            int listHeight = Math.Max(160, height - listTop - 12);
-
-            _fileListView.Size = new Size(listWidth, listHeight);
-
-            _addFilesButton.Location = new Point(buttonLeft, listTop);
-            _addFolderButton.Location = new Point(buttonLeft, _addFilesButton.Bottom + 8);
-            _removeItemButton.Location = new Point(buttonLeft, _addFolderButton.Bottom + 8);
-
+            UpdateQueueColumnWidths();
             PositionProgressBars();
-            LayoutBottomButtons();
+        }
+
+        private void ApplyFileStepButtonSize(Button button, int targetWidth)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            int minWidth;
+            FooterButtonLayoutHelper.ApplyButtonSize(button, out minWidth);
+            int width = Math.Max(minWidth, Math.Max(ScaleLogical(120), targetWidth));
+            button.Size = new Size(width, button.Height);
+        }
+
+        private int CalculateFileStepButtonColumnWidth()
+        {
+            int textPadding = ScaleLogical(40);
+            int minWidth = ScaleLogical(FileStepButtonColumnMinWidthPixels);
+            int maxTextWidth = Math.Max(
+                Math.Max(
+                    TextRenderer.MeasureText(_addFilesButton.Text ?? string.Empty, _addFilesButton.Font).Width,
+                    TextRenderer.MeasureText(_addFolderButton.Text ?? string.Empty, _addFolderButton.Font).Width),
+                TextRenderer.MeasureText(_removeItemButton.Text ?? string.Empty, _removeItemButton.Font).Width);
+
+            return Math.Max(minWidth, maxTextWidth + textPadding);
         }
 
         private void InitializeStepNote()
         {
-            var panel = CreateStepPanel();
+            _noteStepPanel = CreateStepPanel();
+            var panel = _noteStepPanel;
 
             _noteToggleCheckBox.Text = Strings.FileLinkWizardNoteToggle;
             _noteToggleCheckBox.AutoSize = true;
-            _noteToggleCheckBox.Location = new Point(12, 12);
             _noteToggleCheckBox.CheckedChanged += (s, e) => UpdateNoteState();
             panel.Controls.Add(_noteToggleCheckBox);
 
-            _noteTextBox.Location = new Point(12, 44);
-            _noteTextBox.Size = new Size(560, 220);
-            _noteTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
             _noteTextBox.Multiline = true;
             _noteTextBox.ScrollBars = ScrollBars.Vertical;
             _noteTextBox.Enabled = false;
             panel.Controls.Add(_noteTextBox);
 
+            panel.ClientSizeChanged += (s, e) => LayoutNoteStep(panel.ClientSize);
+            LayoutNoteStep(panel.ClientSize);
             _steps.Add(panel);
         }
 
@@ -396,6 +791,7 @@ namespace NcTalkOutlookAddIn.UI
             _progressPanel.Controls.Add(_progressLabel);
 
             Controls.Add(_progressPanel);
+            LayoutProgressPanel();
         }
 
         private Panel CreateStepPanel()
@@ -403,7 +799,8 @@ namespace NcTalkOutlookAddIn.UI
             var panel = new Panel
             {
                 Dock = DockStyle.Fill,
-                Visible = false
+                Visible = false,
+                AutoScroll = true
             };
 
             if (_stepHost != null)
@@ -453,11 +850,18 @@ namespace NcTalkOutlookAddIn.UI
 
             UpdateNavigationState();
             UpdateUploadButtonState();
+            LayoutCurrentStep();
+            LayoutProgressPanel();
             PositionProgressBars();
         }
 
         private void Navigate(int direction)
         {
+            if (_attachmentMode)
+            {
+                return;
+            }
+
             if (direction > 0 && !ValidateCurrentStep())
             {
                 return;
@@ -469,6 +873,22 @@ namespace NcTalkOutlookAddIn.UI
 
         private bool ValidateCurrentStep()
         {
+            if (_attachmentMode)
+            {
+                if (_currentStepIndex != 2)
+                {
+                    return true;
+                }
+
+                if (_items.Count == 0)
+                {
+                    MessageBox.Show(Strings.FileLinkWizardSelectFileOrFolder, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
+
+                return true;
+            }
+
             if (_currentStepIndex == 0)
             {
                 if (string.IsNullOrWhiteSpace(_shareNameTextBox.Text))
@@ -556,19 +976,66 @@ namespace NcTalkOutlookAddIn.UI
             internal string RenamedTo { get; set; }
         }
 
+        private sealed class PathScrollableListView : ListView
+        {
+            private const int WmMouseWheel = 0x020A;
+
+            internal Func<int, bool> HorizontalWheelHandler { get; set; }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WmMouseWheel && HorizontalWheelHandler != null)
+                {
+                    long wParam = m.WParam.ToInt64();
+                    int delta = unchecked((short)((wParam >> 16) & 0xffff));
+                    if (delta != 0 && HorizontalWheelHandler(delta))
+                    {
+                        return;
+                    }
+                }
+
+                base.WndProc(ref m);
+            }
+        }
+
         private async Task FinishAsync()
         {
-            if (!ValidateCurrentStep())
+            if (_attachmentMode)
             {
-                return;
+                if (!ValidateCurrentStep())
+                {
+                    return;
+                }
+
+                ApplyFormData();
+                if (!EnsureAttachmentAutomationAllowedForFinalize())
+                {
+                    return;
+                }
+
+                if (!_uploadCompleted)
+                {
+                    await StartUploadAsync();
+                    if (!_uploadCompleted)
+                    {
+                        return;
+                    }
+                }
             }
-
-            ApplyFormData();
-
-            if (_allowEmptyUpload && (_uploadContext == null || !_uploadCompleted))
+            else
             {
-                _uploadContext = _service.PrepareUpload(_request, CancellationToken.None);
-                _uploadCompleted = true;
+                if (!ValidateCurrentStep())
+                {
+                    return;
+                }
+
+                ApplyFormData();
+
+                if (_allowEmptyUpload && (_uploadContext == null || !_uploadCompleted))
+                {
+                    _uploadContext = _service.PrepareUpload(_request, CancellationToken.None);
+                    _uploadCompleted = true;
+                }
             }
 
             if (_uploadContext == null || !_uploadCompleted)
@@ -598,6 +1065,7 @@ namespace NcTalkOutlookAddIn.UI
                 UseWaitCursor = true;
 
                 Result = await Task.Run(() => _service.FinalizeShare(_uploadContext, _request, _cancellationSource.Token));
+                _shareFinalized = true;
                 _requestSnapshot = CloneRequest(_request);
 
                 DialogResult = DialogResult.OK;
@@ -645,25 +1113,32 @@ namespace NcTalkOutlookAddIn.UI
         {
             _request.ShareName = _shareNameTextBox.Text.Trim();
             _request.Permissions = FileLinkPermissionFlags.Read;
-            if (_permissionCreateCheckBox.Checked)
+            if (!_attachmentMode && _permissionCreateCheckBox.Checked)
             {
                 _request.Permissions |= FileLinkPermissionFlags.Create;
             }
-            if (_permissionWriteCheckBox.Checked)
+            if (!_attachmentMode && _permissionWriteCheckBox.Checked)
             {
                 _request.Permissions |= FileLinkPermissionFlags.Write;
             }
-            if (_permissionDeleteCheckBox.Checked)
+            if (!_attachmentMode && _permissionDeleteCheckBox.Checked)
             {
                 _request.Permissions |= FileLinkPermissionFlags.Delete;
             }
 
             _request.PasswordEnabled = _passwordToggleCheckBox.Checked;
             _request.Password = _passwordToggleCheckBox.Checked ? _passwordTextBox.Text : null;
+            _request.PasswordSeparateEnabled =
+                AddinSettings.SeparatePasswordFeatureEnabled
+                && _passwordToggleCheckBox.Checked
+                && _passwordSeparateToggleCheckBox.Checked;
             _request.ExpireEnabled = _expireToggleCheckBox.Checked;
             _request.ExpireDate = _expireToggleCheckBox.Checked ? _expireDatePicker.Value.Date : (DateTime?)null;
-            _request.NoteEnabled = _noteToggleCheckBox.Checked;
-            _request.Note = _noteToggleCheckBox.Checked ? _noteTextBox.Text.Trim() : null;
+            _request.NoteEnabled = !_attachmentMode && _noteToggleCheckBox.Checked;
+            _request.Note = !_attachmentMode && _noteToggleCheckBox.Checked ? _noteTextBox.Text.Trim() : null;
+            _request.AttachmentMode = _attachmentMode;
+            _request.ShareDate = _shareDate;
+            _request.ShareDatePrefixFormat = _attachmentMode ? AttachmentShareDatePrefixFormat : "yyyyMMdd";
 
             _request.Items.Clear();
             foreach (var item in _items)
@@ -681,10 +1156,14 @@ namespace NcTalkOutlookAddIn.UI
                 Permissions = source.Permissions,
                 PasswordEnabled = source.PasswordEnabled,
                 Password = source.Password,
+                PasswordSeparateEnabled = source.PasswordSeparateEnabled,
                 ExpireEnabled = source.ExpireEnabled,
                 ExpireDate = source.ExpireDate,
                 NoteEnabled = source.NoteEnabled,
-                Note = source.Note
+                Note = source.Note,
+                AttachmentMode = source.AttachmentMode,
+                ShareDate = source.ShareDate,
+                ShareDatePrefixFormat = source.ShareDatePrefixFormat
             };
             foreach (var item in source.Items)
             {
@@ -702,7 +1181,7 @@ namespace NcTalkOutlookAddIn.UI
                 sanitizedShareName = Strings.FileLinkWizardFallbackShareName;
             }
 
-            string folderName = DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + "_" + sanitizedShareName;
+            string folderName = BuildShareFolderName(sanitizedShareName);
 
             Cursor previousCursor = Cursor.Current;
             try
@@ -741,6 +1220,223 @@ namespace NcTalkOutlookAddIn.UI
             return true;
         }
 
+        private string BuildShareFolderName(string sanitizedShareName)
+        {
+            string prefixFormat = FileLinkService.NormalizeShareDatePrefixFormat(_request.ShareDatePrefixFormat);
+            return _shareDate.ToString(prefixFormat, CultureInfo.InvariantCulture) + "_" + sanitizedShareName;
+        }
+
+        private void TryCleanupUnfinalizedUploadContext(string reason)
+        {
+            if (_shareFinalized || _uploadContext == null)
+            {
+                return;
+            }
+
+            FileLinkUploadContext context = _uploadContext;
+            _uploadContext = null;
+            _uploadCompleted = false;
+
+            TryCleanupPreparedUploadContext(context, reason);
+        }
+
+        private void TryCleanupPreparedUploadContext(FileLinkUploadContext context, string reason)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            string relativeFolderPath = context.RelativeFolderPath ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(relativeFolderPath))
+            {
+                return;
+            }
+
+            try
+            {
+                _service.DeleteShareFolder(relativeFolderPath, CancellationToken.None);
+                DiagnosticsLogger.Log(
+                    LogCategories.FileLink,
+                    "Wizard upload context cleanup succeeded (reason="
+                    + (reason ?? string.Empty)
+                    + ", relativeFolder="
+                    + relativeFolderPath
+                    + ").");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Wizard upload context cleanup failed (reason="
+                    + (reason ?? string.Empty)
+                    + ", relativeFolder="
+                    + relativeFolderPath
+                    + ").",
+                    ex);
+            }
+        }
+
+        private void LoadInitialSelections()
+        {
+            if (_launchOptions == null || _launchOptions.InitialSelections == null)
+            {
+                return;
+            }
+
+            var validSelections = new List<FileLinkSelection>();
+            foreach (var selection in _launchOptions.InitialSelections)
+            {
+                if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
+                {
+                    continue;
+                }
+
+                bool exists = selection.SelectionType == FileLinkSelectionType.Directory
+                    ? Directory.Exists(selection.LocalPath)
+                    : File.Exists(selection.LocalPath);
+                if (!exists)
+                {
+                    continue;
+                }
+
+                validSelections.Add(new FileLinkSelection(selection.SelectionType, selection.LocalPath));
+            }
+
+            AddSelections(validSelections);
+        }
+
+        private void ApplyAttachmentModeDefaults()
+        {
+            _noteToggleCheckBox.Checked = false;
+            _noteToggleCheckBox.Enabled = false;
+            _noteTextBox.Text = string.Empty;
+            _noteTextBox.Enabled = false;
+
+            string infoText = BuildAttachmentModeInfoText();
+            _attachmentModeInfoLabel.Text = infoText;
+            _attachmentModeInfoLabel.Visible = !string.IsNullOrWhiteSpace(infoText);
+
+            Cursor previousCursor = Cursor.Current;
+            try
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                UseWaitCursor = true;
+                ResolveAttachmentShareName();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to resolve attachment-mode share name.", ex);
+                MessageBox.Show(
+                    ex.Message,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                UseWaitCursor = false;
+                Cursor.Current = previousCursor;
+            }
+
+            ShowStep(2);
+        }
+
+        private string BuildAttachmentModeInfoText()
+        {
+            if (_launchOptions == null || string.Equals(_launchOptions.AttachmentTrigger, "always", StringComparison.OrdinalIgnoreCase))
+            {
+                return Strings.FileLinkWizardAttachmentModeReasonAlways;
+            }
+
+            return string.Format(
+                CultureInfo.CurrentCulture,
+                Strings.FileLinkWizardAttachmentModeReasonThreshold,
+                FormatSizeMb(_launchOptions.AttachmentTotalBytes),
+                Math.Max(1, _launchOptions.AttachmentThresholdMb).ToString(CultureInfo.CurrentCulture) + " MB",
+                string.IsNullOrWhiteSpace(_launchOptions.AttachmentLastName) ? Strings.AttachmentPromptLastUnknown : _launchOptions.AttachmentLastName.Trim(),
+                FormatSizeMb(_launchOptions.AttachmentLastSizeBytes));
+        }
+
+        private static string FormatSizeMb(long bytes)
+        {
+            decimal value = Math.Max(0, bytes) / (1024m * 1024m);
+            return string.Format(CultureInfo.CurrentCulture, "{0:0.0} MB", value);
+        }
+
+        private void ResolveAttachmentShareName()
+        {
+            if (!_attachmentMode)
+            {
+                return;
+            }
+
+            for (int suffix = 0; suffix < 1000; suffix++)
+            {
+                string candidate = suffix == 0
+                    ? AttachmentShareNameBase
+                    : AttachmentShareNameBase + "_" + suffix.ToString(CultureInfo.InvariantCulture);
+                string folderName = BuildShareFolderName(candidate);
+                bool exists = _service.FolderExists(_request.BasePath, folderName, CancellationToken.None);
+                DiagnosticsLogger.Log(
+                    LogCategories.FileLink,
+                    "Attachment mode share name check: candidate="
+                    + candidate
+                    + ", folder="
+                    + folderName
+                    + ", exists="
+                    + exists.ToString(CultureInfo.InvariantCulture));
+
+                if (!exists)
+                {
+                    _shareNameTextBox.Text = candidate;
+                    return;
+                }
+            }
+
+            throw new TalkServiceException(Strings.FileLinkWizardFolderExistsFormat, false, 0, null);
+        }
+
+        private bool EnsureAttachmentAutomationAllowedForFinalize()
+        {
+            if (!_attachmentMode)
+            {
+                return true;
+            }
+
+            try
+            {
+                var state = _attachmentGuardService.ReadLiveState();
+                if (state == null || !state.LockActive)
+                {
+                    return true;
+                }
+
+                string message = string.Format(
+                    CultureInfo.CurrentCulture,
+                    Strings.SharingAttachmentAutomationLockedError,
+                    state.ThresholdMb.ToString(CultureInfo.CurrentCulture));
+                MessageBox.Show(
+                    message,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                DiagnosticsLogger.Log(
+                    LogCategories.FileLink,
+                    "Attachment mode finalize blocked by host setting (thresholdMb="
+                    + state.ThresholdMb.ToString(CultureInfo.InvariantCulture)
+                    + ", source="
+                    + (state.Source ?? string.Empty)
+                    + ").");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Attachment mode finalize guard check failed.", ex);
+                return false;
+            }
+        }
+
         private void UpdateProgress(FileLinkProgress progress)
         {
             if (InvokeRequired)
@@ -762,6 +1458,19 @@ namespace NcTalkOutlookAddIn.UI
             bool enabled = _passwordToggleCheckBox.Checked;
             _passwordTextBox.Enabled = enabled;
             _passwordGenerateButton.Enabled = enabled;
+            bool separatePasswordInteractive = AddinSettings.SeparatePasswordFeatureEnabled && enabled;
+            _passwordSeparateToggleCheckBox.AutoCheck = separatePasswordInteractive;
+            _passwordSeparateToggleCheckBox.TabStop = separatePasswordInteractive;
+            _passwordSeparateToggleCheckBox.ForeColor = separatePasswordInteractive ? _themePalette.Text : _themePalette.DisabledText;
+            if (!separatePasswordInteractive)
+            {
+                _passwordSeparateToggleCheckBox.Checked = false;
+            }
+
+            if (_generalStepPanel != null)
+            {
+                LayoutGeneralStep(_generalStepPanel.ClientSize);
+            }
         }
 
         private void UpdateExpireState()
@@ -769,11 +1478,20 @@ namespace NcTalkOutlookAddIn.UI
             bool enabled = _expireToggleCheckBox.Checked;
             _expireDatePicker.Enabled = enabled;
             _expireHintLabel.Enabled = enabled;
+
+            if (_expirationStepPanel != null)
+            {
+                LayoutExpirationStep(_expirationStepPanel.ClientSize);
+            }
         }
 
         private void UpdateNoteState()
         {
             _noteTextBox.Enabled = _noteToggleCheckBox.Checked;
+            if (_noteStepPanel != null)
+            {
+                LayoutNoteStep(_noteStepPanel.ClientSize);
+            }
         }
 
         private void AddFiles()
@@ -784,10 +1502,13 @@ namespace NcTalkOutlookAddIn.UI
                 dialog.CheckFileExists = true;
                 if (dialog.ShowDialog(this) == DialogResult.OK)
                 {
+                    var selections = new List<FileLinkSelection>();
                     foreach (string file in dialog.FileNames)
                     {
-                        AddSelection(new FileLinkSelection(FileLinkSelectionType.File, file));
+                        selections.Add(new FileLinkSelection(FileLinkSelectionType.File, file));
                     }
+
+                    AddSelections(selections);
                 }
             }
         }
@@ -798,7 +1519,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
                 {
-                    AddSelection(new FileLinkSelection(FileLinkSelectionType.Directory, dialog.SelectedPath));
+                    AddSelections(new[] { new FileLinkSelection(FileLinkSelectionType.Directory, dialog.SelectedPath) });
                 }
             }
         }
@@ -812,6 +1533,11 @@ namespace NcTalkOutlookAddIn.UI
 
             foreach (ListViewItem item in _fileListView.SelectedItems)
             {
+                if (ReferenceEquals(_lastAutoScrolledUploadItem, item))
+                {
+                    _lastAutoScrolledUploadItem = null;
+                }
+
                 FileLinkSelection selection = item.Tag as FileLinkSelection;
                 if (selection != null)
                 {
@@ -819,11 +1545,7 @@ namespace NcTalkOutlookAddIn.UI
                     SelectionUploadState state;
                     if (_selectionStates.TryGetValue(selection, out state))
                     {
-                        if (state.ProgressBar != null)
-                        {
-                            _fileListView.Controls.Remove(state.ProgressBar);
-                            state.ProgressBar.Dispose();
-                        }
+                        DisposeStateProgressBar(state);
                         _selectionStates.Remove(selection);
                     }
                 }
@@ -834,24 +1556,88 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _allowEmptyUpload = false;
             }
+            UpdateQueueColumnWidths();
             PositionProgressBars();
             InvalidateUpload();
         }
 
-        private void AddSelection(FileLinkSelection selection)
+        private void AddSelections(IEnumerable<FileLinkSelection> selections)
         {
-            if (selection == null)
+            if (selections == null)
             {
                 return;
             }
 
-            if (_items.Any(i => string.Equals(i.LocalPath, selection.LocalPath, StringComparison.OrdinalIgnoreCase)))
+            var pendingSelections = selections.Where(s => s != null && !string.IsNullOrWhiteSpace(s.LocalPath)).ToList();
+            if (pendingSelections.Count == 0)
             {
                 return;
+            }
+
+            var existingPaths = _attachmentMode
+                ? null
+                : new HashSet<string>(
+                    _items.Select(i => i.LocalPath ?? string.Empty),
+                    StringComparer.OrdinalIgnoreCase);
+
+            int requestedCount = pendingSelections.Count;
+            int addedCount = 0;
+
+            _fileListView.BeginUpdate();
+            try
+            {
+                foreach (var selection in pendingSelections)
+                {
+                    if (TryAddSelection(selection, existingPaths))
+                    {
+                        addedCount++;
+                    }
+                }
+            }
+            finally
+            {
+                _fileListView.EndUpdate();
+            }
+
+            if (addedCount == 0)
+            {
+                return;
+            }
+
+            _allowEmptyUpload = false;
+            DiagnosticsLogger.Log(
+                LogCategories.FileLink,
+                "Queue selections added (requested="
+                + requestedCount.ToString(CultureInfo.InvariantCulture)
+                + ", added="
+                + addedCount.ToString(CultureInfo.InvariantCulture)
+                + ", total="
+                + _items.Count.ToString(CultureInfo.InvariantCulture)
+                + ").");
+
+            UpdateQueueColumnWidths();
+            PositionProgressBars();
+            InvalidateUpload();
+        }
+
+        private bool TryAddSelection(FileLinkSelection selection, HashSet<string> existingPaths)
+        {
+            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
+            {
+                return false;
+            }
+
+            if (!_attachmentMode && existingPaths != null)
+            {
+                if (existingPaths.Contains(selection.LocalPath))
+                {
+                    return false;
+                }
+
+                existingPaths.Add(selection.LocalPath);
             }
 
             _items.Add(selection);
-            _allowEmptyUpload = false;
 
             var listViewItem = new ListViewItem(selection.LocalPath)
             {
@@ -862,14 +1648,255 @@ namespace NcTalkOutlookAddIn.UI
             listViewItem.SubItems.Add(string.Empty);
             _fileListView.Items.Add(listViewItem);
 
-            var state = new SelectionUploadState(listViewItem)
-            {
-                ProgressBar = CreateProgressBar()
-            };
+            var state = new SelectionUploadState(listViewItem);
             _selectionStates[selection] = state;
+            return true;
+        }
 
-            PositionProgressBars();
-            InvalidateUpload();
+        private void UpdateQueueColumnWidths()
+        {
+            if (_fileListView == null || _fileListView.Columns.Count < 3 || _fileListView.IsDisposed || _fileListView.Disposing)
+            {
+                return;
+            }
+
+            int typeWidth = 110;
+            int statusWidth = 180;
+            int clientWidth = Math.Max(0, _fileListView.ClientSize.Width);
+            int pathWidth = clientWidth - typeWidth - statusWidth - 6;
+            if (pathWidth < 120)
+            {
+                int shortage = 120 - pathWidth;
+                int reducibleStatus = Math.Max(0, statusWidth - 150);
+                int reduceStatus = Math.Min(shortage, reducibleStatus);
+                statusWidth -= reduceStatus;
+                shortage -= reduceStatus;
+
+                int reducibleType = Math.Max(0, typeWidth - 90);
+                int reduceType = Math.Min(shortage, reducibleType);
+                typeWidth -= reduceType;
+
+                pathWidth = Math.Max(90, clientWidth - typeWidth - statusWidth - 6);
+            }
+
+            _fileListView.Columns[0].Width = pathWidth;
+            _fileListView.Columns[1].Width = typeWidth;
+            _fileListView.Columns[2].Width = statusWidth;
+            UpdatePathColumnScrollRange();
+            _fileListView.Invalidate();
+        }
+
+        private bool HandlePathColumnMouseWheel(int delta)
+        {
+            if (delta == 0)
+            {
+                return false;
+            }
+
+            if (_pathColumnMaxHorizontalOffset <= 0)
+            {
+                _pathColumnHorizontalOffset = 0;
+                return false;
+            }
+
+            int steps = Math.Max(1, Math.Abs(delta) / 120);
+            int shift = steps * PathColumnWheelStepPixels;
+            int nextOffset = _pathColumnHorizontalOffset + (delta < 0 ? shift : -shift);
+            if (nextOffset < 0)
+            {
+                nextOffset = 0;
+            }
+            else if (nextOffset > _pathColumnMaxHorizontalOffset)
+            {
+                nextOffset = _pathColumnMaxHorizontalOffset;
+            }
+
+            if (nextOffset == _pathColumnHorizontalOffset)
+            {
+                return true;
+            }
+
+            _pathColumnHorizontalOffset = nextOffset;
+            _fileListView.Invalidate();
+            return true;
+        }
+
+        private void UpdatePathColumnScrollRange()
+        {
+            if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing || _fileListView.Columns.Count == 0)
+            {
+                _pathColumnHorizontalOffset = 0;
+                _pathColumnMaxHorizontalOffset = 0;
+                return;
+            }
+
+            int visibleWidth = Math.Max(0, _fileListView.Columns[0].Width - 8);
+            if (_fileListView.Items.Count == 0 || visibleWidth <= 0)
+            {
+                _pathColumnHorizontalOffset = 0;
+                _pathColumnMaxHorizontalOffset = 0;
+                return;
+            }
+
+            int widestPath = 0;
+            foreach (ListViewItem item in _fileListView.Items)
+            {
+                string path = item != null ? (item.Text ?? string.Empty) : string.Empty;
+                if (path.Length == 0)
+                {
+                    continue;
+                }
+
+                int width = TextRenderer.MeasureText(
+                    path,
+                    _fileListView.Font,
+                    new Size(int.MaxValue, int.MaxValue),
+                    TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width;
+
+                if (width > widestPath)
+                {
+                    widestPath = width;
+                }
+            }
+
+            _pathColumnMaxHorizontalOffset = Math.Max(0, widestPath - visibleWidth);
+            if (_pathColumnHorizontalOffset > _pathColumnMaxHorizontalOffset)
+            {
+                _pathColumnHorizontalOffset = _pathColumnMaxHorizontalOffset;
+            }
+        }
+
+        private void HandleFileListViewDrawColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            if (e == null)
+            {
+                return;
+            }
+
+            e.DrawDefault = true;
+        }
+
+        private void HandleFileListViewDrawItem(object sender, DrawListViewItemEventArgs e)
+        {
+            if (e == null)
+            {
+                return;
+            }
+
+            if (_fileListView.View != View.Details)
+            {
+                e.DrawDefault = true;
+            }
+        }
+
+        private void HandleFileListViewDrawSubItem(object sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e == null || e.Item == null || e.SubItem == null)
+            {
+                return;
+            }
+
+            Color rowBackColor = e.Item.BackColor.IsEmpty ? _fileListView.BackColor : e.Item.BackColor;
+            Color rowTextColor = e.Item.ForeColor.IsEmpty ? _fileListView.ForeColor : e.Item.ForeColor;
+            Color backColor = e.SubItem.BackColor.IsEmpty ? rowBackColor : e.SubItem.BackColor;
+            Color textColor = e.SubItem.ForeColor.IsEmpty ? rowTextColor : e.SubItem.ForeColor;
+
+            bool selected = e.Item.Selected && (!_fileListView.HideSelection || _fileListView.Focused);
+            if (selected)
+            {
+                backColor = _themePalette != null ? _themePalette.SelectionBackground : SystemColors.Highlight;
+                textColor = _themePalette != null ? _themePalette.SelectionText : SystemColors.HighlightText;
+            }
+
+            using (var backBrush = new SolidBrush(backColor))
+            {
+                e.Graphics.FillRectangle(backBrush, e.Bounds);
+            }
+
+            string text = e.SubItem.Text ?? string.Empty;
+            Rectangle textBounds = new Rectangle(
+                e.Bounds.Left + 4,
+                e.Bounds.Top + 1,
+                Math.Max(0, e.Bounds.Width - 6),
+                Math.Max(0, e.Bounds.Height - 2));
+
+            if (e.ColumnIndex == 0)
+            {
+                var state = e.Graphics.Save();
+                e.Graphics.SetClip(e.Bounds);
+                var shiftedTextBounds = new Rectangle(
+                    textBounds.Left - _pathColumnHorizontalOffset,
+                    textBounds.Top,
+                    textBounds.Width + _pathColumnHorizontalOffset,
+                    textBounds.Height);
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    text,
+                    _fileListView.Font,
+                    shiftedTextBounds,
+                    textColor,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+                e.Graphics.Restore(state);
+            }
+            else
+            {
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    text,
+                    _fileListView.Font,
+                    textBounds,
+                    textColor,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+            }
+
+            if (e.ColumnIndex == _fileListView.Columns.Count - 1 && selected)
+            {
+                Rectangle focusRect = e.Item.Bounds;
+                focusRect.Width = Math.Max(0, _fileListView.ClientSize.Width - focusRect.Left);
+                ControlPaint.DrawFocusRectangle(e.Graphics, focusRect, textColor, backColor);
+            }
+        }
+
+        private void ApplyQueueRowStyle(SelectionUploadState state, Color backgroundColor, Color textColor)
+        {
+            if (state == null || state.Item == null)
+            {
+                return;
+            }
+
+            ListViewItem item = state.Item;
+            item.BackColor = backgroundColor;
+            item.ForeColor = textColor;
+
+            for (int i = 0; i < item.SubItems.Count; i++)
+            {
+                item.SubItems[i].BackColor = backgroundColor;
+                if (i != 2)
+                {
+                    item.SubItems[i].ForeColor = textColor;
+                }
+            }
+        }
+
+        private static string BuildDuplicateRenamePrompt(string originalName)
+        {
+            string name = string.IsNullOrWhiteSpace(originalName)
+                ? Strings.AttachmentPromptLastUnknown
+                : originalName.Trim();
+            string template = Strings.FileLinkWizardRenameDuplicatePrompt ?? string.Empty;
+            if (template.IndexOf("$1", StringComparison.Ordinal) >= 0)
+            {
+                return template.Replace("$1", name);
+            }
+
+            try
+            {
+                return string.Format(CultureInfo.CurrentCulture, template, name);
+            }
+            catch (FormatException)
+            {
+                return template;
+            }
         }
 
         private ProgressBar CreateProgressBar()
@@ -885,13 +1912,38 @@ namespace NcTalkOutlookAddIn.UI
             return bar;
         }
 
+        private void DisposeStateProgressBar(SelectionUploadState state)
+        {
+            if (state == null || state.ProgressBar == null)
+            {
+                return;
+            }
+
+            var bar = state.ProgressBar;
+            state.ProgressBar = null;
+            if (_fileListView != null && !_fileListView.IsDisposed && !_fileListView.Disposing)
+            {
+                _fileListView.Controls.Remove(bar);
+            }
+
+            bar.Dispose();
+        }
+
         private void InvalidateUpload()
         {
+            FileLinkUploadContext obsoleteContext = _uploadContext;
             _uploadCompleted = false;
             _uploadContext = null;
+            _lastAutoScrolledUploadItem = null;
+            ResetUploadProgressPump();
             if (_items.Count > 0)
             {
                 _allowEmptyUpload = false;
+            }
+
+            if (!_shareFinalized && obsoleteContext != null)
+            {
+                TryCleanupPreparedUploadContext(obsoleteContext, "upload_invalidated");
             }
 
             foreach (var state in _selectionStates.Values)
@@ -900,11 +1952,8 @@ namespace NcTalkOutlookAddIn.UI
                 state.UploadedBytes = 0;
                 state.Status = FileLinkUploadStatus.Pending;
                 state.RenamedTo = null;
-                if (state.ProgressBar != null)
-                {
-                    state.ProgressBar.Visible = false;
-                    state.ProgressBar.Value = 0;
-                }
+                ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
+                DisposeStateProgressBar(state);
                 if (state.Item.SubItems.Count >= 3)
                 {
                     state.Item.SubItems[2].Text = string.Empty;
@@ -920,6 +1969,23 @@ namespace NcTalkOutlookAddIn.UI
         {
             bool onFileStep = _currentStepIndex == 2;
             bool onLastStep = _currentStepIndex == _steps.Count - 1;
+
+            if (_attachmentMode)
+            {
+                _backButton.Visible = false;
+                _nextButton.Visible = false;
+                _uploadButton.Visible = false;
+                _finishButton.Visible = onFileStep;
+                _cancelButton.Visible = true;
+                _finishButton.Enabled = onFileStep && !_uploadInProgress && (_uploadCompleted || _items.Count > 0);
+                LayoutBottomButtons();
+                return;
+            }
+
+            _backButton.Visible = true;
+            _nextButton.Visible = true;
+            _finishButton.Visible = true;
+            _cancelButton.Visible = true;
 
             _backButton.Enabled = _currentStepIndex > 0 && !_uploadInProgress;
 
@@ -941,6 +2007,8 @@ namespace NcTalkOutlookAddIn.UI
             _finishButton.Enabled = onLastStep && finishAllowed && !_uploadInProgress;
             _uploadButton.Visible = onFileStep;
             LayoutBottomButtons();
+            UpdateStepHostBounds();
+            LayoutCurrentStep();
         }
 
         private void UpdateUploadButtonState()
@@ -950,35 +2018,83 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LayoutBottomButtons()
         {
-            int y = 420;
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+
             int spacing = 12;
             var buttons = new List<Button>();
 
-            buttons.Add(_backButton);
+            if (_backButton.Visible)
+            {
+                buttons.Add(_backButton);
+            }
             if (_uploadButton.Visible)
             {
                 buttons.Add(_uploadButton);
             }
-            buttons.Add(_nextButton);
-            buttons.Add(_finishButton);
-            buttons.Add(_cancelButton);
-
-            int totalWidth = 0;
-            foreach (var button in buttons)
+            if (_nextButton.Visible)
             {
-                totalWidth += button.Width;
+                buttons.Add(_nextButton);
             }
-            if (buttons.Count > 1)
+            if (_finishButton.Visible)
             {
-                totalWidth += spacing * (buttons.Count - 1);
+                buttons.Add(_finishButton);
+            }
+            if (_cancelButton.Visible)
+            {
+                buttons.Add(_cancelButton);
             }
 
-            int left = Math.Max(12, (ClientSize.Width - totalWidth) / 2);
-
-            foreach (var button in buttons)
+            if (buttons.Count == 0)
             {
-                button.Location = new Point(left, y);
-                left += button.Width + spacing;
+                return;
+            }
+
+            int requiredClientWidth = FooterButtonLayoutHelper.LayoutCentered(
+                this,
+                buttons,
+                FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                FooterButtonLayoutHelper.DefaultBottomPadding,
+                spacing,
+                true);
+            if (requiredClientWidth > ClientSize.Width)
+            {
+                EnsureDialogWidthForButtons(requiredClientWidth);
+                FooterButtonLayoutHelper.LayoutCentered(
+                    this,
+                    buttons,
+                    FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                    FooterButtonLayoutHelper.DefaultBottomPadding,
+                    spacing,
+                    true);
+            }
+        }
+
+        private void EnsureDialogWidthForButtons(int requiredClientWidth)
+        {
+            if (requiredClientWidth <= ClientSize.Width || _layoutAdjustingClientSize || IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            Rectangle workingArea = Screen.FromControl(this).WorkingArea;
+            int maxClientWidth = Math.Max(ClientSize.Width, workingArea.Width - ScaleLogical(32));
+            int targetWidth = Math.Min(requiredClientWidth, maxClientWidth);
+            if (targetWidth <= ClientSize.Width)
+            {
+                return;
+            }
+
+            _layoutAdjustingClientSize = true;
+            try
+            {
+                ClientSize = new Size(targetWidth, ClientSize.Height);
+            }
+            finally
+            {
+                _layoutAdjustingClientSize = false;
             }
         }
 
@@ -989,6 +2105,11 @@ namespace NcTalkOutlookAddIn.UI
         private void PositionProgressBars()
         {
             if (_selectionStates.Count == 0 || _fileListView.Columns.Count < 3)
+            {
+                return;
+            }
+
+            if (_fileListView.IsDisposed || _fileListView.Disposing || !_fileListView.IsHandleCreated)
             {
                 return;
             }
@@ -1010,25 +2131,143 @@ namespace NcTalkOutlookAddIn.UI
 
             foreach (var state in _selectionStates.Values)
             {
-                if (state.ProgressBar == null)
-                {
-                    continue;
-                }
+                PositionProgressBar(state, statusLeft, statusWidth);
+            }
+        }
 
-                int index = state.Item.Index;
-                if (index < 0 || index >= _fileListView.Items.Count)
-                {
-                    state.ProgressBar.Visible = false;
-                    continue;
-                }
+        private void PositionProgressBar(SelectionUploadState state)
+        {
+            if (_fileListView == null || _fileListView.Columns.Count < 3)
+            {
+                return;
+            }
 
-                Rectangle bounds = _fileListView.GetItemRect(index, ItemBoundsPortion.Entire);
-                int left = statusLeft + 4;
-                int width = Math.Max(12, statusWidth - 8);
-                int top = bounds.Top + 3;
-                int height = Math.Max(6, bounds.Height - 6);
-                state.ProgressBar.SetBounds(left, top, width, height);
-                state.ProgressBar.Visible = state.Status == FileLinkUploadStatus.Uploading;
+            int statusLeft = _fileListView.Columns[0].Width + _fileListView.Columns[1].Width;
+            int statusWidth = _fileListView.Columns[2].Width;
+            PositionProgressBar(state, statusLeft, statusWidth);
+        }
+
+        private void PositionProgressBar(SelectionUploadState state, int statusLeft, int statusWidth)
+        {
+            if (state == null || state.ProgressBar == null)
+            {
+                return;
+            }
+
+            if (state.ProgressBar.IsDisposed || state.ProgressBar.Disposing || state.Item == null)
+            {
+                state.ProgressBar.Visible = false;
+                return;
+            }
+
+            if (state.Item.ListView != _fileListView)
+            {
+                state.ProgressBar.Visible = false;
+                return;
+            }
+
+            int itemIndex = state.Item.Index;
+            Rectangle bounds;
+            if (!TryGetListViewItemBounds(itemIndex, out bounds))
+            {
+                state.ProgressBar.Visible = false;
+                return;
+            }
+
+            if (bounds.Height <= 0 || bounds.Width <= 0)
+            {
+                state.ProgressBar.Visible = false;
+                return;
+            }
+
+            int left = statusLeft + 4;
+            int width = Math.Max(12, statusWidth - 8);
+            int top = bounds.Top + 3;
+            int height = Math.Max(6, bounds.Height - 6);
+            state.ProgressBar.SetBounds(left, top, width, height);
+            state.ProgressBar.Visible = state.Status == FileLinkUploadStatus.Uploading;
+        }
+
+        private bool TryGetListViewItemBounds(int index, out Rectangle bounds)
+        {
+            bounds = Rectangle.Empty;
+
+            if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing)
+            {
+                return false;
+            }
+
+            if (index < 0 || index >= _fileListView.Items.Count)
+            {
+                return false;
+            }
+
+            try
+            {
+                bounds = _fileListView.GetItemRect(index, ItemBoundsPortion.Entire);
+                return true;
+            }
+            catch (ArgumentException ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Skipped progress bar positioning because list item bounds are unavailable (index="
+                    + index.ToString(CultureInfo.InvariantCulture)
+                    + ").",
+                    ex);
+                return false;
+            }
+        }
+
+        private int ScaleLogical(int value)
+        {
+            int dpi = DeviceDpi > 0 ? DeviceDpi : 96;
+            return (int)Math.Round(value * (dpi / 96f));
+        }
+
+        private void ReflowWizardLayout()
+        {
+            LayoutBottomButtons();
+            UpdateStepHostBounds();
+            LayoutCurrentStep();
+            LayoutProgressPanel();
+            PositionProgressBars();
+            Invalidate(true);
+        }
+
+        private void AdjustInitialDialogSizeForDisplay()
+        {
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            Rectangle workingArea = Screen.FromControl(this).WorkingArea;
+            int screenMargin = ScaleLogical(40);
+            int maxClientWidth = Math.Max(ScaleLogical(560), workingArea.Width - screenMargin);
+            int maxClientHeight = Math.Max(ScaleLogical(420), workingArea.Height - screenMargin);
+
+            int targetWidth = Math.Min(maxClientWidth, Math.Max(ClientSize.Width, ScaleLogical(760)));
+            int targetHeight = Math.Min(maxClientHeight, Math.Max(ClientSize.Height, ScaleLogical(620)));
+
+            if (targetWidth == ClientSize.Width && targetHeight == ClientSize.Height)
+            {
+                return;
+            }
+
+            if (_layoutAdjustingClientSize)
+            {
+                return;
+            }
+
+            _layoutAdjustingClientSize = true;
+            try
+            {
+                ClientSize = new Size(targetWidth, targetHeight);
+            }
+            finally
+            {
+                _layoutAdjustingClientSize = false;
             }
         }
 
@@ -1049,22 +2288,22 @@ namespace NcTalkOutlookAddIn.UI
             Cursor previousCursor = Cursor.Current;
             Cursor.Current = Cursors.WaitCursor;
             UseWaitCursor = true;
+            FileLinkUploadContext preparedContext = null;
 
             try
             {
+                ResetUploadProgressPump();
+                _lastAutoScrolledUploadItem = null;
                 foreach (var state in _selectionStates.Values)
                 {
                     state.TotalBytes = 0;
                     state.UploadedBytes = 0;
-                    state.Status = FileLinkUploadStatus.Uploading;
-                    if (state.ProgressBar != null)
-                    {
-                        state.ProgressBar.Value = 0;
-                        state.ProgressBar.Visible = true;
-                    }
+                    state.Status = FileLinkUploadStatus.Pending;
+                    DisposeStateProgressBar(state);
                     if (state.Item.SubItems.Count >= 3)
                     {
-                        state.Item.SubItems[2].Text = "0%";
+                        state.Item.SubItems[2].Text = string.Empty;
+                        state.Item.SubItems[2].ForeColor = _themePalette.Text;
                     }
                 }
                 PositionProgressBars();
@@ -1072,15 +2311,15 @@ namespace NcTalkOutlookAddIn.UI
                 _cancellationSource = new CancellationTokenSource();
                 CancellationToken token = _cancellationSource.Token;
 
-                var context = _service.PrepareUpload(_request, token);
+                preparedContext = _service.PrepareUpload(_request, token);
                 var progress = new Progress<FileLinkUploadItemProgress>(HandleUploadProgress);
 
                 await Task.Run(() =>
                 {
-                    _service.UploadSelections(context, _items, progress, HandleDuplicate, token);
+                    _service.UploadSelections(preparedContext, _items, progress, HandleDuplicate, token);
                 });
 
-                _uploadContext = context;
+                _uploadContext = preparedContext;
                 _uploadCompleted = true;
                 UpdateNavigationState();
                 UpdateUploadButtonState();
@@ -1088,14 +2327,12 @@ namespace NcTalkOutlookAddIn.UI
             catch (OperationCanceledException)
             {
                 DiagnosticsLogger.Log(LogCategories.FileLink, "Upload cancelled.");
+                _lastAutoScrolledUploadItem = null;
                 foreach (var state in _selectionStates.Values)
                 {
                     state.Status = FileLinkUploadStatus.Failed;
-                    if (state.ProgressBar != null)
-                    {
-                        state.ProgressBar.Visible = false;
-                        state.ProgressBar.Value = 0;
-                    }
+                    ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
+                    DisposeStateProgressBar(state);
                     if (state.Item.SubItems.Count >= 3)
                     {
                         state.Item.SubItems[2].Text = Strings.FileLinkWizardStatusCancelled;
@@ -1116,11 +2353,19 @@ namespace NcTalkOutlookAddIn.UI
             }
             finally
             {
+                ResetUploadProgressPump();
+                _lastAutoScrolledUploadItem = null;
                 if (_cancellationSource != null)
                 {
                     _cancellationSource.Dispose();
                     _cancellationSource = null;
                 }
+
+                if (!_uploadCompleted && preparedContext != null)
+                {
+                    TryCleanupPreparedUploadContext(preparedContext, "upload_not_completed");
+                }
+
                 UseWaitCursor = false;
                 Cursor.Current = previousCursor;
                 ToggleUpload(false);
@@ -1146,6 +2391,8 @@ namespace NcTalkOutlookAddIn.UI
                 dialog.Text = Strings.DialogTitle;
                 dialog.StartPosition = FormStartPosition.CenterParent;
                 dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.AutoScaleMode = AutoScaleMode.Dpi;
+                dialog.AutoScaleDimensions = new SizeF(96f, 96f);
                 dialog.ClientSize = new Size(420, 150);
                 dialog.MaximizeBox = false;
                 dialog.MinimizeBox = false;
@@ -1154,33 +2401,77 @@ namespace NcTalkOutlookAddIn.UI
                 var label = new Label
                 {
                     Text = Strings.FileLinkNoFilesConfirm,
-                    AutoSize = false,
-                    Size = new Size(390, 70),
+                    AutoSize = true,
                     Location = new Point(15, 15)
                 };
+                label.MaximumSize = new Size(Math.Max(260, dialog.ClientSize.Width - 30), 0);
                 dialog.Controls.Add(label);
 
                 var continueButton = new Button
                 {
                     Text = Strings.ButtonNext,
-                    DialogResult = DialogResult.OK,
-                    Width = 90,
-                    Location = new Point(220, 100)
+                    DialogResult = DialogResult.OK
                 };
                 var backButton = new Button
                 {
                     Text = Strings.ButtonBack,
-                    DialogResult = DialogResult.Cancel,
-                    Width = 90,
-                    Location = new Point(315, 100)
+                    DialogResult = DialogResult.Cancel
                 };
+                int ignoredNextMinWidth;
+                FooterButtonLayoutHelper.ApplyButtonSize(continueButton, out ignoredNextMinWidth);
+                int ignoredBackMinWidth;
+                FooterButtonLayoutHelper.ApplyButtonSize(backButton, out ignoredBackMinWidth);
 
                 dialog.Controls.Add(continueButton);
                 dialog.Controls.Add(backButton);
                 dialog.AcceptButton = continueButton;
                 dialog.CancelButton = backButton;
 
+                Action layoutDialog = () =>
+                {
+                    int outerPadding = 15;
+                    int verticalGap = 14;
+                    label.MaximumSize = new Size(Math.Max(260, dialog.ClientSize.Width - (outerPadding * 2)), 0);
+                    label.Location = new Point(outerPadding, outerPadding);
+
+                    int requiredClientWidth = FooterButtonLayoutHelper.LayoutCentered(
+                        dialog,
+                        new[] { continueButton, backButton },
+                        FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                        FooterButtonLayoutHelper.DefaultBottomPadding,
+                        FooterButtonLayoutHelper.DefaultSpacing,
+                        true);
+                    if (requiredClientWidth > dialog.ClientSize.Width)
+                    {
+                        dialog.ClientSize = new Size(requiredClientWidth, dialog.ClientSize.Height);
+                        label.MaximumSize = new Size(Math.Max(260, dialog.ClientSize.Width - (outerPadding * 2)), 0);
+                        label.Location = new Point(outerPadding, outerPadding);
+                        FooterButtonLayoutHelper.LayoutCentered(
+                            dialog,
+                            new[] { continueButton, backButton },
+                            FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                            FooterButtonLayoutHelper.DefaultBottomPadding,
+                            FooterButtonLayoutHelper.DefaultSpacing,
+                            true);
+                    }
+
+                    int buttonsTop = Math.Min(continueButton.Top, backButton.Top);
+                    int requiredHeight = label.Bottom + verticalGap + continueButton.Height + FooterButtonLayoutHelper.DefaultBottomPadding;
+                    if (requiredHeight > dialog.ClientSize.Height)
+                    {
+                        dialog.ClientSize = new Size(dialog.ClientSize.Width, requiredHeight);
+                        FooterButtonLayoutHelper.LayoutCentered(
+                            dialog,
+                            new[] { continueButton, backButton },
+                            FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                            FooterButtonLayoutHelper.DefaultBottomPadding,
+                            FooterButtonLayoutHelper.DefaultSpacing,
+                            true);
+                    }
+                };
+
                 UiThemeManager.ApplyToForm(dialog);
+                layoutDialog();
 
                 bool result = dialog.ShowDialog(this) == DialogResult.OK;
                 if (!result)
@@ -1198,9 +2489,144 @@ namespace NcTalkOutlookAddIn.UI
                 return;
             }
 
+            bool activatePump = false;
+            lock (_uploadProgressSync)
+            {
+                if (_pendingUploadProgress.ContainsKey(progress.Selection))
+                {
+                    _pendingUploadProgressOrder.Remove(progress.Selection);
+                }
+
+                _pendingUploadProgress[progress.Selection] = progress;
+                _pendingUploadProgressOrder.Add(progress.Selection);
+                if (!_uploadProgressPumpRequested)
+                {
+                    _uploadProgressPumpRequested = true;
+                    activatePump = true;
+                }
+            }
+
+            if (!activatePump)
+            {
+                return;
+            }
+
+            EnsureUploadProgressPumpRunning();
+        }
+
+        private void EnsureUploadProgressPumpRunning()
+        {
+            if (IsDisposed || Disposing)
+            {
+                ResetUploadProgressPump();
+                return;
+            }
+
             if (InvokeRequired)
             {
-                BeginInvoke(new Action<FileLinkUploadItemProgress>(HandleUploadProgress), progress);
+                BeginInvoke(new Action(EnsureUploadProgressPumpRunning));
+                return;
+            }
+
+            if (!_uploadProgressFlushTimer.Enabled)
+            {
+                _uploadProgressFlushTimer.Start();
+            }
+        }
+
+        private void FlushBufferedUploadProgress()
+        {
+            if (IsDisposed || Disposing)
+            {
+                ResetUploadProgressPump();
+                return;
+            }
+
+            List<FileLinkUploadItemProgress> snapshot;
+            lock (_uploadProgressSync)
+            {
+                if (_pendingUploadProgress.Count == 0)
+                {
+                    _pendingUploadProgressOrder.Clear();
+                    _uploadProgressPumpRequested = false;
+                    if (_uploadProgressFlushTimer.Enabled)
+                    {
+                        _uploadProgressFlushTimer.Stop();
+                    }
+                    return;
+                }
+
+                snapshot = new List<FileLinkUploadItemProgress>(_pendingUploadProgressOrder.Count);
+                foreach (var selection in _pendingUploadProgressOrder)
+                {
+                    FileLinkUploadItemProgress queuedProgress;
+                    if (_pendingUploadProgress.TryGetValue(selection, out queuedProgress))
+                    {
+                        snapshot.Add(queuedProgress);
+                    }
+                }
+
+                _pendingUploadProgress.Clear();
+                _pendingUploadProgressOrder.Clear();
+            }
+
+            foreach (var progress in snapshot)
+            {
+                ApplyUploadProgress(progress);
+            }
+
+            ListViewItem activeUploadItem = null;
+            for (int i = snapshot.Count - 1; i >= 0; i--)
+            {
+                FileLinkUploadItemProgress queued = snapshot[i];
+                if (queued != null && queued.Status == FileLinkUploadStatus.Uploading)
+                {
+                    SelectionUploadState activeState;
+                    if (_selectionStates.TryGetValue(queued.Selection, out activeState) && activeState != null)
+                    {
+                        activeUploadItem = activeState.Item;
+                        break;
+                    }
+                }
+            }
+
+            if (activeUploadItem != null)
+            {
+                EnsureUploadItemVisible(activeUploadItem, true);
+            }
+
+            lock (_uploadProgressSync)
+            {
+                if (_pendingUploadProgress.Count == 0)
+                {
+                    _uploadProgressPumpRequested = false;
+                    if (_uploadProgressFlushTimer.Enabled)
+                    {
+                        _uploadProgressFlushTimer.Stop();
+                    }
+                }
+            }
+        }
+
+        private void ResetUploadProgressPump()
+        {
+            lock (_uploadProgressSync)
+            {
+                _pendingUploadProgress.Clear();
+                _pendingUploadProgressOrder.Clear();
+                _uploadProgressPumpRequested = false;
+            }
+
+            if (_uploadProgressFlushTimer.Enabled)
+            {
+                _uploadProgressFlushTimer.Stop();
+            }
+        }
+
+        private void ApplyUploadProgress(FileLinkUploadItemProgress progress)
+        {
+            if (progress == null || progress.Selection == null)
+            {
                 return;
             }
 
@@ -1216,8 +2642,15 @@ namespace NcTalkOutlookAddIn.UI
 
             if (progress.Status == FileLinkUploadStatus.Uploading)
             {
+                ApplyQueueRowStyle(state, ActiveQueueItemBackground, ActiveQueueItemText);
+                EnsureUploadItemVisible(state.Item, false);
                 int percent = state.TotalBytes > 0 ? (int)Math.Min(100, (state.UploadedBytes * 100L) / state.TotalBytes) : 100;
                 percent = Math.Max(0, Math.Min(100, percent));
+                if (state.ProgressBar == null)
+                {
+                    state.ProgressBar = CreateProgressBar();
+                }
+
                 if (state.ProgressBar != null)
                 {
                     state.ProgressBar.Visible = true;
@@ -1226,16 +2659,20 @@ namespace NcTalkOutlookAddIn.UI
                 if (state.Item.SubItems.Count >= 3)
                 {
                     state.Item.SubItems[2].Text = percent.ToString(CultureInfo.InvariantCulture) + "%";
-                    state.Item.SubItems[2].ForeColor = _themePalette.MutedText;
+                    state.Item.SubItems[2].ForeColor = ActiveQueueItemText;
                 }
+
+                PositionProgressBar(state);
             }
             else if (progress.Status == FileLinkUploadStatus.Completed)
             {
-                if (state.ProgressBar != null)
+                if (ReferenceEquals(_lastAutoScrolledUploadItem, state.Item))
                 {
-                    state.ProgressBar.Visible = false;
-                    state.ProgressBar.Value = 100;
+                    _lastAutoScrolledUploadItem = null;
                 }
+                EnsureUploadItemVisible(state.Item, false);
+                ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
+                DisposeStateProgressBar(state);
                 string statusText = Strings.FileLinkWizardStatusSuccess;
                 if (!string.IsNullOrEmpty(state.RenamedTo))
                 {
@@ -1249,10 +2686,13 @@ namespace NcTalkOutlookAddIn.UI
             }
             else if (progress.Status == FileLinkUploadStatus.Failed)
             {
-                if (state.ProgressBar != null)
+                if (ReferenceEquals(_lastAutoScrolledUploadItem, state.Item))
                 {
-                    state.ProgressBar.Visible = false;
+                    _lastAutoScrolledUploadItem = null;
                 }
+                EnsureUploadItemVisible(state.Item, false);
+                ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
+                DisposeStateProgressBar(state);
                 string message = string.IsNullOrWhiteSpace(progress.Message) ? string.Empty : " (" + progress.Message + ")";
                 if (state.Item.SubItems.Count >= 3)
                 {
@@ -1260,24 +2700,64 @@ namespace NcTalkOutlookAddIn.UI
                     state.Item.SubItems[2].ForeColor = _themePalette.ErrorText;
                 }
             }
+        }
 
-            PositionProgressBars();
+        private void EnsureUploadItemVisible(ListViewItem item, bool forceScroll)
+        {
+            if (item == null || item.ListView != _fileListView || _fileListView.IsDisposed || _fileListView.Disposing)
+            {
+                return;
+            }
+
+            int index = item.Index;
+            if (index < 0 || index >= _fileListView.Items.Count)
+            {
+                return;
+            }
+
+            if (!forceScroll && ReferenceEquals(_lastAutoScrolledUploadItem, item))
+            {
+                return;
+            }
+
+            if (!forceScroll && IsQueueItemVisible(index))
+            {
+                _lastAutoScrolledUploadItem = item;
+                return;
+            }
+
+            _lastAutoScrolledUploadItem = item;
+            _fileListView.EnsureVisible(index);
+        }
+
+        private bool IsQueueItemVisible(int itemIndex)
+        {
+            Rectangle bounds;
+            if (!TryGetListViewItemBounds(itemIndex, out bounds))
+            {
+                return false;
+            }
+
+            int top = bounds.Top;
+            int bottom = bounds.Bottom;
+            int viewTop = 0;
+            int viewBottom = _fileListView.ClientSize.Height;
+            return top >= viewTop && bottom <= viewBottom;
         }
 
         private void ShowUploadError(string message)
         {
             _uploadCompleted = false;
             _uploadContext = null;
+            _lastAutoScrolledUploadItem = null;
+            ResetUploadProgressPump();
             foreach (var state in _selectionStates.Values)
             {
                 if (state.Status == FileLinkUploadStatus.Uploading)
                 {
                     state.Status = FileLinkUploadStatus.Failed;
-                    if (state.ProgressBar != null)
-                    {
-                        state.ProgressBar.Visible = false;
-                        state.ProgressBar.Value = 0;
-                    }
+                    ApplyQueueRowStyle(state, _themePalette.InputBackground, _themePalette.Text);
+                    DisposeStateProgressBar(state);
                     if (state.Item.SubItems.Count >= 3)
                     {
                         state.Item.SubItems[2].Text = Strings.FileLinkWizardStatusError;
@@ -1322,39 +2802,95 @@ namespace NcTalkOutlookAddIn.UI
             {
                 form.Text = info.IsDirectory ? Strings.FileLinkWizardRenameFolderTitle : Strings.FileLinkWizardRenameFileTitle;
                 form.FormBorderStyle = FormBorderStyle.FixedDialog;
-                form.ClientSize = new Size(360, 140);
+                form.AutoScaleMode = AutoScaleMode.Dpi;
+                form.AutoScaleDimensions = new SizeF(96f, 96f);
+                form.ClientSize = new Size(520, 170);
                 form.MaximizeBox = false;
                 form.MinimizeBox = false;
                 form.StartPosition = FormStartPosition.CenterParent;
                 form.ShowInTaskbar = false;
                 form.Icon = BrandingAssets.GetAppIcon(32);
 
+                string promptText = info.IsDirectory
+                    ? Strings.FileLinkWizardRenameFolderPrompt
+                    : BuildDuplicateRenamePrompt(info.OriginalName);
                 var label = new Label
                 {
                     AutoSize = true,
-                    Text = info.IsDirectory
-                        ? Strings.FileLinkWizardRenameFolderPrompt
-                        : Strings.FileLinkWizardRenameFilePrompt,
-                    Location = new Point(12, 12)
+                    Text = promptText,
+                    Location = new Point(12, 12),
                 };
+                label.MaximumSize = new Size(Math.Max(260, form.ClientSize.Width - 24), 0);
                 form.Controls.Add(label);
 
                 var textBox = new TextBox
                 {
-                    Location = new Point(12, 40),
-                    Width = 330,
+                    Location = new Point(12, 62),
+                    Width = 496,
                     Text = info.OriginalName
                 };
                 form.Controls.Add(textBox);
 
-                var okButton = new Button { Text = Strings.DialogOk, DialogResult = DialogResult.OK, Location = new Point(188, 88) };
-                var cancelButton = new Button { Text = Strings.DialogCancel, DialogResult = DialogResult.Cancel, Location = new Point(270, 88) };
+                var okButton = new Button { Text = Strings.DialogOk, DialogResult = DialogResult.OK };
+                var cancelButton = new Button { Text = Strings.DialogCancel, DialogResult = DialogResult.Cancel };
+                int ignoredOkMinWidth;
+                FooterButtonLayoutHelper.ApplyButtonSize(okButton, out ignoredOkMinWidth);
+                int ignoredCancelMinWidth;
+                FooterButtonLayoutHelper.ApplyButtonSize(cancelButton, out ignoredCancelMinWidth);
                 form.Controls.Add(okButton);
                 form.Controls.Add(cancelButton);
                 form.AcceptButton = okButton;
                 form.CancelButton = cancelButton;
 
+                Action layoutDialog = () =>
+                {
+                    int outerPadding = 12;
+                    int verticalGap = 12;
+                    int rowGap = 10;
+                    int textBoxHeight = Math.Max(textBox.PreferredHeight, ScaleLogical(24));
+
+                    label.MaximumSize = new Size(Math.Max(260, form.ClientSize.Width - (outerPadding * 2)), 0);
+                    label.Location = new Point(outerPadding, outerPadding);
+                    textBox.SetBounds(outerPadding, label.Bottom + rowGap, Math.Max(220, form.ClientSize.Width - (outerPadding * 2)), textBoxHeight);
+
+                    int requiredClientWidth = FooterButtonLayoutHelper.LayoutCentered(
+                        form,
+                        new[] { okButton, cancelButton },
+                        FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                        FooterButtonLayoutHelper.DefaultBottomPadding,
+                        FooterButtonLayoutHelper.DefaultSpacing,
+                        true);
+                    if (requiredClientWidth > form.ClientSize.Width)
+                    {
+                        form.ClientSize = new Size(requiredClientWidth, form.ClientSize.Height);
+                        label.MaximumSize = new Size(Math.Max(260, form.ClientSize.Width - (outerPadding * 2)), 0);
+                        label.Location = new Point(outerPadding, outerPadding);
+                        textBox.SetBounds(outerPadding, label.Bottom + rowGap, Math.Max(220, form.ClientSize.Width - (outerPadding * 2)), textBoxHeight);
+                        FooterButtonLayoutHelper.LayoutCentered(
+                            form,
+                            new[] { okButton, cancelButton },
+                            FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                            FooterButtonLayoutHelper.DefaultBottomPadding,
+                            FooterButtonLayoutHelper.DefaultSpacing,
+                            true);
+                    }
+
+                    int requiredHeight = textBox.Bottom + verticalGap + okButton.Height + FooterButtonLayoutHelper.DefaultBottomPadding;
+                    if (requiredHeight > form.ClientSize.Height)
+                    {
+                        form.ClientSize = new Size(form.ClientSize.Width, requiredHeight);
+                        FooterButtonLayoutHelper.LayoutCentered(
+                            form,
+                            new[] { okButton, cancelButton },
+                            FooterButtonLayoutHelper.DefaultHorizontalPadding,
+                            FooterButtonLayoutHelper.DefaultBottomPadding,
+                            FooterButtonLayoutHelper.DefaultSpacing,
+                            true);
+                    }
+                };
+
                 UiThemeManager.ApplyToForm(form);
+                layoutDialog();
 
                 if (form.ShowDialog(this) == DialogResult.OK)
                 {
@@ -1404,6 +2940,11 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             int minLength = GetMinPasswordLength();
+            _passwordTextBox.Text = GeneratePasswordValue(minLength);
+        }
+
+        private string GeneratePasswordValue(int minLength)
+        {
             string generated = null;
 
             try
@@ -1425,7 +2966,7 @@ namespace NcTalkOutlookAddIn.UI
                 generated = GenerateLocalPassword(minLength);
             }
 
-            _passwordTextBox.Text = generated;
+            return generated;
         }
 
         private static string GenerateLocalPassword(int minLength)

@@ -184,8 +184,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
             UiThemePalette palette = DetectPalette();
 
-            // Tab "stretching" is a layout preference, not a theme. Apply it regardless of light/dark
-            // so the settings tabs always fill the available width (no leftover strip behind the last tab).
+            // Tab sizing is a layout preference, not a theme.
             try
             {
                 ApplyTabStretchToControlTree(form);
@@ -455,6 +454,15 @@ namespace NcTalkOutlookAddIn.Utilities
 
             comboBox.BackColor = palette.InputBackground;
             comboBox.ForeColor = palette.Text;
+            comboBox.IntegralHeight = false;
+
+            int dpi = comboBox.DeviceDpi > 0 ? comboBox.DeviceDpi : 96;
+            int verticalPadding = Math.Max(6, (int)Math.Round(8f * (dpi / 96f)));
+            int desiredItemHeight = Math.Max(comboBox.ItemHeight, comboBox.Font.Height + verticalPadding);
+            if (comboBox.ItemHeight != desiredItemHeight)
+            {
+                comboBox.ItemHeight = desiredItemHeight;
+            }
 
             if (comboBox.DrawMode != DrawMode.OwnerDrawFixed)
             {
@@ -506,11 +514,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 return;
             }
 
-            ApplyTabStretch(control);
-
-            control.Padding = new Point(0, 0);
             control.Appearance = TabAppearance.Normal;
-            control.Multiline = false;
 
             control.BackColor = palette.WindowBackground;
             control.ForeColor = palette.Text;
@@ -522,6 +526,13 @@ namespace NcTalkOutlookAddIn.Utilities
                 page.UseVisualStyleBackColor = false;
             }
 
+            if (IsAdaptiveTabControl(control))
+            {
+                ApplyAdaptiveTabLayout(control);
+                return;
+            }
+
+            control.Padding = new Point(0, 0);
             if (control.IsHandleCreated)
             {
                 DisableWindowsTheme(control);
@@ -530,6 +541,8 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 control.HandleCreated += (s, e) => DisableWindowsTheme(control);
             }
+
+            ApplyTabStretch(control);
 
             object existing;
             if (TabChromeApplied.TryGetValue(control, out existing))
@@ -764,6 +777,12 @@ namespace NcTalkOutlookAddIn.Utilities
                 return;
             }
 
+            if (IsAdaptiveTabControl(control))
+            {
+                ApplyAdaptiveTabLayout(control);
+                return;
+            }
+
             control.SizeMode = TabSizeMode.Fixed;
             ApplyTabSizing(control);
 
@@ -829,28 +848,100 @@ namespace NcTalkOutlookAddIn.Utilities
                 availableWidth = control.Width;
             }
 
-            // Stretch tabs to fill the full control width so there is no visible strip background.
-            int fillWidth = 0;
-            if (tabCount > 0 && availableWidth > 0)
+            if (availableWidth <= 0 || tabCount <= 0)
             {
-                int dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
-                int safetyMargin = (int)Math.Round(16f * (dpi / 96f));
-
-                // Keep a safety margin to avoid triggering scroll arrows because of rounding/internal tab padding.
-                fillWidth = Math.Max(0, (availableWidth - safetyMargin) / tabCount);
+                return;
             }
 
-            // Prefer no scroll arrows over perfect text fit; use equal-width tabs that always fit the strip.
-            int desiredWidth = fillWidth;
+            int dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
+            int safetyMargin = (int)Math.Round(16f * (dpi / 96f));
+            int textPadding = (int)Math.Round(30f * (dpi / 96f));
+            int fillWidth = Math.Max(0, (availableWidth - safetyMargin) / tabCount);
+
+            int maxTextWidth = 0;
+            foreach (TabPage page in control.TabPages)
+            {
+                string text = page != null ? page.Text : string.Empty;
+                int textWidth = TextRenderer.MeasureText(text ?? string.Empty, control.Font).Width;
+                if (textWidth > maxTextWidth)
+                {
+                    maxTextWidth = textWidth;
+                }
+            }
+
+            int minReadableWidth = Math.Max(40, maxTextWidth + textPadding);
+            int desiredWidth = Math.Max(fillWidth, minReadableWidth);
             if (desiredWidth <= 0)
             {
                 return;
             }
             int desiredHeight = Math.Max(20, control.ItemSize.Height);
 
+            if (control.Multiline)
+            {
+                control.Multiline = false;
+            }
+            if (control.SizeMode != TabSizeMode.Fixed)
+            {
+                control.SizeMode = TabSizeMode.Fixed;
+            }
+
             if (control.ItemSize.Width != desiredWidth || control.ItemSize.Height != desiredHeight)
             {
                 control.ItemSize = new Size(desiredWidth, desiredHeight);
+            }
+        }
+
+        private static bool IsAdaptiveTabControl(TabControl control)
+        {
+            if (control == null)
+            {
+                return false;
+            }
+
+            string typeName = control.GetType().Name ?? string.Empty;
+            if (string.Equals(typeName, "SettingsTabControl", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return control.TabPages != null && control.TabPages.Count >= 6;
+        }
+
+        private static void ApplyAdaptiveTabLayout(TabControl control)
+        {
+            if (control == null)
+            {
+                return;
+            }
+
+            int dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
+            int padX = Math.Max(8, (int)Math.Round(12f * (dpi / 96f)));
+            int padY = Math.Max(4, (int)Math.Round(7f * (dpi / 96f)));
+
+            if (control.DrawMode != TabDrawMode.Normal)
+            {
+                control.DrawMode = TabDrawMode.Normal;
+            }
+
+            if (control.SizeMode != TabSizeMode.Normal)
+            {
+                control.SizeMode = TabSizeMode.Normal;
+            }
+
+            if (!control.Multiline)
+            {
+                control.Multiline = true;
+            }
+
+            if (control.Padding.X != padX || control.Padding.Y != padY)
+            {
+                control.Padding = new Point(padX, padY);
+            }
+
+            if (control.ItemSize != Size.Empty)
+            {
+                control.ItemSize = Size.Empty;
             }
         }
 

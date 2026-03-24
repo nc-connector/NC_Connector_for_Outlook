@@ -18,9 +18,7 @@ namespace NcTalkOutlookAddIn.Utilities
     internal static class DiagnosticsLogger
     {
         private static readonly object SyncRoot = new object();
-        private static readonly string LogDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "NextcloudTalkOutlookAddInData");
+        private static readonly string LogDirectory = AppDataPaths.GetLocalRootDirectory();
         private static readonly string LogFilePath = Path.Combine(LogDirectory, "addin-runtime.log");
         private static bool _enabled;
 

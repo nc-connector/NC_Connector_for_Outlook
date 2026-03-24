@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:http="http://wixtoolset.org/schemas/v4/wxs/http">
+  <Package
+    Name="NC Connector for Outlook"
+    Manufacturer="Bastian Kleinschmidt"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="{8C9D7AA6-EBB2-4F7D-9B5F-A34C59F314B3}"
+    Compressed="yes"
+    Scope="perMachine">
+
+    <SummaryInformation
+      Description="NC Connector for Outlook Integration fuer Outlook"
+      Manufacturer="Bastian Kleinschmidt" />
+
+    <MajorUpgrade AllowDowngrades="yes" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="ProductIcon" SourceFile="assets\nc-connector.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+    <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="NC4OL">
+
+        <Component Id="cmpNcTalkCore" Guid="{AEF96F2F-5033-4A4E-956D-1E735210A517}">
+          <File Id="filNcTalkDll" Source="$(var.BuildOutputDir)NcTalkOutlookAddIn.dll" KeyPath="yes" />
+          <File Id="filNcTalkDllConfig" Source="$(var.BuildOutputDir)NcTalkOutlookAddIn.dll.config" />
+          <File Id="filLicenseTxt" Source="$(var.BuildOutputDir)LICENSE.txt" />
+        </Component>
+
+        <Component Id="cmpOutlookAddinReg" Guid="{8ED9BE3B-8138-4F3D-92FD-A5DA0CECA9F6}">
+          <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="LoadBehavior" Type="integer" Value="3" KeyPath="yes" />
+          <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="FriendlyName" Type="string" Value="NC Connector for Outlook" />
+          <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="Description" Type="string" Value="Nextcloud Talk &amp; Files nahtlos in Outlook integriert" />
+          <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="CommandLineSafe" Type="integer" Value="0" />
+
+          <RegistryValue Root="HKLM" Key="Software\Classes\NcTalkOutlook.AddIn" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\NcTalkOutlook.AddIn\CLSID" Type="string" Value="{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}" />
+
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\ProgId" Type="string" Value="NcTalkOutlook.AddIn" />
+
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Type="string" Value="mscoree.dll" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="ThreadingModel" Type="string" Value="Both" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="Class" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="Assembly" Type="string" Value="NcTalkOutlookAddIn, Version=$(var.AssemblyVersion), Culture=neutral, PublicKeyToken=null" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="RuntimeVersion" Type="string" Value="v4.0.30319" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="CodeBase" Type="string" Value="file:///[INSTALLFOLDER]NcTalkOutlookAddIn.dll" />
+
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="Class" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="Assembly" Type="string" Value="NcTalkOutlookAddIn, Version=$(var.AssemblyVersion), Culture=neutral, PublicKeyToken=null" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="RuntimeVersion" Type="string" Value="v4.0.30319" />
+          <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="CodeBase" Type="string" Value="file:///[INSTALLFOLDER]NcTalkOutlookAddIn.dll" />
+        </Component>
+
+        <Component Id="cmpHttpUrlAcl" Guid="{4D3AF8E4-5FA6-4257-81D8-3AC2B9F8E9F4}">
+          <http:UrlReservation Url="http://127.0.0.1:7777/nc-ifb/" Sddl="D:(A;;GX;;;AU)" HandleExisting="ignore" />
+          <RemoveRegistryKey Root="HKLM" Key="Software\NextcloudTalkOutlookAddIn\HttpUrl" Action="removeOnInstall" />
+          <RegistryValue Root="HKLM" Key="Software\NC4OL\HttpUrl" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+
+      </Directory>
+    </StandardDirectory>
+
+    <!--
+      Outlook can be installed as a 32-bit application on 64-bit Windows.
+      In that case it reads COM add-in registration from the 32-bit registry view (Wow6432Node).
+      This component registers the same add-in keys in the 32-bit view so both Outlook bitnesses work.
+
+      Note: this component is registry-only and is anchored in ProgramFilesFolder to satisfy ICE80.
+    -->
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Component Id="cmpOutlookAddinReg32" Guid="{BC89C35C-3ACF-4F5B-B851-AFE8576EE014}" Bitness="always32">
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="LoadBehavior" Type="integer" Value="3" KeyPath="yes" />
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="FriendlyName" Type="string" Value="NC Connector for Outlook" />
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="Description" Type="string" Value="Nextcloud Talk &amp; Files nahtlos in Outlook integriert" />
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn" Name="CommandLineSafe" Type="integer" Value="0" />
+
+        <RegistryValue Root="HKLM" Key="Software\Classes\NcTalkOutlook.AddIn" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\NcTalkOutlook.AddIn\CLSID" Type="string" Value="{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}" />
+
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\ProgId" Type="string" Value="NcTalkOutlook.AddIn" />
+
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Type="string" Value="mscoree.dll" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="ThreadingModel" Type="string" Value="Both" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="Class" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="Assembly" Type="string" Value="NcTalkOutlookAddIn, Version=$(var.AssemblyVersion), Culture=neutral, PublicKeyToken=null" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="RuntimeVersion" Type="string" Value="v4.0.30319" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32" Name="CodeBase" Type="string" Value="file:///[INSTALLFOLDER]NcTalkOutlookAddIn.dll" />
+
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="Class" Type="string" Value="NcTalkOutlookAddIn.NextcloudTalkAddIn" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="Assembly" Type="string" Value="NcTalkOutlookAddIn, Version=$(var.AssemblyVersion), Culture=neutral, PublicKeyToken=null" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="RuntimeVersion" Type="string" Value="v4.0.30319" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}\InprocServer32\$(var.AssemblyVersion)" Name="CodeBase" Type="string" Value="file:///[INSTALLFOLDER]NcTalkOutlookAddIn.dll" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature
+      Id="MainFeature"
+      Title="NC Connector for Outlook"
+      Level="1"
+      TypicalDefault="install"
+      InstallDefault="local">
+      <ComponentRef Id="cmpNcTalkCore" />
+      <ComponentRef Id="cmpOutlookAddinReg" />
+      <ComponentRef Id="cmpOutlookAddinReg32" />
+      <ComponentRef Id="cmpHttpUrlAcl" />
+    </Feature>
+  </Package>
+</Wix>

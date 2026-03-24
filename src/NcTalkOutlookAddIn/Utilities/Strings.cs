@@ -82,7 +82,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private static readonly object InitLock = new object();
         private static bool _initialized;
         private static string _preferredUiLanguageCode;
-        private static string[] _languageCandidates = new[] { DefaultLanguageCode, EnglishLanguageCode };
+        private static string[] _languageCandidates = new[] { EnglishLanguageCode, DefaultLanguageCode };
 
         private static readonly object TranslationLock = new object();
         private static readonly Dictionary<string, Dictionary<string, string>> TranslationCache = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -128,8 +128,8 @@ namespace NcTalkOutlookAddIn.Utilities
             TryAddCulture(list, () => CultureInfo.CurrentCulture);
             TryAddCulture(list, () => CultureInfo.InstalledUICulture);
 
-            AddLanguageCandidate(list, DefaultLanguageCode);
             AddLanguageCandidate(list, EnglishLanguageCode);
+            AddLanguageCandidate(list, DefaultLanguageCode);
 
             return list.ToArray();
         }
@@ -420,7 +420,7 @@ namespace NcTalkOutlookAddIn.Utilities
                     return Get(key, defaultValue);
                 }
 
-                foreach (string code in new[] { normalized, DefaultLanguageCode, EnglishLanguageCode })
+                foreach (string code in new[] { normalized, EnglishLanguageCode, DefaultLanguageCode })
                 {
                     Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);
                     if (dictionary == null)
@@ -524,6 +524,16 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TalkModeratorHint { get { return Get("ui_create_moderator_hint", "If provided, moderation is transferred to this user after creation and you leave the room."); } }
         internal static string TalkModeratorHintNoDirectory { get { return Get("outlook_moderator_hint_no_directory", "User directory unavailable. Please enter the username manually."); } }
         internal static string TalkModeratorNoMatches { get { return Get("ui_delegate_status_none_with_email", "No matches."); } }
+        internal static string TalkSystemAddressbookRequiredShort { get { return Get("talk_system_addressbook_required_short", "Requires an active Nextcloud system address book."); } }
+        internal static string TalkSystemAddressbookRequiredMessage { get { return Get("talk_system_addressbook_required_message", "This feature requires an active Nextcloud system address book."); } }
+        internal static string TalkSystemAddressbookAdminLinkLabel { get { return Get("talk_system_addressbook_admin_link_label", "Setup guide"); } }
+        internal static string TalkSystemAddressbookAdminGuideUrl
+        {
+            get
+            {
+                return "https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#system-address-book-required-for-user-search-and-moderator-selection";
+            }
+        }
         internal static string TalkVersionUnknown { get { return Get("outlook_version_unknown", "unknown"); } }
         internal static string TalkEventHint { get { return Get("outlook_event_conversation_hint", "Event conversations require Nextcloud 31 or newer.\nDetected version: {0}"); } }
 
@@ -544,6 +554,16 @@ namespace NcTalkOutlookAddIn.Utilities
             }
         }
 
+        internal static string TooltipAddUsersLocked
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("talk_option_add_users_title", "👤 Add users"),
+                    TalkSystemAddressbookRequiredMessage);
+            }
+        }
+
         internal static string TooltipAddGuests
         {
             get
@@ -552,6 +572,38 @@ namespace NcTalkOutlookAddIn.Utilities
                     Get("talk_option_add_guests_title", "🌍 Add guests"),
                     Get("talk_option_add_guests_line1", "Guests are also added directly to the room"),
                     Get("talk_option_add_guests_line2", "⚠️ They will receive a separate (additional) email with a personal access link"));
+            }
+        }
+
+        internal static string TooltipAddGuestsLocked
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("talk_option_add_guests_title", "🌍 Add guests"),
+                    TalkSystemAddressbookRequiredMessage);
+            }
+        }
+
+        internal static string TooltipModerator
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("talk_option_moderator_title", "👑 Moderator delegation"),
+                    Get("talk_option_moderator_line1", "The selected user is promoted after room creation."),
+                    Get("talk_option_moderator_line2", "On successful delegation, the creator leaves the room."),
+                    Get("talk_option_moderator_line3", "If delegation fails, room ownership remains with the creator."));
+            }
+        }
+
+        internal static string TooltipModeratorLocked
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("talk_option_moderator_title", "👑 Moderator delegation"),
+                    TalkSystemAddressbookRequiredMessage);
             }
         }
 
@@ -657,6 +709,28 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string AboutVersionFormat { get { return Get("outlook_about_version_format", "Version: {0}"); } }
         internal static string AboutLicenseLabel { get { return Get("options_about_license_label", "License:"); } }
         internal static string AboutLicenseLink { get { return Get("options_about_license_value", "AGPL v3"); } }
+        internal static string AboutHomepageLabel { get { return Get("options_about_homepage_label", "Homepage:"); } }
+        internal static string AboutHomepageLink { get { return Get("options_about_homepage_link", "https://nc-connector.de"); } }
+        internal static string AboutOverviewText
+        {
+            get
+            {
+                return Get(
+                    "options_about_overview_text",
+                    "Why more than a file-link add-in?\n"
+                    + "NC Connector covers not only file links, but the complete team workflow in the mail client.\n\n"
+                    + "Technical foundation\n"
+                    + "- Thunderbird and Outlook add-ins usable directly, also without Nextcloud backend\n"
+                    + "- Optional Nextcloud backend for central seat assignment and policies\n"
+                    + "- Seat model in backend: Community with 1 free seat, Pro from 5 seats (1 seat = 1 Nextcloud user)\n\n"
+                    + "- File sharing with password, expiration date, and optional separate password delivery\n"
+                    + "- Create and update Talk meetings directly from calendar appointments\n"
+                    + "- Attachment automation with clear rules instead of manual single steps\n"
+                    + "- Central seat assignment in the Nextcloud backend (1 seat = 1 Nextcloud user)");
+            }
+        }
+        internal static string AboutMoreInfoLabel { get { return Get("options_about_more_info_label", "More information -->"); } }
+        internal static string AboutMoreInfoLink { get { return Get("options_about_more_info_link", "Visit homepage"); } }
         internal static string AboutSupportNote { get { return Get("options_about_support_note", "So NC Connector for Outlook can continue to be maintained and improved for free."); } }
         internal static string AboutSupportHeading { get { return Get("options_about_support_heading", "Support"); } }
         internal static string AboutSupportLink { get { return Get("options_support_link", "PayPal: Donate"); } }
@@ -674,7 +748,66 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string SharingDefaultPermWriteLabel { get { return Get("options_sharing_default_perm_write", "Edit"); } }
         internal static string SharingDefaultPermDeleteLabel { get { return Get("options_sharing_default_perm_delete", "Delete"); } }
         internal static string SharingDefaultPasswordLabel { get { return Get("options_sharing_default_password_label", "Set password"); } }
+        internal static string SharingDefaultPasswordSeparateLabel { get { return Get("options_sharing_default_password_separate_label", "Send password separately"); } }
         internal static string SharingDefaultExpireDaysLabel { get { return Get("options_sharing_default_expire_days_label", "Expiration (days)"); } }
+        internal static string SharingAttachmentAutomationHeading { get { return Get("options_sharing_attachments_heading", "Attachment automation"); } }
+        internal static string SharingAttachmentsAlwaysConnectorLabel { get { return Get("options_sharing_attachments_always_label", "Always handle attachments via NC Connector"); } }
+        internal static string SharingAttachmentsOfferAboveLabel { get { return Get("options_sharing_attachments_offer_label", "Offer upload above"); } }
+        internal static string SharingAttachmentsOfferAboveUnit { get { return Get("options_sharing_attachments_offer_suffix", "MB"); } }
+        internal static string SharingAttachmentsLockTitle { get { return Get("options_sharing_attachments_lock_title", "Attachment automation disabled"); } }
+        internal static string SharingAttachmentsLockText { get { return Get("options_sharing_attachments_lock_text", "Outlook's large attachment upload setting is enabled ({0} MB). This conflicts with NC Connector attachment automation. The attachment options below are locked."); } }
+        internal static string SharingAttachmentsLockStep1 { get { return Get("options_sharing_attachments_lock_step1", "Open Outlook File > Options > Mail."); } }
+        internal static string SharingAttachmentsLockStep2 { get { return Get("options_sharing_attachments_lock_step2", "Disable Outlook's large attachment upload option."); } }
+        internal static string SharingAttachmentsLockStep3 { get { return Get("options_sharing_attachments_lock_step3", "Reopen these add-in settings."); } }
+        internal static string SharingAttachmentAutomationLockedError { get { return Get("sharing_attachment_automation_locked_error", "Outlook's large attachment upload setting is enabled ({0} MB). This conflicts with NC Connector attachment automation. The attachment options below are locked."); } }
+
+        internal static string TooltipSharingPermissions
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("options_sharing_permissions_tooltip_title", "Default permissions"),
+                    Get("options_sharing_permissions_tooltip_line1", "These values are used as defaults for new shares."),
+                    Get("options_sharing_permissions_tooltip_line2", "They can still be adjusted in the sharing wizard."),
+                    Get("options_sharing_permissions_tooltip_line3", "In attachment mode, recipient permission is always read-only."));
+            }
+        }
+
+        internal static string TooltipSharingPasswordSeparate
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("sharing_password_separate_tooltip_title", "Coming soon (Pro feature)"),
+                    Get("sharing_password_separate_tooltip_line1", "This option is disabled in this release."),
+                    Get("sharing_password_separate_tooltip_line2", "Password delivery in a separate email will be available in a future Pro release."),
+                    Get("sharing_password_separate_tooltip_line3", "For now, the password is included in the main share block."));
+            }
+        }
+
+        internal static string TooltipSharingAttachmentsAlways
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("options_sharing_attachments_always_tooltip_title", "Always via NC Connector"),
+                    Get("options_sharing_attachments_always_tooltip_line1", "New attachments are removed from the compose mail and processed via NC Connector."),
+                    Get("options_sharing_attachments_always_tooltip_line2", "The sharing wizard opens directly in the file step."),
+                    Get("options_sharing_attachments_always_tooltip_line3", "The final mail contains share links instead of physical attachments."));
+            }
+        }
+
+        internal static string TooltipSharingAttachmentsOffer
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("options_sharing_attachments_offer_tooltip_title", "Attachment threshold"),
+                    Get("options_sharing_attachments_offer_tooltip_line1", "The total size of all attachments is evaluated."),
+                    Get("options_sharing_attachments_offer_tooltip_line2", "If exceeded, you can share via NC Connector or remove the last selected attachment batch."),
+                    Get("options_sharing_attachments_offer_tooltip_line3", "The remove action returns the mail to a below-threshold state."));
+            }
+        }
 
         // Sharing wizard
         internal static string FileLinkNoFilesConfirm { get { return Get("sharing_confirm_no_files_message", "No files or folders were added to this share. Recipients can only upload their own files. Do you want to continue?"); } }
@@ -691,6 +824,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardPermissionsLabel { get { return Get("sharing_step_security", "Permissions"); } }
         internal static string FileLinkWizardFallbackShareName { get { return Get("outlook_sharing_fallback_share_name", "Share"); } }
         internal static string FileLinkWizardPasswordToggle { get { return Get("sharing_password_toggle", "Set password"); } }
+        internal static string FileLinkWizardPasswordSeparateToggle { get { return Get("sharing_password_separate_toggle", "Send password in separate email"); } }
         internal static string FileLinkWizardExpireToggle { get { return Get("sharing_expire_toggle", "Set expiration date"); } }
         internal static string FileLinkWizardExpireHint { get { return Get("sharing_expire_hint", "After this date the link is no longer available."); } }
         internal static string FileLinkWizardBasePathPrefix { get { return Get("outlook_sharing_base_path_prefix", "Base directory: "); } }
@@ -723,6 +857,22 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardRenameFileTitle { get { return Get("outlook_sharing_rename_file_title", "Rename file"); } }
         internal static string FileLinkWizardRenameFolderPrompt { get { return Get("outlook_sharing_rename_folder_prompt", "Please enter a new folder name:"); } }
         internal static string FileLinkWizardRenameFilePrompt { get { return Get("outlook_sharing_rename_file_prompt", "Please enter a new file name:"); } }
+        internal static string FileLinkWizardRenameDuplicatePrompt { get { return Get("sharing_prompt_rename_duplicate", "The file \"$1\" already exists in the queue. Please enter a new name."); } }
+        internal static string FileLinkWizardAttachmentModeReasonThreshold { get { return Get("sharing_attachment_mode_reason_threshold", "Attachment threshold exceeded: {0} > {1}. Last added: \"{2}\" ({3}). These attachments will be shared with NC Connector."); } }
+        internal static string FileLinkWizardAttachmentModeReasonAlways { get { return Get("sharing_attachment_mode_reason_always", "Attachment mode is active. Selected attachments will be shared with NC Connector."); } }
+
+        internal static string AttachmentPromptTitle { get { return Get("sharing_attachment_prompt_title", "Attachment limit exceeded"); } }
+        internal static string AttachmentPromptReason { get { return Get("sharing_attachment_prompt_reason", "The total attachment size is {0} and exceeds the configured limit of {1}. Last added: \"{2}\" ({3})."); } }
+        internal static string AttachmentPromptShare { get { return Get("sharing_attachment_prompt_share", "Share with NC Connector"); } }
+        internal static string AttachmentPromptRemoveLast { get { return Get("sharing_attachment_prompt_remove_last", "Remove last selected attachments"); } }
+        internal static string AttachmentPromptLastUnknown { get { return Get("sharing_attachment_prompt_last_unknown", "Unknown attachment"); } }
+
+        internal static string SharingHtmlPasswordSeparateHint { get { return Get("sharing_html_password_separate_hint", "The password will be sent in a separate email."); } }
+        internal static string SharingHtmlPasswordMailIntro { get { return Get("sharing_html_password_mail_intro", "Here is your password for the shared link."); } }
+        internal static string SharingPasswordMailSubject { get { return Get("sharing_password_mail_subject", "Password for shared link"); } }
+        internal static string SharingPasswordMailSubjectWithLabel { get { return Get("sharing_password_mail_subject_with_label", "Password for shared link: {0}"); } }
+        internal static string SharingPasswordMailNotificationTitle { get { return Get("sharing_password_mail_notify_title", "NC Connector"); } }
+        internal static string SharingPasswordMailNotificationSuccess { get { return Get("sharing_password_mail_notify_success", "Password email sent to {0} recipient(s)."); } }
 
         // Generic dialog title
         internal static string DialogTitle { get { return Get("extName", "NC Connector for Outlook"); } }

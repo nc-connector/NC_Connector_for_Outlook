@@ -46,6 +46,7 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Extensions" />
   </ItemGroup>
@@ -61,6 +62,7 @@
     <Compile Include="Models\FileLinkSelection.cs" />
     <Compile Include="Models\FileLinkRequest.cs" />
     <Compile Include="Models\FileLinkResult.cs" />
+    <Compile Include="Models\FileLinkWizardLaunchOptions.cs" />
     <Compile Include="Models\FileLinkProgress.cs" />
     <Compile Include="Models\FileLinkUploadStatus.cs" />
     <Compile Include="Models\FileLinkUploadItemProgress.cs" />
@@ -77,12 +79,15 @@
     <Compile Include="Services\FileLinkDuplicateInfo.cs" />
     <Compile Include="Services\FileLinkUploadContext.cs" />
     <Compile Include="Services\FileLinkService.cs" />
+    <Compile Include="Services\OutlookAttachmentAutomationGuardService.cs" />
     <Compile Include="Services\PasswordPolicyService.cs" />
     <Compile Include="UI\SettingsForm.cs" />
     <Compile Include="UI\SettingsTabControl.cs" />
     <Compile Include="UI\TalkLinkForm.cs" />
+    <Compile Include="UI\ComposeAttachmentPromptForm.cs" />
     <Compile Include="UI\FileLinkWizardForm.cs" />
     <Compile Include="Utilities\DiagnosticsLogger.cs" />
+    <Compile Include="Utilities\FooterButtonLayoutHelper.cs" />
     <Compile Include="Utilities\LogCategories.cs" />
     <Compile Include="Utilities\HttpAuthUtilities.cs" />
     <Compile Include="Utilities\BrandingAssets.cs" />
@@ -91,7 +96,7 @@
     <Compile Include="Utilities\TimeUtilities.cs" />
     <Compile Include="Utilities\UiThemeManager.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
-    <Compile Include="Utilities\OutlookAccountHelper.cs" />
+    <Compile Include="Utilities\AppDataPaths.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UI\BrandedHeader.cs" />
   </ItemGroup>

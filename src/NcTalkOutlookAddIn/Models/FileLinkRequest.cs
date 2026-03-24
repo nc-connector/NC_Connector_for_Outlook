@@ -30,6 +30,8 @@ namespace NcTalkOutlookAddIn.Models
 
         internal string Password { get; set; }
 
+        internal bool PasswordSeparateEnabled { get; set; }
+
         internal bool ExpireEnabled { get; set; }
 
         internal DateTime? ExpireDate { get; set; }
@@ -37,6 +39,12 @@ namespace NcTalkOutlookAddIn.Models
         internal bool NoteEnabled { get; set; }
 
         internal string Note { get; set; }
+
+        internal bool AttachmentMode { get; set; }
+
+        internal DateTime? ShareDate { get; set; }
+
+        internal string ShareDatePrefixFormat { get; set; }
 
         internal IList<FileLinkSelection> Items { get; private set; }
     }

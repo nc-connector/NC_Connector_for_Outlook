@@ -216,7 +216,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     if (key == null)
                     {
-                        DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "' (Value '" + valueName + "').");
+                        DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' (value '" + valueName + "').");
                         if (critical)
                         {
                             throw new InvalidOperationException("IFB path could not be set: access to '" + path + "' denied.");
@@ -240,7 +240,7 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (UnauthorizedAccessException ex)
             {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "': " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "': " + ex.Message);
                 if (critical)
                 {
                     throw new InvalidOperationException("IFB path could not be set: access denied.", ex);
@@ -249,7 +249,7 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (System.Security.SecurityException ex)
             {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "Sicherheitsausnahme bei Registry '" + path + "': " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Security exception for registry '" + path + "': " + ex.Message);
                 if (critical)
                 {
                     throw new InvalidOperationException("IFB path could not be set: a security policy prevented access.", ex);
@@ -258,7 +258,7 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "Registry '" + path + "' konnte nicht aktualisiert werden: " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Registry '" + path + "' could not be updated: " + ex.Message);
                 if (critical)
                 {
                     throw new InvalidOperationException("IFB path could not be set: " + ex.Message, ex);
@@ -296,7 +296,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     if (key == null)
                     {
-                        DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "' beim Wiederherstellen.");
+                        DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' while restoring.");
                         return;
                     }
 
@@ -320,11 +320,11 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (UnauthorizedAccessException ex)
             {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "Kein Zugriff auf Registry '" + path + "' beim Wiederherstellen: " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' while restoring: " + ex.Message);
             }
             catch (System.Security.SecurityException ex)
             {
-                DiagnosticsLogger.Log(LogCategories.Ifb, "Sicherheitsausnahme bei Registry '" + path + "' beim Wiederherstellen: " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Ifb, "Security exception for registry '" + path + "' while restoring: " + ex.Message);
             }
             catch (Exception ex)
             {

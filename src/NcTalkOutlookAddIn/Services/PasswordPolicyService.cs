@@ -17,12 +17,14 @@ using NcTalkOutlookAddIn.Utilities;
 namespace NcTalkOutlookAddIn.Services
 {
     /**
-     * Fetches password policy information (min_length) and the generator endpoint from the Nextcloud Password Policy app.
+     * Fetches password policy information and the generator endpoint from Nextcloud capabilities.
      */
     internal sealed class PasswordPolicyService
     {
         private readonly TalkServiceConfiguration _configuration;
         private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
+        private static readonly string[] MinLengthKeys = { "minLength", "min_length", "minimumLength", "minimum_length" };
+        private static readonly string[] GenerateUrlKeys = { "api_generate", "apiGenerateUrl", "generateUrl", "generate_url" };
 
         private static void LogApi(string message)
         {
@@ -48,34 +50,62 @@ namespace NcTalkOutlookAddIn.Services
 
             using (DiagnosticsLogger.BeginOperation(LogCategories.Api, "PasswordPolicy.FetchPolicy"))
             {
-            string baseUrl = _configuration.GetNormalizedBaseUrl();
-            string url = baseUrl + "/ocs/v2.php/cloud/capabilities?format=json";
-            LogApi("GET " + url);
+                string baseUrl = _configuration.GetNormalizedBaseUrl();
+                string url = baseUrl + "/ocs/v2.php/cloud/capabilities?format=json";
+                LogApi("GET " + url);
 
-            IDictionary<string, object> root;
-            HttpStatusCode statusCode;
-            ExecuteJsonRequest("GET", url, null, out statusCode, out root);
+                IDictionary<string, object> root;
+                HttpStatusCode statusCode;
+                ExecuteJsonRequest("GET", url, null, out statusCode, out root);
 
-            if (statusCode != HttpStatusCode.OK || root == null)
-            {
-                return new PasswordPolicyInfo(false, 0, string.Empty);
-            }
+                if (statusCode != HttpStatusCode.OK)
+                {
+                    LogApi("Password policy fetch returned HTTP " + (int)statusCode + ".");
+                    return new PasswordPolicyInfo(false, 0, string.Empty);
+                }
 
-            var ocs = GetDictionary(root, "ocs");
-            var data = GetDictionary(ocs, "data");
-            var caps = GetDictionary(data, "capabilities");
-            var policy = GetDictionary(caps, "password_policy");
+                if (root == null)
+                {
+                    LogApi("Password policy fetch returned no parsable JSON payload.");
+                    return new PasswordPolicyInfo(false, 0, string.Empty);
+                }
 
-            if (policy == null)
-            {
-                return new PasswordPolicyInfo(false, 0, string.Empty);
-            }
+                var ocs = GetDictionary(root, "ocs");
+                var data = GetDictionary(ocs, "data");
+                var caps = GetDictionary(data, "capabilities");
+                if (caps == null)
+                {
+                    LogApi("Password policy capabilities block missing.");
+                    return new PasswordPolicyInfo(false, 0, string.Empty);
+                }
 
-            int minLength = GetInt(policy, "min_length");
-            string generateUrl = GetString(policy, "api_generate") ?? string.Empty;
+                var policy = GetDictionary(caps, "password_policy") ?? GetDictionary(caps, "passwordPolicy");
+                if (policy == null)
+                {
+                    LogApi("Password policy block missing.");
+                    return new PasswordPolicyInfo(false, 0, string.Empty);
+                }
 
-            bool hasPolicy = minLength > 0 || !string.IsNullOrEmpty(generateUrl);
-            return new PasswordPolicyInfo(hasPolicy, minLength, generateUrl);
+                int minLength = GetFirstPositiveInt(policy, MinLengthKeys);
+                if (minLength <= 0)
+                {
+                    var policies = GetDictionary(policy, "policies");
+                    var accountPolicy = GetDictionary(policies, "account");
+                    minLength = GetFirstPositiveInt(accountPolicy, MinLengthKeys);
+                }
+
+                var api = GetDictionary(policy, "api");
+                string generateRaw = GetFirstString(api, "generate", "generateUrl", "generate_url");
+                if (string.IsNullOrWhiteSpace(generateRaw))
+                {
+                    generateRaw = GetFirstString(policy, GenerateUrlKeys);
+                }
+
+                string generateUrl = ResolvePolicyUrl(generateRaw, baseUrl);
+                bool hasPolicy = minLength > 0 || !string.IsNullOrWhiteSpace(generateUrl);
+
+                LogApi("Password policy normalized (hasPolicy=" + hasPolicy + ", minLength=" + minLength + ", hasGenerateUrl=" + (!string.IsNullOrWhiteSpace(generateUrl)) + ").");
+                return new PasswordPolicyInfo(hasPolicy, minLength, generateUrl ?? string.Empty);
             }
         }
 
@@ -88,24 +118,31 @@ namespace NcTalkOutlookAddIn.Services
 
             using (DiagnosticsLogger.BeginOperation(LogCategories.Api, "PasswordPolicy.GeneratePassword"))
             {
-                LogApi("GET " + policy.GenerateUrl);
-            IDictionary<string, object> root;
-            HttpStatusCode statusCode;
-            ExecuteJsonRequest("GET", policy.GenerateUrl, null, out statusCode, out root);
+                string apiUrl = ResolvePolicyUrl(policy.GenerateUrl, _configuration.GetNormalizedBaseUrl());
+                if (string.IsNullOrWhiteSpace(apiUrl))
+                {
+                    LogApi("Password generate skipped: no usable generator URL.");
+                    return null;
+                }
 
-            if (statusCode != HttpStatusCode.OK || root == null)
-            {
-                return null;
-            }
+                LogApi("GET " + apiUrl);
+                IDictionary<string, object> root;
+                HttpStatusCode statusCode;
+                ExecuteJsonRequest("GET", apiUrl, null, out statusCode, out root);
 
-            var data = GetDictionary(GetDictionary(root, "ocs"), "data");
-            string password = GetString(data, "password");
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                return null;
-            }
+                if (statusCode != HttpStatusCode.OK || root == null)
+                {
+                    return null;
+                }
 
-            return password.Trim();
+                var data = GetDictionary(GetDictionary(root, "ocs"), "data");
+                string password = GetString(data, "password");
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    return null;
+                }
+
+                return password.Trim();
             }
         }
 
@@ -126,24 +163,27 @@ namespace NcTalkOutlookAddIn.Services
             {
                 var request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = method;
-                request.Accept = "application/json";
-                request.ContentType = "application/json";
+                request.Accept = "application/json, text/plain, */*";
+                request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
                 request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
                 request.Headers["OCS-APIRequest"] = "true";
                 request.Timeout = 60000;
 
-                if (!string.IsNullOrEmpty(payload))
+                bool hasBody = !string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
+                               && !string.Equals(method, "DELETE", StringComparison.OrdinalIgnoreCase);
+
+                if (hasBody)
                 {
-                    byte[] bytes = Encoding.UTF8.GetBytes(payload);
-                    request.ContentLength = bytes.Length;
-                    using (var stream = request.GetRequestStream())
+                    request.ContentType = "application/json";
+                    if (!string.IsNullOrEmpty(payload))
                     {
-                        stream.Write(bytes, 0, bytes.Length);
+                        byte[] bytes = Encoding.UTF8.GetBytes(payload);
+                        request.ContentLength = bytes.Length;
+                        using (var stream = request.GetRequestStream())
+                        {
+                            stream.Write(bytes, 0, bytes.Length);
+                        }
                     }
-                }
-                else
-                {
-                    request.ContentLength = 0;
                 }
 
                 response = (HttpWebResponse)request.GetResponse();
@@ -159,24 +199,30 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
+            LogApi(method + " " + url + " -> " + statusCode);
 
             try
             {
                 using (Stream stream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(stream ?? Stream.Null))
+                using (StreamReader reader = new StreamReader(stream ?? Stream.Null, Encoding.UTF8))
                 {
                     responseText = reader.ReadToEnd();
                 }
 
                 if (!string.IsNullOrEmpty(responseText))
                 {
-                    parsed = _serializer.DeserializeObject(responseText) as IDictionary<string, object>;
+                    string payloadText = PrepareJsonPayload(responseText);
+                    if (!string.IsNullOrEmpty(payloadText))
+                    {
+                        parsed = _serializer.DeserializeObject(payloadText) as IDictionary<string, object>;
+                    }
                 }
             }
             catch (Exception ex)
             {
                 parsed = null;
                 DiagnosticsLogger.LogException(LogCategories.Api, "Password policy response parsing failed.", ex);
+                LogApi("Password policy response sample: " + GetResponseSample(responseText));
             }
             finally
             {
@@ -187,25 +233,78 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        private static Dictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
+        private static string ResolvePolicyUrl(string rawUrl, string baseUrl)
         {
-            if (parent == null)
+            string trimmed = rawUrl == null ? string.Empty : rawUrl.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
             {
                 return null;
             }
 
-            object value;
-            if (parent.TryGetValue(key, out value))
+            try
             {
-                return value as Dictionary<string, object>;
+                Uri absoluteUri;
+                if (Uri.TryCreate(trimmed, UriKind.Absolute, out absoluteUri))
+                {
+                    return absoluteUri.ToString();
+                }
+
+                Uri baseUri;
+                if (!string.IsNullOrWhiteSpace(baseUrl) && Uri.TryCreate(baseUrl, UriKind.Absolute, out baseUri))
+                {
+                    Uri resolved = new Uri(baseUri, trimmed);
+                    return resolved.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Api, "Password policy URL normalization failed.", ex);
             }
 
             return null;
         }
 
-        private static string GetString(IDictionary<string, object> parent, string key)
+        private static string PrepareJsonPayload(string responseText)
         {
-            if (parent == null)
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                return string.Empty;
+            }
+
+            string payload = responseText.Trim().TrimStart('\uFEFF');
+            if (payload.StartsWith(")]}',", StringComparison.Ordinal))
+            {
+                int newlineIndex = payload.IndexOf('\n');
+                payload = newlineIndex >= 0 ? payload.Substring(newlineIndex + 1) : string.Empty;
+            }
+
+            if (payload.StartsWith("while(1);", StringComparison.Ordinal))
+            {
+                payload = payload.Substring("while(1);".Length);
+            }
+
+            if (payload.StartsWith("for(;;);", StringComparison.Ordinal))
+            {
+                payload = payload.Substring("for(;;);".Length);
+            }
+
+            return payload.Trim();
+        }
+
+        private static string GetResponseSample(string responseText)
+        {
+            if (string.IsNullOrEmpty(responseText))
+            {
+                return "<empty>";
+            }
+
+            string normalized = responseText.Replace("\r", " ").Replace("\n", " ").Trim();
+            return normalized.Length <= 180 ? normalized : normalized.Substring(0, 180) + "...";
+        }
+
+        private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
+        {
+            if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return null;
             }
@@ -213,17 +312,53 @@ namespace NcTalkOutlookAddIn.Services
             object value;
             if (parent.TryGetValue(key, out value) && value != null)
             {
-                if (value is string)
-                {
-                    return (string)value;
-                }
+                return value as IDictionary<string, object>;
+            }
 
-                if (value is IDictionary<string, object>)
-                {
-                    return null;
-                }
+            return null;
+        }
 
-                return Convert.ToString(value, CultureInfo.InvariantCulture);
+        private static string GetString(IDictionary<string, object> parent, string key)
+        {
+            if (parent == null || string.IsNullOrWhiteSpace(key))
+            {
+                return null;
+            }
+
+            object value;
+            if (!parent.TryGetValue(key, out value) || value == null)
+            {
+                return null;
+            }
+
+            string direct = value as string;
+            if (direct != null)
+            {
+                return direct;
+            }
+
+            if (value is IDictionary<string, object>)
+            {
+                return null;
+            }
+
+            return Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+
+        private static string GetFirstString(IDictionary<string, object> parent, params string[] keys)
+        {
+            if (parent == null || keys == null)
+            {
+                return null;
+            }
+
+            foreach (string key in keys)
+            {
+                string value = GetString(parent, key);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value.Trim();
+                }
             }
 
             return null;
@@ -231,19 +366,40 @@ namespace NcTalkOutlookAddIn.Services
 
         private static int GetInt(IDictionary<string, object> parent, string key)
         {
-            string raw = GetString(parent, key);
+            if (parent == null || string.IsNullOrWhiteSpace(key))
+            {
+                return 0;
+            }
+
+            object rawObject;
+            if (!parent.TryGetValue(key, out rawObject) || rawObject == null)
+            {
+                return 0;
+            }
+
+            string raw = Convert.ToString(rawObject, CultureInfo.InvariantCulture);
             int value;
             if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
             {
                 return value;
             }
 
-            if (parent != null)
+            return 0;
+        }
+
+        private static int GetFirstPositiveInt(IDictionary<string, object> parent, params string[] keys)
+        {
+            if (parent == null || keys == null)
             {
-                object obj;
-                if (parent.TryGetValue(key, out obj) && obj is int)
+                return 0;
+            }
+
+            foreach (string key in keys)
+            {
+                int value = GetInt(parent, key);
+                if (value > 0)
                 {
-                    return (int)obj;
+                    return value;
                 }
             }
 

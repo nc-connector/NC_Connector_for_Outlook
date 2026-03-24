@@ -65,92 +65,76 @@ namespace NcTalkOutlookAddIn.Services
             string baseUrl = _configuration.GetNormalizedBaseUrl();
             string createUrl = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room";
 
-            bool attemptEventConversation = request.RoomType == TalkRoomType.EventConversation
-                                            && request.AppointmentStart.HasValue
-                                            && request.AppointmentEnd.HasValue;
-
-            List<bool> attempts = new List<bool>();
-            if (attemptEventConversation)
+            bool includeEvent = request.RoomType == TalkRoomType.EventConversation;
+            if (includeEvent && (!request.AppointmentStart.HasValue || !request.AppointmentEnd.HasValue))
             {
-                attempts.Add(true);
+                throw new TalkServiceException("Event conversation requires appointment start/end.", false, HttpStatusCode.BadRequest, null);
             }
-            attempts.Add(false);
-
-            Exception lastError = null;
-
-            foreach (bool includeEvent in attempts)
+            try
             {
+                LogTalk("CreateRoom attempt includeEvent=" + includeEvent + " lobby=" + request.LobbyEnabled + " listable=" + request.SearchVisible + " addUsers=" + request.AddUsers + " addGuests=" + request.AddGuests);
+                IDictionary<string, object> payload = BuildCreatePayload(request, includeEvent);
+                string payloadJson = _serializer.Serialize(payload);
+
+                IDictionary<string, object> responseData;
+                HttpStatusCode statusCode;
+                string responseText = ExecuteJsonRequest("POST", createUrl, payload, out statusCode, out responseData);
+
+                if (!IsSuccessStatus(statusCode))
+                {
+                    ThrowServiceError(statusCode, responseText, responseData);
+                }
+
+                string token = ExtractRoomToken(responseData);
+                if (string.IsNullOrEmpty(token))
+                {
+                    throw new TalkServiceException("Response did not contain a room token.", false, statusCode, responseText);
+                }
+
+                string roomUrl = baseUrl + "/call/" + token;
+
+                if (request.LobbyEnabled)
+                {
+                    // Lobby updates must not abort room creation. If this fails, the room still exists and
+                    // Outlook will retry on appointment save (Write event) when the tracking subscription runs.
+                    TryUpdateLobbyInternal(token, request.AppointmentStart, baseUrl, true);
+                }
+
+                if (!includeEvent)
+                {
+                    TryUpdateListable(token, request.SearchVisible, baseUrl);
+                }
+
                 try
                 {
-                    LogTalk("CreateRoom attempt includeEvent=" + includeEvent + " lobby=" + request.LobbyEnabled + " listable=" + request.SearchVisible + " addUsers=" + request.AddUsers + " addGuests=" + request.AddGuests);
-                    IDictionary<string, object> payload = BuildCreatePayload(request, includeEvent);
-                    string payloadJson = _serializer.Serialize(payload);
-
-                    IDictionary<string, object> responseData;
-                    HttpStatusCode statusCode;
-                    string responseText = ExecuteJsonRequest("POST", createUrl, payload, out statusCode, out responseData);
-
-                    if (!IsSuccessStatus(statusCode))
-                    {
-                        if (includeEvent && ShouldFallbackToStandard(statusCode, responseData))
-                        {
-                            lastError = null;
-                            continue;
-                        }
-
-                        ThrowServiceError(statusCode, responseText, responseData);
-                    }
-
-                    string token = ExtractRoomToken(responseData);
-                    if (string.IsNullOrEmpty(token))
-                    {
-                        throw new TalkServiceException("Response did not contain a room token.", false, statusCode, responseText);
-                    }
-
-                    string roomUrl = baseUrl + "/call/" + token;
-
-                    if (request.LobbyEnabled)
-                    {
-                        // Lobby updates must not abort room creation. If this fails, the room still exists and
-                        // Outlook will retry on appointment save (Write event) when the tracking subscription runs.
-                        TryUpdateLobbyInternal(token, request.AppointmentStart, baseUrl, true);
-                    }
-
-                    if (!includeEvent)
-                    {
-                        TryUpdateListable(token, request.SearchVisible, baseUrl);
-                    }
-
                     TryUpdateDescription(token, request.Description, includeEvent, baseUrl);
-
-                    return new TalkRoomCreationResult(token, roomUrl, includeEvent, request.LobbyEnabled, request.SearchVisible);
                 }
                 catch (TalkServiceException ex)
                 {
-                    lastError = ex;
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "CreateRoom failed (includeEvent=" + includeEvent + ", status=" + (int)ex.StatusCode + ").", ex);
-                    if (includeEvent && !ex.IsAuthenticationError && ShouldFallbackToStandard(ex.StatusCode, null))
+                    if (includeEvent && IsEventConversationDescriptionLockError(ex))
                     {
-                        LogTalk("CreateRoom falling back to standard room due to status=" + (int)ex.StatusCode + ".");
-                        continue;
+                        // Event conversations may reject direct room description updates with a generic
+                        // "event" BadRequest. Keep the event conversation and continue without room-type fallback.
+                        LogTalk("CreateRoom description update skipped for event conversation: " + ex.Message);
                     }
+                    else
+                    {
+                        throw;
+                    }
+                }
 
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    lastError = ex;
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "CreateRoom failed unexpectedly (includeEvent=" + includeEvent + ").", ex);
-                    throw;
-                }
+                return new TalkRoomCreationResult(token, roomUrl, includeEvent, request.LobbyEnabled, request.SearchVisible);
             }
-
-            if (lastError != null)
+            catch (TalkServiceException ex)
             {
-                throw lastError;
+                DiagnosticsLogger.LogException(LogCategories.Talk, "CreateRoom failed (includeEvent=" + includeEvent + ", status=" + (int)ex.StatusCode + ").", ex);
+                throw;
             }
-
-            throw new TalkServiceException("Talk room could not be created.", false, HttpStatusCode.InternalServerError, null);
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "CreateRoom failed unexpectedly (includeEvent=" + includeEvent + ").", ex);
+                throw;
+            }
         }
 
         /**
@@ -438,6 +422,18 @@ namespace NcTalkOutlookAddIn.Services
             TryUpdateDescription(token, description, isEventConversation, baseUrl);
         }
 
+        internal void UpdateRoomName(string token, string roomName)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return;
+            }
+
+            EnsureConfiguration();
+            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            TryUpdateRoomName(token, roomName, baseUrl);
+        }
+
         internal bool AddUserParticipant(string token, string userId)
         {
             return AddParticipant(token, ActorTypeUsers, userId);
@@ -596,13 +592,113 @@ namespace NcTalkOutlookAddIn.Services
             return IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.NotFound;
         }
 
-        private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
+        /**
+         * Reads server-side room traits for cross-client interoperability when local
+         * appointment flags are not available yet (for example TB-created events in Outlook).
+         */
+        internal bool TryReadRoomTraits(string token, out bool? lobbyEnabled, out bool? isEventConversation)
         {
-            if (isEventConversation)
+            lobbyEnabled = null;
+            isEventConversation = null;
+
+            if (string.IsNullOrWhiteSpace(token))
             {
-                return;
+                return false;
             }
 
+            EnsureConfiguration();
+            string normalizedToken = token.Trim();
+            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            bool resolvedAny = false;
+
+            try
+            {
+                HttpStatusCode statusCode;
+                IDictionary<string, object> parsed;
+                ExecuteJsonRequest("GET",
+                                   baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(normalizedToken) + "/object",
+                                   (string)null,
+                                   out statusCode,
+                                   out parsed);
+
+                if (IsSuccessStatus(statusCode))
+                {
+                    isEventConversation = true;
+                    resolvedAny = true;
+                }
+                else if (statusCode == HttpStatusCode.NotFound ||
+                         statusCode == HttpStatusCode.Conflict)
+                {
+                    isEventConversation = false;
+                    resolvedAny = true;
+                }
+            }
+            catch (TalkServiceException ex)
+            {
+                if (ex.StatusCode == HttpStatusCode.NotFound ||
+                    ex.StatusCode == HttpStatusCode.Conflict)
+                {
+                    isEventConversation = false;
+                    resolvedAny = true;
+                }
+                else
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe event conversation flag.", ex);
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe event conversation flag.", ex);
+            }
+
+            try
+            {
+                HttpStatusCode statusCode;
+                IDictionary<string, object> parsed;
+                ExecuteJsonRequest("GET",
+                                   baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(normalizedToken) + "/webinar/lobby",
+                                   (string)null,
+                                   out statusCode,
+                                   out parsed);
+
+                if (IsSuccessStatus(statusCode))
+                {
+                    IDictionary<string, object> data = GetDictionary(GetDictionary(parsed, "ocs"), "data");
+                    int lobbyState;
+                    if (TryGetInt(data, "state", out lobbyState))
+                    {
+                        lobbyEnabled = lobbyState != 0;
+                        resolvedAny = true;
+                    }
+                }
+                else if (statusCode == HttpStatusCode.NotFound)
+                {
+                    lobbyEnabled = false;
+                    resolvedAny = true;
+                }
+            }
+            catch (TalkServiceException ex)
+            {
+                if (ex.StatusCode == HttpStatusCode.NotFound)
+                {
+                    lobbyEnabled = false;
+                    resolvedAny = true;
+                }
+                else
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe lobby flag.", ex);
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe lobby flag.", ex);
+            }
+
+            return resolvedAny;
+        }
+
+        private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
+        {
             if (description == null)
             {
                 return;
@@ -615,6 +711,30 @@ namespace NcTalkOutlookAddIn.Services
             IDictionary<string, object> parsed;
             string responseText = ExecuteJsonRequest("PUT",
                                                      baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + "/description",
+                                                     payload,
+                                                     out statusCode,
+                                                     out parsed);
+
+            if (!IsSuccessStatus(statusCode))
+            {
+                ThrowServiceError(statusCode, responseText, parsed);
+            }
+        }
+
+        private void TryUpdateRoomName(string token, string roomName, string baseUrl)
+        {
+            if (string.IsNullOrWhiteSpace(roomName))
+            {
+                return;
+            }
+
+            Dictionary<string, object> payload = new Dictionary<string, object>();
+            payload["roomName"] = roomName.Trim();
+
+            HttpStatusCode statusCode;
+            IDictionary<string, object> parsed;
+            string responseText = ExecuteJsonRequest("PUT",
+                                                     baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token),
                                                      payload,
                                                      out statusCode,
                                                      out parsed);
@@ -817,27 +937,56 @@ namespace NcTalkOutlookAddIn.Services
 
         private static int GetInt(IDictionary<string, object> parent, string key)
         {
+            int value;
+            return TryGetInt(parent, key, out value) ? value : 0;
+        }
+
+        private static bool TryGetInt(IDictionary<string, object> parent, string key, out int value)
+        {
+            value = 0;
             if (parent == null)
             {
-                return 0;
+                return false;
             }
 
-            object value;
-            if (parent.TryGetValue(key, out value) && value != null)
+            object raw;
+            if (!parent.TryGetValue(key, out raw) || raw == null)
             {
-                if (value is int)
-                {
-                    return (int)value;
-                }
-
-                int parsed;
-                if (int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
-                {
-                    return parsed;
-                }
+                return false;
             }
 
-            return 0;
+            if (raw is int)
+            {
+                value = (int)raw;
+                return true;
+            }
+
+            if (raw is long)
+            {
+                long longValue = (long)raw;
+                if (longValue < int.MinValue || longValue > int.MaxValue)
+                {
+                    return false;
+                }
+
+                value = (int)longValue;
+                return true;
+            }
+
+            if (raw is bool)
+            {
+                value = (bool)raw ? 1 : 0;
+                return true;
+            }
+
+            int parsed;
+            if (int.TryParse(Convert.ToString(raw, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
+            {
+                value = parsed;
+                return true;
+            }
+
+            return false;
         }
 
         private static string ExtractVersion(IDictionary<string, object> payload)
@@ -985,35 +1134,20 @@ namespace NcTalkOutlookAddIn.Services
             throw new TalkServiceException(builder.ToString(), authError, statusCode, responseText);
         }
 
-        private static bool ShouldFallbackToStandard(HttpStatusCode statusCode, IDictionary<string, object> responseData)
+        private static bool IsEventConversationDescriptionLockError(TalkServiceException ex)
         {
-            if (statusCode == HttpStatusCode.Conflict ||
-                statusCode == HttpStatusCode.NotImplemented ||
-                statusCode == HttpStatusCode.BadRequest ||
-                statusCode == (HttpStatusCode)422)
+            if (ex == null || ex.StatusCode != HttpStatusCode.BadRequest)
             {
-                return true;
+                return false;
             }
 
-            IDictionary<string, object> meta = GetDictionary(GetDictionary(responseData, "ocs"), "meta");
-            IDictionary<string, object> payload = GetDictionary(GetDictionary(responseData, "ocs"), "data");
-            string message = GetString(meta, "message");
-            if (string.IsNullOrEmpty(message))
+            if (string.IsNullOrWhiteSpace(ex.Message))
             {
-                message = GetString(payload, "error");
+                return false;
             }
 
-            if (!string.IsNullOrEmpty(message))
-            {
-                string normalized = message.ToLowerInvariant();
-                if (normalized.IndexOf("object", StringComparison.Ordinal) >= 0 &&
-                    normalized.IndexOf("event", StringComparison.Ordinal) >= 0)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            string normalized = ex.Message.ToLowerInvariant();
+            return normalized.IndexOf("event", StringComparison.Ordinal) >= 0;
         }
 
         private static string BuildEventObjectId(TalkRoomRequest request)
