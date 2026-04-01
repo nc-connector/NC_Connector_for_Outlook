@@ -250,6 +250,7 @@ namespace NcTalkOutlookAddIn.Services
 
             return new FileLinkResult(
                 shareData.Url,
+                shareData.Id,
                 shareData.Token,
                 request.PasswordEnabled ? request.Password : null,
                 request.ExpireEnabled ? request.ExpireDate : null,
@@ -602,22 +603,28 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
+        /**
+         * Create the public share through the documented OCS create endpoint and then update mutable metadata.
+         */
         private ShareData CreateShare(string baseUrl, string username, string relativeFolderPath, string shareName, FileLinkRequest request, CancellationToken cancellationToken)
         {
             string url = baseUrl.TrimEnd('/') + "/ocs/v2.php/apps/files_sharing/api/v1/shares";
-            var httpRequest = (HttpWebRequest)WebRequest.Create(url);
-            httpRequest.Method = "POST";
-            httpRequest.Timeout = 90000;
-            httpRequest.Accept = "application/json";
-            httpRequest.ContentType = "application/x-www-form-urlencoded";
-            httpRequest.Headers["OCS-APIRequest"] = "true";
-            httpRequest.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
+            string payload = BuildShareCreatePayload(relativeFolderPath, shareName, request);
+            ShareData shareData = ExecuteShareCreateRequest(url, payload, cancellationToken);
+            UpdateShareMetadata(baseUrl, shareData, request, cancellationToken);
+            return shareData;
+        }
 
+        /**
+         * Build the documented form-encoded create payload for OCS public-link shares.
+         */
+        private string BuildShareCreatePayload(string relativeFolderPath, string shareName, FileLinkRequest request)
+        {
             var builder = new StringBuilder();
             builder.Append("path=").Append(Uri.EscapeDataString("/" + relativeFolderPath));
             builder.Append("&shareType=").Append(ShareTypePublicLink.ToString(CultureInfo.InvariantCulture));
-            builder.Append("&name=").Append(Uri.EscapeDataString(shareName));
             builder.Append("&permissions=").Append(CalculatePermissionValue(request.Permissions).ToString(CultureInfo.InvariantCulture));
+
             if (request.PasswordEnabled && !string.IsNullOrEmpty(request.Password))
             {
                 builder.Append("&password=").Append(Uri.EscapeDataString(request.Password));
@@ -626,12 +633,57 @@ namespace NcTalkOutlookAddIn.Services
             {
                 builder.Append("&expireDate=").Append(Uri.EscapeDataString(request.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
             }
-            if (request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
+            if (!string.IsNullOrWhiteSpace(shareName))
             {
-                builder.Append("&note=").Append(Uri.EscapeDataString(request.Note));
+                builder.Append("&label=").Append(Uri.EscapeDataString(shareName));
+            }
+            if ((request.Permissions & FileLinkPermissionFlags.Create) == FileLinkPermissionFlags.Create)
+            {
+                builder.Append("&publicUpload=true");
             }
 
-            byte[] payload = Encoding.UTF8.GetBytes(builder.ToString());
+            return builder.ToString();
+        }
+
+        /**
+         * Update mutable share metadata through the documented OCS update endpoint.
+         */
+        private void UpdateShareMetadata(string baseUrl, ShareData shareData, FileLinkRequest request, CancellationToken cancellationToken)
+        {
+            if (shareData == null || string.IsNullOrWhiteSpace(shareData.Id))
+            {
+                return;
+            }
+
+            string url = baseUrl.TrimEnd('/') + "/ocs/v2.php/apps/files_sharing/api/v1/shares/" + Uri.EscapeDataString(shareData.Id);
+            var payload = new StringBuilder();
+            payload.Append("permissions=").Append(Uri.EscapeDataString(CalculatePermissionValue(request.Permissions).ToString(CultureInfo.InvariantCulture)));
+            payload.Append("&publicUpload=").Append((request.Permissions & FileLinkPermissionFlags.Create) == FileLinkPermissionFlags.Create ? "true" : "false");
+            payload.Append("&note=").Append(Uri.EscapeDataString(request.NoteEnabled ? (request.Note ?? string.Empty) : string.Empty));
+            payload.Append("&attributes=").Append(Uri.EscapeDataString("[]"));
+            if (request.ExpireEnabled && request.ExpireDate.HasValue)
+            {
+                payload.Append("&expireDate=").Append(Uri.EscapeDataString(request.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+            }
+            if (request.PasswordEnabled && !string.IsNullOrEmpty(request.Password))
+            {
+                payload.Append("&password=").Append(Uri.EscapeDataString(request.Password));
+            }
+
+            ExecuteShareMetadataUpdateRequest(url, payload.ToString(), cancellationToken);
+        }
+
+        private ShareData ExecuteShareCreateRequest(string url, string formPayload, CancellationToken cancellationToken)
+        {
+            var httpRequest = (HttpWebRequest)WebRequest.Create(url);
+            httpRequest.Method = "POST";
+            httpRequest.Timeout = 90000;
+            httpRequest.Accept = "application/json";
+            httpRequest.ContentType = "application/x-www-form-urlencoded";
+            httpRequest.Headers["OCS-APIRequest"] = "true";
+            httpRequest.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
+
+            byte[] payload = Encoding.UTF8.GetBytes(formPayload ?? string.Empty);
             using (Stream requestStream = httpRequest.GetRequestStream())
             {
                 requestStream.Write(payload, 0, payload.Length);
@@ -640,16 +692,91 @@ namespace NcTalkOutlookAddIn.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             LogApi("POST " + url);
-            using (var response = (HttpWebResponse)httpRequest.GetResponse())
-            using (var reader = new StreamReader(response.GetResponseStream() ?? Stream.Null))
+            try
             {
-                LogApi("POST " + url + " -> " + response.StatusCode);
-                var parsed = _serializer.Deserialize(reader.ReadToEnd());
-                return new ShareData
+                using (var response = (HttpWebResponse)httpRequest.GetResponse())
+                using (var reader = new StreamReader(response.GetResponseStream() ?? Stream.Null))
                 {
-                    Url = parsed.Url,
-                    Token = parsed.Token
-                };
+                    LogApi("POST " + url + " -> " + response.StatusCode);
+                    string content = reader.ReadToEnd();
+                    var parsed = _serializer.Deserialize(content);
+                    return new ShareData
+                    {
+                        Url = parsed.Url,
+                        Id = parsed.Id,
+                        Token = parsed.Token
+                    };
+                }
+            }
+            catch (WebException ex)
+            {
+                var response = ex.Response as HttpWebResponse;
+                if (response != null)
+                {
+                    string responseBody = ReadResponseBody(response);
+                    string serverMessage = _serializer.TryExtractOcsErrorMessage(responseBody);
+                    string detail = string.IsNullOrWhiteSpace(serverMessage) ? ex.Message : serverMessage;
+                    bool authError = response.StatusCode == HttpStatusCode.Unauthorized
+                                     || response.StatusCode == HttpStatusCode.Forbidden;
+
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Api,
+                        "Share create failed (" + url + ", status=" + (int)response.StatusCode + ", detail=" + detail + ").",
+                        ex);
+                    throw new TalkServiceException("Share creation failed: " + detail, authError, response.StatusCode, responseBody);
+                }
+
+                DiagnosticsLogger.LogException(LogCategories.Api, "Share create failed (" + url + ").", ex);
+                throw new TalkServiceException("Share creation failed: " + ex.Message, false, 0, null);
+            }
+        }
+
+        private void ExecuteShareMetadataUpdateRequest(string url, string formPayload, CancellationToken cancellationToken)
+        {
+            var httpRequest = (HttpWebRequest)WebRequest.Create(url);
+            httpRequest.Method = "PUT";
+            httpRequest.Timeout = 90000;
+            httpRequest.Accept = "application/json";
+            httpRequest.ContentType = "application/x-www-form-urlencoded";
+            httpRequest.Headers["OCS-APIRequest"] = "true";
+            httpRequest.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
+
+            byte[] payload = Encoding.UTF8.GetBytes(formPayload ?? string.Empty);
+            using (Stream requestStream = httpRequest.GetRequestStream())
+            {
+                requestStream.Write(payload, 0, payload.Length);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            LogApi("PUT " + url);
+            try
+            {
+                using (var response = (HttpWebResponse)httpRequest.GetResponse())
+                {
+                    LogApi("PUT " + url + " -> " + response.StatusCode);
+                }
+            }
+            catch (WebException ex)
+            {
+                var response = ex.Response as HttpWebResponse;
+                if (response != null)
+                {
+                    string responseBody = ReadResponseBody(response);
+                    string serverMessage = _serializer.TryExtractOcsErrorMessage(responseBody);
+                    string detail = string.IsNullOrWhiteSpace(serverMessage) ? ex.Message : serverMessage;
+                    bool authError = response.StatusCode == HttpStatusCode.Unauthorized
+                                     || response.StatusCode == HttpStatusCode.Forbidden;
+
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Api,
+                        "Share metadata update failed (" + url + ", status=" + (int)response.StatusCode + ", detail=" + detail + ").",
+                        ex);
+                    throw new TalkServiceException("Share metadata update failed: " + detail, authError, response.StatusCode, responseBody);
+                }
+
+                DiagnosticsLogger.LogException(LogCategories.Api, "Share metadata update failed (" + url + ").", ex);
+                throw new TalkServiceException("Share metadata update failed: " + ex.Message, false, 0, null);
             }
         }
 
@@ -663,6 +790,27 @@ namespace NcTalkOutlookAddIn.Services
                 baseUrl.TrimEnd('/'),
                 Uri.EscapeDataString(username ?? string.Empty),
                 encoded);
+        }
+
+        private static string ReadResponseBody(HttpWebResponse response)
+        {
+            if (response == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                using (var stream = response.GetResponseStream())
+                using (var reader = new StreamReader(stream ?? Stream.Null))
+                {
+                    return reader.ReadToEnd();
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         internal static string NormalizeRelativePath(string path)
@@ -853,6 +1001,8 @@ namespace NcTalkOutlookAddIn.Services
 
         private sealed class ShareData
         {
+            internal string Id { get; set; }
+
             internal string Url { get; set; }
 
             internal string Token { get; set; }
@@ -872,9 +1022,43 @@ namespace NcTalkOutlookAddIn.Services
                 var data = GetDictionary(ocs, "data");
                 return new ShareData
                 {
+                    Id = GetString(data, "id"),
                     Url = GetString(data, "url"),
                     Token = GetString(data, "token")
                 };
+            }
+
+            internal string TryExtractOcsErrorMessage(string content)
+            {
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    return null;
+                }
+
+                try
+                {
+                    var decoded = DeserializeObject(content) as IDictionary<string, object>;
+                    if (decoded == null)
+                    {
+                        return null;
+                    }
+
+                    var ocs = GetDictionary(decoded, "ocs");
+                    var meta = GetDictionary(ocs, "meta");
+                    string message = GetString(meta, "message");
+                    if (!string.IsNullOrWhiteSpace(message))
+                    {
+                        return message;
+                    }
+
+                    var data = GetDictionary(ocs, "data");
+                    message = GetString(data, "error");
+                    return string.IsNullOrWhiteSpace(message) ? null : message;
+                }
+                catch
+                {
+                    return null;
+                }
             }
 
             private static IDictionary<string, object> GetDictionary(IDictionary<string, object> json, string key)

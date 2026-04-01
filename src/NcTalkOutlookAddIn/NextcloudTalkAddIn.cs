@@ -17,6 +17,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using System.Windows.Forms;
 using Extensibility;
 using Microsoft.Office.Core;
@@ -45,10 +46,7 @@ namespace NcTalkOutlookAddIn
         private readonly Dictionary<string, AppointmentSubscription> _activeSubscriptions = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByToken = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private FreeBusyManager _freeBusyManager;
-        private bool _itemLoadHooked;
         private Outlook.Inspectors _inspectors;
-        private Outlook.Explorers _explorers;
-        private readonly List<ExplorerSubscription> _explorerSubscriptions = new List<ExplorerSubscription>();
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByEntryId = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private readonly List<MailComposeSubscription> _mailComposeSubscriptions = new List<MailComposeSubscription>();
         private readonly object _mailComposeSyncRoot = new object();
@@ -56,9 +54,9 @@ namespace NcTalkOutlookAddIn
         private readonly HashSet<string> _pendingAppointmentEnsureKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _pendingAppointmentEnsureSyncRoot = new object();
         private DateTime _lastDeferredAppointmentEnsureRestrictionLogUtc = DateTime.MinValue;
+        private DateTime _lastDeferredAppointmentEnsureUnstableIdentityLogUtc = DateTime.MinValue;
         private int _deferredAppointmentEnsureRestrictionSuppressedCount;
         private SynchronizationContext _uiSynchronizationContext;
-        private bool _initialScanPerformed;
         private const int ComposeAttachmentEvalDebounceMs = 250;
         private const int ComposeShareCleanupSendGraceMs = 15000;
 
@@ -88,6 +86,8 @@ namespace NcTalkOutlookAddIn
         private const string IcalDelegateReady = "X-NCTALK-DELEGATE-READY";
         private const string BodySectionHeader = "Nextcloud Talk";
         private const string TalkHelpUrlMarker = "join_a_call_or_chat_as_guest.html";
+        private const string HtmlTalkBlockStartMarker = "<!-- NC4OL_TALK_BLOCK_START -->";
+        private const string HtmlTalkBlockEndMarker = "<!-- NC4OL_TALK_BLOCK_END -->";
         private const int PropertyVersionValue = 1;
         private static readonly Regex TalkUrlTokenRegex = new Regex(@"https?://[^\s""'<>]+/call/(?<token>[A-Za-z0-9_-]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -165,9 +165,7 @@ namespace NcTalkOutlookAddIn
             }
             _freeBusyManager = new FreeBusyManager(_settingsStorage.DataDirectory);
             _freeBusyManager.Initialize(_outlookApplication);
-            EnsureItemLoadHook();
             EnsureInspectorHook();
-            EnsureExplorerHook();
             ApplyIfbSettings();
         }
 
@@ -251,9 +249,7 @@ namespace NcTalkOutlookAddIn
          */
         public void OnDisconnection(ext_DisconnectMode removeMode, ref Array custom)
         {
-            UnhookItemLoad();
             UnhookInspector();
-            UnhookExplorer();
             UnhookMailComposeSubscriptions();
             if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
             {
@@ -301,9 +297,7 @@ namespace NcTalkOutlookAddIn
          */
         public void OnBeginShutdown(ref Array custom)
         {
-            UnhookItemLoad();
             UnhookInspector();
-            UnhookExplorer();
             UnhookMailComposeSubscriptions();
             if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
             {
@@ -466,6 +460,7 @@ namespace NcTalkOutlookAddIn
             LogTalk("Talk link started (subject='" + subject + "', start=" + start.ToString("o") + ", end=" + end.ToString("o") + ").");
 
             var configuration = new TalkServiceConfiguration(_currentSettings.ServerUrl, _currentSettings.Username, _currentSettings.AppPassword);
+            BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "talk_wizard_open");
             PasswordPolicyInfo passwordPolicy = null;
             try
             {
@@ -519,6 +514,7 @@ namespace NcTalkOutlookAddIn
                 _currentSettings ?? new AddinSettings(),
                 configuration,
                 passwordPolicy,
+                policyStatus,
                 userDirectory,
                 talkWizardAddressbookStatus,
                 subject,
@@ -531,6 +527,12 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
+                string descriptionLanguage = ResolveTalkDescriptionLanguage(
+                    policyStatus,
+                    _currentSettings != null ? _currentSettings.EventDescriptionLang : "default");
+                string descriptionType = ResolveTalkEventDescriptionType(policyStatus);
+                string invitationTemplate = ResolveTalkInvitationTemplate(policyStatus);
+
                 var request = new TalkRoomRequest
                 {
                     Title = dialog.TalkTitle,
@@ -540,7 +542,13 @@ namespace NcTalkOutlookAddIn
                     RoomType = dialog.SelectedRoomType,
                     AppointmentStart = start,
                     AppointmentEnd = end,
-                    Description = BuildInitialRoomDescription(dialog.TalkPassword, _currentSettings != null ? _currentSettings.EventDescriptionLang : "default"),
+                    DescriptionLanguage = descriptionLanguage,
+                    DescriptionType = descriptionType,
+                    InvitationTemplate = invitationTemplate,
+                    Description = BuildInitialRoomDescription(
+                        dialog.TalkPassword,
+                        descriptionLanguage,
+                        invitationTemplate),
                     AddUsers = dialog.AddUsers,
                     AddGuests = dialog.AddGuests,
                     DelegateModeratorId = dialog.DelegateModeratorId,
@@ -622,8 +630,12 @@ namespace NcTalkOutlookAddIn
         {
             EnsureSettingsLoaded();
             LogSettings("Settings dialog opened.");
-
-            using (var form = new SettingsForm(_currentSettings, _outlookApplication))
+            var configuration = new TalkServiceConfiguration(
+                _currentSettings != null ? _currentSettings.ServerUrl : string.Empty,
+                _currentSettings != null ? _currentSettings.Username : string.Empty,
+                _currentSettings != null ? _currentSettings.AppPassword : string.Empty);
+            BackendPolicyStatus initialPolicyStatus = FetchBackendPolicyStatus(configuration, "settings_open_initial");
+            using (var form = new SettingsForm(_currentSettings, _outlookApplication, initialPolicyStatus))
             {
                 if (form.ShowDialog() == DialogResult.OK)
                 {
@@ -703,6 +715,7 @@ namespace NcTalkOutlookAddIn
                 _currentSettings.ServerUrl,
                 _currentSettings.Username,
                 _currentSettings.AppPassword);
+            BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "sharing_wizard_open");
 
             string basePath = string.IsNullOrWhiteSpace(_currentSettings.FileLinkBasePath)
                 ? "90 Freigaben - extern"
@@ -719,7 +732,7 @@ namespace NcTalkOutlookAddIn
                 passwordPolicy = null;
             }
 
-            using (var wizard = new FileLinkWizardForm(_currentSettings ?? new AddinSettings(), configuration, passwordPolicy, basePath, launchOptions))
+            using (var wizard = new FileLinkWizardForm(_currentSettings ?? new AddinSettings(), configuration, passwordPolicy, policyStatus, basePath, launchOptions))
             {
                 if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
                 {
@@ -732,15 +745,14 @@ namespace NcTalkOutlookAddIn
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
 
-                    string html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride);
+                    string html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
 
                     if (composeSubscription != null
                         && wizard.RequestSnapshot != null
-                        && AddinSettings.SeparatePasswordFeatureEnabled
                         && wizard.RequestSnapshot.PasswordSeparateEnabled
                         && !string.IsNullOrWhiteSpace(wizard.Result.Password))
                     {
-                        string passwordOnlyHtml = FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride);
+                        string passwordOnlyHtml = FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
                         composeSubscription.RegisterSeparatePasswordDispatch(
                             wizard.Result,
                             wizard.RequestSnapshot,
@@ -1733,6 +1745,12 @@ namespace NcTalkOutlookAddIn
                 return;
             }
 
+            if (TryInsertHtmlIntoMailBody(mail, html))
+            {
+                LogCore("Inserted HTML block into mail (HTMLBody primary).");
+                return;
+            }
+
             IDataObject previousClipboard = null;
             bool restoreClipboard = false;
 
@@ -1776,6 +1794,16 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
+            LogCore("Failed to insert HTML into mail: all insertion paths exhausted.");
+            MessageBox.Show(
+                string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, "all insertion paths exhausted"),
+                Strings.DialogTitle,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+
+        private bool TryInsertHtmlIntoMailBody(Outlook.MailItem mail, string html)
+        {
             try
             {
                 string existing = mail.HTMLBody ?? string.Empty;
@@ -1798,16 +1826,12 @@ namespace NcTalkOutlookAddIn
                     mail.HTMLBody = insertHtml + existing;
                 }
 
-                LogCore("Inserted HTML block into mail (HTMLBody fallback).");
+                return true;
             }
             catch (Exception ex)
             {
-                LogCore("Failed to insert HTML via HTMLBody fallback: " + ex.Message);
-                MessageBox.Show(
-                    string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                LogCore("Failed to insert HTML via HTMLBody path: " + ex.Message);
+                return false;
             }
         }
 
@@ -1906,6 +1930,154 @@ namespace NcTalkOutlookAddIn
                     catch (Exception ex)
                     {
                         DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Word application COM object.", ex);
+                    }
+                }
+            }
+        }
+
+        private static string ReadAppointmentHtmlBody(Outlook.AppointmentItem appointment)
+        {
+            Outlook.Inspector inspector = null;
+            object htmlEditor = null;
+            object body = null;
+
+            try
+            {
+                inspector = appointment != null ? appointment.GetInspector : null;
+                if (inspector == null)
+                {
+                    return string.Empty;
+                }
+
+                htmlEditor = inspector.HTMLEditor;
+                if (htmlEditor == null)
+                {
+                    return string.Empty;
+                }
+
+                body = htmlEditor.GetType().InvokeMember("body", BindingFlags.GetProperty, null, htmlEditor, null);
+                if (body == null)
+                {
+                    return string.Empty;
+                }
+
+                object innerHtml = body.GetType().InvokeMember("innerHTML", BindingFlags.GetProperty, null, body, null);
+                return innerHtml != null ? Convert.ToString(innerHtml, CultureInfo.InvariantCulture) ?? string.Empty : string.Empty;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment HTML body.", ex);
+                return string.Empty;
+            }
+            finally
+            {
+                if (body != null && Marshal.IsComObject(body))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(body);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML body COM object.", ex);
+                    }
+                }
+
+                if (htmlEditor != null && Marshal.IsComObject(htmlEditor))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(htmlEditor);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML editor COM object.", ex);
+                    }
+                }
+
+                if (inspector != null && Marshal.IsComObject(inspector))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(inspector);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment Inspector COM object.", ex);
+                    }
+                }
+            }
+        }
+
+        private static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
+        {
+            Outlook.Inspector inspector = null;
+            object htmlEditor = null;
+            object body = null;
+
+            try
+            {
+                inspector = appointment != null ? appointment.GetInspector : null;
+                if (inspector == null)
+                {
+                    return false;
+                }
+
+                htmlEditor = inspector.HTMLEditor;
+                if (htmlEditor == null)
+                {
+                    return false;
+                }
+
+                body = htmlEditor.GetType().InvokeMember("body", BindingFlags.GetProperty, null, htmlEditor, null);
+                if (body == null)
+                {
+                    return false;
+                }
+
+                body.GetType().InvokeMember("innerHTML", BindingFlags.SetProperty, null, body, new object[] { html ?? string.Empty });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to write appointment HTML body.", ex);
+                return false;
+            }
+            finally
+            {
+                if (body != null && Marshal.IsComObject(body))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(body);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML body COM object.", ex);
+                    }
+                }
+
+                if (htmlEditor != null && Marshal.IsComObject(htmlEditor))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(htmlEditor);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML editor COM object.", ex);
+                    }
+                }
+
+                if (inspector != null && Marshal.IsComObject(inspector))
+                {
+                    try
+                    {
+                        Marshal.ReleaseComObject(inspector);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment Inspector COM object.", ex);
                     }
                 }
             }
@@ -2045,6 +2217,92 @@ namespace NcTalkOutlookAddIn
                 _currentSettings.AppPassword));
         }
 
+        private BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
+        {
+            try
+            {
+                var service = new BackendPolicyService(configuration);
+                BackendPolicyStatus status = service.FetchStatus();
+                LogCore(
+                    "Backend policy status fetched (trigger=" + (trigger ?? "n/a")
+                    + ", active=" + (status != null && status.PolicyActive)
+                    + ", warningVisible=" + (status != null && status.WarningVisible)
+                    + ", mode=" + (status != null ? status.Mode : "local")
+                    + ", reason=" + (status != null ? status.Reason : "n/a")
+                    + ").");
+                return status;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Backend policy status fetch failed (trigger=" + (trigger ?? "n/a") + ").", ex);
+                return null;
+            }
+        }
+
+        private static string ResolveTalkDescriptionLanguage(BackendPolicyStatus policyStatus, string fallbackLanguageOverride)
+        {
+            if (policyStatus != null && policyStatus.PolicyActive)
+            {
+                string policyLanguageRaw = policyStatus.GetPolicyString("talk", "language_talk_description");
+                if (!string.IsNullOrWhiteSpace(policyLanguageRaw))
+                {
+                    return NormalizeTalkDescriptionLanguage(policyLanguageRaw);
+                }
+            }
+
+            return NormalizeTalkDescriptionLanguage(fallbackLanguageOverride);
+        }
+
+        private static string ResolveTalkInvitationTemplate(BackendPolicyStatus policyStatus)
+        {
+            if (policyStatus == null || !policyStatus.PolicyActive)
+            {
+                return string.Empty;
+            }
+
+            return policyStatus.GetPolicyString("talk", "talk_invitation_template");
+        }
+
+        private static string ResolveTalkEventDescriptionType(BackendPolicyStatus policyStatus)
+        {
+            if (policyStatus != null && policyStatus.PolicyActive)
+            {
+                string policyTypeRaw = policyStatus.GetPolicyString("talk", "event_description_type");
+                if (!string.IsNullOrWhiteSpace(policyTypeRaw))
+                {
+                    return NormalizeTalkEventDescriptionType(policyTypeRaw);
+                }
+            }
+
+            return "plain_text";
+        }
+
+        /**
+         * Normalize Talk description language while preserving the explicit "custom" mode.
+         */
+        private static string NormalizeTalkDescriptionLanguage(string languageOverride)
+        {
+            if (string.IsNullOrWhiteSpace(languageOverride))
+            {
+                return "default";
+            }
+
+            string trimmed = languageOverride.Trim();
+            if (string.Equals(trimmed, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "custom";
+            }
+
+            return Strings.NormalizeLanguageOverride(trimmed);
+        }
+
+        private static string NormalizeTalkEventDescriptionType(string descriptionType)
+        {
+            return string.Equals(descriptionType, "html", StringComparison.OrdinalIgnoreCase)
+                ? "html"
+                : "plain_text";
+        }
+
         private void ApplyRoomToAppointment(Outlook.AppointmentItem appointment, TalkRoomRequest request, TalkRoomCreationResult result)
         {
             if (appointment == null || result == null)
@@ -2059,7 +2317,36 @@ namespace NcTalkOutlookAddIn
             }
 
             appointment.Location = result.RoomUrl;
-            appointment.Body = UpdateBodyWithTalkBlock(appointment.Body, result.RoomUrl, request.Password, _currentSettings != null ? _currentSettings.EventDescriptionLang : "default");
+            string normalizedDescriptionType = NormalizeTalkEventDescriptionType(request.DescriptionType);
+            if (string.Equals(normalizedDescriptionType, "html", StringComparison.OrdinalIgnoreCase))
+            {
+                string updatedHtmlBody = UpdateHtmlBodyWithTalkBlock(
+                    ReadAppointmentHtmlBody(appointment),
+                    appointment.Body,
+                    result.RoomUrl,
+                    request.Password,
+                    request.DescriptionLanguage,
+                    request.InvitationTemplate);
+                if (!TryWriteAppointmentHtmlBody(appointment, updatedHtmlBody))
+                {
+                    LogTalk("Appointment HTML editor unavailable, falling back to plain-text Talk block insertion.");
+                    appointment.Body = UpdateBodyWithTalkBlock(
+                        appointment.Body,
+                        result.RoomUrl,
+                        request.Password,
+                        request.DescriptionLanguage,
+                        request.InvitationTemplate);
+                }
+            }
+            else
+            {
+                appointment.Body = UpdateBodyWithTalkBlock(
+                    appointment.Body,
+                    result.RoomUrl,
+                    request.Password,
+                    request.DescriptionLanguage,
+                    request.InvitationTemplate);
+            }
 
             SetUserProperty(appointment, PropertyToken, Outlook.OlUserPropertyType.olText, result.RoomToken);
             var storedRoomType = result.CreatedAsEventConversation ? TalkRoomType.EventConversation : TalkRoomType.StandardRoom;
@@ -2137,38 +2424,14 @@ namespace NcTalkOutlookAddIn
             TryUpdateRoomDescription(appointment, result.RoomToken, result.CreatedAsEventConversation);
         }
 
-        private static string UpdateBodyWithTalkBlock(string existingBody, string roomUrl, string password, string languageOverride)
+        private static string UpdateBodyWithTalkBlock(string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
         {
             string body = RemoveExistingTalkBlock(existingBody ?? string.Empty);
-
-            string joinLabel = Strings.GetInLanguage(languageOverride, "ui_description_join_label", "Join the meeting now:");
-            string passwordLineFormat = Strings.GetInLanguage(languageOverride, "ui_description_password_line", "Password: {0}");
-            string helpLabel = Strings.GetInLanguage(languageOverride, "ui_description_help_label", "Need help?");
-            string helpUrl = Strings.GetInLanguage(
-                languageOverride,
-                "ui_description_help_url",
-                "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
-
-            var lines = new List<string>
+            string block = BuildTalkBodyBlock(roomUrl, password, languageOverride, invitationTemplate);
+            if (string.IsNullOrWhiteSpace(block))
             {
-                BodySectionHeader,
-                string.Empty,
-                joinLabel,
-                roomUrl ?? string.Empty,
-                string.Empty
-            };
-
-            if (!string.IsNullOrWhiteSpace(password))
-            {
-                lines.Add(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim()));
-                lines.Add(string.Empty);
+                return body.TrimEnd('\r', '\n');
             }
-
-            lines.Add(helpLabel);
-            lines.Add(string.Empty);
-            lines.Add(helpUrl);
-
-            string block = string.Join("\r\n", lines).TrimEnd('\r', '\n');
 
             if (string.IsNullOrWhiteSpace(body))
             {
@@ -2176,6 +2439,25 @@ namespace NcTalkOutlookAddIn
             }
 
             return body.TrimEnd('\r', '\n') + "\r\n\r\n" + block;
+        }
+
+        private static string UpdateHtmlBodyWithTalkBlock(string existingHtmlBody, string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
+        {
+            string html = PrepareHtmlBody(existingHtmlBody, existingBody);
+            html = RemoveExistingTalkBlockHtml(html);
+
+            string block = BuildTalkBodyBlockHtml(roomUrl, password, languageOverride, invitationTemplate);
+            if (string.IsNullOrWhiteSpace(block))
+            {
+                return string.IsNullOrWhiteSpace(html) ? string.Empty : html.Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return block;
+            }
+
+            return html.TrimEnd() + Environment.NewLine + block;
         }
 
         private static string RemoveExistingTalkBlock(string body)
@@ -2200,7 +2482,7 @@ namespace NcTalkOutlookAddIn
 
             while (index < lines.Count)
             {
-                if (!string.Equals((lines[index] ?? string.Empty).Trim(), BodySectionHeader, StringComparison.OrdinalIgnoreCase))
+                if (!IsTalkBlockHeaderLine(lines[index]))
                 {
                     index++;
                     continue;
@@ -2238,13 +2520,183 @@ namespace NcTalkOutlookAddIn
             return string.Join("\r\n", lines).Trim('\r', '\n');
         }
 
+        private static string RemoveExistingTalkBlockHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return string.Empty;
+            }
+
+            string updated = html;
+            int startIndex = updated.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase);
+            while (startIndex >= 0)
+            {
+                int endIndex = updated.IndexOf(HtmlTalkBlockEndMarker, startIndex, StringComparison.OrdinalIgnoreCase);
+                if (endIndex < 0)
+                {
+                    break;
+                }
+
+                endIndex += HtmlTalkBlockEndMarker.Length;
+                updated = updated.Remove(startIndex, endIndex - startIndex);
+                startIndex = updated.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return updated.Trim();
+        }
+
+        private static string PrepareHtmlBody(string existingHtmlBody, string existingBody)
+        {
+            string html = string.IsNullOrWhiteSpace(existingHtmlBody) ? string.Empty : existingHtmlBody;
+            string body = string.IsNullOrWhiteSpace(existingBody) ? string.Empty : existingBody;
+            if (!string.IsNullOrWhiteSpace(html) && html.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return html;
+            }
+
+            string cleanedBody = RemoveExistingTalkBlock(body);
+            bool bodyHadLegacyBlock = !string.Equals(cleanedBody, body, StringComparison.Ordinal);
+            if (bodyHadLegacyBlock || string.IsNullOrWhiteSpace(html))
+            {
+                return ConvertPlainTextToHtml(cleanedBody);
+            }
+
+            return html;
+        }
+
+        /**
+         * Build the text block inserted into the Outlook appointment body.
+         * Backend custom templates are converted to plain text so the same policy
+         * payload can be reused for room descriptions and Outlook's plain-text body.
+         */
+        private static string BuildTalkBodyBlock(string roomUrl, string password, string languageOverride, string invitationTemplate)
+        {
+            string normalizedLanguage = NormalizeTalkDescriptionLanguage(languageOverride);
+            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(invitationTemplate))
+            {
+                return RenderTalkInvitationTemplate(invitationTemplate, roomUrl, password);
+            }
+
+            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedLanguage = "default";
+            }
+
+            string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
+            string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
+            string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
+            string helpUrl = Strings.GetInLanguage(
+                normalizedLanguage,
+                "ui_description_help_url",
+                "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
+
+            var lines = new List<string>
+            {
+                BodySectionHeader,
+                string.Empty,
+                joinLabel,
+                roomUrl ?? string.Empty,
+                string.Empty
+            };
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                lines.Add(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim()));
+                lines.Add(string.Empty);
+            }
+
+            lines.Add(helpLabel);
+            lines.Add(string.Empty);
+            lines.Add(helpUrl);
+            return string.Join("\r\n", lines).TrimEnd('\r', '\n');
+        }
+
+        /**
+         * Build the HTML block inserted into the Outlook appointment body when the
+         * backend explicitly requests HTML event descriptions.
+         */
+        private static string BuildTalkBodyBlockHtml(string roomUrl, string password, string languageOverride, string invitationTemplate)
+        {
+            string normalizedLanguage = NormalizeTalkDescriptionLanguage(languageOverride);
+            string innerHtml;
+
+            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(invitationTemplate))
+            {
+                innerHtml = RenderTalkInvitationTemplateHtml(invitationTemplate, roomUrl, password);
+            }
+            else
+            {
+                if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedLanguage = "default";
+                }
+
+                string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
+                string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
+                string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
+                string helpUrl = Strings.GetInLanguage(
+                    normalizedLanguage,
+                    "ui_description_help_url",
+                    "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
+
+                var html = new StringBuilder();
+                html.Append("<div>");
+                html.Append("<p><strong>").Append(HttpUtility.HtmlEncode(BodySectionHeader)).Append("</strong></p>");
+                html.Append("<p>")
+                    .Append(HttpUtility.HtmlEncode(joinLabel))
+                    .Append("<br><a href=\"")
+                    .Append(HttpUtility.HtmlAttributeEncode(roomUrl ?? string.Empty))
+                    .Append("\">")
+                    .Append(HttpUtility.HtmlEncode(roomUrl ?? string.Empty))
+                    .Append("</a></p>");
+
+                if (!string.IsNullOrWhiteSpace(password))
+                {
+                    html.Append("<p>")
+                        .Append(HttpUtility.HtmlEncode(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim())))
+                        .Append("</p>");
+                }
+
+                html.Append("<p>")
+                    .Append(HttpUtility.HtmlEncode(helpLabel))
+                    .Append("<br><a href=\"")
+                    .Append(HttpUtility.HtmlAttributeEncode(helpUrl))
+                    .Append("\">")
+                    .Append(HttpUtility.HtmlEncode(helpUrl))
+                    .Append("</a></p>");
+                html.Append("</div>");
+                innerHtml = html.ToString();
+            }
+
+            if (string.IsNullOrWhiteSpace(innerHtml))
+            {
+                return string.Empty;
+            }
+
+            return HtmlTalkBlockStartMarker
+                + "<div data-nc4ol-talk-block=\"true\" style=\"margin-top:16px;\">"
+                + innerHtml.Trim()
+                + "</div>"
+                + HtmlTalkBlockEndMarker;
+        }
+
+        private static bool IsTalkBlockHeaderLine(string line)
+        {
+            string normalized = NormalizeTalkBlockLine(line);
+            return string.Equals(normalized, BodySectionHeader, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static int FindTalkBlockEnd(List<string> lines, int headerIndex)
         {
             int maxIndex = Math.Min(lines.Count - 1, headerIndex + 40);
             for (int i = headerIndex; i <= maxIndex; i++)
             {
-                string line = lines[i] ?? string.Empty;
-                if (line.IndexOf(TalkHelpUrlMarker, StringComparison.OrdinalIgnoreCase) >= 0)
+                string rawLine = lines[i] ?? string.Empty;
+                string normalized = NormalizeTalkBlockLine(rawLine);
+                if (rawLine.IndexOf(TalkHelpUrlMarker, StringComparison.OrdinalIgnoreCase) >= 0
+                    || normalized.IndexOf(TalkHelpUrlMarker, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return i;
                 }
@@ -2253,15 +2705,138 @@ namespace NcTalkOutlookAddIn
             return -1;
         }
 
-        private static string BuildInitialRoomDescription(string password, string languageOverride)
+        private static string BuildInitialRoomDescription(string password, string languageOverride, string invitationTemplate)
         {
+            string normalizedLanguage = NormalizeTalkDescriptionLanguage(languageOverride);
+            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(invitationTemplate))
+            {
+                return RenderTalkInvitationTemplate(invitationTemplate, string.Empty, password);
+            }
+
             if (string.IsNullOrWhiteSpace(password))
             {
                 return string.Empty;
             }
 
-            string passwordLineFormat = Strings.GetInLanguage(languageOverride, "ui_description_password_line", "Password: {0}");
+            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedLanguage = "default";
+            }
+
+            string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
             return string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim());
+        }
+
+        private static string RenderTalkInvitationTemplate(string template, string meetingUrl, string password)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                return string.Empty;
+            }
+
+            string rendered = template
+                .Replace("{MEETING_URL}", meetingUrl ?? string.Empty)
+                .Replace("{PASSWORD}", password ?? string.Empty);
+            return ConvertHtmlTemplateToPlainText(rendered);
+        }
+
+        private static string RenderTalkInvitationTemplateHtml(string template, string meetingUrl, string password)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                return string.Empty;
+            }
+
+            return template
+                .Replace("{MEETING_URL}", HttpUtility.HtmlEncode(meetingUrl ?? string.Empty))
+                .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty))
+                .Trim();
+        }
+
+        private static string NormalizeTalkBlockLine(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return string.Empty;
+            }
+
+            string normalized = Regex.Replace(line, "<[^>]+>", string.Empty);
+            normalized = HttpUtility.HtmlDecode(normalized) ?? string.Empty;
+            normalized = normalized.Replace('\u00A0', ' ');
+            return normalized.Trim();
+        }
+
+        /**
+         * Outlook appointment bodies are plain text. Convert backend HTML/text
+         * templates into a stable plain-text block before inserting them.
+         */
+        private static string ConvertHtmlTemplateToPlainText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            string text = value.Replace("\r\n", "\n").Replace('\r', '\n');
+            text = Regex.Replace(text, @"<\s*br\s*/?\s*>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"<\s*/\s*(p|div|li|tr|table|h[1-6])\s*>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"<\s*(p|div|li|tr|table|h[1-6])[^>]*>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, "<[^>]+>", string.Empty, RegexOptions.IgnoreCase);
+            text = HttpUtility.HtmlDecode(text) ?? string.Empty;
+            text = text.Replace('\u00A0', ' ');
+
+            var lines = new List<string>();
+            bool lastBlank = false;
+            foreach (string rawLine in text.Split('\n'))
+            {
+                string line = (rawLine ?? string.Empty).Trim();
+                if (line.Length == 0)
+                {
+                    if (!lastBlank && lines.Count > 0)
+                    {
+                        lines.Add(string.Empty);
+                    }
+                    lastBlank = true;
+                    continue;
+                }
+
+                lines.Add(line);
+                lastBlank = false;
+            }
+
+            return string.Join("\r\n", lines).Trim();
+        }
+
+        private static string ConvertPlainTextToHtml(string value)
+        {
+            string normalized = (value ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
+            }
+
+            string[] paragraphs = Regex.Split(normalized, @"\n{2,}");
+            var html = new StringBuilder();
+            for (int i = 0; i < paragraphs.Length; i++)
+            {
+                string paragraph = (paragraphs[i] ?? string.Empty).Trim();
+                if (paragraph.Length == 0)
+                {
+                    continue;
+                }
+
+                if (html.Length > 0)
+                {
+                    html.Append(Environment.NewLine);
+                }
+
+                html.Append("<p>")
+                    .Append(HttpUtility.HtmlEncode(paragraph).Replace("\n", "<br>"))
+                    .Append("</p>");
+            }
+
+            return html.ToString();
         }
 
         private static string BuildDescriptionPayload(Outlook.AppointmentItem appointment)
@@ -2272,6 +2847,14 @@ namespace NcTalkOutlookAddIn
             }
 
             string body = appointment.Body ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                string htmlBody = ReadAppointmentHtmlBody(appointment);
+                if (!string.IsNullOrWhiteSpace(htmlBody))
+                {
+                    body = ConvertHtmlTemplateToPlainText(htmlBody);
+                }
+            }
             return body.Trim();
         }
 
@@ -2389,9 +2972,14 @@ namespace NcTalkOutlookAddIn
 
         private static string TryGetGlobalAppointmentIdForDeferredKey(Outlook.AppointmentItem appointment)
         {
+            if (appointment == null)
+            {
+                return null;
+            }
+
             try
             {
-                return appointment != null ? appointment.GlobalAppointmentID : null;
+                return appointment.GlobalAppointmentID;
             }
             catch
             {
@@ -2762,36 +3350,6 @@ namespace NcTalkOutlookAddIn
             string normalized = ex.Message.Trim();
             return string.Equals(normalized, "event", StringComparison.OrdinalIgnoreCase) ||
                    normalized.IndexOf("event conversation", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static bool IsMissingOrForbiddenRoomMutationError(TalkServiceException ex)
-        {
-            if (ex == null)
-            {
-                return false;
-            }
-
-            return ex.StatusCode == HttpStatusCode.NotFound ||
-                   ex.StatusCode == HttpStatusCode.Forbidden;
-        }
-
-        private static string GetNormalizedRoomName(Outlook.AppointmentItem appointment)
-        {
-            if (appointment == null)
-            {
-                return string.Empty;
-            }
-
-            try
-            {
-                string subject = appointment.Subject;
-                return string.IsNullOrWhiteSpace(subject) ? string.Empty : subject.Trim();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment subject for room name sync.", ex);
-                return string.Empty;
-            }
         }
 
         private void TryHydrateMissingRoomTraitsFromServer(
@@ -3498,6 +4056,36 @@ namespace NcTalkOutlookAddIn
             return false;
         }
 
+        private static bool IsMissingOrForbiddenRoomMutationError(TalkServiceException ex)
+        {
+            if (ex == null)
+            {
+                return false;
+            }
+
+            return ex.StatusCode == HttpStatusCode.NotFound ||
+                   ex.StatusCode == HttpStatusCode.Forbidden;
+        }
+
+        private static string GetNormalizedRoomName(Outlook.AppointmentItem appointment)
+        {
+            if (appointment == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                string subject = appointment.Subject;
+                return string.IsNullOrWhiteSpace(subject) ? string.Empty : subject.Trim();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment subject for room name sync.", ex);
+                return string.Empty;
+            }
+        }
+
         private bool TryUpdateLobby(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
         {
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
@@ -3863,7 +4451,7 @@ namespace NcTalkOutlookAddIn
                 _cleanupEntries.Add(new ComposeShareCleanupEntry
                 {
                     RelativeFolder = relativeFolder,
-                    ShareId = result.ShareToken ?? string.Empty,
+                    ShareId = result.ShareId ?? string.Empty,
                     ShareLabel = result.FolderName ?? string.Empty,
                     CreatedUtc = DateTime.UtcNow
                 });
@@ -3874,7 +4462,7 @@ namespace NcTalkOutlookAddIn
                     + ", relativeFolder="
                     + relativeFolder
                     + ", shareId="
-                    + (result.ShareToken ?? string.Empty)
+                    + (result.ShareId ?? string.Empty)
                     + ", shareLabel="
                     + (result.FolderName ?? string.Empty)
                     + ", armedCount="
@@ -4169,6 +4757,39 @@ namespace NcTalkOutlookAddIn
                 int thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(settings.SharingAttachmentsOfferAboveMb);
                 bool alwaysConnector = settings.SharingAttachmentsAlwaysConnector;
                 bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;
+
+                if (_owner._currentSettings != null)
+                {
+                    var configuration = new TalkServiceConfiguration(
+                        _owner._currentSettings.ServerUrl,
+                        _owner._currentSettings.Username,
+                        _owner._currentSettings.AppPassword);
+                    BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate");
+                    if (policyStatus != null && policyStatus.PolicyActive)
+                    {
+                        bool policyBool;
+                        int policyInt;
+
+                        if (policyStatus.IsLocked("share", "attachments_always_via_ncconnector")
+                            && policyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
+                        {
+                            alwaysConnector = policyBool;
+                        }
+
+                        if (policyStatus.IsLocked("share", "attachments_min_size_mb"))
+                        {
+                            if (policyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
+                            {
+                                thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
+                                offerAboveEnabled = true;
+                            }
+                            else if (policyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
+                            {
+                                offerAboveEnabled = false;
+                            }
+                        }
+                    }
+                }
 
                 return new AttachmentAutomationSettings
                 {
@@ -5333,8 +5954,11 @@ namespace NcTalkOutlookAddIn
             private bool _unsavedCloseCleanupPending;
             private int _unsavedCloseCleanupAttempts;
             private System.Windows.Forms.Timer _unsavedCloseCleanupTimer;
+            private System.Windows.Forms.Timer _deferredWriteLobbyTimer;
+            private int _deferredWriteLobbyAttempts;
             private string _entryId;
             private const int UnsavedCloseCleanupMaxAttempts = 90;
+            private const int DeferredWriteLobbyMaxAttempts = 4;
 
             internal AppointmentSubscription(
                 NextcloudTalkAddIn owner,
@@ -5448,6 +6072,8 @@ namespace NcTalkOutlookAddIn
                             lobbySynced = false;
                         }
                     }
+
+                    ScheduleDeferredWriteLobbyVerification();
                 }
 
                 LogTalk("Updating room description during OnWrite (token=" + _roomToken + ").");
@@ -5542,6 +6168,114 @@ namespace NcTalkOutlookAddIn
                 LogTalk("OnClose unsaved cleanup scheduled (token=" + _roomToken + ").");
             }
 
+            private void ScheduleDeferredWriteLobbyVerification()
+            {
+                if (_disposed || _roomDeleted || _appointment == null)
+                {
+                    return;
+                }
+
+                _deferredWriteLobbyAttempts = 0;
+                if (_deferredWriteLobbyTimer == null)
+                {
+                    _deferredWriteLobbyTimer = new System.Windows.Forms.Timer();
+                    _deferredWriteLobbyTimer.Interval = 750;
+                    _deferredWriteLobbyTimer.Tick += OnDeferredWriteLobbyTick;
+                }
+
+                _deferredWriteLobbyTimer.Stop();
+                _deferredWriteLobbyTimer.Start();
+                LogTalk("Deferred post-write lobby verification scheduled (token=" + _roomToken + ").");
+            }
+
+            private void OnDeferredWriteLobbyTick(object sender, EventArgs e)
+            {
+                if (_disposed || _roomDeleted || _appointment == null)
+                {
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                    return;
+                }
+
+                _deferredWriteLobbyAttempts++;
+
+                if (!_owner.IsOrganizer(_appointment))
+                {
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                    LogTalk("Deferred post-write lobby verification skipped (not organizer, token=" + _roomToken + ").");
+                    return;
+                }
+
+                string delegateId;
+                if (_owner.IsDelegatedToOtherUser(_appointment, out delegateId))
+                {
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                    LogTalk("Deferred post-write lobby verification skipped (delegation=" + delegateId + ", token=" + _roomToken + ").");
+                    return;
+                }
+
+                bool effectiveLobbyKnown;
+                bool effectiveLobbyEnabled;
+                bool effectiveIsEventConversation;
+                _owner.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
+                bool shouldAttemptLobbyUpdate = effectiveLobbyEnabled || !effectiveLobbyKnown;
+                if (!shouldAttemptLobbyUpdate)
+                {
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                    return;
+                }
+
+                long currentStartEpoch;
+                if (!_owner.TryStampIcalStartEpoch(_appointment, _roomToken, out currentStartEpoch))
+                {
+                    if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
+                    {
+                        _deferredWriteLobbyAttempts = 0;
+                        StopDeferredWriteLobbyTimer();
+                        LogTalk("Deferred post-write lobby verification stopped after missing X-NCTALK-START (token=" + _roomToken + ").");
+                    }
+
+                    return;
+                }
+
+                if (_lastLobbyTimer.HasValue && currentStartEpoch == _lastLobbyTimer.Value)
+                {
+                    if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
+                    {
+                        _deferredWriteLobbyAttempts = 0;
+                        StopDeferredWriteLobbyTimer();
+                        LogTalk("Deferred post-write lobby verification completed without detected start change (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
+                    }
+
+                    return;
+                }
+
+                LogTalk("Deferred post-write lobby verification applying update (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
+                if (_owner.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
+                {
+                    _lastLobbyTimer = currentStartEpoch;
+                    if (!effectiveLobbyKnown)
+                    {
+                        _owner.PersistLobbyTraits(_appointment, _roomToken, true);
+                    }
+
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                    LogTalk("Deferred post-write lobby verification successful (token=" + _roomToken + ").");
+                    return;
+                }
+
+                if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
+                {
+                    _deferredWriteLobbyAttempts = 0;
+                    StopDeferredWriteLobbyTimer();
+                    LogTalk("Deferred post-write lobby verification failed after retries (token=" + _roomToken + ").");
+                }
+            }
+
             private void OnUnsavedCloseCleanupTick(object sender, EventArgs e)
             {
                 if (_disposed || _roomDeleted || _appointment == null)
@@ -5628,6 +6362,19 @@ namespace NcTalkOutlookAddIn
                 _unsavedCloseCleanupTimer.Tick -= OnUnsavedCloseCleanupTick;
                 _unsavedCloseCleanupTimer.Dispose();
                 _unsavedCloseCleanupTimer = null;
+            }
+
+            private void StopDeferredWriteLobbyTimer()
+            {
+                if (_deferredWriteLobbyTimer == null)
+                {
+                    return;
+                }
+
+                _deferredWriteLobbyTimer.Stop();
+                _deferredWriteLobbyTimer.Tick -= OnDeferredWriteLobbyTick;
+                _deferredWriteLobbyTimer.Dispose();
+                _deferredWriteLobbyTimer = null;
             }
 
             private bool IsAppointmentOpenInAnyInspector(Outlook.AppointmentItem appointment)
@@ -5795,6 +6542,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 StopUnsavedCloseCleanupTimer();
+                StopDeferredWriteLobbyTimer();
 
                 _owner.UnregisterSubscription(_key, _roomToken, _entryId);
                 _disposed = true;
@@ -5852,125 +6600,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private sealed class ExplorerSubscription : IDisposable
-        {
-            private readonly NextcloudTalkAddIn _owner;
-            private readonly Outlook.Explorer _explorer;
-            private readonly Outlook.ExplorerEvents_10_Event _events;
-            private bool _disposed;
-
-            internal ExplorerSubscription(NextcloudTalkAddIn owner, Outlook.Explorer explorer)
-            {
-                _owner = owner;
-                _explorer = explorer;
-                _events = explorer as Outlook.ExplorerEvents_10_Event;
-                if (_events != null)
-                {
-                    _events.SelectionChange += OnSelectionChange;
-                    _events.Close += OnClose;
-                }
-            }
-
-            internal bool IsFor(Outlook.Explorer explorer)
-            {
-                return explorer != null && explorer == _explorer;
-            }
-
-            private void OnSelectionChange()
-            {
-                if (_disposed || _explorer == null)
-                {
-                    return;
-                }
-
-                Outlook.Selection selection = null;
-                try
-                {
-                    selection = _explorer.Selection;
-                    if (selection == null)
-                    {
-                        return;
-                    }
-
-                    int count = selection.Count;
-                    for (int index = 1; index <= count; index++)
-                    {
-                        try
-                        {
-                            var appointment = selection[index] as Outlook.AppointmentItem;
-                            if (appointment != null)
-                            {
-                                _owner.EnsureSubscriptionForAppointment(appointment);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to process explorer selection item.", ex);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to handle explorer selection change.", ex);
-                }
-                finally
-                {
-                    if (selection != null && Marshal.IsComObject(selection))
-                    {
-                        try
-                        {
-                            Marshal.ReleaseComObject(selection);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Selection COM object.", ex);
-                        }
-                    }
-                }
-            }
-
-            private void OnClose()
-            {
-                Dispose();
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                if (_events != null)
-                {
-                    try
-                    {
-                        _events.SelectionChange -= OnSelectionChange;
-                        _events.Close -= OnClose;
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to detach explorer event handlers.", ex);
-                    }
-                }
-
-                if (_explorer != null && Marshal.IsComObject(_explorer))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(_explorer);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Explorer COM object.", ex);
-                    }
-                }
-
-                _owner.RemoveExplorerSubscription(this);
-                _disposed = true;
-            }
-        }
-
         private void EnsureSettingsLoaded()
         {
             if (_currentSettings == null)
@@ -5984,10 +6613,7 @@ namespace NcTalkOutlookAddIn
                 {
                     _currentSettings = new AddinSettings();
                 }
-                EnsureItemLoadHook();
                 EnsureInspectorHook();
-                EnsureExplorerHook();
-                EnsureExistingAppointmentsSubscribed();
             }
         }
 
@@ -6071,239 +6697,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void EnsureExplorerHook()
-        {
-            if (_outlookApplication == null)
-            {
-                return;
-            }
-
-            if (_explorers == null)
-            {
-                try
-                {
-                    _explorers = _outlookApplication.Explorers;
-                    if (_explorers != null)
-                    {
-                        _explorers.NewExplorer += OnNewExplorer;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook Explorers.NewExplorer.", ex);
-                    _explorers = null;
-                }
-            }
-
-            try
-            {
-                HookExplorer(_outlookApplication.ActiveExplorer());
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook current ActiveExplorer.", ex);
-            }
-        }
-
-        private void UnhookExplorer()
-        {
-            foreach (var subscription in _explorerSubscriptions.ToArray())
-            {
-                subscription.Dispose();
-            }
-
-            _explorerSubscriptions.Clear();
-
-            if (_explorers != null)
-            {
-                try
-                {
-                    _explorers.NewExplorer -= OnNewExplorer;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Explorers.NewExplorer.", ex);
-                }
-                finally
-                {
-                    try
-                    {
-                        Marshal.FinalReleaseComObject(_explorers);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Explorers COM object.", ex);
-                    }
-                    _explorers = null;
-                }
-            }
-        }
-
-        private void EnsureExistingAppointmentsSubscribed()
-        {
-            if (_outlookApplication == null || _initialScanPerformed)
-            {
-                return;
-            }
-
-            Outlook.MAPIFolder calendar = null;
-            Outlook.Items items = null;
-
-            try
-            {
-                var session = _outlookApplication.Session;
-                if (session == null)
-                {
-                    return;
-                }
-
-                try
-                {
-                    calendar = session.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderCalendar);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access default calendar folder.", ex);
-                    calendar = null;
-                }
-
-                if (calendar == null)
-                {
-                    return;
-                }
-
-                try
-                {
-                    items = calendar.Items;
-                    if (items == null)
-                    {
-                        return;
-                    }
-
-                    items.IncludeRecurrences = true;
-                    object raw = items.GetFirst();
-                    while (raw != null)
-                    {
-                        object current = raw;
-                        try
-                        {
-                            var appointment = current as Outlook.AppointmentItem;
-                            if (appointment != null)
-                            {
-                                EnsureSubscriptionForAppointment(appointment);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to inspect calendar item during initial scan.", ex);
-                        }
-                        finally
-                        {
-                            if (current != null && Marshal.IsComObject(current))
-                            {
-                                try
-                                {
-                                    Marshal.ReleaseComObject(current);
-                                }
-                                catch (Exception ex)
-                                {
-                                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release calendar item COM object.", ex);
-                                }
-                            }
-                        }
-
-                        raw = items.GetNext();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed while scanning calendar items for existing subscriptions.", ex);
-                }
-            }
-            finally
-            {
-                if (items != null)
-                {
-                    try
-                    {
-                        Marshal.FinalReleaseComObject(items);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Items COM object.", ex);
-                    }
-                }
-
-                if (calendar != null)
-                {
-                    try
-                    {
-                        Marshal.FinalReleaseComObject(calendar);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Calendar folder COM object.", ex);
-                    }
-                }
-
-                _initialScanPerformed = true;
-            }
-        }
-
-        private void EnsureItemLoadHook()
-        {
-            if (_outlookApplication == null || _itemLoadHooked)
-            {
-                return;
-            }
-
-            try
-            {
-                _outlookApplication.ItemLoad += OnApplicationItemLoad;
-                _itemLoadHooked = true;
-            }
-            catch (Exception ex)
-            {
-                _itemLoadHooked = false;
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook Outlook Application.ItemLoad.", ex);
-            }
-        }
-
-        private void UnhookItemLoad()
-        {
-            if (_outlookApplication == null || !_itemLoadHooked)
-            {
-                return;
-            }
-
-            try
-            {
-                _outlookApplication.ItemLoad -= OnApplicationItemLoad;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Outlook Application.ItemLoad.", ex);
-            }
-            finally
-            {
-                _itemLoadHooked = false;
-            }
-        }
-
-        private void OnApplicationItemLoad(object item)
-        {
-            if (item == null)
-            {
-                return;
-            }
-
-            var appointment = item as Outlook.AppointmentItem;
-            if (appointment != null)
-            {
-                EnsureSubscriptionForAppointment(appointment);
-            }
-        }
-
         private void OnNewInspector(Outlook.Inspector inspector)
         {
             if (inspector == null)
@@ -6329,23 +6722,6 @@ namespace NcTalkOutlookAddIn
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to process NewInspector event.", ex);
-            }
-        }
-
-        private void OnNewExplorer(Outlook.Explorer explorer)
-        {
-            if (explorer == null)
-            {
-                return;
-            }
-
-            try
-            {
-                HookExplorer(explorer);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to process NewExplorer event.", ex);
             }
         }
 
@@ -6469,10 +6845,25 @@ namespace NcTalkOutlookAddIn
 
             if (ensureKey.StartsWith("obj:", StringComparison.Ordinal))
             {
-                LogDeferredAppointmentEnsureRestriction(
-                    "Deferred appointment subscription ensure suppressed: unstable appointment identity during Outlook event restriction (hresult=0x" +
-                    triggerException.ErrorCode.ToString("X8", CultureInfo.InvariantCulture) +
-                    ").");
+                bool shouldEmitIdentityRestriction;
+                lock (_pendingAppointmentEnsureSyncRoot)
+                {
+                    DateTime nowUtc = DateTime.UtcNow;
+                    shouldEmitIdentityRestriction = _lastDeferredAppointmentEnsureUnstableIdentityLogUtc == DateTime.MinValue ||
+                        (nowUtc - _lastDeferredAppointmentEnsureUnstableIdentityLogUtc).TotalSeconds >= 60;
+                    if (shouldEmitIdentityRestriction)
+                    {
+                        _lastDeferredAppointmentEnsureUnstableIdentityLogUtc = nowUtc;
+                    }
+                }
+
+                if (shouldEmitIdentityRestriction)
+                {
+                    LogDeferredAppointmentEnsureRestriction(
+                        "Deferred appointment subscription ensure suppressed: unstable appointment identity during Outlook event restriction (hresult=0x" +
+                        triggerException.ErrorCode.ToString("X8", CultureInfo.InvariantCulture) +
+                        ").");
+                }
                 return false;
             }
 
@@ -6521,33 +6912,5 @@ namespace NcTalkOutlookAddIn
             return (ex.ErrorCode & 0xFFFF) == 0x0108;
         }
 
-        private void HookExplorer(Outlook.Explorer explorer)
-        {
-            if (explorer == null)
-            {
-                return;
-            }
-
-            foreach (var existing in _explorerSubscriptions)
-            {
-                if (existing.IsFor(explorer))
-                {
-                    return;
-                }
-            }
-
-            var subscription = new ExplorerSubscription(this, explorer);
-            _explorerSubscriptions.Add(subscription);
-        }
-
-        private void RemoveExplorerSubscription(ExplorerSubscription subscription)
-        {
-            if (subscription == null)
-            {
-                return;
-            }
-
-            _explorerSubscriptions.Remove(subscription);
-        }
     }
 }

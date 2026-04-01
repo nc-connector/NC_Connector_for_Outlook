@@ -14,12 +14,6 @@
   "ui_button_apply": {
     "message": "Apply"
   },
-  "ui_button_apply_progress": {
-    "message": "Applying..."
-  },
-  "ui_button_create_progress": {
-    "message": "Creating..."
-  },
   "ui_button_clear": {
     "message": "Clear"
   },
@@ -215,12 +209,6 @@
   "ui_alert_location_missing": {
     "message": "(Note: Location field was not filled automatically.)"
   },
-  "ui_alert_event_fallback": {
-    "message": "Note: Server does not support event conversations. A group conversation was created."
-  },
-  "ui_alert_generic_fallback": {
-    "message": "(Note: A fallback link without API support was created.)"
-  },
   "ui_alert_reason": {
     "message": "Reason: $1"
   },
@@ -235,15 +223,6 @@
   },
   "ui_alert_delegation_removed": {
     "message": "You were removed from the conversation."
-  },
-  "ui_alert_password_protected": {
-    "message": "Note: This conversation is password protected."
-  },
-  "ui_prompt_base_url": {
-    "message": "Nextcloud base URL (e.g. https://cloud.example.com):"
-  },
-  "ui_prompt_title": {
-    "message": "Title for new public conversation:"
   },
   "ui_default_title": {
     "message": "Meeting"
@@ -630,7 +609,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Why more than a file-link add-in?\nNC Connector covers not only file links, but the complete team workflow in the mail client.\n\nTechnical foundation\n- Thunderbird and Outlook add-ins usable directly, also without Nextcloud backend\n- Optional Nextcloud backend for central seat assignment and policies\n- Seat model in backend: Community with 1 free seat, Pro from 5 seats (1 seat = 1 Nextcloud user)\n\n- File sharing with password, expiration date, and optional separate password delivery\n- Create and update Talk meetings directly from calendar appointments\n- Attachment automation with clear rules instead of manual single steps\n- Central seat assignment in the Nextcloud backend (1 seat = 1 Nextcloud user)"
+    "message": "More than file links\n\nNC Connector combines secure file sharing, Talk meetings, and attachment automation directly in Thunderbird and Outlook. This keeps important team workflows where they belong: in the mail and calendar client.\n\nWhat NC Connector covers\n- File sharing with password, expiration date, and optional separate password delivery\n- Create and update Talk meetings directly from calendar appointments\n- Attachment automation with clear rules instead of manual individual steps\n- Consistent sharing and invitation blocks directly in the familiar workflow\n\nOptional with Nextcloud backend\n- Central Seat assignment and policy management\n- Custom templates and designs for shares and Talk invitations\n- Separate password delivery and central control for organizations\n- 1 Seat = 1 Nextcloud user\n\nWithout backend, the add-ins remain directly usable. With backend, central control for teams and organizations is added."
   },
   "options_about_more_info_label": {
     "message": "More information -->"
@@ -983,14 +962,8 @@
   "sharing_prompt_rename_duplicate": {
     "message": "The file \"$1\" already exists in the queue. Please enter a new name."
   },
-  "sharing_prompt_rename_existing": {
-    "message": "The file \"$1\" already exists on the server. Please enter a new name."
-  },
   "sharing_message_rename_cancelled": {
     "message": "Upload cancelled because no replacement name was provided."
-  },
-  "sharing_password_policy_error": {
-    "message": "Password must contain at least 10 characters, including upper- & lowercase letters and a special character."
   },
   "sharing_html_intro_line": {
     "message": "I would like to share files securely and protect your privacy. Click the link below to download your files."
@@ -1293,16 +1266,16 @@
     "message": "Send password in separate email"
   },
   "sharing_password_separate_tooltip_line1": {
-    "message": "This option is disabled in this release."
+    "message": "The main share block does not include an inline password."
   },
   "sharing_password_separate_tooltip_line2": {
-    "message": "Password delivery in a separate email will be available in a future Pro release."
+    "message": "The password is sent in a follow-up email to the same recipients."
   },
   "sharing_password_separate_tooltip_line3": {
-    "message": "For now, the password is included in the main share block."
+    "message": "If auto-send fails, a manual fallback draft is opened."
   },
   "sharing_password_separate_tooltip_title": {
-    "message": "Coming soon (Pro feature)"
+    "message": "✉️ Send password separately"
   },
   "talk_option_moderator_title": {
     "message": "👑 Moderator delegation"
@@ -1324,5 +1297,35 @@
   },
   "talk_system_addressbook_admin_link_label": {
     "message": "Setup guide"
+  },
+  "policy_warning_no_seat": {
+    "message": "No NC Connector seat is assigned to your account. Local settings are used. Please contact your Nextcloud administrator."
+  },
+  "policy_admin_controlled_tooltip": {
+    "message": "Admin controlled"
+  },
+  "policy_warning_admin_link_label": {
+    "message": "Open admin setup guide"
+  },
+  "policy_warning_title": {
+    "message": "Backend policy is currently unavailable."
+  },
+  "policy_warning_license_invalid": {
+    "message": "Your NC Connector license or seat is currently not valid. Local settings are used. Please contact your Nextcloud administrator."
+  },
+  "policy_warning_seat_state_format": {
+    "message": "Your NC Connector seat is currently in state \"$1\". Local settings are used. Please contact your Nextcloud administrator."
+  },
+  "options_lang_custom": {
+    "message": "Custom (backend template)"
+  },
+  "sharing_password_separate_backend_required_tooltip": {
+    "message": "This feature requires the Nextcloud backend."
+  },
+  "sharing_password_separate_no_seat_tooltip": {
+    "message": "Your administrator must assign an NC Connector seat to your account for this feature."
+  },
+  "sharing_password_separate_paused_tooltip": {
+    "message": "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator."
   }
 }

@@ -14,12 +14,6 @@
   "ui_button_apply": {
     "message": "Alkalmaz"
   },
-  "ui_button_apply_progress": {
-    "message": "Alkalmazás..."
-  },
-  "ui_button_create_progress": {
-    "message": "Létrehozás..."
-  },
   "ui_button_clear": {
     "message": "Kiürítés"
   },
@@ -215,12 +209,6 @@
   "ui_alert_location_missing": {
     "message": "(Megjegyzés: a Hely mező nem lett automatikusan kitöltve.)"
   },
-  "ui_alert_event_fallback": {
-    "message": "Megjegyzés: a szerver nem támogatja az eseménybeszélgetéseket. Csoportbeszélgetés jött létre."
-  },
-  "ui_alert_generic_fallback": {
-    "message": "(Megjegyzés: API-támogatás nélküli tartalék hivatkozás készült.)"
-  },
   "ui_alert_reason": {
     "message": "Ok: $1"
   },
@@ -235,15 +223,6 @@
   },
   "ui_alert_delegation_removed": {
     "message": "Önt eltávolították a beszélgetésből."
-  },
-  "ui_alert_password_protected": {
-    "message": "Megjegyzés: ez a beszélgetés jelszóval védett."
-  },
-  "ui_prompt_base_url": {
-    "message": "Nextcloud alap URL (pl. https://cloud.example.com):"
-  },
-  "ui_prompt_title": {
-    "message": "Az új nyilvános beszélgetés címe:"
   },
   "ui_default_title": {
     "message": "Megbeszélés"
@@ -630,7 +609,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Miert tobb, mint egy fajllink-bovitmeny?\nAz NC Connector nem csak a fajlhivatkozasokat fedi le, hanem a teljes csapatmunkafolyamatot a levelezo kliensben.\n\nTechnikai alap\n- Thunderbird- es Outlook-bovitmenyek kozvetlenul hasznalhatok, Nextcloud backend nelkul is\n- Opcionális Nextcloud backend a kozponti seat-kiosztashoz es szabalyzatokhoz\n- Seat modell a backendben: Community 1 ingyenes seattel, Pro 5 seattol (1 seat = 1 Nextcloud-felhasznalo)\n\n- Fajlmegosztas jelszoval, lejarati datummal es opcionalis kulon jelszokezbesitessel\n- Talk megbeszelesek letrehozasa es frissitese kozvetlenul naptarbejegyzesekbol\n- Melleklet-automatizalas egyertelmu szabalyokkal a kezi lepesek helyett\n- Kozponti seat-kiosztas a Nextcloud backendben (1 seat = 1 Nextcloud-felhasznalo)"
+    "message": "Több mint fájllinkek\n\nAz NC Connector a biztonságos fájlmegosztást, a Talk megbeszéléseket és a mellékletautomatizálást közvetlenül a Thunderbirdhöz és az Outlookhoz kapcsolja. Így a fontos csapatmunkafolyamatok ott maradnak, ahová valók: a levelező- és naptárkliensben.\n\nMit fed le az NC Connector\n- Fájlmegosztás jelszóval, lejárati dátummal és opcionális külön jelszóküldéssel\n- Talk megbeszélések létrehozása és frissítése közvetlenül a naptárbejegyzésekből\n- Mellékletautomatizálás világos szabályokkal a kézi egyedi lépések helyett\n- Egységes megosztási és meghívóblokkok közvetlenül a megszokott munkafolyamatban\n\nOpcionálisan Nextcloud backenddel\n- Központi Seat-kiosztás és szabályzatkezelés\n- Saját sablonok és megjelenések a megosztásokhoz és a Talk meghívókhoz\n- Külön jelszóküldés és központi vezérlés szervezetek számára\n- 1 Seat = 1 Nextcloud felhasználó\n\nBackend nélkül a bővítmények közvetlenül használhatók maradnak. Backenddel központi vezérlés érhető el csapatok és szervezetek számára."
   },
   "options_about_more_info_label": {
     "message": "Tovabbi informaciok -->"
@@ -983,14 +962,8 @@
   "sharing_prompt_rename_duplicate": {
     "message": "A(z) \"$1\" fájl már szerepel a várólistán. Kérjük, adjon meg új nevet."
   },
-  "sharing_prompt_rename_existing": {
-    "message": "A(z) \"$1\" fájl már létezik a szerveren. Kérjük, adjon meg új nevet."
-  },
   "sharing_message_rename_cancelled": {
     "message": "A feltöltés megszakadt, mert nem adott meg új nevet."
-  },
-  "sharing_password_policy_error": {
-    "message": "A jelszónak legalább 10 karakterből kell állnia, nagy- és kisbetűkkel, valamint egy speciális karakterrel."
   },
   "sharing_html_intro_line": {
     "message": "Szeretnék fájlokat biztonságosan megosztani, és megóvni az Ön magánszféráját. Kattintson az alábbi hivatkozásra a fájlok letöltéséhez."
@@ -1293,16 +1266,16 @@
     "message": "Jelszó küldése külön e-mailben"
   },
   "sharing_password_separate_tooltip_line1": {
-    "message": "Ez az opció le van tiltva ebben a kiadásban."
+    "message": "A fő megosztási blokk nem tartalmaz beépített jelszót."
   },
   "sharing_password_separate_tooltip_line2": {
-    "message": "A jelszó külön e-mailben történő kézbesítése egy jövőbeli Pro kiadásban lesz elérhető."
+    "message": "A jelszót utólagos e-mailben küldjük el ugyanazoknak a címzetteknek."
   },
   "sharing_password_separate_tooltip_line3": {
-    "message": "A jelszó egyelőre a fő megosztási blokkban található."
+    "message": "Ha az automatikus küldés sikertelen, kézi tartalék piszkozat nyílik meg."
   },
   "sharing_password_separate_tooltip_title": {
-    "message": "Hamarosan (Pro funkció)"
+    "message": "✉️ Küldje el a jelszót külön"
   },
   "talk_option_moderator_title": {
     "message": "👑 Moderátor delegáció"
@@ -1324,5 +1297,35 @@
   },
   "talk_system_addressbook_admin_link_label": {
     "message": "Beállítási útmutató"
+  },
+  "policy_warning_no_seat": {
+    "message": "Nincs NC Connector seat hozzárendelve a fiókjához. A helyi beállítások lesznek használva. Kérjük, forduljon a Nextcloud rendszergazdájához."
+  },
+  "policy_admin_controlled_tooltip": {
+    "message": "Rendszergazda által vezérelt"
+  },
+  "policy_warning_admin_link_label": {
+    "message": "Adminisztrátori beállítási útmutató megnyitása"
+  },
+  "policy_warning_title": {
+    "message": "A háttérszabályzat jelenleg nem érhető el."
+  },
+  "policy_warning_license_invalid": {
+    "message": "Az NC Connector licence vagy a seat-hozzárendelés jelenleg nem érvényes. A helyi beállítások lesznek használva. Kérjük, forduljon a Nextcloud rendszergazdájához."
+  },
+  "policy_warning_seat_state_format": {
+    "message": "Az NC Connector seat jelenleg \"$1\" állapotban van. A helyi beállítások lesznek használva. Kérjük, forduljon a Nextcloud rendszergazdájához."
+  },
+  "options_lang_custom": {
+    "message": "Egyeni (backend sablon)"
+  },
+  "sharing_password_separate_backend_required_tooltip": {
+    "message": "Ehhez a funkcióhoz a Nextcloud backend szükséges."
+  },
+  "sharing_password_separate_no_seat_tooltip": {
+    "message": "A rendszergazdának ehhez a funkcióhoz NC Connector seatet kell hozzárendelnie a fiókjához."
+  },
+  "sharing_password_separate_paused_tooltip": {
+    "message": "Az Ön NC Connector seatje jelenleg szünetel. Kérjük, forduljon a Nextcloud rendszergazdájához."
   }
 }

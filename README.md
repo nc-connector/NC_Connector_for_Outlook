@@ -17,10 +17,12 @@ Open an appointment, choose Nextcloud Talk, configure the room, and select a mod
 The compose button “Insert Nextcloud share” starts the sharing wizard with upload queue, password generator, expiration date, note field, attachment automation, and optional separate password follow-up mail. The finished share is inserted as formatted HTML directly into the email.
 - **Enterprise-grade security**  
 Lobby until start time, moderator delegation, automatic cleanup of discarded appointments, mandatory passwords, and expiration policies help protect sensitive meetings and files.
+- **Central backend policies (optional)**  
+If the optional NC Connector backend is installed, Talk and Sharing defaults can be controlled centrally. On wizard open and in Settings, the add-in checks the backend status, applies valid seat policies, and locks admin-controlled options while still showing their effective values.
 - **Internet Free/Busy Gateway (IFB)**  
 A local HTTP listener answers Outlook free/busy requests directly from Nextcloud. The installer configures registry values for search path and read URL. If the direct fetch returns HTTP 404, the add-in falls back to a scheduling POST so availability data is still provided.
 - **Debug logging at the press of a button**  
-Enable it in the Debug tab. Writes structured logs (authentication, appointment and filelink flows, IFB) to `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. The path is displayed in the UI.
+Enable it in the Debug tab. Writes structured logs (authentication, appointment and filelink flows, IFB) to `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. Runtime exceptions are still written there even when the debug switch is off. The path is displayed in the UI.
 
 ## Changelog
 
@@ -57,12 +59,21 @@ See [`CHANGELOG.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/bl
   - recipient permission is always read-only
   - HTML output uses ZIP download URL `/s/<token>/download` and hides the permissions row.
 - Optional separate password-mail flow:
+  - requires the optional NC Connector backend plus an active seat assigned to the current user
   - hide inline password in main HTML block
   - send password in a follow-up email after successful primary send
   - fallback to a prefilled manual draft if auto-send fails.
 
 ### Administration & compliance
 - Login Flow V2 (app password is created automatically) and central options (base URL, debug mode, sharing paths, defaults for Sharing/Talk).
+- Optional NC Connector backend status/policy contract:
+  - checked on Talk wizard open, Sharing wizard open, and Settings open/save
+  - valid active seat enables backend policy values and admin locks
+- missing backend / no seat / invalid seat / expired grace time falls back to local settings
+  - invalid seat states remain visible in the UI so users can contact their administrator
+- backend share/Talk templates are only activated when the language override is set to `Custom`
+- `Custom` is only shown when the NC Connector backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
+- if `Custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
 - Full localization (see [`Translations.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md)) and structured debug logs for support cases.
 
 ## Language & translations
@@ -79,6 +90,8 @@ In Settings under **Advanced**, you can choose the language for inserted text bl
 
 Option `Default (UI)` uses the current UI language (including fallbacks).
 
+Option `Custom` is only shown when the NC Connector backend endpoint exists. It becomes selectable only when the effective backend policy for the respective domain is actually `custom` and a backend template is present. Otherwise it stays disabled and Outlook keeps using the local UI-default block.
+
 ## System requirements
 
 - Windows 10 or Windows 11 (64-bit)  
@@ -89,17 +102,27 @@ Option `Default (UI)` uses the current UI language (including fallbacks).
 ## Installation and updates
 
 1. Close Outlook.  
-2. Run the latest MSI (for example `NCConnectorForOutlook-2.2.9.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.  
+2. Run the latest MSI (for example `NCConnectorForOutlook-3.0.0.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.  
 3. Start Outlook and click **NC Connector → Settings** in the ribbon.  
 4. Choose the login mode, run the connection test, and save. If the test succeeds, IFB is active automatically.  
 5. Verify the filelink base directory and enable debug logging if needed.
 
 Updates are applied by installing a MSI package over the existing installation (same, older, or newer version). Personal settings are kept and migrated to profile-based XML files (`settings_<OutlookProfile>.xml`) under `%LOCALAPPDATA%\NC4OL`. Uninstall removes the add-in, stops the IFB listener, and resets the registry values.
 
+### Release 3.0.0 operational notes
+
+- Runtime artifacts are consolidated in `%LOCALAPPDATA%\NC4OL`:
+  - settings files (`settings_<OutlookProfile>.xml`)
+  - IFB/system-addressbook cache
+  - debug log (`addin-runtime.log`)
+- Legacy INI settings from older builds are migrated on first start and removed after successful migration.
+- Attachment-mode compose shares arm server-side cleanup immediately after share creation and clear cleanup only after confirmed successful mail send.
+- If separate password mail is enabled, the main mail hides inline password information and password follow-up dispatch is triggered only after confirmed successful primary send. This feature is only available with backend endpoint + active assigned seat.
+
 ## Troubleshooting
 
-- **Debug log**: enable it in the *Debug* tab. Log file: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`.  
-- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-2.2.9.msi" ADDLOCAL=ALL`.  
+- **Debug log**: enable it in the *Debug* tab for verbose traces. Log file: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. Runtime exceptions are written there even when debug logging is disabled.  
+- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-3.0.0.msi" ADDLOCAL=ALL`.  
 - **Test IFB**: `powershell -Command "Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. If behavior differs, verify the registry under `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar`.  
 - **Check TLS/proxy**: `powershell -Command "Test-NetConnection <your-domain> -Port 443"`. If you see SSL warnings, verify certificates/proxy settings.  
 - **Sharing errors**: the debug log includes HTTP status codes and exception details. Required wizard fields are validated.
@@ -139,5 +162,4 @@ Updates are applied by installing a MSI package over the existing installation (
 | --- |
 
 </details>
-
 

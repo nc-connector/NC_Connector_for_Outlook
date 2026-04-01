@@ -15,6 +15,7 @@ namespace NcTalkOutlookAddIn.Models
     {
         internal FileLinkResult(
             string shareUrl,
+            string shareId,
             string shareToken,
             string password,
             DateTime? expireDate,
@@ -23,6 +24,7 @@ namespace NcTalkOutlookAddIn.Models
             string relativePath)
         {
             ShareUrl = shareUrl;
+            ShareId = shareId;
             ShareToken = shareToken;
             Password = password;
             ExpireDate = expireDate;
@@ -32,6 +34,8 @@ namespace NcTalkOutlookAddIn.Models
         }
 
         internal string ShareUrl { get; private set; }
+
+        internal string ShareId { get; private set; }
 
         internal string ShareToken { get; private set; }
 

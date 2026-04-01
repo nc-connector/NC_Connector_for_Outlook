@@ -66,6 +66,7 @@
     <Compile Include="Models\FileLinkProgress.cs" />
     <Compile Include="Models\FileLinkUploadStatus.cs" />
     <Compile Include="Models\FileLinkUploadItemProgress.cs" />
+    <Compile Include="Models\BackendPolicyStatus.cs" />
     <Compile Include="Models\NextcloudUser.cs" />
     <Compile Include="Models\PasswordPolicyInfo.cs" />
     <Compile Include="Models\TalkParticipant.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="Services\FileLinkDuplicateInfo.cs" />
     <Compile Include="Services\FileLinkUploadContext.cs" />
     <Compile Include="Services\FileLinkService.cs" />
+    <Compile Include="Services\BackendPolicyService.cs" />
     <Compile Include="Services\OutlookAttachmentAutomationGuardService.cs" />
     <Compile Include="Services\PasswordPolicyService.cs" />
     <Compile Include="UI\SettingsForm.cs" />
@@ -95,6 +97,7 @@
     <Compile Include="Utilities\Strings.cs" />
     <Compile Include="Utilities\TimeUtilities.cs" />
     <Compile Include="Utilities\UiThemeManager.cs" />
+    <Compile Include="Utilities\DisabledControlTooltipHintHelper.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -14,12 +14,6 @@
   "ui_button_apply": {
     "message": "应用"
   },
-  "ui_button_apply_progress": {
-    "message": "正在应用..."
-  },
-  "ui_button_create_progress": {
-    "message": "正在创建..."
-  },
   "ui_button_clear": {
     "message": "清除"
   },
@@ -215,12 +209,6 @@
   "ui_alert_location_missing": {
     "message": "(注意：未自动填充“地点”字段。)"
   },
-  "ui_alert_event_fallback": {
-    "message": "注意：服务器不支持事件会话。已创建群组会话。"
-  },
-  "ui_alert_generic_fallback": {
-    "message": "(注意：已创建不支持 API 的备用链接。)"
-  },
   "ui_alert_reason": {
     "message": "原因：$1"
   },
@@ -235,15 +223,6 @@
   },
   "ui_alert_delegation_removed": {
     "message": "您已从会话中移除。"
-  },
-  "ui_alert_password_protected": {
-    "message": "注意：此会话受密码保护。"
-  },
-  "ui_prompt_base_url": {
-    "message": "Nextcloud 基础 URL（例如 https://cloud.example.com）："
-  },
-  "ui_prompt_title": {
-    "message": "新公开会话的标题："
   },
   "ui_default_title": {
     "message": "会议"
@@ -630,7 +609,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "为什么不仅仅是一个文件链接插件？\nNC Connector 不仅支持文件链接，还覆盖邮件客户端中的完整团队工作流。\n\n技术基础\n- Thunderbird 和 Outlook 插件可直接使用，即使没有 Nextcloud 后端也可以\n- 可选 Nextcloud 后端，用于集中分配席位和策略\n- 后端席位模型：Community 含 1 个免费席位，Pro 从 5 个席位起（1 个席位 = 1 个 Nextcloud 用户）\n\n- 文件共享支持密码、到期日期，以及可选的单独密码邮件发送\n- 可直接从日历事件创建和更新 Talk 会议\n- 附件自动化采用明确规则，替代手动逐步操作\n- Nextcloud 后端中的集中席位分配（1 个席位 = 1 个 Nextcloud 用户）"
+    "message": "不只是文件链接\n\nNC Connector 将安全文件共享、Talk 会议和附件自动化直接整合到 Thunderbird 和 Outlook 中。这样，重要的团队工作流程就能保留在它应在的位置：邮件与日历客户端中。\n\nNC Connector 覆盖的内容\n- 带密码、到期日期以及可选单独发送密码的文件共享\n- 直接从日历事件创建和更新 Talk 会议\n- 以清晰规则实现附件自动化，而不是手动逐个处理\n- 在熟悉的工作流程中直接插入统一的共享块和邀请块\n\n可选搭配 Nextcloud 后端\n- 集中的 Seat 分配和策略管理\n- 用于分享和 Talk 邀请的自定义模板与设计\n- 独立密码投递以及面向组织的集中控制\n- 1 Seat = 1 个 Nextcloud 用户\n\n即使没有后端，这些附加组件也可直接使用。有了后端后，还会增加面向团队和组织的集中控制。"
   },
   "options_about_more_info_label": {
     "message": "更多信息 -->"
@@ -983,14 +962,8 @@
   "sharing_prompt_rename_duplicate": {
     "message": "文件 \"$1\" 已在队列中存在。请输入新名称。"
   },
-  "sharing_prompt_rename_existing": {
-    "message": "文件 \"$1\" 已在服务器上存在。请输入新名称。"
-  },
   "sharing_message_rename_cancelled": {
     "message": "由于未提供替代名称，上传已取消。"
-  },
-  "sharing_password_policy_error": {
-    "message": "密码至少需要 10 个字符，并包含大写字母、小写字母和特殊字符。"
   },
   "sharing_html_intro_line": {
     "message": "我希望安全地共享文件并保护您的隐私。点击下面的链接下载您的文件。"
@@ -1293,16 +1266,16 @@
     "message": "通过单独邮件发送密码"
   },
   "sharing_password_separate_tooltip_line1": {
-    "message": "此版本中禁用此选项。"
+    "message": "主共享块不包含内联密码。"
   },
   "sharing_password_separate_tooltip_line2": {
-    "message": "未来的专业版将提供通过单独电子邮件发送密码的功能。"
+    "message": "密码将通过后续电子邮件发送给相同的收件人。"
   },
   "sharing_password_separate_tooltip_line3": {
-    "message": "目前，密码包含在主共享块中。"
+    "message": "如果自动发送失败，则会打开手动后备草稿。"
   },
   "sharing_password_separate_tooltip_title": {
-    "message": "即将推出（专业版功能）"
+    "message": "✉️单独发送密码"
   },
   "talk_option_moderator_title": {
     "message": "👑 主持人代表团"
@@ -1324,5 +1297,35 @@
   },
   "talk_system_addressbook_admin_link_label": {
     "message": "设置指南"
+  },
+  "policy_warning_no_seat": {
+    "message": "您的账户未分配 NC Connector 席位。将使用本地设置。请联系您的 Nextcloud 管理员。"
+  },
+  "policy_admin_controlled_tooltip": {
+    "message": "由管理员控制"
+  },
+  "policy_warning_admin_link_label": {
+    "message": "打开管理员设置指南"
+  },
+  "policy_warning_title": {
+    "message": "后端策略当前不可用。"
+  },
+  "policy_warning_license_invalid": {
+    "message": "您的 NC Connector 许可证或席位分配当前无效。将使用本地设置。请联系您的 Nextcloud 管理员。"
+  },
+  "policy_warning_seat_state_format": {
+    "message": "NC Connector 席位当前处于“$1”状态。将使用本地设置。请联系您的 Nextcloud 管理员。"
+  },
+  "options_lang_custom": {
+    "message": "自定义（后端模板）"
+  },
+  "sharing_password_separate_backend_required_tooltip": {
+    "message": "此功能需要 Nextcloud 后端。"
+  },
+  "sharing_password_separate_no_seat_tooltip": {
+    "message": "要使用此功能，管理员必须为您的账户分配 NC Connector 席位。"
+  },
+  "sharing_password_separate_paused_tooltip": {
+    "message": "您的 NC Connector 席位当前已暂停。请联系您的 Nextcloud 管理员。"
   }
 }

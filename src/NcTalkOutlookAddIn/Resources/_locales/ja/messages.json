@@ -14,12 +14,6 @@
   "ui_button_apply": {
     "message": "適用"
   },
-  "ui_button_apply_progress": {
-    "message": "適用中..."
-  },
-  "ui_button_create_progress": {
-    "message": "作成中..."
-  },
   "ui_button_clear": {
     "message": "クリア"
   },
@@ -215,12 +209,6 @@
   "ui_alert_location_missing": {
     "message": "(注: 場所フィールドは自動入力されませんでした。)"
   },
-  "ui_alert_event_fallback": {
-    "message": "注: サーバーはイベント会話をサポートしていません。グループ会話を作成しました。"
-  },
-  "ui_alert_generic_fallback": {
-    "message": "(注: API サポートなしの代替リンクを作成しました。)"
-  },
   "ui_alert_reason": {
     "message": "理由: $1"
   },
@@ -235,15 +223,6 @@
   },
   "ui_alert_delegation_removed": {
     "message": "会話から削除されました。"
-  },
-  "ui_alert_password_protected": {
-    "message": "注: この会話はパスワードで保護されています。"
-  },
-  "ui_prompt_base_url": {
-    "message": "Nextcloud のベース URL（例: https://cloud.example.com）:"
-  },
-  "ui_prompt_title": {
-    "message": "新しい公開会話のタイトル:"
   },
   "ui_default_title": {
     "message": "ミーティング"
@@ -630,7 +609,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "なぜ単なるファイルリンクアドオン以上なのか？\nNC Connector は、ファイルリンクだけでなく、メールクライアント内のチームワークフロー全体をカバーします。\n\n技術基盤\n- Thunderbird と Outlook のアドオンを、Nextcloud バックエンドがなくても直接利用可能\n- シート割り当てとポリシーを一元管理するための任意の Nextcloud バックエンド\n- バックエンドのシートモデル: Community は無料 1 シート、Pro は 5 シートから（1 シート = 1 Nextcloud ユーザー）\n\n- パスワード・有効期限・任意の別メールでのパスワード送信に対応したファイル共有\n- カレンダー予定から Talk ミーティングを直接作成・更新\n- 手動の個別作業ではなく、明確なルールによる添付ファイル自動化\n- Nextcloud バックエンドでのシート一元割り当て（1 シート = 1 Nextcloud ユーザー）"
+    "message": "ファイルリンク以上の機能\n\nNC Connector は、安全なファイル共有、Talk ミーティング、添付ファイル自動化を Thunderbird と Outlook に直接統合します。これにより、重要なチームのワークフローを本来あるべき場所、つまりメールとカレンダーのクライアント内に保てます。\n\nNC Connector がカバーする内容\n- パスワード、期限日、必要に応じた別送パスワード付きのファイル共有\n- カレンダーの予定から直接 Talk ミーティングを作成・更新\n- 手作業の個別対応ではなく、明確なルールによる添付ファイル自動化\n- 共有ブロックと招待ブロックを普段の作業フローにそのまま挿入\n\nNextcloud backend を利用する場合\n- Seat の集中割り当てとポリシー管理\n- 共有と Talk 招待用の独自テンプレートとデザイン\n- パスワード別送と組織向けの集中制御\n- 1 Seat = 1 Nextcloud ユーザー\n\nbackend がなくても add-on はそのまま利用できます。backend を使うと、チームや組織向けの集中管理が追加されます。"
   },
   "options_about_more_info_label": {
     "message": "詳細情報 -->"
@@ -983,14 +962,8 @@
   "sharing_prompt_rename_duplicate": {
     "message": "ファイル \"$1\" は既にキューに存在します。新しい名前を入力してください。"
   },
-  "sharing_prompt_rename_existing": {
-    "message": "ファイル \"$1\" はサーバーに既に存在します。新しい名前を入力してください。"
-  },
   "sharing_message_rename_cancelled": {
     "message": "置換名が指定されなかったため、アップロードはキャンセルされました。"
-  },
-  "sharing_password_policy_error": {
-    "message": "パスワードは大文字と小文字、特殊文字を含む 10 文字以上である必要があります。"
   },
   "sharing_html_intro_line": {
     "message": "ファイルを安全に共有し、あなたのプライバシーを保護したいと思います。以下のリンクをクリックしてファイルをダウンロードしてください。"
@@ -1293,16 +1266,16 @@
     "message": "パスワードを別メールで送信する"
   },
   "sharing_password_separate_tooltip_line1": {
-    "message": "このオプションはこのリリースでは無効になっています。"
+    "message": "メインの共有ブロックにはインライン パスワードは含まれません。"
   },
   "sharing_password_separate_tooltip_line2": {
-    "message": "将来の Pro リリースでは、別の電子メールでのパスワード配信が利用可能になる予定です。"
+    "message": "パスワードは、同じ受信者にフォローアップ電子メールで送信されます。"
   },
   "sharing_password_separate_tooltip_line3": {
-    "message": "現時点では、パスワードはメインの共有ブロックに含まれています。"
+    "message": "自動送信が失敗した場合は、手動のフォールバック ドラフトが開かれます。"
   },
   "sharing_password_separate_tooltip_title": {
-    "message": "近日公開予定 (Pro 機能)"
+    "message": "✉️ パスワードを別途送信"
   },
   "talk_option_moderator_title": {
     "message": "👑 モデレーター代表団"
@@ -1324,5 +1297,35 @@
   },
   "talk_system_addressbook_admin_link_label": {
     "message": "セットアップガイド"
+  },
+  "policy_warning_no_seat": {
+    "message": "あなたのアカウントには NC Connector のシートが割り当てられていません。ローカル設定が使用されます。Nextcloud 管理者に連絡してください。"
+  },
+  "policy_admin_controlled_tooltip": {
+    "message": "管理者により制御"
+  },
+  "policy_warning_admin_link_label": {
+    "message": "管理者向けセットアップガイドを開く"
+  },
+  "policy_warning_title": {
+    "message": "バックエンドポリシーは現在利用できません。"
+  },
+  "policy_warning_license_invalid": {
+    "message": "NC Connector のライセンスまたはシート割り当ては現在有効ではありません。ローカル設定が使用されます。Nextcloud 管理者に連絡してください。"
+  },
+  "policy_warning_seat_state_format": {
+    "message": "NC Connector のシートは現在 \"$1\" 状態です。ローカル設定が使用されます。Nextcloud 管理者に連絡してください。"
+  },
+  "options_lang_custom": {
+    "message": "カスタム（バックエンドテンプレート）"
+  },
+  "sharing_password_separate_backend_required_tooltip": {
+    "message": "この機能には Nextcloud バックエンドが必要です。"
+  },
+  "sharing_password_separate_no_seat_tooltip": {
+    "message": "この機能を使うには、管理者があなたのアカウントに NC Connector の seat を割り当てる必要があります。"
+  },
+  "sharing_password_separate_paused_tooltip": {
+    "message": "あなたの NC Connector seat は現在一時停止されています。Nextcloud 管理者に連絡してください。"
   }
 }

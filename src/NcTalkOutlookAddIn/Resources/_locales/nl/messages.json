@@ -14,12 +14,6 @@
   "ui_button_apply": {
     "message": "Toepassen"
   },
-  "ui_button_apply_progress": {
-    "message": "Bezig met toepassen..."
-  },
-  "ui_button_create_progress": {
-    "message": "Bezig met aanmaken..."
-  },
   "ui_button_clear": {
     "message": "Wissen"
   },
@@ -215,12 +209,6 @@
   "ui_alert_location_missing": {
     "message": "(Opmerking: veld Locatie is niet automatisch ingevuld.)"
   },
-  "ui_alert_event_fallback": {
-    "message": "Opmerking: Server ondersteunt geen evenementconversaties. Er is een groepsconversatie aangemaakt."
-  },
-  "ui_alert_generic_fallback": {
-    "message": "(Opmerking: er is een fallback-link zonder API-ondersteuning aangemaakt.)"
-  },
   "ui_alert_reason": {
     "message": "Reden: $1"
   },
@@ -235,15 +223,6 @@
   },
   "ui_alert_delegation_removed": {
     "message": "Je bent uit de conversatie verwijderd."
-  },
-  "ui_alert_password_protected": {
-    "message": "Opmerking: deze conversatie is met een wachtwoord beveiligd."
-  },
-  "ui_prompt_base_url": {
-    "message": "Nextcloud basis-URL (bijv. https://cloud.example.com):"
-  },
-  "ui_prompt_title": {
-    "message": "Titel voor nieuwe openbare conversatie:"
   },
   "ui_default_title": {
     "message": "Vergadering"
@@ -630,7 +609,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Waarom meer dan een filelink-add-on?\nNC Connector dekt niet alleen bestandslinks af, maar de volledige teamworkflow in de e-mailclient.\n\nTechnische basis\n- Thunderbird- en Outlook-add-ons direct bruikbaar, ook zonder Nextcloud-backend\n- Optionele Nextcloud-backend voor centrale seat-toewijzing en beleid\n- Seat-model in de backend: Community met 1 gratis seat, Pro vanaf 5 seats (1 seat = 1 Nextcloud-gebruiker)\n\n- Bestandsdeling met wachtwoord, vervaldatum en optionele aparte wachtwoordverzending\n- Talk-vergaderingen direct vanuit agenda-afspraken aanmaken en bijwerken\n- Bijlage-automatisering met duidelijke regels in plaats van handmatige losse stappen\n- Centrale seat-toewijzing in de Nextcloud-backend (1 seat = 1 Nextcloud-gebruiker)"
+    "message": "Meer dan alleen bestandslinks\n\nNC Connector brengt veilig bestanden delen, Talk-vergaderingen en automatisering van bijlagen direct samen in Thunderbird en Outlook. Zo blijven belangrijke teamworkflows waar ze horen: in de mail- en agenda-client.\n\nWat NC Connector afdekt\n- Bestanden delen met wachtwoord, vervaldatum en optionele aparte verzending van het wachtwoord\n- Talk-vergaderingen direct vanuit agenda-afspraken aanmaken en bijwerken\n- Automatisering van bijlagen met duidelijke regels in plaats van losse handmatige stappen\n- Eenduidige deel- en uitnodigingsblokken direct in de vertrouwde workflow\n\nOptioneel met Nextcloud-backend\n- Centrale Seat-toewijzing en beleidsbeheer\n- Eigen sjablonen en ontwerpen voor shares en Talk-uitnodigingen\n- Aparte wachtwoordverzending en centrale aansturing voor organisaties\n- 1 Seat = 1 Nextcloud-gebruiker\n\nZonder backend blijven de add-ons direct bruikbaar. Met backend komt daar centrale aansturing voor teams en organisaties bij."
   },
   "options_about_more_info_label": {
     "message": "Meer informatie -->"
@@ -983,14 +962,8 @@
   "sharing_prompt_rename_duplicate": {
     "message": "Het bestand \"$1\" bestaat al in de wachtrij. Voer een nieuwe naam in."
   },
-  "sharing_prompt_rename_existing": {
-    "message": "Het bestand \"$1\" bestaat al op de server. Voer een nieuwe naam in."
-  },
   "sharing_message_rename_cancelled": {
     "message": "Upload geannuleerd omdat er geen vervangende naam is opgegeven."
-  },
-  "sharing_password_policy_error": {
-    "message": "Het wachtwoord moet minstens 10 tekens bevatten, inclusief hoofd- en kleine letters en een speciaal teken."
   },
   "sharing_html_intro_line": {
     "message": "Ik wil graag bestanden veilig delen en je privacy beschermen. Klik op de link hieronder om je bestanden te downloaden."
@@ -1293,16 +1266,16 @@
     "message": "Wachtwoord in aparte e-mail versturen"
   },
   "sharing_password_separate_tooltip_line1": {
-    "message": "Deze optie is uitgeschakeld in deze release."
+    "message": "Het hoofddeelblok bevat geen inline wachtwoord."
   },
   "sharing_password_separate_tooltip_line2": {
-    "message": "Wachtwoordlevering in een aparte e-mail zal beschikbaar zijn in een toekomstige Pro-release."
+    "message": "Het wachtwoord wordt in een vervolg-e-mail naar dezelfde ontvangers verzonden."
   },
   "sharing_password_separate_tooltip_line3": {
-    "message": "Voorlopig is het wachtwoord opgenomen in het hoofdshareblok."
+    "message": "Als automatisch verzenden mislukt, wordt er handmatig een fallback-concept geopend."
   },
   "sharing_password_separate_tooltip_title": {
-    "message": "Binnenkort beschikbaar (Pro-functie)"
+    "message": "✉️ Wachtwoord apart versturen"
   },
   "talk_option_moderator_title": {
     "message": "👑 Moderatordelegatie"
@@ -1324,5 +1297,35 @@
   },
   "talk_system_addressbook_admin_link_label": {
     "message": "Installatiehandleiding"
+  },
+  "policy_warning_no_seat": {
+    "message": "Aan uw account is geen NC Connector-seat toegewezen. Lokale instellingen worden gebruikt. Neem contact op met uw Nextcloud-beheerder."
+  },
+  "policy_admin_controlled_tooltip": {
+    "message": "Door beheerder beheerd"
+  },
+  "policy_warning_admin_link_label": {
+    "message": "Handleiding voor beheerders openen"
+  },
+  "policy_warning_title": {
+    "message": "Het backendbeleid is momenteel niet beschikbaar."
+  },
+  "policy_warning_license_invalid": {
+    "message": "Uw NC Connector-licentie of seat-toewijzing is momenteel niet geldig. Lokale instellingen worden gebruikt. Neem contact op met uw Nextcloud-beheerder."
+  },
+  "policy_warning_seat_state_format": {
+    "message": "De NC Connector-seat staat momenteel in de status \"$1\". Lokale instellingen worden gebruikt. Neem contact op met uw Nextcloud-beheerder."
+  },
+  "options_lang_custom": {
+    "message": "Aangepast (backendsjabloon)"
+  },
+  "sharing_password_separate_backend_required_tooltip": {
+    "message": "Deze functie vereist de Nextcloud-backend."
+  },
+  "sharing_password_separate_no_seat_tooltip": {
+    "message": "Uw beheerder moet voor deze functie een NC Connector-seat aan uw account toewijzen."
+  },
+  "sharing_password_separate_paused_tooltip": {
+    "message": "Uw NC Connector-seat is momenteel gepauzeerd. Neem contact op met uw Nextcloud-beheerder."
   }
 }

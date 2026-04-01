@@ -274,7 +274,17 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             string trimmed = languageOverride.Trim();
-            if (string.Equals(trimmed, "default", StringComparison.OrdinalIgnoreCase))
+            string alias = trimmed
+                .Replace("_", " ")
+                .Replace("-", " ")
+                .Trim()
+                .ToLowerInvariant();
+            if (string.Equals(alias, "default", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(alias, "default ui", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(alias, "ui default", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(alias, "standard", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(alias, "standard ui", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(alias, "ui", StringComparison.OrdinalIgnoreCase))
             {
                 return "default";
             }
@@ -492,6 +502,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string AdvancedShareBlockLangLabel { get { return Get("options_share_block_lang_label", "Language for sharing HTML block"); } }
         internal static string AdvancedEventDescriptionLangLabel { get { return Get("options_event_description_lang_label", "Language for Talk description text"); } }
         internal static string LanguageOverrideDefaultOption { get { return Get("options_lang_default", "Default (UI)"); } }
+        internal static string LanguageOverrideCustomOption { get { return Get("options_lang_custom", "Custom (backend template)"); } }
 
         internal static string ButtonSave { get { return Get("options_save_button", "Save"); } }
         internal static string ButtonCancel { get { return Get("ui_button_cancel", "Cancel"); } }
@@ -532,6 +543,19 @@ namespace NcTalkOutlookAddIn.Utilities
             get
             {
                 return "https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#system-address-book-required-for-user-search-and-moderator-selection";
+            }
+        }
+        internal static string PolicyWarningTitle { get { return Get("policy_warning_title", "Backend policy is currently unavailable."); } }
+        internal static string PolicyWarningNoSeat { get { return Get("policy_warning_no_seat", "No NC Connector seat is assigned to your account. Local settings are used. Please contact your Nextcloud administrator."); } }
+        internal static string PolicyWarningLicenseInvalid { get { return Get("policy_warning_license_invalid", "Your NC Connector license or seat is currently not valid. Local settings are used. Please contact your Nextcloud administrator."); } }
+        internal static string PolicyWarningSeatStateFormat { get { return Get("policy_warning_seat_state_format", "Your NC Connector seat is currently in state \"{0}\". Local settings are used. Please contact your Nextcloud administrator."); } }
+        internal static string PolicyWarningAdminLinkLabel { get { return Get("policy_warning_admin_link_label", "Open admin setup guide"); } }
+        internal static string PolicyAdminControlledTooltip { get { return Get("policy_admin_controlled_tooltip", "Admin controlled"); } }
+        internal static string PolicyAdminGuideUrl
+        {
+            get
+            {
+                return "https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md";
             }
         }
         internal static string TalkVersionUnknown { get { return Get("outlook_version_unknown", "unknown"); } }
@@ -717,16 +741,20 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return Get(
                     "options_about_overview_text",
-                    "Why more than a file-link add-in?\n"
-                    + "NC Connector covers not only file links, but the complete team workflow in the mail client.\n\n"
-                    + "Technical foundation\n"
-                    + "- Thunderbird and Outlook add-ins usable directly, also without Nextcloud backend\n"
-                    + "- Optional Nextcloud backend for central seat assignment and policies\n"
-                    + "- Seat model in backend: Community with 1 free seat, Pro from 5 seats (1 seat = 1 Nextcloud user)\n\n"
+                    "More than file links\n\n"
+                    + "NC Connector combines secure file sharing, Talk meetings, and attachment automation directly in Thunderbird and Outlook. "
+                    + "This keeps important team workflows where they belong: in the mail and calendar client.\n\n"
+                    + "What NC Connector covers\n"
                     + "- File sharing with password, expiration date, and optional separate password delivery\n"
                     + "- Create and update Talk meetings directly from calendar appointments\n"
-                    + "- Attachment automation with clear rules instead of manual single steps\n"
-                    + "- Central seat assignment in the Nextcloud backend (1 seat = 1 Nextcloud user)");
+                    + "- Attachment automation with clear rules instead of manual individual steps\n"
+                    + "- Consistent sharing and invitation blocks directly in the familiar workflow\n\n"
+                    + "Optional with Nextcloud backend\n"
+                    + "- Central seat assignment and policy management\n"
+                    + "- Custom templates and designs for shares and Talk invitations\n"
+                    + "- Separate password delivery and central control for organizations\n"
+                    + "- 1 seat = 1 Nextcloud user\n\n"
+                    + "Without backend, the add-ins remain directly usable. With backend, central control for teams and organizations is added.");
             }
         }
         internal static string AboutMoreInfoLabel { get { return Get("options_about_more_info_label", "More information -->"); } }
@@ -773,15 +801,33 @@ namespace NcTalkOutlookAddIn.Utilities
             }
         }
 
-        internal static string TooltipSharingPasswordSeparate
+        internal static string SharingPasswordSeparateBackendRequiredTooltip
         {
             get
             {
-                return BuildTooltip(
-                    Get("sharing_password_separate_tooltip_title", "Coming soon (Pro feature)"),
-                    Get("sharing_password_separate_tooltip_line1", "This option is disabled in this release."),
-                    Get("sharing_password_separate_tooltip_line2", "Password delivery in a separate email will be available in a future Pro release."),
-                    Get("sharing_password_separate_tooltip_line3", "For now, the password is included in the main share block."));
+                return Get(
+                    "sharing_password_separate_backend_required_tooltip",
+                    "This feature requires the Nextcloud backend.");
+            }
+        }
+
+        internal static string SharingPasswordSeparateNoSeatTooltip
+        {
+            get
+            {
+                return Get(
+                    "sharing_password_separate_no_seat_tooltip",
+                    "Your administrator must assign an NC Connector seat to your account for this feature.");
+            }
+        }
+
+        internal static string SharingPasswordSeparatePausedTooltip
+        {
+            get
+            {
+                return Get(
+                    "sharing_password_separate_paused_tooltip",
+                    "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator.");
             }
         }
 

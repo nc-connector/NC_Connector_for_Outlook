@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-2.2.9\\installer\\NcConnectorOutlookInstaller.wixproj": {}
+    "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-3.0.0\\installer\\NcConnectorOutlookInstaller.wixproj": {}
   },
   "projects": {
-    "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-2.2.9\\installer\\NcConnectorOutlookInstaller.wixproj": {
+    "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-3.0.0\\installer\\NcConnectorOutlookInstaller.wixproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-2.2.9\\installer\\NcConnectorOutlookInstaller.wixproj",
+        "projectUniqueName": "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-3.0.0\\installer\\NcConnectorOutlookInstaller.wixproj",
         "projectName": "NCConnectorForOutlook",
-        "projectPath": "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-2.2.9\\installer\\NcConnectorOutlookInstaller.wixproj",
+        "projectPath": "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-3.0.0\\installer\\NcConnectorOutlookInstaller.wixproj",
         "packagesPath": "C:\\Users\\Bastian\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-2.2.9\\installer\\obj\\",
+        "outputPath": "C:\\Users\\Bastian\\VS-Code\\NC-E-T_new\\nc4ol-3.0.0\\installer\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Bastian\\AppData\\Roaming\\NuGet\\NuGet.Config"

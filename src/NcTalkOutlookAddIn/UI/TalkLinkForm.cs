@@ -56,8 +56,13 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Label _moderatorAddressbookWarningTitleLabel = new Label();
         private readonly Label _moderatorAddressbookWarningTextLabel = new Label();
         private readonly LinkLabel _moderatorAddressbookWarningLinkLabel = new LinkLabel();
+        private readonly Panel _policyWarningPanel = new Panel();
+        private readonly Label _policyWarningTitleLabel = new Label();
+        private readonly Label _policyWarningTextLabel = new Label();
+        private readonly LinkLabel _policyWarningLinkLabel = new LinkLabel();
         private readonly Label _moderatorHintLabel = new Label();
         private readonly ToolTip _toolTip = new ToolTip();
+        private readonly DisabledControlTooltipHintHelper _disabledTooltipHints;
         private readonly Button _okButton = new Button();
         private readonly Button _cancelButton = new Button();
         private readonly BrandedHeader _headerPanel = new BrandedHeader();
@@ -66,6 +71,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly string _serverVersionHint;
         private readonly PasswordPolicyInfo _passwordPolicy;
         private readonly TalkServiceConfiguration _configuration;
+        private readonly BackendPolicyStatus _backendPolicyStatus;
         private readonly List<NextcloudUser> _userDirectory;
         private readonly bool _systemAddressbookAvailable;
         private readonly string _systemAddressbookError;
@@ -144,6 +150,7 @@ namespace NcTalkOutlookAddIn.UI
             AddinSettings defaults,
             TalkServiceConfiguration configuration,
             PasswordPolicyInfo passwordPolicy,
+            BackendPolicyStatus policyStatus,
             List<NextcloudUser> userDirectory,
             IfbAddressBookCache.SystemAddressbookStatus addressbookStatus,
             string appointmentSubject,
@@ -153,6 +160,8 @@ namespace NcTalkOutlookAddIn.UI
             _eventConversationsSupported = DetermineEventConversationSupport(defaults, out _serverVersionHint);
             _passwordPolicy = passwordPolicy;
             _configuration = configuration;
+            _backendPolicyStatus = policyStatus;
+            _disabledTooltipHints = new DisabledControlTooltipHintHelper(_toolTip);
             _userDirectory = userDirectory ?? new List<NextcloudUser>();
             _systemAddressbookAvailable = addressbookStatus != null && addressbookStatus.Available;
             _systemAddressbookError = addressbookStatus != null ? (addressbookStatus.Error ?? string.Empty) : string.Empty;
@@ -321,6 +330,37 @@ namespace NcTalkOutlookAddIn.UI
                 _eventSupportHintLabel.Text = string.Format(Strings.TalkEventHint, versionInfo);
             }
 
+            _policyWarningPanel.Visible = false;
+            _policyWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
+            _policyWarningPanel.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(
+                    e.Graphics,
+                    _policyWarningPanel.ClientRectangle,
+                    Color.FromArgb(176, 0, 32),
+                    ButtonBorderStyle.Solid);
+            };
+
+            _policyWarningTitleLabel.AutoSize = true;
+            _policyWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
+            _policyWarningTitleLabel.Font = new Font(
+                _policyWarningTitleLabel.Font,
+                FontStyle.Bold);
+            _policyWarningTitleLabel.Text = "\u26a0 " + Strings.PolicyWarningTitle;
+            _policyWarningPanel.Controls.Add(_policyWarningTitleLabel);
+
+            _policyWarningTextLabel.AutoSize = true;
+            _policyWarningTextLabel.Text = string.Empty;
+            _policyWarningPanel.Controls.Add(_policyWarningTextLabel);
+
+            _policyWarningLinkLabel.AutoSize = true;
+            _policyWarningLinkLabel.Text = Strings.PolicyWarningAdminLinkLabel;
+            _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
+            _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
+            _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
+            _policyWarningLinkLabel.LinkClicked += (s, e) => OpenBrowser(Strings.PolicyAdminGuideUrl);
+            _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
+
             _okButton.Text = Strings.DialogOk;
             _okButton.AutoSize = false;
             _okButton.DialogResult = DialogResult.OK;
@@ -341,6 +381,7 @@ namespace NcTalkOutlookAddIn.UI
             Controls.Add(_passwordGenerateButton);
             Controls.Add(_settingsGroup);
             Controls.Add(_moderatorGroup);
+            Controls.Add(_policyWarningPanel);
             Controls.Add(_okButton);
             Controls.Add(_cancelButton);
 
@@ -414,6 +455,31 @@ namespace NcTalkOutlookAddIn.UI
                     _eventSupportHintLabel.Location = new Point(inputX, y - ScaleLogical(2));
                     _eventSupportHintLabel.MaximumSize = new Size(inputWidth, 0);
                     y = _eventSupportHintLabel.Bottom + verticalGap;
+                }
+
+                if (_policyWarningPanel.Visible)
+                {
+                    int warningPadding = ScaleLogical(8);
+                    int panelWidth = Math.Max(ScaleLogical(260), ClientSize.Width - (outerPadding * 2));
+                    int warningTextWidth = Math.Max(ScaleLogical(160), panelWidth - (warningPadding * 2));
+
+                    _policyWarningTitleLabel.Location = new Point(warningPadding, warningPadding);
+                    _policyWarningTitleLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                    int warningTextTop = _policyWarningTitleLabel.Bottom + ScaleLogical(4);
+                    _policyWarningTextLabel.Location = new Point(warningPadding, warningTextTop);
+                    _policyWarningTextLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                    int warningLinkTop = _policyWarningTextLabel.Bottom + ScaleLogical(6);
+                    _policyWarningLinkLabel.Location = new Point(warningPadding, warningLinkTop);
+
+                    int panelHeight = _policyWarningLinkLabel.Bottom + warningPadding;
+                    _policyWarningPanel.SetBounds(outerPadding, y, panelWidth, panelHeight);
+                    y = _policyWarningPanel.Bottom + verticalGap;
+                }
+                else
+                {
+                    _policyWarningPanel.SetBounds(outerPadding, y, Math.Max(ScaleLogical(260), ClientSize.Width - (outerPadding * 2)), 0);
                 }
 
                 _passwordToggleCheckBox.Location = new Point(outerPadding, y);
@@ -567,11 +633,60 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyDefaults(AddinSettings defaults, string appointmentSubject)
         {
-            TalkTitle = string.IsNullOrWhiteSpace(appointmentSubject) ? DefaultTitle : appointmentSubject.Trim();
+            string titleDefault = string.IsNullOrWhiteSpace(appointmentSubject) ? DefaultTitle : appointmentSubject.Trim();
+            bool passwordDefault = defaults == null || defaults.TalkDefaultPasswordEnabled;
+            bool addUsersDefault = defaults == null || defaults.TalkDefaultAddUsers;
+            bool addGuestsDefault = defaults != null && defaults.TalkDefaultAddGuests;
+            bool lobbyDefault = defaults == null || defaults.TalkDefaultLobbyEnabled;
+            bool searchDefault = defaults == null || defaults.TalkDefaultSearchVisible;
+            TalkRoomType roomTypeDefault = defaults != null ? defaults.TalkDefaultRoomType : TalkRoomType.EventConversation;
+
+            if (IsPolicyActive())
+            {
+                bool policyBool;
+                string policyString;
+
+                policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_title");
+                if (!string.IsNullOrWhiteSpace(policyString))
+                {
+                    titleDefault = policyString;
+                }
+
+                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
+                {
+                    passwordDefault = policyBool;
+                }
+                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_users", out policyBool))
+                {
+                    addUsersDefault = policyBool;
+                }
+                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_guests", out policyBool))
+                {
+                    addGuestsDefault = policyBool;
+                }
+                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_lobby_active", out policyBool))
+                {
+                    lobbyDefault = policyBool;
+                }
+                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_show_in_search", out policyBool))
+                {
+                    searchDefault = policyBool;
+                }
+
+                policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");
+                if (!string.IsNullOrWhiteSpace(policyString))
+                {
+                    roomTypeDefault = string.Equals(policyString.Trim(), "event", StringComparison.OrdinalIgnoreCase)
+                        ? TalkRoomType.EventConversation
+                        : TalkRoomType.StandardRoom;
+                }
+            }
+
+            TalkTitle = titleDefault;
             _titleTextBox.Text = TalkTitle;
 
             int minLength = GetMinPasswordLength();
-            _passwordToggleCheckBox.Checked = defaults == null || defaults.TalkDefaultPasswordEnabled;
+            _passwordToggleCheckBox.Checked = passwordDefault;
             TalkPassword = string.Empty;
             _passwordTextBox.Text = string.Empty;
             if (_passwordToggleCheckBox.Checked)
@@ -580,18 +695,17 @@ namespace NcTalkOutlookAddIn.UI
                 _passwordTextBox.Text = TalkPassword;
             }
 
-            _addUsersCheckBox.Checked = defaults == null || defaults.TalkDefaultAddUsers;
-            _addGuestsCheckBox.Checked = defaults != null && defaults.TalkDefaultAddGuests;
-            _lobbyCheckBox.Checked = defaults == null || defaults.TalkDefaultLobbyEnabled;
-            _searchCheckBox.Checked = defaults == null || defaults.TalkDefaultSearchVisible;
+            _addUsersCheckBox.Checked = addUsersDefault;
+            _addGuestsCheckBox.Checked = addGuestsDefault;
+            _lobbyCheckBox.Checked = lobbyDefault;
+            _searchCheckBox.Checked = searchDefault;
 
-            var preferred = defaults != null ? defaults.TalkDefaultRoomType : TalkRoomType.EventConversation;
-            if (!_eventConversationsSupported && preferred == TalkRoomType.EventConversation)
+            if (!_eventConversationsSupported && roomTypeDefault == TalkRoomType.EventConversation)
             {
-                preferred = TalkRoomType.StandardRoom;
+                roomTypeDefault = TalkRoomType.StandardRoom;
             }
 
-            SelectRoomType(preferred);
+            SelectRoomType(roomTypeDefault);
 
             LobbyUntilStart = _lobbyCheckBox.Checked;
             SearchVisible = _searchCheckBox.Checked;
@@ -600,15 +714,96 @@ namespace NcTalkOutlookAddIn.UI
             DelegateModeratorId = string.Empty;
             DelegateModeratorName = string.Empty;
 
+            ApplyPolicyWarningUi();
+            ApplyPolicyLockState();
+            ApplySystemAddressbookLockState();
             UpdatePasswordState();
             UpdateRoomTypeTooltip();
-            ApplySystemAddressbookLockState();
             UpdateModeratorHint();
+        }
+
+        private bool IsPolicyActive()
+        {
+            return _backendPolicyStatus != null && _backendPolicyStatus.PolicyActive;
+        }
+
+        private bool IsPolicyLocked(string key)
+        {
+            return _backendPolicyStatus != null && _backendPolicyStatus.IsLocked("talk", key);
+        }
+
+        private bool IsPolicyGeneratePasswordEnabled()
+        {
+            if (!IsPolicyActive())
+            {
+                return true;
+            }
+
+            bool value;
+            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_generate_password", out value))
+            {
+                return value;
+            }
+
+            return true;
+        }
+
+        private void ApplyPolicyWarningUi()
+        {
+            bool visible = _backendPolicyStatus != null
+                           && _backendPolicyStatus.WarningVisible
+                           && !string.IsNullOrWhiteSpace(_backendPolicyStatus.WarningMessage);
+            _policyWarningPanel.Visible = visible;
+            _policyWarningTextLabel.Text = visible ? _backendPolicyStatus.WarningMessage : string.Empty;
+        }
+
+        private void ApplyPolicyLockState()
+        {
+            bool lockTitle = IsPolicyLocked("talk_title");
+            bool lockRoomType = IsPolicyLocked("talk_room_type");
+            bool lockPassword = IsPolicyLocked("talk_set_password");
+            bool lockLobby = IsPolicyLocked("talk_lobby_active");
+            bool lockSearch = IsPolicyLocked("talk_show_in_search");
+            bool lockUsers = IsPolicyLocked("talk_add_users");
+            bool lockGuests = IsPolicyLocked("talk_add_guests");
+
+            _titleTextBox.Enabled = !lockTitle;
+            _roomTypeComboBox.Enabled = !lockRoomType;
+            _passwordToggleCheckBox.Enabled = !lockPassword;
+            _lobbyCheckBox.Enabled = !lockLobby;
+            _searchCheckBox.Enabled = !lockSearch;
+
+            // Address book lock is applied in ApplySystemAddressbookLockState().
+            if (!lockUsers)
+            {
+                _addUsersCheckBox.Enabled = true;
+            }
+            if (!lockGuests)
+            {
+                _addGuestsCheckBox.Enabled = true;
+            }
+
+            SetTooltipWithFallback(_titleTextBox, lockTitle ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTitle, _titleLabel);
+            SetTooltipWithFallback(_roomTypeComboBox, lockRoomType ? Strings.PolicyAdminControlledTooltip : _toolTip.GetToolTip(_roomTypeComboBox), lockRoomType, _roomTypeLabel);
+            SetTooltipWithFallback(_passwordToggleCheckBox, lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPassword, _passwordLabel, _passwordTextBox);
+            SetTooltipWithFallback(_lobbyCheckBox, lockLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockLobby);
+            SetTooltipWithFallback(_searchCheckBox, lockSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockSearch);
+
+            if (lockUsers)
+            {
+                SetTooltipWithFallback(_addUsersCheckBox, Strings.PolicyAdminControlledTooltip, true);
+            }
+            if (lockGuests)
+            {
+                SetTooltipWithFallback(_addGuestsCheckBox, Strings.PolicyAdminControlledTooltip, true);
+            }
         }
 
         private void ApplySystemAddressbookLockState()
         {
             bool lockActive = !_systemAddressbookAvailable;
+            bool usersPolicyLocked = IsPolicyLocked("talk_add_users");
+            bool guestsPolicyLocked = IsPolicyLocked("talk_add_guests");
             string lockDetail = lockActive
                 ? (!string.IsNullOrWhiteSpace(_systemAddressbookError) ? _systemAddressbookError : Strings.TalkSystemAddressbookRequiredMessage)
                 : string.Empty;
@@ -625,8 +820,8 @@ namespace NcTalkOutlookAddIn.UI
                 _moderatorSearchLockLogged = false;
             }
 
-            _addUsersCheckBox.Enabled = !lockActive;
-            _addGuestsCheckBox.Enabled = !lockActive;
+            _addUsersCheckBox.Enabled = !lockActive && !usersPolicyLocked;
+            _addGuestsCheckBox.Enabled = !lockActive && !guestsPolicyLocked;
             _moderatorTextBox.Enabled = !lockActive;
             _moderatorClearButton.Enabled = !lockActive;
 
@@ -635,21 +830,28 @@ namespace NcTalkOutlookAddIn.UI
                 ? Strings.TalkSystemAddressbookRequiredMessage
                 : string.Empty;
 
-            _toolTip.SetToolTip(_addUsersCheckBox, lockActive ? Strings.TooltipAddUsersLocked : Strings.TooltipAddUsers);
-            _toolTip.SetToolTip(_addGuestsCheckBox, lockActive ? Strings.TooltipAddGuestsLocked : Strings.TooltipAddGuests);
-            _toolTip.SetToolTip(_moderatorTextBox, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator);
-            _toolTip.SetToolTip(_moderatorClearButton, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator);
+            SetTooltipWithFallback(
+                _addUsersCheckBox,
+                lockActive ? Strings.TooltipAddUsersLocked : (usersPolicyLocked ? Strings.PolicyAdminControlledTooltip : Strings.TooltipAddUsers),
+                lockActive || usersPolicyLocked);
+            SetTooltipWithFallback(
+                _addGuestsCheckBox,
+                lockActive ? Strings.TooltipAddGuestsLocked : (guestsPolicyLocked ? Strings.PolicyAdminControlledTooltip : Strings.TooltipAddGuests),
+                lockActive || guestsPolicyLocked);
+            SetTooltipWithFallback(_moderatorTextBox, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
+            SetTooltipWithFallback(_moderatorClearButton, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
 
             DiagnosticsLogger.Log(
                 LogCategories.Talk,
                 "Talk wizard system address book lock state applied (locked=" + lockActive +
                 ", available=" + _systemAddressbookAvailable +
-                ", hasError=" + (!string.IsNullOrWhiteSpace(lockDetail)) + ").");
+                ", hasError=" + (!string.IsNullOrWhiteSpace(lockDetail)) +
+                ", usersPolicyLocked=" + usersPolicyLocked +
+                ", guestsPolicyLocked=" + guestsPolicyLocked + ").");
         }
 
-        private static void OpenSystemAddressbookSetupGuide()
+        private static void OpenBrowser(string url)
         {
-            string url = Strings.TalkSystemAddressbookAdminGuideUrl;
             if (string.IsNullOrWhiteSpace(url))
             {
                 return;
@@ -665,17 +867,40 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to open system address book setup guide URL.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to open URL.", ex);
             }
+        }
+
+        private static void OpenSystemAddressbookSetupGuide()
+        {
+            OpenBrowser(Strings.TalkSystemAddressbookAdminGuideUrl);
         }
 
         private void UpdateRoomTypeTooltip()
         {
+            if (IsPolicyLocked("talk_room_type"))
+            {
+                SetTooltipWithFallback(_roomTypeComboBox, Strings.PolicyAdminControlledTooltip, true, _roomTypeLabel);
+                return;
+            }
+
             var selected = _roomTypeComboBox.SelectedItem as RoomTypeOption;
             var roomType = selected != null ? selected.Value : TalkRoomType.EventConversation;
-            _toolTip.SetToolTip(
+            SetTooltipWithFallback(
                 _roomTypeComboBox,
-                roomType == TalkRoomType.EventConversation ? Strings.TooltipRoomTypeEvent : Strings.TooltipRoomTypeStandard);
+                roomType == TalkRoomType.EventConversation ? Strings.TooltipRoomTypeEvent : Strings.TooltipRoomTypeStandard,
+                false,
+                _roomTypeLabel);
+        }
+
+        private void SetTooltipWithFallback(Control primary, string text, params Control[] fallbackTargets)
+        {
+            _disabledTooltipHints.Apply(primary, text, fallbackTargets);
+        }
+
+        private void SetTooltipWithFallback(Control primary, string text, bool showHint, params Control[] fallbackTargets)
+        {
+            _disabledTooltipHints.Apply(primary, text, showHint, fallbackTargets);
         }
 
         /**
@@ -717,8 +942,15 @@ namespace NcTalkOutlookAddIn.UI
         private void UpdatePasswordState()
         {
             bool enabled = _passwordToggleCheckBox.Checked;
-            _passwordTextBox.Enabled = enabled;
-            _passwordGenerateButton.Enabled = enabled;
+            bool lockPassword = IsPolicyLocked("talk_set_password");
+            bool allowGenerate = IsPolicyGeneratePasswordEnabled();
+            _passwordTextBox.Enabled = enabled && !lockPassword;
+            _passwordGenerateButton.Enabled = enabled && allowGenerate;
+            _disabledTooltipHints.Apply(
+                _passwordGenerateButton,
+                !enabled ? string.Empty : (allowGenerate ? string.Empty : Strings.PolicyAdminControlledTooltip),
+                enabled && !allowGenerate,
+                _passwordLabel);
         }
 
         private int GetMinPasswordLength()

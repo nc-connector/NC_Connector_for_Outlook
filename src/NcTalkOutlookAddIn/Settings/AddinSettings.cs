@@ -16,8 +16,6 @@ namespace NcTalkOutlookAddIn.Settings
      */
     internal class AddinSettings
     {
-        internal static readonly bool SeparatePasswordFeatureEnabled = false;
-
         public AddinSettings()
         {
             ServerUrl = string.Empty;
@@ -36,7 +34,7 @@ namespace NcTalkOutlookAddIn.Settings
             SharingDefaultPermWrite = false;
             SharingDefaultPermDelete = false;
             SharingDefaultPasswordEnabled = true;
-            SharingDefaultPasswordSeparateEnabled = SeparatePasswordFeatureEnabled;
+            SharingDefaultPasswordSeparateEnabled = false;
             SharingDefaultExpireDays = 7;
             SharingAttachmentsAlwaysConnector = false;
             SharingAttachmentsOfferAboveEnabled = true;

@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -41,12 +42,12 @@ namespace NcTalkOutlookAddIn.UI
         private static readonly Color ActiveQueueItemBackground = BrandingAssets.BrandBlue;
         private static readonly Color ActiveQueueItemText = Color.White;
         private readonly UiThemePalette _themePalette = UiThemeManager.DetectPalette();
-        private readonly ToolTip _toolTip = new ToolTip();
 
         private readonly FileLinkService _service;
         private readonly FileLinkRequest _request = new FileLinkRequest();
         private readonly TalkServiceConfiguration _configuration;
         private readonly PasswordPolicyInfo _passwordPolicy;
+        private readonly BackendPolicyStatus _backendPolicyStatus;
         private readonly AddinSettings _defaults;
         private readonly FileLinkWizardLaunchOptions _launchOptions;
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
@@ -58,6 +59,12 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _cancelButton = new Button();
         private readonly Button _uploadButton = new Button();
         private readonly BrandedHeader _headerPanel = new BrandedHeader();
+        private readonly Panel _policyWarningPanel = new Panel();
+        private readonly Label _policyWarningTitleLabel = new Label();
+        private readonly Label _policyWarningTextLabel = new Label();
+        private readonly LinkLabel _policyWarningLinkLabel = new LinkLabel();
+        private readonly ToolTip _toolTip = new ToolTip();
+        private readonly DisabledControlTooltipHintHelper _disabledTooltipHints;
         private Panel _stepHost;
         private readonly Panel _progressPanel = new Panel();
         private readonly ProgressBar _progressBar = new ProgressBar();
@@ -112,16 +119,18 @@ namespace NcTalkOutlookAddIn.UI
         private Panel _expirationStepPanel;
         private Panel _noteStepPanel;
 
-        internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, string basePath)
-            : this(defaults, configuration, passwordPolicy, basePath, null)
+        internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, BackendPolicyStatus policyStatus, string basePath)
+            : this(defaults, configuration, passwordPolicy, policyStatus, basePath, null)
         {
         }
 
-        internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, string basePath, FileLinkWizardLaunchOptions launchOptions)
+        internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, BackendPolicyStatus policyStatus, string basePath, FileLinkWizardLaunchOptions launchOptions)
         {
-            _defaults = defaults ?? new AddinSettings();
+            _defaults = (defaults ?? new AddinSettings()).Clone();
             _configuration = configuration;
             _passwordPolicy = passwordPolicy;
+            _backendPolicyStatus = policyStatus;
+            _disabledTooltipHints = new DisabledControlTooltipHintHelper(_toolTip);
             _service = new FileLinkService(configuration);
             _launchOptions = launchOptions ?? new FileLinkWizardLaunchOptions();
             _attachmentMode = _launchOptions.AttachmentMode;
@@ -130,6 +139,7 @@ namespace NcTalkOutlookAddIn.UI
             _request.AttachmentMode = _attachmentMode;
             _request.ShareDate = _shareDate;
             _request.ShareDatePrefixFormat = _attachmentMode ? AttachmentShareDatePrefixFormat : "yyyyMMdd";
+            ApplyPolicyDefaultsToSettings();
 
             Text = Strings.FileLinkWizardTitle;
             FormBorderStyle = FormBorderStyle.Sizable;
@@ -145,6 +155,7 @@ namespace NcTalkOutlookAddIn.UI
 
             InitializeHeader();
             InitializeWizardLayout();
+            InitializePolicyWarningPanel();
             InitializeStepGeneral();
             InitializeStepExpiration();
             InitializeStepFiles();
@@ -153,7 +164,7 @@ namespace NcTalkOutlookAddIn.UI
             InitializeUploadProgressPump();
             AdjustInitialDialogSizeForDisplay();
 
-            UiThemeManager.ApplyToForm(this, _toolTip);
+            UiThemeManager.ApplyToForm(this);
 
             LoadInitialSelections();
             if (_attachmentMode)
@@ -164,6 +175,9 @@ namespace NcTalkOutlookAddIn.UI
             {
                 ShowStep(0);
             }
+
+            ApplyPolicyWarningUi();
+            ApplyPolicyLockState();
         }
 
         internal FileLinkResult Result { get; private set; }
@@ -171,6 +185,189 @@ namespace NcTalkOutlookAddIn.UI
         internal FileLinkRequest RequestSnapshot
         {
             get { return _requestSnapshot; }
+        }
+
+        private bool IsPolicyActive()
+        {
+            return _backendPolicyStatus != null && _backendPolicyStatus.PolicyActive;
+        }
+
+        private bool IsPolicyLocked(string key)
+        {
+            return _backendPolicyStatus != null && _backendPolicyStatus.IsLocked("share", key);
+        }
+
+        /**
+         * Return true when the current user has an active backend seat.
+         * Separate password delivery is gated by this entitlement.
+         */
+        private bool HasBackendSeatEntitlement()
+        {
+            return _backendPolicyStatus != null
+                   && _backendPolicyStatus.EndpointAvailable
+                   && _backendPolicyStatus.SeatAssigned
+                   && _backendPolicyStatus.IsValid
+                   && string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /**
+         * Return the tooltip shown when separate password delivery is unavailable.
+         */
+        private string GetSeparatePasswordUnavailableTooltip()
+        {
+            if (_backendPolicyStatus == null || !_backendPolicyStatus.EndpointAvailable)
+            {
+                return Strings.SharingPasswordSeparateBackendRequiredTooltip;
+            }
+
+            if (!_backendPolicyStatus.SeatAssigned)
+            {
+                return Strings.SharingPasswordSeparateNoSeatTooltip;
+            }
+
+            if (!_backendPolicyStatus.IsValid
+                || !string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase))
+            {
+                return Strings.SharingPasswordSeparatePausedTooltip;
+            }
+
+            return string.Empty;
+        }
+
+        private void ApplyPolicyDefaultsToSettings()
+        {
+            if (!IsPolicyActive())
+            {
+                return;
+            }
+
+            bool policyBool;
+            int policyInt;
+            string policyString;
+
+            policyString = _backendPolicyStatus.GetPolicyString("share", "share_base_directory");
+            if (!string.IsNullOrWhiteSpace(policyString))
+            {
+                _request.BasePath = policyString;
+            }
+
+            policyString = _backendPolicyStatus.GetPolicyString("share", "share_name_template");
+            if (!string.IsNullOrWhiteSpace(policyString))
+            {
+                _defaults.SharingDefaultShareName = policyString;
+            }
+
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
+            {
+                _defaults.SharingDefaultPermCreate = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_edit", out policyBool))
+            {
+                _defaults.SharingDefaultPermWrite = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_delete", out policyBool))
+            {
+                _defaults.SharingDefaultPermDelete = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_set_password", out policyBool))
+            {
+                _defaults.SharingDefaultPasswordEnabled = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_send_password_separately", out policyBool))
+            {
+                _defaults.SharingDefaultPasswordSeparateEnabled = policyBool;
+            }
+            if (!HasBackendSeatEntitlement())
+            {
+                _defaults.SharingDefaultPasswordSeparateEnabled = false;
+            }
+            if (_backendPolicyStatus.TryGetPolicyInt("share", "share_expire_days", out policyInt))
+            {
+                _defaults.SharingDefaultExpireDays = Math.Max(1, policyInt);
+            }
+        }
+
+        private void ApplyPolicyWarningUi()
+        {
+            bool visible = _backendPolicyStatus != null
+                           && _backendPolicyStatus.WarningVisible
+                           && !string.IsNullOrWhiteSpace(_backendPolicyStatus.WarningMessage);
+            _policyWarningPanel.Visible = visible;
+            _policyWarningTextLabel.Text = visible ? _backendPolicyStatus.WarningMessage : string.Empty;
+            LayoutPolicyWarningPanel();
+            UpdateStepHostBounds();
+            LayoutCurrentStep();
+            LayoutProgressPanel();
+        }
+
+        private void ApplyPolicyLockState()
+        {
+            bool lockShareName = IsPolicyLocked("share_name_template");
+            bool lockPermCreate = IsPolicyLocked("share_permission_upload");
+            bool lockPermWrite = IsPolicyLocked("share_permission_edit");
+            bool lockPermDelete = IsPolicyLocked("share_permission_delete");
+            bool lockPassword = IsPolicyLocked("share_set_password");
+            bool lockPasswordSeparate = IsPolicyLocked("share_send_password_separately");
+            bool lockExpireDays = IsPolicyLocked("share_expire_days");
+            bool separatePasswordAvailable = HasBackendSeatEntitlement();
+            string separatePasswordUnavailableTooltip = GetSeparatePasswordUnavailableTooltip();
+
+            _shareNameTextBox.ReadOnly = _attachmentMode || lockShareName;
+            _permissionCreateCheckBox.Enabled = !_attachmentMode && !lockPermCreate;
+            _permissionWriteCheckBox.Enabled = !_attachmentMode && !lockPermWrite;
+            _permissionDeleteCheckBox.Enabled = !_attachmentMode && !lockPermDelete;
+            _passwordToggleCheckBox.Enabled = !lockPassword;
+            _expireToggleCheckBox.Enabled = !lockExpireDays;
+
+            SetTooltipWithFallback(_shareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _shareNameLabel, _titleLabel);
+            SetTooltipWithFallback(_permissionCreateCheckBox, lockPermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermCreate, _permissionsLabel);
+            SetTooltipWithFallback(_permissionWriteCheckBox, lockPermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermWrite, _permissionsLabel);
+            SetTooltipWithFallback(_permissionDeleteCheckBox, lockPermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermDelete, _permissionsLabel);
+            SetTooltipWithFallback(_passwordToggleCheckBox, lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPassword, _passwordTextBox);
+            SetTooltipWithFallback(
+                _passwordSeparateToggleCheckBox,
+                !separatePasswordAvailable
+                    ? separatePasswordUnavailableTooltip
+                    : (lockPasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
+                !separatePasswordAvailable || lockPasswordSeparate,
+                _passwordTextBox);
+            SetTooltipWithFallback(_expireToggleCheckBox, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, lockExpireDays, _expireHintLabel);
+            SetTooltipWithFallback(_expireDatePicker, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, false, _expireHintLabel);
+
+            UpdatePasswordState();
+            UpdateExpireState();
+        }
+
+        private void SetTooltipWithFallback(Control primary, string text, params Control[] fallbackTargets)
+        {
+            _disabledTooltipHints.Apply(primary, text, fallbackTargets);
+        }
+
+        private void SetTooltipWithFallback(Control primary, string text, bool showHint, params Control[] fallbackTargets)
+        {
+            _disabledTooltipHints.Apply(primary, text, showHint, fallbackTargets);
+        }
+
+        private static void OpenPolicyAdminGuide()
+        {
+            string url = Strings.PolicyAdminGuideUrl;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to open policy admin guide URL.", ex);
+            }
         }
 
         protected override void OnSizeChanged(EventArgs e)
@@ -182,6 +379,7 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             LayoutBottomButtons();
+            LayoutPolicyWarningPanel();
             UpdateStepHostBounds();
             LayoutCurrentStep();
             LayoutProgressPanel();
@@ -230,6 +428,39 @@ namespace NcTalkOutlookAddIn.UI
             Controls.Add(_headerPanel);
         }
 
+        private void InitializePolicyWarningPanel()
+        {
+            _policyWarningPanel.Visible = false;
+            _policyWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
+            _policyWarningPanel.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(
+                    e.Graphics,
+                    _policyWarningPanel.ClientRectangle,
+                    Color.FromArgb(176, 0, 32),
+                    ButtonBorderStyle.Solid);
+            };
+            Controls.Add(_policyWarningPanel);
+
+            _policyWarningTitleLabel.AutoSize = true;
+            _policyWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
+            _policyWarningTitleLabel.Font = new Font(_policyWarningTitleLabel.Font, FontStyle.Bold);
+            _policyWarningTitleLabel.Text = "\u26a0 " + Strings.PolicyWarningTitle;
+            _policyWarningPanel.Controls.Add(_policyWarningTitleLabel);
+
+            _policyWarningTextLabel.AutoSize = true;
+            _policyWarningTextLabel.Text = string.Empty;
+            _policyWarningPanel.Controls.Add(_policyWarningTextLabel);
+
+            _policyWarningLinkLabel.AutoSize = true;
+            _policyWarningLinkLabel.Text = Strings.PolicyWarningAdminLinkLabel;
+            _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
+            _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
+            _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
+            _policyWarningLinkLabel.LinkClicked += (s, e) => OpenPolicyAdminGuide();
+            _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
+        }
+
         private void InitializeWizardLayout()
         {
             int headerBottom = _headerPanel.Bottom;
@@ -274,8 +505,36 @@ namespace NcTalkOutlookAddIn.UI
             Controls.Add(_cancelButton);
 
             LayoutBottomButtons();
+            LayoutPolicyWarningPanel();
             UpdateStepHostBounds();
             LayoutProgressPanel();
+        }
+
+        private void LayoutPolicyWarningPanel()
+        {
+            int left = ScaleLogical(20);
+            int top = _titleLabel.Bottom + ScaleLogical(10);
+            int width = Math.Max(ScaleLogical(240), ClientSize.Width - ScaleLogical(40));
+            if (!_policyWarningPanel.Visible)
+            {
+                _policyWarningPanel.SetBounds(left, top, width, 0);
+                return;
+            }
+
+            int padding = ScaleLogical(8);
+            int textWidth = Math.Max(ScaleLogical(180), width - (padding * 2));
+            _policyWarningTitleLabel.Location = new Point(padding, padding);
+            _policyWarningTitleLabel.MaximumSize = new Size(textWidth, 0);
+
+            int textTop = _policyWarningTitleLabel.Bottom + ScaleLogical(4);
+            _policyWarningTextLabel.Location = new Point(padding, textTop);
+            _policyWarningTextLabel.MaximumSize = new Size(textWidth, 0);
+
+            int linkTop = _policyWarningTextLabel.Bottom + ScaleLogical(6);
+            _policyWarningLinkLabel.Location = new Point(padding, linkTop);
+
+            int height = _policyWarningLinkLabel.Bottom + padding;
+            _policyWarningPanel.SetBounds(left, top, width, height);
         }
 
         private void UpdateStepHostBounds()
@@ -284,6 +543,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
+
+            int top = _policyWarningPanel.Visible
+                ? _policyWarningPanel.Bottom + ScaleLogical(10)
+                : _titleLabel.Bottom + ScaleLogical(16);
+            _stepHost.Location = new Point(ScaleLogical(20), top);
 
             int stepHostWidth = Math.Max(0, ClientSize.Width - 40);
             int stepHostBottom = GetStepHostBottomLimit();
@@ -426,10 +690,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _passwordSeparateToggleCheckBox.Text = Strings.FileLinkWizardPasswordSeparateToggle;
             _passwordSeparateToggleCheckBox.AutoSize = true;
-            _passwordSeparateToggleCheckBox.Checked =
-                AddinSettings.SeparatePasswordFeatureEnabled
-                && _defaults.SharingDefaultPasswordSeparateEnabled;
-            _toolTip.SetToolTip(_passwordSeparateToggleCheckBox, Strings.TooltipSharingPasswordSeparate);
+            _passwordSeparateToggleCheckBox.Checked = _defaults.SharingDefaultPasswordSeparateEnabled;
             panel.Controls.Add(_passwordSeparateToggleCheckBox);
 
             if (_attachmentMode)
@@ -1129,8 +1390,8 @@ namespace NcTalkOutlookAddIn.UI
             _request.PasswordEnabled = _passwordToggleCheckBox.Checked;
             _request.Password = _passwordToggleCheckBox.Checked ? _passwordTextBox.Text : null;
             _request.PasswordSeparateEnabled =
-                AddinSettings.SeparatePasswordFeatureEnabled
-                && _passwordToggleCheckBox.Checked
+                _passwordToggleCheckBox.Checked
+                && HasBackendSeatEntitlement()
                 && _passwordSeparateToggleCheckBox.Checked;
             _request.ExpireEnabled = _expireToggleCheckBox.Checked;
             _request.ExpireDate = _expireToggleCheckBox.Checked ? _expireDatePicker.Value.Date : (DateTime?)null;
@@ -1456,13 +1717,20 @@ namespace NcTalkOutlookAddIn.UI
         private void UpdatePasswordState()
         {
             bool enabled = _passwordToggleCheckBox.Checked;
+            bool lockPasswordSeparate = IsPolicyLocked("share_send_password_separately");
+            bool separatePasswordAvailable = HasBackendSeatEntitlement();
+            string separatePasswordUnavailableTooltip = GetSeparatePasswordUnavailableTooltip();
             _passwordTextBox.Enabled = enabled;
             _passwordGenerateButton.Enabled = enabled;
-            bool separatePasswordInteractive = AddinSettings.SeparatePasswordFeatureEnabled && enabled;
-            _passwordSeparateToggleCheckBox.AutoCheck = separatePasswordInteractive;
-            _passwordSeparateToggleCheckBox.TabStop = separatePasswordInteractive;
-            _passwordSeparateToggleCheckBox.ForeColor = separatePasswordInteractive ? _themePalette.Text : _themePalette.DisabledText;
-            if (!separatePasswordInteractive)
+            _passwordSeparateToggleCheckBox.Enabled = enabled && !lockPasswordSeparate && separatePasswordAvailable;
+            SetTooltipWithFallback(
+                _passwordSeparateToggleCheckBox,
+                !separatePasswordAvailable
+                    ? separatePasswordUnavailableTooltip
+                    : (lockPasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
+                !separatePasswordAvailable || lockPasswordSeparate,
+                _passwordTextBox);
+            if (!enabled || !separatePasswordAvailable)
             {
                 _passwordSeparateToggleCheckBox.Checked = false;
             }
@@ -1476,7 +1744,8 @@ namespace NcTalkOutlookAddIn.UI
         private void UpdateExpireState()
         {
             bool enabled = _expireToggleCheckBox.Checked;
-            _expireDatePicker.Enabled = enabled;
+            bool lockExpireDays = IsPolicyLocked("share_expire_days");
+            _expireDatePicker.Enabled = enabled && !lockExpireDays;
             _expireHintLabel.Enabled = enabled;
 
             if (_expirationStepPanel != null)

@@ -29,6 +29,12 @@ namespace NcTalkOutlookAddIn.Models
 
         public string Description { get; set; }
 
+        public string DescriptionLanguage { get; set; }
+
+        public string DescriptionType { get; set; }
+
+        public string InvitationTemplate { get; set; }
+
         public bool AddUsers { get; set; }
 
         public bool AddGuests { get; set; }

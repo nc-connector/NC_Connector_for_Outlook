@@ -627,7 +627,8 @@ namespace NcTalkOutlookAddIn.Services
                     resolvedAny = true;
                 }
                 else if (statusCode == HttpStatusCode.NotFound ||
-                         statusCode == HttpStatusCode.Conflict)
+                         statusCode == HttpStatusCode.Conflict ||
+                         IsRecoverableEventBindingStatus(statusCode))
                 {
                     isEventConversation = false;
                     resolvedAny = true;
@@ -636,7 +637,8 @@ namespace NcTalkOutlookAddIn.Services
             catch (TalkServiceException ex)
             {
                 if (ex.StatusCode == HttpStatusCode.NotFound ||
-                    ex.StatusCode == HttpStatusCode.Conflict)
+                    ex.StatusCode == HttpStatusCode.Conflict ||
+                    IsRecoverableEventBindingStatus(ex.StatusCode))
                 {
                     isEventConversation = false;
                     resolvedAny = true;
@@ -671,7 +673,9 @@ namespace NcTalkOutlookAddIn.Services
                         resolvedAny = true;
                     }
                 }
-                else if (statusCode == HttpStatusCode.NotFound)
+                else if (statusCode == HttpStatusCode.NotFound ||
+                         statusCode == HttpStatusCode.MethodNotAllowed ||
+                         statusCode == HttpStatusCode.NotImplemented)
                 {
                     lobbyEnabled = false;
                     resolvedAny = true;
@@ -679,7 +683,9 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (TalkServiceException ex)
             {
-                if (ex.StatusCode == HttpStatusCode.NotFound)
+                if (ex.StatusCode == HttpStatusCode.NotFound ||
+                    ex.StatusCode == HttpStatusCode.MethodNotAllowed ||
+                    ex.StatusCode == HttpStatusCode.NotImplemented)
                 {
                     lobbyEnabled = false;
                     resolvedAny = true;

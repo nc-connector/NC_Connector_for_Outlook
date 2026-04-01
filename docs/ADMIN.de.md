@@ -8,6 +8,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 - [Updates / Upgrade-Verhalten](#updates--upgrade-verhalten)
 - [Dateien & Registry](#dateien--registry)
 - [Einstellungen (Profil-XML)](#einstellungen-profil-xml)
+- [Compose-Freigabe-Lifecycle (3.0.0)](#compose-freigabe-lifecycle-300)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [Systemadressbuch erforderlich fuer Benutzersuche und Moderator-Auswahl](#systemadressbuch-erforderlich-fuer-benutzersuche-und-moderator-auswahl)
 - [Logging / Support](#logging--support)
@@ -21,7 +22,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 Beispiel (silent):
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-2.2.9.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.0.0.msi" /qn /norestart
 ```
 
 Danach Outlook starten. Im Ribbon erscheint der Tab **NC Connector** (Kalender/Termin + E-Mail).
@@ -112,6 +113,20 @@ Empfehlung:
 
 - Nur Base-URL und Defaults pre-seeden.
 - Credentials entweder ueber Login Flow v2 oder per Benutzer setzen lassen (empfohlen fuer DPAPI-Kompatibilitaet).
+
+## Compose-Freigabe-Lifecycle (3.0.0)
+
+### Attachment-Automatisierung und Cleanup-Vertrag
+- Im Compose-Attachment-Modus werden serverseitige Artefakte direkt nach Share-Erstellung fuer Cleanup-Tracking registriert.
+- Cleanup wird erst nach bestaetigtem erfolgreichem Hauptversand wieder entfernt.
+- Wird das Compose-Fenster ohne erfolgreichen Versand geschlossen, loescht das Add-in die erzeugten Share-Ordner-Artefakte serverseitig (best effort, mit Grace-Timer fuer Send/Close-Race).
+
+### Separater Passwort-Follow-up-Versand
+- Ist `Passwort separat senden` aktiv, enthaelt der Haupt-HTML-Block kein Inline-Passwort.
+- Der Passwort-Follow-up-Versand startet erst nach bestaetigtem erfolgreichem Hauptversand.
+- Versandstrategie:
+  - zuerst automatischer Versand
+  - bei Fehlern ein vorbefuellter manueller Fallback-Entwurf.
 
 ## Internet Free/Busy Gateway (IFB)
 
@@ -204,5 +219,4 @@ netstat -ano | Select-String ":7777"
 - App-Passwort gültig?
 - Talk installiert?
 - Password Policy App optional: bei fehlender App wird lokal generiert (Fallback)
-
 

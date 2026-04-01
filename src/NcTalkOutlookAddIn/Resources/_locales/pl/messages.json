@@ -14,12 +14,6 @@
   "ui_button_apply": {
     "message": "Zastosuj"
   },
-  "ui_button_apply_progress": {
-    "message": "Zastosowywanie..."
-  },
-  "ui_button_create_progress": {
-    "message": "Tworzenie..."
-  },
   "ui_button_clear": {
     "message": "Wyczyść"
   },
@@ -215,12 +209,6 @@
   "ui_alert_location_missing": {
     "message": "(Uwaga: pole Lokalizacja nie zostało wypełnione automatycznie.)"
   },
-  "ui_alert_event_fallback": {
-    "message": "Uwaga: serwer nie obsługuje rozmów wydarzeń. Utworzono rozmowę grupową."
-  },
-  "ui_alert_generic_fallback": {
-    "message": "(Uwaga: utworzono link zapasowy bez obsługi API.)"
-  },
   "ui_alert_reason": {
     "message": "Powód: $1"
   },
@@ -235,15 +223,6 @@
   },
   "ui_alert_delegation_removed": {
     "message": "Zostałeś usunięty z rozmowy."
-  },
-  "ui_alert_password_protected": {
-    "message": "Uwaga: ta rozmowa jest chroniona hasłem."
-  },
-  "ui_prompt_base_url": {
-    "message": "Bazowy URL Nextcloud (np. https://cloud.example.com):"
-  },
-  "ui_prompt_title": {
-    "message": "Tytuł nowej publicznej rozmowy:"
   },
   "ui_default_title": {
     "message": "Spotkanie"
@@ -630,7 +609,7 @@
     "message": "https://nc-connector.de"
   },
   "options_about_overview_text": {
-    "message": "Dlaczego to wiecej niz dodatek do linkow do plikow?\nNC Connector obejmuje nie tylko linki do plikow, ale caly workflow zespolu w kliencie pocztowym.\n\nPodstawa techniczna\n- Dodatki Thunderbird i Outlook gotowe do uzycia bezposrednio, takze bez backendu Nextcloud\n- Opcjonalny backend Nextcloud do centralnego przydzielania seatow i polityk\n- Model seatow w backendzie: Community z 1 darmowym seatem, Pro od 5 seatow (1 seat = 1 uzytkownik Nextcloud)\n\n- Udostepnianie plikow z haslem, data wygasniecia i opcjonalnym oddzielnym dostarczeniem hasla\n- Tworzenie i aktualizacja spotkan Talk bezposrednio z wydarzen kalendarza\n- Automatyzacja zalacznikow z jasnymi zasadami zamiast recznych pojedynczych krokow\n- Centralny przydzial seatow w backendzie Nextcloud (1 seat = 1 uzytkownik Nextcloud)"
+    "message": "Więcej niż tylko linki do plików\n\nNC Connector łączy bezpieczne udostępnianie plików, spotkania Talk i automatyzację załączników bezpośrednio z Thunderbirdem i Outlookiem. Dzięki temu ważne przepływy pracy zespołu pozostają tam, gdzie powinny: w kliencie poczty i kalendarza.\n\nCo obejmuje NC Connector\n- Udostępnianie plików z hasłem, datą wygaśnięcia i opcjonalnym oddzielnym wysłaniem hasła\n- Tworzenie i aktualizowanie spotkań Talk bezpośrednio z wydarzeń kalendarza\n- Automatyzację załączników z jasnymi regułami zamiast ręcznych pojedynczych kroków\n- Spójne bloki udostępniania i zaproszeń bezpośrednio w codziennym przepływie pracy\n\nOpcjonalnie z backendem Nextcloud\n- Centralne przydzielanie Seatów i zarządzanie politykami\n- Własne szablony i projekty dla udostępnień oraz zaproszeń Talk\n- Oddzielne dostarczanie haseł i centralne sterowanie dla organizacji\n- 1 Seat = 1 użytkownik Nextcloud\n\nBez backendu dodatki pozostają od razu gotowe do użycia. Z backendem dochodzi centralne sterowanie dla zespołów i organizacji."
   },
   "options_about_more_info_label": {
     "message": "Wiecej informacji -->"
@@ -983,14 +962,8 @@
   "sharing_prompt_rename_duplicate": {
     "message": "Plik \"$1\" już istnieje w kolejce. Wpisz nową nazwę."
   },
-  "sharing_prompt_rename_existing": {
-    "message": "Plik \"$1\" już istnieje na serwerze. Wpisz nową nazwę."
-  },
   "sharing_message_rename_cancelled": {
     "message": "Przesyłanie anulowane, ponieważ nie podano nazwy zastępczej."
-  },
-  "sharing_password_policy_error": {
-    "message": "Hasło musi zawierać co najmniej 10 znaków, w tym małe i wielkie litery oraz znak specjalny."
   },
   "sharing_html_intro_line": {
     "message": "Chcę udostępnić pliki w bezpieczny sposób i chronić Twoją prywatność. Kliknij poniższy link, aby pobrać pliki."
@@ -1293,16 +1266,16 @@
     "message": "Wyślij hasło w osobnym e-mailu"
   },
   "sharing_password_separate_tooltip_line1": {
-    "message": "Ta opcja jest wyłączona w tej wersji."
+    "message": "Główny blok udostępniania nie zawiera wbudowanego hasła."
   },
   "sharing_password_separate_tooltip_line2": {
-    "message": "Dostarczenie hasła w osobnym e-mailu będzie możliwe w przyszłej wersji Pro."
+    "message": "Hasło zostanie wysłane w kolejnym e-mailu do tych samych odbiorców."
   },
   "sharing_password_separate_tooltip_line3": {
-    "message": "Na razie hasło znajduje się w głównym bloku udostępniania."
+    "message": "Jeśli automatyczne wysyłanie nie powiedzie się, zostanie otwarta ręczna wersja robocza zastępcza."
   },
   "sharing_password_separate_tooltip_title": {
-    "message": "Już wkrótce (funkcja Pro)"
+    "message": "✉️ Wyślij hasło osobno"
   },
   "talk_option_moderator_title": {
     "message": "👑 Delegacja Moderatora"
@@ -1324,5 +1297,35 @@
   },
   "talk_system_addressbook_admin_link_label": {
     "message": "Przewodnik konfiguracji"
+  },
+  "policy_warning_no_seat": {
+    "message": "Do twojego konta nie przypisano żadnego seat dla NC Connector. Zostaną użyte ustawienia lokalne. Skontaktuj się z administratorem Nextcloud."
+  },
+  "policy_admin_controlled_tooltip": {
+    "message": "Sterowane przez administratora"
+  },
+  "policy_warning_admin_link_label": {
+    "message": "Otwórz instrukcję konfiguracji dla administratora"
+  },
+  "policy_warning_title": {
+    "message": "Polityka backendu jest obecnie niedostępna."
+  },
+  "policy_warning_license_invalid": {
+    "message": "Licencja lub przydział seat dla NC Connector jest obecnie nieważny. Zostaną użyte ustawienia lokalne. Skontaktuj się z administratorem Nextcloud."
+  },
+  "policy_warning_seat_state_format": {
+    "message": "Seat NC Connector jest obecnie w stanie \"$1\". Zostaną użyte ustawienia lokalne. Skontaktuj się z administratorem Nextcloud."
+  },
+  "options_lang_custom": {
+    "message": "Niestandardowy (szablon backendu)"
+  },
+  "sharing_password_separate_backend_required_tooltip": {
+    "message": "Ta funkcja wymaga backendu Nextcloud."
+  },
+  "sharing_password_separate_no_seat_tooltip": {
+    "message": "Administrator musi przypisać do Twojego konta seat NC Connector, aby użyć tej funkcji."
+  },
+  "sharing_password_separate_paused_tooltip": {
+    "message": "Twój seat NC Connector jest obecnie wstrzymany. Skontaktuj się z administratorem Nextcloud."
   }
 }

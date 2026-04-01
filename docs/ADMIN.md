@@ -7,6 +7,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 - [Updates / upgrade behavior](#updates--upgrade-behavior)
 - [Files & registry](#files--registry)
 - [Settings (profile XML)](#settings-profile-xml)
+- [Compose sharing lifecycle (3.0.0)](#compose-sharing-lifecycle-300)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
 - [Logging / support](#logging--support)
@@ -19,7 +20,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 Silent install example:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-2.2.9.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.0.0.msi" /qn /norestart
 ```
 
 Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).
@@ -94,6 +95,47 @@ Because profile XML settings live in the user profile, common rollout approaches
 Recommendation:
 - Pre-seed only base URL and defaults.
 - Let users fetch credentials via Login Flow v2 or enter them manually (recommended for DPAPI compatibility).
+
+### Optional NC Connector backend policies
+
+If the optional Nextcloud backend app `ncc_backend_4mc` is installed, Outlook also evaluates:
+- `/apps/ncc_backend_4mc/api/v1/status`
+
+Runtime behavior:
+- checked when Talk wizard opens
+- checked when Sharing wizard opens
+- checked when Settings open or are saved
+- valid active seat => backend policy values apply and `policy_editable=false` fields are locked in the UI
+- missing backend / no seat / invalid seat => local Outlook settings remain active
+- if the backend is unreachable, Outlook falls back to the locally saved add-in settings
+- if the backend is reachable but the license/seat state is no longer usable, Outlook also falls back to the locally saved add-in settings
+- invalid seat states remain visible in the UI so users can contact their administrator
+- separate password delivery is only available when the backend endpoint exists and the current user has an active assigned seat
+- backend custom templates stay inactive until the corresponding language override is set to `custom`
+- the `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
+- if `custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
+- `policy.talk.event_description_type` may be `html` or `plain_text`; when `html` is active, Outlook writes the Talk block into the open appointment editor as HTML so the event description renders rich text while the synchronized plain-text body remains available for downstream sync paths
+
+Central policy can currently control:
+- Talk defaults and lock state
+- Sharing defaults and lock state
+- share HTML/password templates
+- Talk description language / custom invitation template
+
+## Compose sharing lifecycle (3.0.0)
+
+### Attachment automation and cleanup contract
+- In compose attachment mode, created server artifacts are tracked immediately after share creation.
+- Cleanup tracking is cleared only after a confirmed successful primary mail send.
+- If a compose window is closed without a successful send, the add-in deletes the created share folder artifacts server-side (best effort, with send/close grace timer handling).
+
+### Separate password follow-up mail
+- If `Send password separately` is enabled, the main HTML block does not contain inline password text.
+- This feature is only available when the NC Connector backend endpoint exists and the current user has an active assigned seat.
+- Follow-up password mail dispatch runs only after the primary mail send is confirmed.
+- Dispatch strategy:
+  - first try automatic send
+  - if automatic send fails, open a prefilled manual fallback draft.
 
 ## Internet Free/Busy Gateway (IFB)
 
@@ -182,5 +224,4 @@ netstat -ano | Select-String ":7777"
 - App password valid?
 - Talk installed/enabled?
 - Password Policy app optional: if missing, passwords are generated locally (fallback)
-
 

@@ -4,7 +4,36 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
-## [2.2.9] - 2026-03-24
+## [3.0.0] - 2026-03-30
+
+### Added
+- Optional NC Connector backend policy runtime for Talk and Sharing:
+  - backend status endpoint is queried on Talk wizard open, Sharing wizard open, and Settings open/save
+  - active valid seats enable backend policy values and `policy_editable` locks
+  - paused/invalid seat states show an in-product warning and fall back to local add-in settings
+  - central templates are supported for share HTML/password blocks and Talk description text
+  - separate password follow-up delivery is explicitly gated behind backend endpoint + active assigned seat
+  - backend custom text templates are only activated when the language override is set to `Custom`, otherwise local UI-default text remains active
+  - backend attachment-threshold policy now treats `attachments_min_size_mb: null` as an explicit "disabled" state
+
+### Changed
+- Release line/version references were aligned to `3.0.0` across assembly metadata, installer defaults, readmes, and admin/development docs.
+- Backend policy runtime is now fetched live on the relevant entry points and evaluated by compose attachment automation as well as in Settings/Wizard UI, so locked backend attachment rules stay authoritative without reusing stale cached policy data.
+- Backend policy runtime now targets `/apps/ncc_backend_4mc/api/v1/status`; if the backend is unreachable, the license/seat state is no longer usable, or the backend grace window has expired, Outlook falls back to local add-in settings.
+- Talk event descriptions now honor backend `event_description_type`; HTML templates are written into the open Outlook appointment editor with stable NC block markers while `Body` stays aligned for room-description sync.
+- Locked settings and wizard controls now expose their admin/seat/backend explanation through active hint anchors instead of relying on WinForms tooltips on disabled controls.
+
+### Fixed
+- Outlook issue #4 (`HTTP 400` at final share creation) was hardened in the sharing service:
+  - create-share now extracts and surfaces OCS server error details instead of only generic WebException text
+  - share creation now follows the documented Nextcloud OCS contract more closely: `label` is sent on create, mutable metadata is updated separately through form-encoded OCS update arguments
+  - the previous `HTTP 400` retry path that silently dropped optional `label` / `note` metadata was removed
+- Runtime exceptions are now always written to `addin-runtime.log`, even when the optional debug log switch is off.
+- Backend custom share HTML in attachment mode now removes only the `RIGHTS` row, preventing truncated or fragmentary HTML blocks.
+- Compose mail insertion now prefers the `HTMLBody` path for backend HTML blocks, avoiding partial insertion from the old Word-editor fallback path.
+- Talk appointment save handling now performs a short deferred post-write lobby verification so start-time changes from externally created appointments are still picked up after Outlook commits the final value.
+
+## [2.3.0] - 2026-02-28
 
 ### Added
 - Compose attachment automation settings:
@@ -64,10 +93,13 @@ This project follows the principles of **Keep a Changelog** and **Semantic Versi
   - if event conversation prerequisites are missing, creation fails fast with a clear service error.
 
 ### Documentation
-- Corrected all 2.2.9 branch version references in README/admin/development docs:
-  - MSI examples now use `NCConnectorForOutlook-2.2.9.msi`
-  - local path examples now use `nc4ol-2.2.9`.
-- Clarified MSI upgrade/reinstall semantics in README/admin docs (same/older/newer package install over existing installation).
+- Updated `README.md` / `README.de.md` with 2.3.0 operational behavior:
+  - profile-based settings XML + legacy migration cleanup
+  - consolidated runtime path `%LOCALAPPDATA%\NC4OL`
+  - compose cleanup and separate-password follow-up flow semantics.
+- Clarified MSI reinstall/update semantics in README/admin docs (same/older/newer package install over existing installation).
+- Expanded `docs/ADMIN.md` / `docs/ADMIN.de.md` with compose-sharing lifecycle details (cleanup contract and password follow-up dispatch behavior).
+- Expanded `docs/DEVELOPMENT.md` / `docs/DEVELOPMENT.de.md` with explicit 2.3.0 implementation deltas and runtime contracts used for parity work.
 
 ## [2.2.7] - 2026-02-13
 

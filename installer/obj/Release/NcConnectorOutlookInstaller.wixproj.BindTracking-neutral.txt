@@ -1,9 +1,9 @@
-BuiltPdbOutput	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9\installer\obj\Release\NCConnectorForOutlook.wixpdb
-BuiltTargetOutput	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9\installer\obj\Release\NCConnectorForOutlook.msi
+BuiltPdbOutput	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0\installer\obj\Release\NCConnectorForOutlook.wixpdb
+BuiltTargetOutput	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0\installer\obj\Release\NCConnectorForOutlook.msi
 Input	assets\nc-connector.ico
 Input	C:\Users\Bastian\.nuget\packages\wixtoolset.http.wixext\6.0.2\wixext6\WixToolset.Http.wixext.dll
-Input	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9\src\\NcTalkOutlookAddIn\\bin\\Release\\LICENSE.txt
-Input	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9\src\\NcTalkOutlookAddIn\\bin\\Release\\NcTalkOutlookAddIn.dll
-Input	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9\src\\NcTalkOutlookAddIn\\bin\\Release\\NcTalkOutlookAddIn.dll.config
-Intermediate	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9\installer\obj\Release\#cab1.cab
-Intermediate	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9\installer\obj\Release\WixToolset.Http.wixext_JkHKa2mzXQ7PXgDnOCh798Lq2sc\wix-ir\httpca.dll-1
+Input	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0\src\\NcTalkOutlookAddIn\\bin\\Release\\LICENSE.txt
+Input	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0\src\\NcTalkOutlookAddIn\\bin\\Release\\NcTalkOutlookAddIn.dll
+Input	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0\src\\NcTalkOutlookAddIn\\bin\\Release\\NcTalkOutlookAddIn.dll.config
+Intermediate	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0\installer\obj\Release\#cab1.cab
+Intermediate	C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0\installer\obj\Release\WixToolset.Http.wixext_JkHKa2mzXQ7PXgDnOCh798Lq2sc\wix-ir\httpca.dll-1

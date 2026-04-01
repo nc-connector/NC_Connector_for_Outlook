@@ -43,6 +43,11 @@ namespace NcTalkOutlookAddIn.UI
         private readonly TabPage _fileLinkTab = new TabPage(Strings.TabFileLink);
         private readonly TabPage _talkTab = new TabPage(Strings.TabTalkLink);
         private readonly ToolTip _toolTip = new ToolTip();
+        private readonly DisabledControlTooltipHintHelper _disabledTooltipHints;
+        private readonly Panel _policyWarningPanel = new Panel();
+        private readonly Label _policyWarningTitleLabel = new Label();
+        private readonly Label _policyWarningTextLabel = new Label();
+        private readonly LinkLabel _policyWarningLinkLabel = new LinkLabel();
 
         private readonly TextBox _serverUrlTextBox = new TextBox();
         private readonly TextBox _usernameTextBox = new TextBox();
@@ -122,6 +127,7 @@ namespace NcTalkOutlookAddIn.UI
         private bool _talkAddressbookLockActive;
         private string _talkAddressbookLockDetail = string.Empty;
         private bool _layoutApplying;
+        private BackendPolicyStatus _backendPolicyStatus;
 
         internal AddinSettings Result
         {
@@ -129,9 +135,11 @@ namespace NcTalkOutlookAddIn.UI
             private set { _result = value; }
         }
 
-        internal SettingsForm(AddinSettings settings, Outlook.Application outlookApplication)
+        internal SettingsForm(AddinSettings settings, Outlook.Application outlookApplication, BackendPolicyStatus initialPolicyStatus)
         {
             _outlookApplication = outlookApplication;
+            _backendPolicyStatus = initialPolicyStatus;
+            _disabledTooltipHints = new DisabledControlTooltipHintHelper(_toolTip);
             AutoScaleMode = AutoScaleMode.Dpi;
             AutoScaleDimensions = new SizeF(96F, 96F);
             Text = Strings.SettingsFormTitle;
@@ -167,6 +175,7 @@ namespace NcTalkOutlookAddIn.UI
             _tabControl.TabPages.Add(_aboutTab);
             _tabControl.SelectedIndexChanged += OnSelectedTabChanged;
             Controls.Add(_tabControl);
+            InitializePolicyWarningPanel();
 
             InitializeGeneralTab();
             InitializeTalkTab();
@@ -205,6 +214,39 @@ namespace NcTalkOutlookAddIn.UI
 
             AcceptButton = _saveButton;
             CancelButton = _cancelButton;
+        }
+
+        private void InitializePolicyWarningPanel()
+        {
+            _policyWarningPanel.Visible = false;
+            _policyWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
+            _policyWarningPanel.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(
+                    e.Graphics,
+                    _policyWarningPanel.ClientRectangle,
+                    Color.FromArgb(176, 0, 32),
+                    ButtonBorderStyle.Solid);
+            };
+            Controls.Add(_policyWarningPanel);
+
+            _policyWarningTitleLabel.AutoSize = true;
+            _policyWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
+            _policyWarningTitleLabel.Font = new Font(_policyWarningTitleLabel.Font, FontStyle.Bold);
+            _policyWarningTitleLabel.Text = "\u26a0 " + Strings.PolicyWarningTitle;
+            _policyWarningPanel.Controls.Add(_policyWarningTitleLabel);
+
+            _policyWarningTextLabel.AutoSize = true;
+            _policyWarningTextLabel.Text = string.Empty;
+            _policyWarningPanel.Controls.Add(_policyWarningTextLabel);
+
+            _policyWarningLinkLabel.AutoSize = true;
+            _policyWarningLinkLabel.Text = Strings.PolicyWarningAdminLinkLabel;
+            _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
+            _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
+            _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
+            _policyWarningLinkLabel.LinkClicked += (s, e) => OpenBrowser(Strings.PolicyAdminGuideUrl);
+            _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
         }
 
         private void InitializeGeneralTab()
@@ -318,6 +360,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             base.OnShown(e);
             ApplyResponsiveLayout(true);
+            RefreshBackendPolicyStatus("settings_open");
         }
 
         private void ApplyResponsiveLayout(bool ensureClientWidth)
@@ -374,6 +417,31 @@ namespace NcTalkOutlookAddIn.UI
                 }
 
                 int tabTop = HeaderHeight + outerPadding;
+                if (_policyWarningPanel.Visible)
+                {
+                    int warningPadding = ScaleLogical(8);
+                    int panelWidth = Math.Max(ScaleLogical(420), ClientSize.Width - (outerPadding * 2));
+                    int warningTextWidth = Math.Max(ScaleLogical(220), panelWidth - (warningPadding * 2));
+
+                    _policyWarningTitleLabel.Location = new Point(warningPadding, warningPadding);
+                    _policyWarningTitleLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                    int warningTextTop = _policyWarningTitleLabel.Bottom + ScaleLogical(4);
+                    _policyWarningTextLabel.Location = new Point(warningPadding, warningTextTop);
+                    _policyWarningTextLabel.MaximumSize = new Size(warningTextWidth, 0);
+
+                    int warningLinkTop = _policyWarningTextLabel.Bottom + ScaleLogical(6);
+                    _policyWarningLinkLabel.Location = new Point(warningPadding, warningLinkTop);
+
+                    int panelHeight = _policyWarningLinkLabel.Bottom + warningPadding;
+                    _policyWarningPanel.SetBounds(outerPadding, tabTop, panelWidth, panelHeight);
+                    tabTop = _policyWarningPanel.Bottom + ScaleLogical(8);
+                }
+                else
+                {
+                    _policyWarningPanel.SetBounds(outerPadding, tabTop, Math.Max(ScaleLogical(420), ClientSize.Width - (outerPadding * 2)), 0);
+                }
+
                 int tabBottom = hasStatus
                     ? Math.Max(tabTop + ScaleLogical(220), statusTop - ScaleLogical(4))
                     : Math.Max(tabTop + ScaleLogical(220), buttonTop - ScaleLogical(4));
@@ -645,10 +713,13 @@ namespace NcTalkOutlookAddIn.UI
             _advancedTab.Controls.Add(_shareBlockLangLabel);
 
             _shareBlockLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _shareBlockLangCombo.DrawMode = DrawMode.OwnerDrawFixed;
             _shareBlockLangCombo.IntegralHeight = false;
             _shareBlockLangCombo.Location = new Point(260, langTop - 2);
             _shareBlockLangCombo.Width = 240;
-            PopulateLanguageOverrideCombo(_shareBlockLangCombo);
+            _shareBlockLangCombo.DrawItem += HandleLanguageComboDrawItem;
+            _shareBlockLangCombo.SelectionChangeCommitted += HandleLanguageComboSelectionCommitted;
+            PopulateLanguageOverrideCombo(_shareBlockLangCombo, "share");
             _advancedTab.Controls.Add(_shareBlockLangCombo);
 
             _eventDescriptionLangLabel.Text = Strings.AdvancedEventDescriptionLangLabel;
@@ -657,10 +728,13 @@ namespace NcTalkOutlookAddIn.UI
             _advancedTab.Controls.Add(_eventDescriptionLangLabel);
 
             _eventDescriptionLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _eventDescriptionLangCombo.DrawMode = DrawMode.OwnerDrawFixed;
             _eventDescriptionLangCombo.IntegralHeight = false;
             _eventDescriptionLangCombo.Location = new Point(260, langTop + 30);
             _eventDescriptionLangCombo.Width = 240;
-            PopulateLanguageOverrideCombo(_eventDescriptionLangCombo);
+            _eventDescriptionLangCombo.DrawItem += HandleLanguageComboDrawItem;
+            _eventDescriptionLangCombo.SelectionChangeCommitted += HandleLanguageComboSelectionCommitted;
+            PopulateLanguageOverrideCombo(_eventDescriptionLangCombo, "talk");
             _advancedTab.Controls.Add(_eventDescriptionLangCombo);
         }
 
@@ -971,9 +1045,7 @@ namespace NcTalkOutlookAddIn.UI
             _sharingDefaultPermWriteCheckBox.Checked = Result.SharingDefaultPermWrite;
             _sharingDefaultPermDeleteCheckBox.Checked = Result.SharingDefaultPermDelete;
             _sharingDefaultPasswordCheckBox.Checked = Result.SharingDefaultPasswordEnabled;
-            _sharingDefaultPasswordSeparateCheckBox.Checked =
-                AddinSettings.SeparatePasswordFeatureEnabled
-                && Result.SharingDefaultPasswordSeparateEnabled;
+            _sharingDefaultPasswordSeparateCheckBox.Checked = HasBackendSeatEntitlement() && Result.SharingDefaultPasswordSeparateEnabled;
             int expireDays = Result.SharingDefaultExpireDays;
             if (expireDays <= 0)
             {
@@ -998,18 +1070,18 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultSearchCheckBox.Checked = Result.TalkDefaultSearchVisible;
             SelectTalkRoomType(Result.TalkDefaultRoomType);
             UpdateTalkRoomTypeTooltip();
-            SelectLanguageChoice(_shareBlockLangCombo, Result.ShareBlockLang);
-            SelectLanguageChoice(_eventDescriptionLangCombo, Result.EventDescriptionLang);
+            RefreshLanguageOverrideCombos(Result.ShareBlockLang, Result.EventDescriptionLang);
             UpdateDebugPathLabel();
             UpdateAboutTab();
             RefreshSharingAttachmentLockState();
             UpdateSharingAttachmentOptionsState();
-            ApplySharingPasswordSeparateAvailability();
+            ApplyBackendPolicyStatus("settings_init");
             RefreshTalkSystemAddressbookState(true, "settings_open");
         }
 
         private void OnSaveButtonClick(object sender, EventArgs e)
         {
+            RefreshBackendPolicyStatus("settings_save");
             RefreshTalkSystemAddressbookState(true, "settings_save");
 
             Result.ServerUrl = _serverUrlTextBox.Text.Trim();
@@ -1028,9 +1100,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.SharingDefaultPermDelete = _sharingDefaultPermDeleteCheckBox.Checked;
             Result.SharingDefaultPasswordEnabled = _sharingDefaultPasswordCheckBox.Checked;
             Result.SharingDefaultPasswordSeparateEnabled =
-                AddinSettings.SeparatePasswordFeatureEnabled
-                && _sharingDefaultPasswordCheckBox.Checked
-                && _sharingDefaultPasswordSeparateCheckBox.Checked;
+                HasBackendSeatEntitlement() && _sharingDefaultPasswordSeparateCheckBox.Checked;
             Result.SharingDefaultExpireDays = (int)_sharingDefaultExpireDaysUpDown.Value;
             Result.SharingAttachmentsAlwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
             Result.SharingAttachmentsOfferAboveEnabled = _sharingAttachmentsOfferAboveCheckBox.Checked;
@@ -1230,6 +1300,224 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
+        private bool IsPolicyActive()
+        {
+            return _backendPolicyStatus != null && _backendPolicyStatus.PolicyActive;
+        }
+
+        private bool IsPolicyLocked(string domain, string key)
+        {
+            return _backendPolicyStatus != null && _backendPolicyStatus.IsLocked(domain, key);
+        }
+
+        /**
+         * Return true when the backend endpoint exists.
+         */
+        private bool IsBackendEndpointAvailable()
+        {
+            return _backendPolicyStatus != null && _backendPolicyStatus.EndpointAvailable;
+        }
+
+        /**
+         * Return true when the current user has an active backend seat.
+         * This gate controls premium-only UI features independently from policy locks.
+         */
+        private bool HasBackendSeatEntitlement()
+        {
+            return _backendPolicyStatus != null
+                   && _backendPolicyStatus.EndpointAvailable
+                   && _backendPolicyStatus.SeatAssigned
+                   && _backendPolicyStatus.IsValid
+                   && string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /**
+         * Return the tooltip shown when separate password delivery is unavailable.
+         */
+        private string GetSeparatePasswordUnavailableTooltip()
+        {
+            if (_backendPolicyStatus == null || !_backendPolicyStatus.EndpointAvailable)
+            {
+                return Strings.SharingPasswordSeparateBackendRequiredTooltip;
+            }
+
+            if (!_backendPolicyStatus.SeatAssigned)
+            {
+                return Strings.SharingPasswordSeparateNoSeatTooltip;
+            }
+
+            if (!_backendPolicyStatus.IsValid
+                || !string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase))
+            {
+                return Strings.SharingPasswordSeparatePausedTooltip;
+            }
+
+            return string.Empty;
+        }
+
+        private void RefreshBackendPolicyStatus(string trigger)
+        {
+            string serverUrl = _serverUrlTextBox.Text.Trim();
+            string username = _usernameTextBox.Text.Trim();
+            string appPassword = _appPasswordTextBox.Text ?? string.Empty;
+            var configuration = new TalkServiceConfiguration(serverUrl, username, appPassword);
+
+            try
+            {
+                var service = new BackendPolicyService(configuration);
+                _backendPolicyStatus = service.FetchStatus();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Backend policy status check failed in settings.", ex);
+                _backendPolicyStatus = null;
+            }
+
+            ApplyBackendPolicyStatus(trigger);
+        }
+
+        private void ApplyBackendPolicyStatus(string trigger)
+        {
+            bool warningVisible = _backendPolicyStatus != null
+                                  && _backendPolicyStatus.WarningVisible
+                                  && !string.IsNullOrWhiteSpace(_backendPolicyStatus.WarningMessage);
+            string currentShareLanguage = GetSelectedLanguageChoice(_shareBlockLangCombo);
+            string currentTalkLanguage = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
+            _policyWarningPanel.Visible = warningVisible;
+            _policyWarningTextLabel.Text = warningVisible ? _backendPolicyStatus.WarningMessage : string.Empty;
+            RefreshLanguageOverrideCombos(currentShareLanguage, currentTalkLanguage);
+
+            if (IsPolicyActive())
+            {
+                ApplyPolicyDefaultsToControls();
+            }
+
+            DiagnosticsLogger.Log(
+                LogCategories.Core,
+                "Policy status applied in settings (trigger=" + (trigger ?? "n/a")
+                + ", active=" + IsPolicyActive().ToString(CultureInfo.InvariantCulture)
+                + ", warningVisible=" + warningVisible.ToString(CultureInfo.InvariantCulture)
+                + ", mode=" + (_backendPolicyStatus != null ? _backendPolicyStatus.Mode : "local")
+                + ", reason=" + (_backendPolicyStatus != null ? _backendPolicyStatus.Reason : "n/a")
+                + ").");
+
+            UpdateControlState();
+            ApplyResponsiveLayout(false);
+        }
+
+        private void ApplyPolicyDefaultsToControls()
+        {
+            if (!IsPolicyActive())
+            {
+                return;
+            }
+
+            bool policyBool;
+            int policyInt;
+            string policyString;
+
+            policyString = _backendPolicyStatus.GetPolicyString("share", "share_base_directory");
+            if (!string.IsNullOrWhiteSpace(policyString))
+            {
+                _fileLinkBaseTextBox.Text = policyString;
+            }
+
+            policyString = _backendPolicyStatus.GetPolicyString("share", "share_name_template");
+            if (!string.IsNullOrWhiteSpace(policyString))
+            {
+                _sharingDefaultShareNameTextBox.Text = policyString;
+            }
+
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
+            {
+                _sharingDefaultPermCreateCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_edit", out policyBool))
+            {
+                _sharingDefaultPermWriteCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_delete", out policyBool))
+            {
+                _sharingDefaultPermDeleteCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_set_password", out policyBool))
+            {
+                _sharingDefaultPasswordCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_send_password_separately", out policyBool))
+            {
+                _sharingDefaultPasswordSeparateCheckBox.Checked = policyBool;
+            }
+            if (!HasBackendSeatEntitlement())
+            {
+                _sharingDefaultPasswordSeparateCheckBox.Checked = false;
+            }
+            if (_backendPolicyStatus.TryGetPolicyInt("share", "share_expire_days", out policyInt))
+            {
+                decimal clamped = Math.Max(_sharingDefaultExpireDaysUpDown.Minimum, Math.Min(_sharingDefaultExpireDaysUpDown.Maximum, policyInt));
+                _sharingDefaultExpireDaysUpDown.Value = clamped;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
+            {
+                _sharingAttachmentsAlwaysCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
+            {
+                int normalizedThreshold = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
+                decimal clampedThreshold = Math.Max(
+                    _sharingAttachmentsOfferAboveMbUpDown.Minimum,
+                    Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, normalizedThreshold));
+                _sharingAttachmentsOfferAboveMbUpDown.Value = clampedThreshold;
+                _sharingAttachmentsOfferAboveCheckBox.Checked = true;
+            }
+            else if (_backendPolicyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
+            {
+                _sharingAttachmentsOfferAboveCheckBox.Checked = false;
+            }
+
+            policyString = _backendPolicyStatus.GetPolicyString("share", "language_share_html_block");
+            if (!string.IsNullOrWhiteSpace(policyString))
+            {
+                SelectLanguageChoice(_shareBlockLangCombo, policyString);
+            }
+
+            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
+            {
+                _talkDefaultPasswordCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_users", out policyBool))
+            {
+                _talkDefaultAddUsersCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_guests", out policyBool))
+            {
+                _talkDefaultAddGuestsCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_lobby_active", out policyBool))
+            {
+                _talkDefaultLobbyCheckBox.Checked = policyBool;
+            }
+            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_show_in_search", out policyBool))
+            {
+                _talkDefaultSearchCheckBox.Checked = policyBool;
+            }
+
+            policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");
+            if (!string.IsNullOrWhiteSpace(policyString))
+            {
+                SelectTalkRoomType(
+                    string.Equals(policyString.Trim(), "event", StringComparison.OrdinalIgnoreCase)
+                    ? TalkRoomType.EventConversation
+                    : TalkRoomType.StandardRoom);
+            }
+
+            policyString = _backendPolicyStatus.GetPolicyString("talk", "language_talk_description");
+            if (!string.IsNullOrWhiteSpace(policyString))
+            {
+                SelectLanguageChoice(_eventDescriptionLangCombo, policyString);
+            }
+        }
+
         private void RefreshSharingAttachmentLockState()
         {
             try
@@ -1252,7 +1540,11 @@ namespace NcTalkOutlookAddIn.UI
         {
             bool alwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
             bool lockActive = _sharingAttachmentLockActive;
+            bool policyLockAlways = IsPolicyLocked("share", "attachments_always_via_ncconnector");
+            bool policyLockThreshold = IsPolicyLocked("share", "attachments_min_size_mb");
             bool uiBusy = _isBusy;
+            bool effectiveAlwaysLock = lockActive || policyLockAlways;
+            bool effectiveThresholdLock = lockActive || policyLockThreshold;
 
             _sharingAttachmentLockHintLabel.Visible = lockActive;
             _sharingAttachmentLockStepsLabel.Visible = lockActive;
@@ -1318,12 +1610,32 @@ namespace NcTalkOutlookAddIn.UI
                 _sharingAttachmentAutomationGroup.Height = requiredGroupHeight;
             }
 
-            _sharingAttachmentsAlwaysCheckBox.Enabled = !lockActive && !uiBusy;
-            _sharingAttachmentsOfferAboveCheckBox.Enabled = !lockActive && !alwaysConnector && !uiBusy;
+            _sharingAttachmentsAlwaysCheckBox.Enabled = !effectiveAlwaysLock && !uiBusy;
+            _sharingAttachmentsOfferAboveCheckBox.Enabled = !effectiveThresholdLock && !alwaysConnector && !uiBusy;
 
-            bool thresholdInputEnabled = !lockActive && !alwaysConnector && _sharingAttachmentsOfferAboveCheckBox.Checked && !uiBusy;
+            bool thresholdInputEnabled = !effectiveThresholdLock && !alwaysConnector && _sharingAttachmentsOfferAboveCheckBox.Checked && !uiBusy;
             _sharingAttachmentsOfferAboveMbUpDown.Enabled = thresholdInputEnabled;
-            _sharingAttachmentsOfferAboveUnitLabel.Enabled = !lockActive && !alwaysConnector && !uiBusy;
+            _sharingAttachmentsOfferAboveUnitLabel.Enabled = !effectiveThresholdLock && !alwaysConnector && !uiBusy;
+
+            _disabledTooltipHints.Apply(
+                _sharingAttachmentsAlwaysCheckBox,
+                lockActive
+                    ? _sharingAttachmentLockHintLabel.Text
+                    : (policyLockAlways ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSharingAttachmentsAlways),
+                effectiveAlwaysLock,
+                _sharingAttachmentLockHintLabel);
+            _disabledTooltipHints.Apply(
+                _sharingAttachmentsOfferAboveCheckBox,
+                lockActive
+                    ? _sharingAttachmentLockHintLabel.Text
+                    : (policyLockThreshold ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSharingAttachmentsOffer),
+                effectiveThresholdLock,
+                _sharingAttachmentLockHintLabel);
+            _disabledTooltipHints.Apply(
+                _sharingAttachmentsOfferAboveMbUpDown,
+                effectiveThresholdLock ? Strings.PolicyAdminControlledTooltip : string.Empty,
+                false,
+                _sharingAttachmentsOfferAboveUnitLabel);
         }
 
         private void RefreshTalkSystemAddressbookState(bool forceRefresh, string trigger)
@@ -1362,13 +1674,24 @@ namespace NcTalkOutlookAddIn.UI
             _talkAddressbookLockActive = lockActive;
             _talkAddressbookLockDetail = lockActive ? (detail ?? Strings.TalkSystemAddressbookRequiredMessage) : string.Empty;
 
-            _talkDefaultAddUsersCheckBox.Enabled = !lockActive && !_isBusy;
-            _talkDefaultAddGuestsCheckBox.Enabled = !lockActive && !_isBusy;
+            bool usersPolicyLocked = IsPolicyLocked("talk", "talk_add_users");
+            bool guestsPolicyLocked = IsPolicyLocked("talk", "talk_add_guests");
+
+            _talkDefaultAddUsersCheckBox.Enabled = !lockActive && !usersPolicyLocked && !_isBusy;
+            _talkDefaultAddGuestsCheckBox.Enabled = !lockActive && !guestsPolicyLocked && !_isBusy;
             _talkAddressbookWarningPanel.Visible = lockActive;
             _talkAddressbookWarningTextLabel.Text = lockActive ? _talkAddressbookLockDetail : string.Empty;
 
-            _toolTip.SetToolTip(_talkDefaultAddUsersCheckBox, lockActive ? Strings.TooltipAddUsersLocked : Strings.TooltipAddUsers);
-            _toolTip.SetToolTip(_talkDefaultAddGuestsCheckBox, lockActive ? Strings.TooltipAddGuestsLocked : Strings.TooltipAddGuests);
+            _disabledTooltipHints.Apply(
+                _talkDefaultAddUsersCheckBox,
+                lockActive ? Strings.TooltipAddUsersLocked : (usersPolicyLocked ? Strings.PolicyAdminControlledTooltip : Strings.TooltipAddUsers),
+                lockActive || usersPolicyLocked,
+                _talkAddressbookWarningPanel);
+            _disabledTooltipHints.Apply(
+                _talkDefaultAddGuestsCheckBox,
+                lockActive ? Strings.TooltipAddGuestsLocked : (guestsPolicyLocked ? Strings.PolicyAdminControlledTooltip : Strings.TooltipAddGuests),
+                lockActive || guestsPolicyLocked,
+                _talkAddressbookWarningPanel);
 
             DiagnosticsLogger.Log(
                 LogCategories.Talk,
@@ -1431,15 +1754,18 @@ namespace NcTalkOutlookAddIn.UI
 
         private sealed class LanguageOption
         {
-            internal LanguageOption(string value, string label)
+            internal LanguageOption(string value, string label, bool enabled = true)
             {
                 Value = value ?? string.Empty;
                 Label = label ?? value ?? string.Empty;
+                Enabled = enabled;
             }
 
             internal string Value { get; private set; }
 
             internal string Label { get; private set; }
+
+            internal bool Enabled { get; private set; }
 
             public override string ToString()
             {
@@ -1449,7 +1775,30 @@ namespace NcTalkOutlookAddIn.UI
 
         private static string NormalizeLanguageChoice(string value)
         {
+            if (string.Equals((value ?? string.Empty).Trim(), "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "custom";
+            }
+
             return Strings.NormalizeLanguageOverride(value);
+        }
+
+        private bool IsCustomLanguageModeAvailable(string domain)
+        {
+            if (!IsBackendEndpointAvailable() || !IsPolicyActive())
+            {
+                return false;
+            }
+
+            string normalizedDomain = string.Equals(domain, "talk", StringComparison.OrdinalIgnoreCase)
+                ? "talk"
+                : "share";
+            string languageKey = normalizedDomain == "talk" ? "language_talk_description" : "language_share_html_block";
+            string templateKey = normalizedDomain == "talk" ? "talk_invitation_template" : "share_html_block_template";
+            string languageValue = NormalizeLanguageChoice(_backendPolicyStatus.GetPolicyString(normalizedDomain, languageKey));
+            string templateValue = _backendPolicyStatus.GetPolicyString(normalizedDomain, templateKey);
+            return string.Equals(languageValue, "custom", StringComparison.OrdinalIgnoreCase)
+                   && !string.IsNullOrWhiteSpace(templateValue);
         }
 
         private static string GetLanguageLabel(string code)
@@ -1471,7 +1820,7 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
-        private void PopulateLanguageOverrideCombo(ComboBox combo)
+        private void PopulateLanguageOverrideCombo(ComboBox combo, string domain)
         {
             if (combo == null)
             {
@@ -1489,10 +1838,27 @@ namespace NcTalkOutlookAddIn.UI
 
                 combo.Items.Add(new LanguageOption(code, GetLanguageLabel(code)));
             }
+            if (IsBackendEndpointAvailable())
+            {
+                combo.Items.Add(new LanguageOption("custom", Strings.LanguageOverrideCustomOption, IsCustomLanguageModeAvailable(domain)));
+            }
             if (combo.Items.Count > 0)
             {
                 combo.SelectedIndex = 0;
             }
+        }
+
+        /**
+         * Rebuild language override combos so the `custom` option only exists
+         * when the backend endpoint is available and only becomes selectable
+         * once the corresponding backend policy actually uses a custom template.
+         */
+        private void RefreshLanguageOverrideCombos(string shareValue, string talkValue)
+        {
+            PopulateLanguageOverrideCombo(_shareBlockLangCombo, "share");
+            PopulateLanguageOverrideCombo(_eventDescriptionLangCombo, "talk");
+            SelectLanguageChoice(_shareBlockLangCombo, shareValue);
+            SelectLanguageChoice(_eventDescriptionLangCombo, talkValue);
         }
 
         private static void SelectLanguageChoice(ComboBox combo, string value)
@@ -1506,15 +1872,28 @@ namespace NcTalkOutlookAddIn.UI
             foreach (var item in combo.Items)
             {
                 var option = item as LanguageOption;
-                if (option != null && string.Equals(option.Value, normalized, StringComparison.OrdinalIgnoreCase))
+                if (option != null
+                    && option.Enabled
+                    && string.Equals(option.Value, normalized, StringComparison.OrdinalIgnoreCase))
                 {
                     combo.SelectedItem = option;
+                    combo.Tag = option.Value;
                     return;
                 }
             }
 
             if (combo.Items.Count > 0)
             {
+                foreach (var item in combo.Items)
+                {
+                    var option = item as LanguageOption;
+                    if (option != null && option.Enabled)
+                    {
+                        combo.SelectedItem = option;
+                        combo.Tag = option.Value;
+                        return;
+                    }
+                }
                 combo.SelectedIndex = 0;
             }
         }
@@ -1527,7 +1906,47 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             var selected = combo.SelectedItem as LanguageOption;
-            return selected != null ? NormalizeLanguageChoice(selected.Value) : "default";
+            return selected != null && selected.Enabled ? NormalizeLanguageChoice(selected.Value) : "default";
+        }
+
+        private void HandleLanguageComboDrawItem(object sender, DrawItemEventArgs e)
+        {
+            ComboBox combo = sender as ComboBox;
+            if (combo == null || e.Index < 0 || e.Index >= combo.Items.Count)
+            {
+                return;
+            }
+
+            e.DrawBackground();
+            var option = combo.Items[e.Index] as LanguageOption;
+            string label = option != null ? option.Label : Convert.ToString(combo.Items[e.Index], CultureInfo.InvariantCulture);
+            bool enabled = option == null || option.Enabled;
+            Color foreColor = enabled ? e.ForeColor : SystemColors.GrayText;
+            TextRenderer.DrawText(e.Graphics, label ?? string.Empty, e.Font, e.Bounds, foreColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+            e.DrawFocusRectangle();
+        }
+
+        private void HandleLanguageComboSelectionCommitted(object sender, EventArgs e)
+        {
+            ComboBox combo = sender as ComboBox;
+            if (combo == null)
+            {
+                return;
+            }
+
+            var selected = combo.SelectedItem as LanguageOption;
+            if (selected == null)
+            {
+                return;
+            }
+
+            if (!selected.Enabled)
+            {
+                SelectLanguageChoice(combo, Convert.ToString(combo.Tag, CultureInfo.InvariantCulture) ?? "default");
+                return;
+            }
+
+            combo.Tag = selected.Value;
         }
 
         private sealed class TalkRoomTypeOption
@@ -1574,11 +1993,23 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdateTalkRoomTypeTooltip()
         {
+            if (IsPolicyLocked("talk", "talk_room_type"))
+            {
+                SetTooltipWithFallback(
+                    _talkDefaultRoomTypeCombo,
+                    Strings.PolicyAdminControlledTooltip,
+                    true,
+                    _talkDefaultRoomTypeLabel);
+                return;
+            }
+
             var selected = _talkDefaultRoomTypeCombo.SelectedItem as TalkRoomTypeOption;
             TalkRoomType roomType = selected != null ? selected.Value : TalkRoomType.EventConversation;
-            _toolTip.SetToolTip(
+            SetTooltipWithFallback(
                 _talkDefaultRoomTypeCombo,
-                roomType == TalkRoomType.EventConversation ? Strings.TooltipRoomTypeEvent : Strings.TooltipRoomTypeStandard);
+                roomType == TalkRoomType.EventConversation ? Strings.TooltipRoomTypeEvent : Strings.TooltipRoomTypeStandard,
+                false,
+                _talkDefaultRoomTypeLabel);
         }
 
         private void OnDebugOpenLinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -1663,25 +2094,95 @@ namespace NcTalkOutlookAddIn.UI
             _ifbCacheHoursLabel.Enabled = !_isBusy;
             _debugLogCheckBox.Enabled = !_isBusy;
             _debugOpenLink.Enabled = !_isBusy;
-            _talkDefaultAddUsersCheckBox.Enabled = !_talkAddressbookLockActive && !_isBusy;
-            _talkDefaultAddGuestsCheckBox.Enabled = !_talkAddressbookLockActive && !_isBusy;
-            UpdateSharingAttachmentOptionsState();
-            ApplySharingPasswordSeparateAvailability();
-        }
 
-        private void ApplySharingPasswordSeparateAvailability()
-        {
-            bool featureEnabled = AddinSettings.SeparatePasswordFeatureEnabled;
-            bool interactive = featureEnabled && _sharingDefaultPasswordCheckBox.Checked && !_isBusy;
+            bool lockShareBase = IsPolicyLocked("share", "share_base_directory");
+            bool lockShareName = IsPolicyLocked("share", "share_name_template");
+            bool lockSharePermCreate = IsPolicyLocked("share", "share_permission_upload");
+            bool lockSharePermWrite = IsPolicyLocked("share", "share_permission_edit");
+            bool lockSharePermDelete = IsPolicyLocked("share", "share_permission_delete");
+            bool lockSharePassword = IsPolicyLocked("share", "share_set_password");
+            bool lockSharePasswordSeparate = IsPolicyLocked("share", "share_send_password_separately");
+            bool lockShareExpire = IsPolicyLocked("share", "share_expire_days");
+            bool lockShareLang = IsPolicyLocked("share", "language_share_html_block");
+            bool lockTalkPassword = IsPolicyLocked("talk", "talk_set_password");
+            bool lockTalkLobby = IsPolicyLocked("talk", "talk_lobby_active");
+            bool lockTalkSearch = IsPolicyLocked("talk", "talk_show_in_search");
+            bool lockTalkRoomType = IsPolicyLocked("talk", "talk_room_type");
+            bool lockTalkLang = IsPolicyLocked("talk", "language_talk_description");
+            bool lockTalkUsers = IsPolicyLocked("talk", "talk_add_users");
+            bool lockTalkGuests = IsPolicyLocked("talk", "talk_add_guests");
+            bool separatePasswordAvailable = HasBackendSeatEntitlement();
+            string separatePasswordUnavailableTooltip = GetSeparatePasswordUnavailableTooltip();
 
-            _sharingDefaultPasswordSeparateCheckBox.AutoCheck = interactive;
-            _sharingDefaultPasswordSeparateCheckBox.TabStop = interactive;
-            _sharingDefaultPasswordSeparateCheckBox.ForeColor = interactive ? _themePalette.Text : _themePalette.DisabledText;
+            _fileLinkBaseTextBox.Enabled = !lockShareBase && !_isBusy;
+            _sharingDefaultShareNameTextBox.Enabled = !lockShareName && !_isBusy;
+            _sharingDefaultPermCreateCheckBox.Enabled = !lockSharePermCreate && !_isBusy;
+            _sharingDefaultPermWriteCheckBox.Enabled = !lockSharePermWrite && !_isBusy;
+            _sharingDefaultPermDeleteCheckBox.Enabled = !lockSharePermDelete && !_isBusy;
+            _sharingDefaultPasswordCheckBox.Enabled = !lockSharePassword && !_isBusy;
 
-            if (!interactive)
+            bool separateEnabled = separatePasswordAvailable
+                                   && _sharingDefaultPasswordCheckBox.Checked
+                                   && !lockSharePasswordSeparate
+                                   && !_isBusy;
+            _sharingDefaultPasswordSeparateCheckBox.Enabled = separateEnabled;
+            if (!separatePasswordAvailable || !_sharingDefaultPasswordCheckBox.Checked)
             {
                 _sharingDefaultPasswordSeparateCheckBox.Checked = false;
             }
+            _sharingDefaultExpireDaysUpDown.Enabled = !lockShareExpire && !_isBusy;
+            _shareBlockLangCombo.Enabled = !lockShareLang && !_isBusy;
+
+            _talkDefaultPasswordCheckBox.Enabled = !lockTalkPassword && !_isBusy;
+            _talkDefaultLobbyCheckBox.Enabled = !lockTalkLobby && !_isBusy;
+            _talkDefaultSearchCheckBox.Enabled = !lockTalkSearch && !_isBusy;
+            _talkDefaultRoomTypeCombo.Enabled = !lockTalkRoomType && !_isBusy;
+            _eventDescriptionLangCombo.Enabled = !lockTalkLang && !_isBusy;
+            _talkDefaultAddUsersCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkUsers && !_isBusy;
+            _talkDefaultAddGuestsCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkGuests && !_isBusy;
+
+            SetTooltipWithFallback(_fileLinkBaseTextBox, lockShareBase ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareBase, _fileLinkBaseHintLabel);
+            SetTooltipWithFallback(_sharingDefaultShareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _sharingDefaultShareNameLabel);
+            SetTooltipWithFallback(_sharingDefaultPermCreateCheckBox, lockSharePermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermCreate, _sharingDefaultPermissionsLabel);
+            SetTooltipWithFallback(_sharingDefaultPermWriteCheckBox, lockSharePermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermWrite, _sharingDefaultPermissionsLabel);
+            SetTooltipWithFallback(_sharingDefaultPermDeleteCheckBox, lockSharePermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermDelete, _sharingDefaultPermissionsLabel);
+            SetTooltipWithFallback(_sharingDefaultPasswordCheckBox, lockSharePassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePassword);
+            SetTooltipWithFallback(
+                _sharingDefaultPasswordSeparateCheckBox,
+                !separatePasswordAvailable
+                    ? separatePasswordUnavailableTooltip
+                    : (lockSharePasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
+                !separatePasswordAvailable || lockSharePasswordSeparate);
+            SetTooltipWithFallback(_sharingDefaultExpireDaysUpDown, lockShareExpire ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareExpire, _sharingDefaultExpireDaysLabel);
+            SetTooltipWithFallback(_shareBlockLangCombo, lockShareLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareLang, _shareBlockLangLabel);
+            SetTooltipWithFallback(_talkDefaultPasswordCheckBox, lockTalkPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkPassword);
+            SetTooltipWithFallback(_talkDefaultLobbyCheckBox, lockTalkLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockTalkLobby);
+            SetTooltipWithFallback(_talkDefaultSearchCheckBox, lockTalkSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockTalkSearch);
+            TalkRoomTypeOption selectedTalkRoomTypeOption = _talkDefaultRoomTypeCombo.SelectedItem as TalkRoomTypeOption;
+            bool standardTalkRoomTypeSelected =
+                selectedTalkRoomTypeOption != null &&
+                selectedTalkRoomTypeOption.Value == TalkRoomType.StandardRoom;
+            SetTooltipWithFallback(
+                _talkDefaultRoomTypeCombo,
+                lockTalkRoomType
+                    ? Strings.PolicyAdminControlledTooltip
+                    : (standardTalkRoomTypeSelected
+                        ? Strings.TooltipRoomTypeStandard
+                        : Strings.TooltipRoomTypeEvent),
+                lockTalkRoomType,
+                _talkDefaultRoomTypeLabel);
+            SetTooltipWithFallback(_eventDescriptionLangCombo, lockTalkLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkLang, _eventDescriptionLangLabel);
+            UpdateSharingAttachmentOptionsState();
+        }
+
+        private void SetTooltipWithFallback(Control primary, string text, params Control[] fallbackTargets)
+        {
+            _disabledTooltipHints.Apply(primary, text, fallbackTargets);
+        }
+
+        private void SetTooltipWithFallback(Control primary, string text, bool showHint, params Control[] fallbackTargets)
+        {
+            _disabledTooltipHints.Apply(primary, text, showHint, fallbackTargets);
         }
 
         private void SetBusy(bool busy)
@@ -1784,7 +2285,6 @@ namespace NcTalkOutlookAddIn.UI
             _sharingDefaultPasswordCheckBox.Text = Strings.SharingDefaultPasswordLabel;
             _sharingDefaultPasswordCheckBox.Location = new Point(260, 114);
             _sharingDefaultPasswordCheckBox.AutoSize = true;
-            _sharingDefaultPasswordCheckBox.CheckedChanged += (s, e) => ApplySharingPasswordSeparateAvailability();
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultPasswordCheckBox);
 
             _sharingDefaultPasswordSeparateCheckBox.Text = Strings.SharingDefaultPasswordSeparateLabel;
@@ -1846,7 +2346,7 @@ namespace NcTalkOutlookAddIn.UI
             _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentsOfferAboveUnitLabel);
 
             _toolTip.SetToolTip(_sharingDefaultPermissionsLabel, Strings.TooltipSharingPermissions);
-            _toolTip.SetToolTip(_sharingDefaultPasswordSeparateCheckBox, Strings.TooltipSharingPasswordSeparate);
+            _toolTip.SetToolTip(_sharingDefaultPasswordSeparateCheckBox, string.Empty);
             _toolTip.SetToolTip(_sharingAttachmentsAlwaysCheckBox, Strings.TooltipSharingAttachmentsAlways);
             _toolTip.SetToolTip(_sharingAttachmentsOfferAboveCheckBox, Strings.TooltipSharingAttachmentsOffer);
         }

@@ -83,6 +83,11 @@ namespace NcTalkOutlookAddIn.Utilities
                 return;
             }
 
+            WriteLogLine(category, message);
+        }
+
+        private static void WriteLogLine(string category, string message)
+        {
             try
             {
                 lock (SyncRoot)
@@ -120,12 +125,12 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             if (ex == null)
             {
-                Log(category, context);
+                WriteLogLine(category, context);
                 return;
             }
 
             string message = string.IsNullOrWhiteSpace(context) ? "Exception" : context.Trim();
-            Log(category, message + ": " + ex);
+            WriteLogLine(category, message + ": " + ex);
         }
 
         internal static OperationScope BeginOperation(string category, string operation)

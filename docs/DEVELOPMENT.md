@@ -25,6 +25,28 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 - **Nextcloud sharing** from the mail compose window (upload + link share + HTML block insertion)
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
+## Release 3.0.0 delta summary
+
+This release added parity-critical behavior that developers should preserve in future changes:
+
+- Compose attachment automation now has deterministic two-mode handling (`always` vs. threshold prompt).
+- Compose threshold prompt is a strict two-action decision (`Share with NC Connector` / `Remove last selected attachments`) with batch removal semantics.
+- Attachment-mode share output is specialized (`email_attachment` naming contract, read-only recipients, ZIP download link `/s/<token>/download`, no permissions row).
+- Compose share cleanup is lifecycle-driven (armed after share creation, cleared only after confirmed send, delayed delete on unsent close race).
+- Separate password follow-up dispatch is post-send only and includes automatic send plus manual fallback draft behavior.
+- Talk defaults and Talk wizard use a centralized system-addressbook availability contract and deterministic lock state.
+- Optional NC Connector backend policy mode is evaluated on wizard/settings entrypoints and can override/lock Talk + Sharing defaults, including central text/template payloads.
+- Backend custom templates are only activated when the effective language override is `custom`; otherwise runtime stays on local UI-default text blocks.
+- The `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for the respective domain is actually `custom` and provides a template.
+- Separate password follow-up dispatch is seat-gated and only available with backend endpoint + active assigned seat.
+- Backend attachment-threshold policy uses `attachments_min_size_mb` as both value and enable-state: a positive integer enables threshold mode, `null` disables it.
+- Locked backend attachment-automation policy is also enforced in compose runtime through the live backend status, not only in Settings UI.
+- If the backend is unreachable, the runtime falls back to local add-in settings immediately.
+- If the backend is reachable but the license/seat state is no longer usable or the backend grace window has expired, the runtime also falls back to local add-in settings.
+- Talk event-description templates may arrive as `html` or `plain_text`; when `html` is active, Outlook writes the Talk block into the open appointment editor HTML with stable markers so the rendered event description stays HTML while `Body` continues to provide the synchronized plain-text view.
+- Share creation now follows the documented Nextcloud OCS contract more closely: create via `POST /shares` with `label`, then update mutable metadata like `note` via form-encoded `PUT /shares/{id}` arguments.
+- Runtime settings and caches use `%LOCALAPPDATA%\\NC4OL` with profile-scoped XML settings migration.
+
 ## Quick start
 
 ### Prerequisites
@@ -38,7 +60,7 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-2.2.9"
+cd "C:\\path\\to\\nc4ol-3.0.0"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -109,6 +131,7 @@ Key code locations:
    - persisted metadata as Outlook `UserProperties` (including `X-NCTALK-*` keys)
 5. A runtime subscription is registered for the appointment (`AppointmentSubscription` inside `NextcloudTalkAddIn.cs`):
    - **Write** (save): updates lobby timer on time changes, updates room description, syncs participants, applies delegation
+   - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update on the same opened appointment instead of broad calendar scanning.
    - **Close** (discard without saving): deletes the room to avoid orphans (best-effort)
    - **BeforeDelete**: deletes the room (best-effort)
 
@@ -116,7 +139,7 @@ Key code locations:
 
 1. User clicks **Insert Nextcloud share** while composing an email.
 2. `UI/FileLinkWizardForm.cs` collects sharing settings and the file/folder selection.
-3. `Services/FileLinkService.cs` performs WebDAV upload and creates the public share via OCS.
+3. `Services/FileLinkService.cs` performs WebDAV upload, creates the public share via OCS (`label` on create), then updates mutable metadata like `note` via the documented OCS update arguments.
 4. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
 5. `NextcloudTalkAddIn.InsertHtmlIntoMailItem(...)` inserts the HTML into the message body.
 
@@ -220,6 +243,7 @@ Guidelines for new code:
 - Log **start/end** of network operations (use `DiagnosticsLogger.BeginOperation(...)`).
 - Log **decisions** (feature detection, version checks, fallbacks).
 - Log **exceptions with context** (use `DiagnosticsLogger.LogException(...)`).
+  `LogException(...)` bypasses the optional debug switch and must remain the always-on error path.
 - Never swallow exceptions silently.
 
 ## Compatibility & version checks
@@ -352,5 +376,4 @@ Primary write location:
 1. Add a property to `src/NcTalkOutlookAddIn/Utilities/Strings.cs`.
 2. Add the key to all locale files under `src/NcTalkOutlookAddIn/Resources/_locales/`.
 3. Rebuild and verify the UI.
-
 

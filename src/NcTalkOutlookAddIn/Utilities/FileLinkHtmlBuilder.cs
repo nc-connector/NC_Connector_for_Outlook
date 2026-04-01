@@ -5,6 +5,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
@@ -26,7 +27,7 @@ namespace NcTalkOutlookAddIn.Utilities
         /**
          * Creates the HTML block including branding and share information.
          */
-        internal static string Build(FileLinkResult result, FileLinkRequest request, string languageOverride)
+        internal static string Build(FileLinkResult result, FileLinkRequest request, string languageOverride, BackendPolicyStatus policyStatus = null)
         {
             if (result == null)
             {
@@ -37,27 +38,45 @@ namespace NcTalkOutlookAddIn.Utilities
             bool separatePassword = request != null
                 && request.PasswordSeparateEnabled
                 && !string.IsNullOrWhiteSpace(result.Password);
+            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
+
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, false, effectiveLanguage);
+            if (!string.IsNullOrWhiteSpace(policyTemplate))
+            {
+                return RenderPolicyTemplate(
+                    policyTemplate,
+                    result,
+                    request,
+                    effectiveLanguage,
+                    attachmentMode,
+                    separatePassword,
+                    passwordOnly: false);
+            }
+            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveLanguage = "default";
+            }
 
             string intro = Strings.GetInLanguage(
-                languageOverride,
+                effectiveLanguage,
                 "sharing_html_intro",
                 "I would like to share files securely and protect your privacy. Click the link below to download your files.");
 
             string footerFormat = Strings.GetInLanguage(
-                languageOverride,
+                effectiveLanguage,
                 "sharing_html_footer",
                 "{0} is a solution for secure email and file exchange.");
 
-            string downloadLabel = Strings.GetInLanguage(languageOverride, "sharing_html_download_label", "Download link");
-            string passwordLabel = Strings.GetInLanguage(languageOverride, "sharing_html_password_label", "Password");
-            string expireLabel = Strings.GetInLanguage(languageOverride, "sharing_html_expire_label", "Expiration date");
-            string permissionsLabel = Strings.GetInLanguage(languageOverride, "sharing_html_permissions_label", "Your permissions");
-            string passwordSeparateHint = Strings.GetInLanguage(languageOverride, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
+            string downloadLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_download_label", "Download link");
+            string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
+            string expireLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_expire_label", "Expiration date");
+            string permissionsLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_permissions_label", "Your permissions");
+            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
 
-            string permissionRead = Strings.GetInLanguage(languageOverride, "sharing_permission_read", "Read");
-            string permissionCreate = Strings.GetInLanguage(languageOverride, "sharing_permission_create", "Upload");
-            string permissionWrite = Strings.GetInLanguage(languageOverride, "sharing_permission_write", "Modify");
-            string permissionDelete = Strings.GetInLanguage(languageOverride, "sharing_permission_delete", "Delete");
+            string permissionRead = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read");
+            string permissionCreate = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload");
+            string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
+            string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
 
             string brandBlue = BrandingAssets.BrandBlueHex;
 
@@ -138,18 +157,36 @@ namespace NcTalkOutlookAddIn.Utilities
         /**
          * Creates the password-only follow-up HTML block.
          */
-        internal static string BuildPasswordOnly(FileLinkResult result, string languageOverride)
+        internal static string BuildPasswordOnly(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null)
         {
             if (result == null)
             {
                 throw new ArgumentNullException("result");
             }
 
+            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, true, effectiveLanguage);
+            if (!string.IsNullOrWhiteSpace(policyTemplate))
+            {
+                return RenderPolicyTemplate(
+                    policyTemplate,
+                    result,
+                    request: null,
+                    effectiveLanguage: effectiveLanguage,
+                    attachmentMode: false,
+                    separatePassword: false,
+                    passwordOnly: true);
+            }
+            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveLanguage = "default";
+            }
+
             string intro = Strings.GetInLanguage(
-                languageOverride,
+                effectiveLanguage,
                 "sharing_html_password_mail_intro",
                 "Here is your password for the shared link.");
-            string passwordLabel = Strings.GetInLanguage(languageOverride, "sharing_html_password_label", "Password");
+            string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
             string brandBlue = BrandingAssets.BrandBlueHex;
 
             var builder = new StringBuilder();
@@ -189,6 +226,178 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         /**
+         * Resolve effective HTML block language with policy override support.
+         */
+        private static string ResolveEffectiveLanguage(string languageOverride, BackendPolicyStatus policyStatus)
+        {
+            if (policyStatus != null && policyStatus.PolicyActive)
+            {
+                string policyLang = policyStatus.GetPolicyString("share", "language_share_html_block");
+                if (!string.IsNullOrWhiteSpace(policyLang))
+                {
+                    return string.Equals(policyLang, "custom", StringComparison.OrdinalIgnoreCase)
+                        ? "custom"
+                        : Strings.NormalizeLanguageOverride(policyLang);
+                }
+            }
+
+            string normalized = Strings.NormalizeLanguageOverride(languageOverride);
+            if (string.Equals((languageOverride ?? string.Empty).Trim(), "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return "custom";
+            }
+            return normalized;
+        }
+
+        /**
+         * Resolve custom policy template for normal or password-only mode.
+         */
+        private static string ResolvePolicyTemplate(BackendPolicyStatus policyStatus, bool passwordOnly, string effectiveLanguage)
+        {
+            if (policyStatus == null || !policyStatus.PolicyActive)
+            {
+                return string.Empty;
+            }
+
+            string language = policyStatus.GetPolicyString("share", "language_share_html_block");
+            if (!string.Equals(language, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            string key = passwordOnly ? "share_password_template" : "share_html_block_template";
+            string template = policyStatus.GetPolicyString("share", key);
+            return template ?? string.Empty;
+        }
+
+        /**
+         * Render one backend-provided custom HTML template.
+         */
+        private static string RenderPolicyTemplate(
+            string template,
+            FileLinkResult result,
+            FileLinkRequest request,
+            string effectiveLanguage,
+            bool attachmentMode,
+            bool separatePassword,
+            bool passwordOnly)
+        {
+            if (string.IsNullOrWhiteSpace(template) || result == null)
+            {
+                return string.Empty;
+            }
+
+            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
+            string permissionRead = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read");
+            string permissionCreate = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload");
+            string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
+            string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
+
+            string downloadUrl = attachmentMode
+                ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
+                : (result.ShareUrl ?? string.Empty);
+
+            string passwordValue = result.Password ?? string.Empty;
+            if (!passwordOnly && separatePassword)
+            {
+                passwordValue = passwordSeparateHint;
+            }
+
+            string noteValue = string.Empty;
+            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
+            {
+                noteValue = request.Note.Trim();
+            }
+
+            string rightsValue = attachmentMode
+                ? string.Empty
+                : BuildPermissions(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete);
+
+            string expireValue = result.ExpireDate.HasValue
+                ? result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                : string.Empty;
+
+            string html = template;
+            if (attachmentMode)
+            {
+                html = StripTemplateRow(html, "RIGHTS");
+            }
+            html = html.Replace("{URL}", HttpUtility.HtmlEncode(downloadUrl ?? string.Empty));
+            html = html.Replace("{PASSWORD}", HttpUtility.HtmlEncode(passwordValue));
+            html = html.Replace("{EXPIRATIONDATE}", HttpUtility.HtmlEncode(expireValue));
+            html = html.Replace("{RIGHTS}", rightsValue);
+            html = html.Replace("{NOTE}", HttpUtility.HtmlEncode(noteValue));
+            return html;
+        }
+
+        /**
+         * Remove one placeholder row from backend-provided HTML templates.
+         * This is used to reduce the custom share block for attachment mode.
+         */
+        private static string StripTemplateRow(string template, string placeholder)
+        {
+            string token = "{" + (placeholder ?? string.Empty).Trim() + "}";
+            if (string.IsNullOrWhiteSpace(token) || string.Equals(token, "{}", StringComparison.Ordinal))
+            {
+                return template ?? string.Empty;
+            }
+
+            string output = template ?? string.Empty;
+            int tokenIndex = output.IndexOf(token, StringComparison.Ordinal);
+            if (tokenIndex < 0)
+            {
+                return output;
+            }
+
+            int rowStart = LastIndexOfIgnoreCase(output, "<tr", tokenIndex);
+            int rowEnd = IndexOfIgnoreCase(output, "</tr>", tokenIndex);
+            if (rowStart >= 0 && rowEnd >= 0 && rowEnd >= rowStart)
+            {
+                output = output.Remove(rowStart, (rowEnd + 5) - rowStart);
+            }
+
+            return output.Replace(token, string.Empty);
+        }
+
+        /**
+         * Case-insensitive search for the last occurrence before one absolute index.
+         */
+        private static int LastIndexOfIgnoreCase(string value, string search, int startIndexExclusive)
+        {
+            if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(search))
+            {
+                return -1;
+            }
+
+            int maxIndex = Math.Min(startIndexExclusive, value.Length);
+            if (maxIndex <= 0)
+            {
+                return -1;
+            }
+
+            return value.LastIndexOf(search, maxIndex - 1, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /**
+         * Case-insensitive forward search.
+         */
+        private static int IndexOfIgnoreCase(string value, string search, int startIndex)
+        {
+            if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(search))
+            {
+                return -1;
+            }
+
+            int normalizedStart = Math.Max(0, startIndex);
+            if (normalizedStart >= value.Length)
+            {
+                return -1;
+            }
+
+            return value.IndexOf(search, normalizedStart, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /**
          * Adds a table row with label and content.
          */
         private static void AppendRow(StringBuilder builder, string label, string valueHtml)
@@ -221,8 +430,33 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             string token = string.IsNullOrWhiteSpace(shareToken) ? string.Empty : shareToken.Trim();
+            try
+            {
+                var shareUri = new Uri(shareUrl, UriKind.Absolute);
+                string[] segments = shareUri.AbsolutePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                int shareSegmentIndex = Array.FindLastIndex(
+                    segments,
+                    segment => string.Equals(segment, "s", StringComparison.OrdinalIgnoreCase));
+                if (shareSegmentIndex >= 0 && shareSegmentIndex + 1 < segments.Length)
+                {
+                    token = segments[shareSegmentIndex + 1];
+                }
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    return shareUri.GetLeftPart(UriPartial.Authority).TrimEnd('/')
+                        + "/s/"
+                        + Uri.EscapeDataString(token)
+                        + "/download";
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to derive attachment-mode ZIP download URL from share URL.", ex);
+            }
+
             if (string.IsNullOrEmpty(token))
             {
+                DiagnosticsLogger.Log(LogCategories.FileLink, "Attachment-mode ZIP download URL fallback used public share URL because no token was available.");
                 return shareUrl;
             }
 
@@ -236,7 +470,7 @@ namespace NcTalkOutlookAddIn.Utilities
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to build attachment-mode ZIP download URL.", ex);
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to build attachment-mode ZIP download URL from token fallback.", ex);
                 return shareUrl;
             }
         }

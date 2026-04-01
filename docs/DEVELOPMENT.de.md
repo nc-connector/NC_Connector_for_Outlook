@@ -20,6 +20,19 @@ Das Add-in integriert:
 - **Nextcloud Filelink** im E-Mail-Composer (Wizard, Upload, HTML-Block)
 - **IFB (Internet Free/Busy)** als lokaler HTTP-Proxy zu Nextcloud
 
+## Release 3.0.0 Delta-Ueberblick
+
+In 3.0.0 gelten die paritaetskritischen Verhaltensregeln weiterhin und muessen bei Folgeaenderungen stabil bleiben:
+
+- Compose-Anhangsautomatisierung mit deterministischen Modi (`always` vs. Schwellwert-Prompt).
+- Schwellwert-Prompt strikt mit zwei Aktionen (`Share with NC Connector` / `Remove last selected attachments`) und Batch-Entfernungssemantik.
+- Spezialisierter Attachment-Share-Output (`email_attachment`-Namensvertrag, read-only Empfaengerrechte, ZIP-Link `/s/<token>/download`, keine Permissions-Zeile).
+- Compose-Share-Cleanup mit Lifecycle-Vertrag (armed nach Share-Erstellung, cleared nur nach bestaetigtem Versand, delayed delete bei unsent-close-Race).
+- Separater Passwort-Follow-up-Versand nur post-send inklusive Auto-Send und manuellem Fallback-Entwurf.
+- Talk-Defaults und Talk-Wizard mit zentralem Systemadressbuch-Verfuegbarkeitsvertrag und deterministischem Lock-Zustand.
+- Public-Link-Share-Erstellung folgt dem dokumentierten Nextcloud-OCS-Vertrag: `label` beim Create, veränderliche Metadaten wie `note` danach über den OCS-Update-Endpunkt.
+- Runtime-Settings und Caches unter `%LOCALAPPDATA%\\NC4OL` mit profilbasierter XML-Migration.
+
 ## Voraussetzungen
 
 - Windows 10/11
@@ -35,7 +48,7 @@ Auf manchen Build-Systemen fehlen die .NET Framework Reference Assemblies für 4
 Beispiel:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0"
 
 # Optional: Reference Assemblies lokal holen (nur wenn nötig)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -48,7 +61,7 @@ $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAsse
 Der empfohlene Build läuft immer über `build.ps1`:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-2.2.9"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.0"
 $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2"
 .\build.ps1 -Configuration Release
 ```
@@ -110,7 +123,7 @@ UI:
 - `src/NcTalkOutlookAddIn/UI/ComposeAttachmentPromptForm.cs` (2-Aktions-Prompt fuer Schwellwertmodus)
 - `src/NcTalkOutlookAddIn/UI/BrandedHeader.cs` (Header-Banner)
 
-Compose-Filelink-Paritaet (2.2.9):
+Compose-Filelink-Paritaet (3.0.0):
 
 - `MailComposeSubscription` in `NextcloudTalkAddIn.cs` steuert den Compose-Lifecycle fuer:
   - debouncte Anhangsauswertung (`ComposeAttachmentEvalDebounceMs`)
@@ -123,7 +136,7 @@ Compose-Filelink-Paritaet (2.2.9):
   - vor Auswertung
   - vor Prompt-Aktionsverarbeitung
   - vor Wizard-Finalize im Attachment-Modus.
-- `FileLinkHtmlBuilder` erzeugt im Attachment-Modus reduziertes HTML mit ZIP-Link `/s/<token>/download` (ohne `?accept=zip`).
+- `FileLinkHtmlBuilder` erzeugt im Attachment-Modus reduziertes HTML mit ZIP-Link `/s/<token>/download`.
 
 Installer:
 
@@ -154,5 +167,3 @@ Wichtig für Updates:
 3) MSI installieren/upgrade testen (alte Version → neue Version)
 4) Talk + Filelink + IFB Smoke-Test
 5) MSI ggf. signieren (falls in der Umgebung erforderlich)
-
-
