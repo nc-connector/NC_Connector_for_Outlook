@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Не удалось подключиться: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Диагностика подключения"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "Сбой TLS-рукопожатия."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector использует для этого надстройки системный TLS по умолчанию. Проверьте доверие к сертификату, проверку прокси и TLS-инспекцию и системную политику TLS."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "Не удалось проверить сертификат сервера."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Проверьте доверие к сертификату, совпадение имени хоста и не подменяет ли сертификат прокси с TLS-инспекцией."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "Не удалось разрешить имя сервера."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Проверьте URL сервера, разрешение DNS, состояние VPN и не ожидает ли прокси другое имя хоста."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "Не удалось установить защищённое соединение."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Проверьте настройки прокси, правила брандмауэра, исходящую связность и не мешает ли TLS-инспекция соединению."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "Попытка подключения превысила время ожидания."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Проверьте доступность сервера, задержку прокси/брандмауэра и отвечает ли Nextcloud вовремя."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "Подключение к серверу Nextcloud завершилось ошибкой до получения HTTP-ответа."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Проверьте доступность сервера, доверие к сертификату, настройки прокси и системную политику TLS."
+  },
   "outlook_error_no_appointment": {
     "message": "Не удалось определить текущую встречу."
   },
@@ -1329,3 +1368,5 @@
     "message": "Ваш seat NC Connector сейчас приостановлен. Пожалуйста, обратитесь к администратору Nextcloud."
   }
 }
+
+

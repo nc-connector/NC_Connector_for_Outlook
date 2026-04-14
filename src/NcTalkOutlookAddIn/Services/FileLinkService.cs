@@ -400,14 +400,19 @@ namespace NcTalkOutlookAddIn.Services
 
             string uniqueRoot = EnsureUniqueName(context, context.RelativeFolderPath, relativeRoot, duplicateResolver, selection, true, cancellationToken);
             string remoteRoot = CombineRelativePath(context.RelativeFolderPath, uniqueRoot);
-            EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteRoot, cancellationToken, context.KnownFolderPaths);
+
+            // For directory uploads we enforce MKCOL without relying on cache hints.
+            // A stale known-folder cache can otherwise skip folder creation and the first PUT fails with 404.
+            EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteRoot, cancellationToken);
+            context.KnownFolderPaths.Add(remoteRoot);
 
             foreach (string directory in Directory.EnumerateDirectories(selection.LocalPath, "*", SearchOption.AllDirectories))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string relativeSub = ConvertPath(GetRelativePath(selection.LocalPath, directory));
                 string remoteSub = CombineRelativePath(remoteRoot, relativeSub);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteSub, cancellationToken, context.KnownFolderPaths);
+                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteSub, cancellationToken);
+                context.KnownFolderPaths.Add(remoteSub);
             }
 
             foreach (string file in Directory.EnumerateFiles(selection.LocalPath, "*", SearchOption.AllDirectories))
@@ -415,7 +420,8 @@ namespace NcTalkOutlookAddIn.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 string relativeFile = ConvertPath(GetRelativePath(selection.LocalPath, file));
                 string remoteFolder = GetRemoteFolder(remoteRoot, relativeFile);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteFolder, cancellationToken, context.KnownFolderPaths);
+                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteFolder, cancellationToken);
+                context.KnownFolderPaths.Add(remoteFolder);
 
                 string remoteFileName = SanitizeComponent(Path.GetFileName(relativeFile));
                 if (string.IsNullOrWhiteSpace(remoteFileName))
@@ -488,10 +494,15 @@ namespace NcTalkOutlookAddIn.Services
         {
             string folderKey = remoteFolder ?? string.Empty;
             string fullPath = CombineRelativePath(folderKey, sanitizedName);
-            HashSet<string> primarySet = isDirectory ? context.KnownFolderPaths : context.KnownFilePaths;
-            HashSet<string> secondarySet = isDirectory ? context.KnownFilePaths : context.KnownFolderPaths;
+            HashSet<string> primaryKnownSet = isDirectory ? context.KnownFolderPaths : context.KnownFilePaths;
+            HashSet<string> secondaryKnownSet = isDirectory ? context.KnownFilePaths : context.KnownFolderPaths;
+            HashSet<string> primaryReservedSet = isDirectory ? context.ReservedFolderPaths : context.ReservedFilePaths;
+            HashSet<string> secondaryReservedSet = isDirectory ? context.ReservedFilePaths : context.ReservedFolderPaths;
 
-            while (primarySet.Contains(fullPath) || secondarySet.Contains(fullPath))
+            while (primaryKnownSet.Contains(fullPath)
+                || secondaryKnownSet.Contains(fullPath)
+                || primaryReservedSet.Contains(fullPath)
+                || secondaryReservedSet.Contains(fullPath))
             {
                 if (duplicateResolver == null)
                 {
@@ -515,7 +526,7 @@ namespace NcTalkOutlookAddIn.Services
                 fullPath = CombineRelativePath(folderKey, sanitizedName);
             }
 
-            primarySet.Add(fullPath);
+            primaryReservedSet.Add(fullPath);
             return sanitizedName;
         }
 

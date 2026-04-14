@@ -690,6 +690,19 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string StatusTestSuccessVersionFormat { get { return Get("outlook_test_version_format", "Nextcloud {0}"); } }
         internal static string StatusTestFailureUnknown { get { return Get("outlook_test_failure_unknown", "Unknown error"); } }
         internal static string StatusTestFailure { get { return Get("outlook_test_failure_format", "Connection failed: {0}"); } }
+        internal static string ConnectionDiagnosticsDialogTitle { get { return Get("outlook_connection_diagnostics_title", "Connection diagnostics"); } }
+        internal static string ConnectionFailureTlsSummary { get { return Get("outlook_connection_failure_tls_summary", "TLS handshake failed."); } }
+        internal static string ConnectionFailureTlsGuidance { get { return Get("outlook_connection_failure_tls_guidance", "NC Connector uses OS-default TLS for this add-in. Check certificate trust, proxy/TLS inspection, and machine TLS policy."); } }
+        internal static string ConnectionFailureCertificateSummary { get { return Get("outlook_connection_failure_certificate_summary", "The server certificate could not be validated."); } }
+        internal static string ConnectionFailureCertificateGuidance { get { return Get("outlook_connection_failure_certificate_guidance", "Check certificate trust, hostname matching, and whether a TLS-inspecting proxy is replacing the certificate."); } }
+        internal static string ConnectionFailureDnsSummary { get { return Get("outlook_connection_failure_dns_summary", "The server name could not be resolved."); } }
+        internal static string ConnectionFailureDnsGuidance { get { return Get("outlook_connection_failure_dns_guidance", "Check the server URL, DNS resolution, VPN state, and whether a proxy expects a different hostname."); } }
+        internal static string ConnectionFailureProxySummary { get { return Get("outlook_connection_failure_proxy_summary", "The secure connection could not be established."); } }
+        internal static string ConnectionFailureProxyGuidance { get { return Get("outlook_connection_failure_proxy_guidance", "Check proxy settings, firewall rules, outbound connectivity, and whether TLS inspection is interfering with the connection."); } }
+        internal static string ConnectionFailureTimeoutSummary { get { return Get("outlook_connection_failure_timeout_summary", "The connection attempt timed out."); } }
+        internal static string ConnectionFailureTimeoutGuidance { get { return Get("outlook_connection_failure_timeout_guidance", "Check server reachability, proxy/firewall latency, and whether the Nextcloud server responds in time."); } }
+        internal static string ConnectionFailureGenericSummary { get { return Get("outlook_connection_failure_generic_summary", "The connection to the Nextcloud server failed before any HTTP response was received."); } }
+        internal static string ConnectionFailureGenericGuidance { get { return Get("outlook_connection_failure_generic_guidance", "Check server reachability, certificate trust, proxy settings, and machine TLS policy."); } }
 
         internal static string ErrorMissingCredentials { get { return Get("error_credentials_missing", "Please configure server URL, username, and app password in the settings first."); } }
         internal static string ErrorNoAppointment { get { return Get("outlook_error_no_appointment", "Could not determine the current appointment item."); } }

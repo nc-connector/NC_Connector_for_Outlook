@@ -22,6 +22,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private readonly ToolTip _toolTip;
         private readonly Dictionary<Control, Label> _hintLabels = new Dictionary<Control, Label>();
+        private readonly Dictionary<Control, Control> _anchorOverridesByPrimary = new Dictionary<Control, Control>();
         private readonly Dictionary<Control, Control[]> _fallbackTargetsByPrimary = new Dictionary<Control, Control[]>();
         private readonly Dictionary<Control, bool> _showHintByPrimary = new Dictionary<Control, bool>();
         private readonly HashSet<Control> _trackedControls = new HashSet<Control>();
@@ -38,10 +39,15 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal void Apply(Control primary, string text, params Control[] fallbackTargets)
         {
-            Apply(primary, text, false, fallbackTargets);
+            Apply(primary, text, false, null, fallbackTargets);
         }
 
         internal void Apply(Control primary, string text, bool showHint, params Control[] fallbackTargets)
+        {
+            Apply(primary, text, showHint, null, fallbackTargets);
+        }
+
+        internal void Apply(Control primary, string text, bool showHint, Control anchorOverride, params Control[] fallbackTargets)
         {
             if (primary == null)
             {
@@ -49,9 +55,14 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             Control[] normalizedFallbackTargets = fallbackTargets ?? new Control[0];
+            _anchorOverridesByPrimary[primary] = anchorOverride;
             _fallbackTargetsByPrimary[primary] = normalizedFallbackTargets;
             _showHintByPrimary[primary] = showHint;
             Track(primary);
+            if (anchorOverride != null)
+            {
+                Track(anchorOverride);
+            }
             if (normalizedFallbackTargets.Length > 0)
             {
                 foreach (Control target in normalizedFallbackTargets)
@@ -72,17 +83,17 @@ namespace NcTalkOutlookAddIn.Utilities
                 }
             }
 
-            UpdateHint(primary, text, showHint, normalizedFallbackTargets);
+            UpdateHint(primary, text, showHint, anchorOverride, normalizedFallbackTargets);
         }
 
-        private void UpdateHint(Control primary, string text, bool showHint, Control[] fallbackTargets)
+        private void UpdateHint(Control primary, string text, bool showHint, Control anchorOverride, Control[] fallbackTargets)
         {
             if (primary == null)
             {
                 return;
             }
 
-            Control anchor = ResolveAnchor(primary, fallbackTargets);
+            Control anchor = ResolveAnchor(primary, anchorOverride, fallbackTargets);
             bool shouldShow = showHint
                               && !string.IsNullOrWhiteSpace(text)
                               && primary.Visible
@@ -175,6 +186,14 @@ namespace NcTalkOutlookAddIn.Utilities
                     continue;
                 }
 
+                Control anchorOverride;
+                if (_anchorOverridesByPrimary.TryGetValue(primary, out anchorOverride)
+                    && ReferenceEquals(anchorOverride, changed))
+                {
+                    RefreshHint(primary);
+                    continue;
+                }
+
                 Control[] fallbackTargets = pair.Value ?? new Control[0];
                 for (int i = 0; i < fallbackTargets.Length; i++)
                 {
@@ -206,14 +225,25 @@ namespace NcTalkOutlookAddIn.Utilities
                 showHint = false;
             }
 
-            UpdateHint(primary, _toolTip.GetToolTip(primary), showHint, fallbackTargets);
+            Control anchorOverride;
+            if (!_anchorOverridesByPrimary.TryGetValue(primary, out anchorOverride))
+            {
+                anchorOverride = null;
+            }
+
+            UpdateHint(primary, _toolTip.GetToolTip(primary), showHint, anchorOverride, fallbackTargets);
         }
 
-        private static Control ResolveAnchor(Control primary, Control[] fallbackTargets)
+        private static Control ResolveAnchor(Control primary, Control anchorOverride, Control[] fallbackTargets)
         {
             if (primary == null)
             {
                 return null;
+            }
+
+            if (anchorOverride != null && anchorOverride.Visible && anchorOverride.Parent != null)
+            {
+                return anchorOverride;
             }
 
             if (primary is CheckBox || primary is RadioButton || primary is Label || primary is LinkLabel)

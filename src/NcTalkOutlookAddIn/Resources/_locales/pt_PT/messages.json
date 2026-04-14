@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Falha na ligação: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Diagnóstico da ligação"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "A negociação TLS falhou."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "O NC Connector usa o TLS predefinido do sistema para este suplemento. Verifique a confiança do certificado, a inspeção de proxy/TLS e a política TLS do sistema."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "Não foi possível validar o certificado do servidor."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Verifique a confiança do certificado, a correspondência do nome do anfitrião e se um proxy com inspeção TLS está a substituir o certificado."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "Não foi possível resolver o nome do servidor."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Verifique o URL do servidor, a resolução DNS, o estado da VPN e se um proxy espera um nome de anfitrião diferente."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "Não foi possível estabelecer a ligação segura."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Verifique as definições de proxy, as regras da firewall, a conectividade de saída e se a inspeção TLS está a interferir com a ligação."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "A tentativa de ligação expirou."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Verifique a disponibilidade do servidor, a latência do proxy/firewall e se o Nextcloud responde atempadamente."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "A ligação ao servidor Nextcloud falhou antes de ser recebida qualquer resposta HTTP."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Verifique a disponibilidade do servidor, a confiança do certificado, as definições de proxy e a política TLS do sistema."
+  },
   "outlook_error_no_appointment": {
     "message": "Não foi possível determinar o compromisso atual."
   },
@@ -1329,3 +1368,5 @@
     "message": "O seu seat do NC Connector está atualmente em pausa. Contacte o administrador do Nextcloud."
   }
 }
+
+

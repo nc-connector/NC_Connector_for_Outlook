@@ -3,7 +3,8 @@ Param(
     [string]$Configuration = "Release",
     [string]$SolutionPath = "",
     [string]$MsbuildPath = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\MSBuild.exe",
-    [string]$OutputDir = ""
+    [string]$OutputDir = "",
+    [switch]$SkipIceValidation
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,7 +47,20 @@ if (-not (Test-Path $wixProject)) {
 }
 
 Write-Host "Building MSI via WiX v4 SDK (dotnet build)..."
-& dotnet build $wixProject -c $Configuration "/p:BuildOutputDir=$buildOutputDir\\" "/p:ProductVersion=$assemblyVersionShort" "/p:AssemblyVersion=$assemblyVersionFull" | Out-Host
+$wixArgs = @(
+    "build",
+    $wixProject,
+    "-c",
+    $Configuration,
+    "/p:BuildOutputDir=$buildOutputDir\\",
+    "/p:ProductVersion=$assemblyVersionShort",
+    "/p:AssemblyVersion=$assemblyVersionFull"
+)
+if ($SkipIceValidation) {
+    # Useful on environments where Windows Installer ICE execution is unavailable (WIX0217).
+    $wixArgs += "/p:SuppressValidation=true"
+}
+& dotnet @wixArgs | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet build (WiX) exited with code $LASTEXITCODE."
 }

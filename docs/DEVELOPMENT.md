@@ -25,11 +25,12 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 - **Nextcloud sharing** from the mail compose window (upload + link share + HTML block insertion)
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
-## Release 3.0.0 delta summary
+## Release 3.0.1 delta summary
 
 This release added parity-critical behavior that developers should preserve in future changes:
 
 - Compose attachment automation now has deterministic two-mode handling (`always` vs. threshold prompt).
+- Compose attachment automation now also evaluates pre-add (`BeforeAttachmentAdd`) and can best-effort cancel host add before Outlook post-add handling when a local path is resolvable.
 - Compose threshold prompt is a strict two-action decision (`Share with NC Connector` / `Remove last selected attachments`) with batch removal semantics.
 - Attachment-mode share output is specialized (`email_attachment` naming contract, read-only recipients, ZIP download link `/s/<token>/download`, no permissions row).
 - Compose share cleanup is lifecycle-driven (armed after share creation, cleared only after confirmed send, delayed delete on unsent close race).
@@ -60,13 +61,19 @@ This release added parity-critical behavior that developers should preserve in f
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-3.0.0"
+cd "C:\\path\\to\\nc4ol-3.0.1"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
 $env:FrameworkPathOverride = "$PWD\\packages\\Microsoft.NETFramework.ReferenceAssemblies.net472\\build\\.NETFramework\\v4.7.2"
 
 .\build.ps1 -Configuration Release
+```
+
+If WiX ICE validation is not available on the build host (for example `WIX0217` in restricted environments), use:
+
+```powershell
+.\build.ps1 -Configuration Release -SkipIceValidation
 ```
 
 Output:
@@ -96,6 +103,13 @@ Top-level:
 Key code locations:
 
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.cs` — entry point, ribbon XML, Outlook event wiring, orchestration
+- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.cs` — compose runtime subscription lifecycle
+- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.AppointmentSubscription.cs` — appointment runtime subscription lifecycle
+- `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` — appointment lifecycle orchestration for Talk room metadata/sync
+- `src/NcTalkOutlookAddIn/Controllers/ComposeShareLifecycleController.cs` — compose share cleanup + separate-password dispatch flow
+- `src/NcTalkOutlookAddIn/Controllers/TalkDescriptionTemplateController.cs` — Talk template/body block rendering
+- `src/NcTalkOutlookAddIn/Controllers/OutlookRecipientResolverController.cs` — SMTP and attendee recipient resolution
+- `src/NcTalkOutlookAddIn/Controllers/MailComposeSubscriptionRegistryController.cs` — compose-subscription registry lifecycle
 - `src/NcTalkOutlookAddIn/Services/` — Nextcloud HTTP integrations (Talk, sharing, IFB, login flow)
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
@@ -125,7 +139,7 @@ Key code locations:
 1. User clicks **Insert Talk link** in an appointment.
 2. `UI/TalkLinkForm.cs` collects: title, password, lobby, listable flag, room type, participant sync options, optional delegation target.
 3. `Services/TalkService.cs` creates the room via OCS.
-4. `NextcloudTalkAddIn.ApplyRoomToAppointment(...)` updates the appointment:
+4. `Controllers/TalkAppointmentController.ApplyRoomToAppointment(...)` (invoked by `NextcloudTalkAddIn`) updates the appointment:
    - `Location` (Talk URL)
    - a localized plain-text body block (incl. password and help URL)
    - persisted metadata as Outlook `UserProperties` (including `X-NCTALK-*` keys)
@@ -143,12 +157,16 @@ Key code locations:
 4. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
 5. `NextcloudTalkAddIn.InsertHtmlIntoMailItem(...)` inserts the HTML into the message body.
 
-Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`):
+Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) with lifecycle logic delegated to `Controllers/ComposeShareLifecycleController`:
 
 - Debounced attachment evaluation (`ComposeAttachmentEvalDebounceMs`) after compose attachment changes.
 - Attachment automation modes:
   - always route attachments into NC sharing flow, or
   - threshold mode with a two-action prompt (`Share with NC Connector` / `Remove last selected attachments`).
+- Pre-add attachment interception:
+  - `BeforeAttachmentAdd` path resolves candidate file metadata early
+  - can best-effort cancel host attachment add and launch NC sharing before Outlook post-add handling.
+  - hard Outlook/Exchange size blocks can still happen before add-in callbacks and are not interceptable via official Outlook OOM events.
 - Runtime host guard checks (live large-attachment setting) at:
   - pre-evaluation
   - pre-prompt-action handling
@@ -157,6 +175,7 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
   - removes selected compose attachments
   - queues files as initial wizard selections
   - opens directly in file-step-equivalent mode.
+- `UI/FileLinkWizardForm.cs` file-step queue accepts Explorer drag & drop for files/folders across queue and action-area controls.
 - Compose share cleanup lifecycle:
   - arm immediately after share creation
   - clear only after successful send
@@ -221,6 +240,7 @@ Debug logging is optional and is intended to make support cases reproducible.
 
 - Enable: Settings → **Debug** → “Write debug log file”
 - Log file: `%LOCALAPPDATA%\\NC4OL\\addin-runtime.log`
+- Runtime exceptions are always written via `DiagnosticsLogger.LogException(...)`, even when debug logging is disabled.
 
 Format:
 
@@ -376,4 +396,5 @@ Primary write location:
 1. Add a property to `src/NcTalkOutlookAddIn/Utilities/Strings.cs`.
 2. Add the key to all locale files under `src/NcTalkOutlookAddIn/Resources/_locales/`.
 3. Rebuild and verify the UI.
+
 

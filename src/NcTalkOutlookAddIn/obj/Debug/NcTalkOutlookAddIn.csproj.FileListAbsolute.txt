@@ -1,0 +1,2 @@
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1\src\NcTalkOutlookAddIn\obj\Debug\NcTalkOutlookAddIn.csproj.AssemblyReference.cache
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1\src\NcTalkOutlookAddIn\obj\Debug\NcTalkOutlookAddIn.csproj.CoreCompileInputs.cache

@@ -163,8 +163,9 @@ namespace NcTalkOutlookAddIn.Services
                     response = ex.Response as HttpWebResponse;
                     if (response == null)
                     {
-                        DiagnosticsLogger.LogException(LogCategories.Api, "Login flow request failed without HTTP response.", ex);
-                        throw new TalkServiceException("HTTP connection error: " + ex.Message, false, 0, null);
+                        HttpFailureInfo failure = HttpFailureDiagnostics.Analyze(ex);
+                        DiagnosticsLogger.LogException(LogCategories.Api, "Login flow request failed without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(ex, failure) + ").", ex);
+                        throw new TalkServiceException(failure.BuildUserMessage(), false, 0, null, true);
                     }
                 }
 

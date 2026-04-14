@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "接続に失敗しました: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "接続診断"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "TLS ハンドシェイクに失敗しました。"
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector はこのアドインで OS の既定 TLS を使用します。証明書の信頼、プロキシ/TLS インスペクション、システムの TLS ポリシーを確認してください。"
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "サーバー証明書を検証できませんでした。"
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "証明書の信頼、ホスト名の一致、および TLS インスペクションを行うプロキシが証明書を置き換えていないか確認してください。"
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "サーバー名を解決できませんでした。"
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "サーバー URL、DNS 解決、VPN の状態、およびプロキシが別のホスト名を想定していないか確認してください。"
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "安全な接続を確立できませんでした。"
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "プロキシ設定、ファイアウォール規則、外向き接続性、および TLS インスペクションが接続を妨げていないか確認してください。"
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "接続試行がタイムアウトしました。"
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "サーバー到達性、プロキシ/ファイアウォールの遅延、および Nextcloud が時間内に応答しているか確認してください。"
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "HTTP 応答を受信する前に Nextcloud サーバーへの接続が失敗しました。"
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "サーバー到達性、証明書の信頼、プロキシ設定、およびシステムの TLS ポリシーを確認してください。"
+  },
   "outlook_error_no_appointment": {
     "message": "現在の予定アイテムを特定できませんでした。"
   },
@@ -1329,3 +1368,5 @@
     "message": "あなたの NC Connector seat は現在一時停止されています。Nextcloud 管理者に連絡してください。"
   }
 }
+
+

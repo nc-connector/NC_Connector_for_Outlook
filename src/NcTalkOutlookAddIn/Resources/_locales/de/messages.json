@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Verbindung fehlgeschlagen: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Verbindungsdiagnose"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "TLS-Handshake fehlgeschlagen."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector verwendet fuer dieses Add-in die TLS-Standards des Betriebssystems. Pruefen Sie Zertifikatsvertrauen, Proxy/TLS-Inspection und die TLS-Richtlinien des Systems."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "Das Serverzertifikat konnte nicht validiert werden."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Pruefen Sie Zertifikatsvertrauen, Hostnamen-Zuordnung und ob ein TLS-pruefender Proxy das Zertifikat ersetzt."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "Der Servername konnte nicht aufgeloest werden."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Pruefen Sie Server-URL, DNS-Aufloesung, VPN-Status und ob ein Proxy einen anderen Hostnamen erwartet."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "Die sichere Verbindung konnte nicht aufgebaut werden."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Pruefen Sie Proxy-Einstellungen, Firewall-Regeln, ausgehende Konnektivitaet und ob TLS-Inspection die Verbindung stoert."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "Der Verbindungsversuch hat ein Timeout erreicht."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Pruefen Sie Server-Erreichbarkeit, Proxy/Firewall-Latenz und ob der Nextcloud-Server rechtzeitig antwortet."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "Die Verbindung zum Nextcloud-Server ist fehlgeschlagen, bevor eine HTTP-Antwort empfangen wurde."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Pruefen Sie Server-Erreichbarkeit, Zertifikatsvertrauen, Proxy-Einstellungen und die TLS-Richtlinien des Systems."
+  },
   "outlook_error_no_appointment": {
     "message": "Der aktuelle Termin konnte nicht ermittelt werden."
   },
@@ -1329,3 +1368,4 @@
     "message": "Ihr NC Connector Seat ist derzeit pausiert. Bitte wenden Sie sich an Ihren Nextcloud-Administrator."
   }
 }
+

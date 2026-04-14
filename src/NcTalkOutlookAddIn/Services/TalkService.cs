@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Copyright (c) 2025 Bastian Kleinschmidt
  * Licensed under the GNU Affero General Public License v3.0.
  * See LICENSE.txt for details.
@@ -830,8 +830,9 @@ namespace NcTalkOutlookAddIn.Services
                     response = ex.Response as HttpWebResponse;
                     if (response == null)
                     {
-                        DiagnosticsLogger.LogException(LogCategories.Api, "HTTP connection error.", ex);
-                        throw new TalkServiceException("HTTP connection error: " + ex.Message, false, 0, null);
+                        HttpFailureInfo failure = HttpFailureDiagnostics.Analyze(ex);
+                        DiagnosticsLogger.LogException(LogCategories.Api, "HTTP connection error without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(ex, failure) + ").", ex);
+                        throw new TalkServiceException(failure.BuildUserMessage(), false, 0, null, true);
                     }
                 }
 

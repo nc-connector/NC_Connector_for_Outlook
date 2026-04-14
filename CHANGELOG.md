@@ -4,6 +4,47 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.0.1] - 2026-04-14
+
+### Added
+- The FileLink wizard now accepts Explorer drag & drop for files/folders across the entire file step (queue, surrounding pane, and action area), not just via explicit add buttons.
+- TLS defaults are now hardened at add-in scope via `NcTalkOutlookAddIn.dll.config`, explicitly enabling strong crypto and OS-default TLS negotiation without changing machine-wide .NET registry settings.
+- Settings connection diagnostics now classify transport failures (TLS handshake, certificate trust, DNS, proxy/connectivity, timeout) and surface actionable guidance instead of only generic secure-channel errors.
+
+### Changed
+- Release line/version references were aligned to `3.0.1` across assembly metadata, installer defaults, readmes, and admin/development docs.
+- The new connection diagnostics strings were translated across all supported Outlook locales, so non-English users do not fall back to generic English placeholders.
+- Compose attachment automation now evaluates attachments pre-add via `BeforeAttachmentAdd`; threshold/always flows can cancel the host add and open NC share mode before Outlook post-add handling.
+- Compose automation subscription coverage was expanded with `ApplicationEvents_11.ItemLoad` so mail items loaded outside `NewInspector` (for example inline compose contexts) are also tracked for attachment automation.
+- Repository text-format policy was standardized with new `.editorconfig` and `.gitattributes`; project text files were normalized to consistent CRLF line endings.
+- With debug logging enabled, compose pre-add attachment automation now logs detailed candidate/decision/fallback diagnostics (including unresolved-path reasons) to improve support traceability.
+- `NextcloudTalkAddIn` was split into dedicated `partial` units for runtime hooks and logging to reduce orchestration density in the main source file.
+- COM cleanup now uses shared `ComInteropScope` helpers (including scoped wrappers), and high-risk recipient/explorer release paths were migrated to the centralized implementation.
+- Oversized UI forms were modularized with `partial` feature files (`FileLinkWizardForm.DragDrop`, `SettingsForm.Language`, `TalkLinkForm.Moderator`) to improve maintainability and test focus.
+- Talk body/template rendering and block sanitation were extracted into `Controllers/TalkDescriptionTemplateController`.
+- Appointment attendee e-mail discovery and SMTP recipient resolution were extracted into `Controllers/OutlookRecipientResolverController`.
+- Compose subscription lifecycle (get-or-create/remove/dispose-all) now runs through `Controllers/MailComposeSubscriptionRegistryController` instead of direct list/lock management in the add-in root.
+- Talk appointment lifecycle logic (`ApplyRoomToAppointment`, runtime room trait resolution, room mutation sync, delegation and participant sync) was extracted into `Controllers/TalkAppointmentController`.
+- Compose share cleanup and separate-password dispatch flow (including recipient normalization, auto-send, and manual fallback) was extracted into `Controllers/ComposeShareLifecycleController`.
+- Legacy recipient helper forwarders in `NextcloudTalkAddIn` were removed; compose recipient normalization now calls `ComposeShareLifecycleController` helpers directly.
+- Remaining recipient CSV/normalization passthrough wrappers were removed from the add-in root to avoid duplicate helper paths.
+- `ComposeShareLifecycleController` COM release paths now use centralized `ComInteropScope.TryRelease(...)` for consistent exception-safe cleanup.
+- `build.ps1` now supports `-SkipIceValidation` for environments where WiX ICE execution is unavailable (`WIX0217`), while keeping the default validated build path unchanged.
+- Large nested runtime subscription classes were moved out of the root file into dedicated partial units:
+  - `NextcloudTalkAddIn.MailComposeSubscription.cs`
+  - `NextcloudTalkAddIn.AppointmentSubscription.cs`
+- Minor UI redundancy cleanup (no behavior change) was applied in `FileLinkWizardForm`, `SettingsForm`, and `TalkLinkForm` (shared helpers for selection validation, resize wiring, and settings-option checkbox setup).
+
+### Fixed
+- In `Always via NC Connector` mode, pre-add multi-file drag/drop is now debounced and batched into a single wizard launch instead of opening one wizard per file.
+- Folder uploads in the FileLink wizard now correctly create required subfolders for mixed file+directory queues; reserved-name tracking no longer suppresses required DAV `MKCOL` calls.
+- Upload status/progress UI now flushes buffered per-item progress updates immediately on failure/cancel/finalize paths, preventing stale bars or missing final state labels.
+- Admin-controlled `?` hint glyphs now support explicit row anchors, preventing them from drifting into adjacent password and attachment threshold input fields in the FileLink wizard, sharing settings, and Talk password block.
+- Pre-add attachment interception now also probes `Attachment.FileName` and `Attachment.DisplayName` for resolvable local paths when `Attachment.PathName` is unavailable, improving early capture reliability for drag/drop scenarios.
+- Pre-add attachment candidate materialization now falls back to `Attachment.SaveAsFile(...)` and compares COM-reported size vs. measured file size, reducing false below-threshold decisions for unresolved path scenarios.
+- `ApplicationEvents_11.ItemLoad` compose subscription is now limited to active inline-compose contexts to prevent duplicate compose subscriptions and duplicate threshold prompts when inspector-based subscriptions are already active.
+- Add-in lifecycle teardown was de-duplicated by centralizing shutdown/disconnect cleanup into a shared idempotent path.
+
 ## [3.0.0] - 2026-03-30
 
 ### Added
@@ -121,3 +162,5 @@ This project follows the principles of **Keep a Changelog** and **Semantic Versi
 
 ### Documentation
 - Expanded admin and developer documentation.
+
+

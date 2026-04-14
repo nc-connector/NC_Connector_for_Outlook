@@ -25,7 +25,7 @@ namespace NcTalkOutlookAddIn.UI
     /// <summary>
     /// Dialog for configuring and creating a Nextcloud Talk room for the active appointment.
     /// </summary>
-    internal sealed class TalkLinkForm : Form
+    internal sealed partial class TalkLinkForm : Form
     {
         private static readonly string DefaultTitle = Strings.TalkDefaultTitle;
         private const int DefaultMinPasswordLength = 5;
@@ -217,21 +217,10 @@ namespace NcTalkOutlookAddIn.UI
 
             _settingsGroup.Text = Strings.TalkSettingsGroup;
 
-            _addUsersCheckBox.Text = Strings.TalkAddUsersCheck;
-            _addUsersCheckBox.AutoSize = true;
-            _settingsGroup.Controls.Add(_addUsersCheckBox);
-
-            _addGuestsCheckBox.Text = Strings.TalkAddGuestsCheck;
-            _addGuestsCheckBox.AutoSize = true;
-            _settingsGroup.Controls.Add(_addGuestsCheckBox);
-
-            _lobbyCheckBox.Text = Strings.TalkLobbyCheck;
-            _lobbyCheckBox.AutoSize = true;
-            _settingsGroup.Controls.Add(_lobbyCheckBox);
-
-            _searchCheckBox.Text = Strings.TalkSearchCheck;
-            _searchCheckBox.AutoSize = true;
-            _settingsGroup.Controls.Add(_searchCheckBox);
+            InitializeSettingsOptionCheckBox(_addUsersCheckBox, Strings.TalkAddUsersCheck);
+            InitializeSettingsOptionCheckBox(_addGuestsCheckBox, Strings.TalkAddGuestsCheck);
+            InitializeSettingsOptionCheckBox(_lobbyCheckBox, Strings.TalkLobbyCheck);
+            InitializeSettingsOptionCheckBox(_searchCheckBox, Strings.TalkSearchCheck);
 
             _moderatorGroup.Text = Strings.TalkModeratorGroup;
 
@@ -401,6 +390,18 @@ namespace NcTalkOutlookAddIn.UI
 
             Controls.Add(_moderatorListBox);
             ApplyDialogLayout(false);
+        }
+
+        private void InitializeSettingsOptionCheckBox(CheckBox checkBox, string text)
+        {
+            if (checkBox == null)
+            {
+                return;
+            }
+
+            checkBox.Text = text ?? string.Empty;
+            checkBox.AutoSize = true;
+            _settingsGroup.Controls.Add(checkBox);
         }
 
         private void InitializeHeader()
@@ -785,7 +786,14 @@ namespace NcTalkOutlookAddIn.UI
 
             SetTooltipWithFallback(_titleTextBox, lockTitle ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTitle, _titleLabel);
             SetTooltipWithFallback(_roomTypeComboBox, lockRoomType ? Strings.PolicyAdminControlledTooltip : _toolTip.GetToolTip(_roomTypeComboBox), lockRoomType, _roomTypeLabel);
-            SetTooltipWithFallback(_passwordToggleCheckBox, lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPassword, _passwordLabel, _passwordTextBox);
+            _disabledTooltipHints.Apply(
+                _passwordToggleCheckBox,
+                lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty,
+                lockPassword,
+                _passwordGenerateButton,
+                _passwordLabel,
+                _passwordTextBox,
+                _passwordGenerateButton);
             SetTooltipWithFallback(_lobbyCheckBox, lockLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockLobby);
             SetTooltipWithFallback(_searchCheckBox, lockSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockSearch);
 
@@ -1017,411 +1025,6 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             return new string(chars);
-        }
-
-        private void UpdateModeratorResults()
-        {
-            if (!_systemAddressbookAvailable)
-            {
-                if (!_moderatorSearchLockLogged)
-                {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Talk,
-                        "Talk wizard moderator search skipped because system address book is locked.");
-                    _moderatorSearchLockLogged = true;
-                }
-
-                _moderatorListBox.Items.Clear();
-                HideModeratorDropdown();
-                UpdateModeratorHint();
-                return;
-            }
-
-            _moderatorSearchLockLogged = false;
-
-            if (_userDirectory.Count == 0)
-            {
-                HideModeratorDropdown();
-                UpdateModeratorHint();
-                return;
-            }
-
-            string term = (_moderatorTextBox.Text ?? string.Empty).Trim();
-
-            _moderatorListBox.BeginUpdate();
-            _moderatorListBox.Items.Clear();
-            int added = 0;
-            foreach (var user in _userDirectory)
-            {
-                if (user == null)
-                {
-                    continue;
-                }
-
-                if (term.Length == 0 ||
-                    user.UserId.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    (!string.IsNullOrEmpty(user.Email) && user.Email.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0))
-                {
-                    _moderatorListBox.Items.Add(user);
-                    added++;
-                }
-            }
-            _moderatorListBox.EndUpdate();
-
-            _moderatorHintLabel.Visible = added == 0;
-            _moderatorHintLabel.Text = added == 0 ? Strings.TalkModeratorNoMatches : Strings.TalkModeratorHint;
-            if (added > 0)
-            {
-                _moderatorHintLabel.Visible = false;
-                ShowModeratorDropdown();
-            }
-            else
-            {
-                HideModeratorDropdown();
-            }
-        }
-
-        private void SelectModeratorFromList()
-        {
-            var selected = _moderatorListBox.SelectedItem as NextcloudUser;
-            if (selected == null)
-            {
-                return;
-            }
-
-            _selectedModerator = selected;
-            _moderatorTextBox.Text = selected.UserId;
-            HideModeratorDropdown();
-            SetModeratorAvatar(selected);
-            UpdateModeratorHint();
-        }
-
-        private void ClearModerator()
-        {
-            _selectedModerator = null;
-            _moderatorTextBox.Text = string.Empty;
-            _moderatorListBox.Items.Clear();
-            HideModeratorDropdown();
-            _moderatorAvatarBox.Image = null;
-            UpdateModeratorHint();
-        }
-
-        private void ShowModeratorDropdown()
-        {
-            if (_moderatorListBox.Items.Count == 0)
-            {
-                HideModeratorDropdown();
-                return;
-            }
-
-            if (_moderatorListBox.SelectedIndex < 0)
-            {
-                _moderatorListBox.SelectedIndex = 0;
-            }
-
-            PositionModeratorDropdown();
-            _moderatorListBox.BringToFront();
-            _moderatorListBox.Visible = true;
-        }
-
-        private void HideModeratorDropdown()
-        {
-            _moderatorListBox.Visible = false;
-        }
-
-        private void PositionModeratorDropdown()
-        {
-            if (!_systemAddressbookAvailable)
-            {
-                HideModeratorDropdown();
-                return;
-            }
-
-            int width = Math.Max(0, _moderatorGroup.Width - 24);
-            int rows = Math.Max(1, Math.Min(ModeratorDropdownMaxRows, _moderatorListBox.Items.Count));
-            int desiredHeight = (rows * _moderatorListBox.ItemHeight) + 4;
-
-            Point inputClient = PointToClient(_moderatorTextBox.PointToScreen(Point.Empty));
-            int x = _moderatorGroup.Left + 12;
-            int y = inputClient.Y - desiredHeight - ModeratorDropdownMargin;
-
-            int minY = _headerPanel.Bottom + ModeratorDropdownMargin;
-            if (y < minY)
-            {
-                y = inputClient.Y + _moderatorTextBox.Height + ModeratorDropdownMargin;
-            }
-
-            int maxBottom = _okButton != null ? _okButton.Top - ModeratorDropdownMargin : ClientSize.Height;
-            if (y + desiredHeight > maxBottom)
-            {
-                desiredHeight = Math.Max(_moderatorListBox.ItemHeight + 4, maxBottom - y);
-            }
-
-            _moderatorListBox.Location = new Point(x, y);
-            _moderatorListBox.Size = new Size(width, Math.Max(_moderatorListBox.ItemHeight + 4, desiredHeight));
-        }
-
-        private void SetModeratorAvatar(NextcloudUser user)
-        {
-            if (user == null)
-            {
-                _moderatorAvatarBox.Image = null;
-                return;
-            }
-
-            EnsureAvatarLoaded(user.UserId);
-            _moderatorAvatarBox.Image = GetCachedAvatar(user.UserId);
-        }
-
-        private void OnModeratorDrawItem(object sender, DrawItemEventArgs e)
-        {
-            if (e.Index < 0 || e.Index >= _moderatorListBox.Items.Count)
-            {
-                return;
-            }
-
-            bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
-            Color backColor;
-            Color foreColor;
-            if (_themePalette.IsDark)
-            {
-                backColor = isSelected ? _themePalette.SelectionBackground : _moderatorListBox.BackColor;
-                foreColor = isSelected ? _themePalette.SelectionText : _moderatorListBox.ForeColor;
-            }
-            else
-            {
-                backColor = isSelected ? SystemColors.Highlight : e.BackColor;
-                foreColor = isSelected ? SystemColors.HighlightText : e.ForeColor;
-            }
-
-            using (var back = new SolidBrush(backColor))
-            {
-                e.Graphics.FillRectangle(back, e.Bounds);
-            }
-
-            var user = _moderatorListBox.Items[e.Index] as NextcloudUser;
-            string label = user != null ? user.DisplayLabel : (_moderatorListBox.Items[e.Index] != null ? _moderatorListBox.Items[e.Index].ToString() : string.Empty);
-
-            const int avatarSize = 28;
-            int avatarX = e.Bounds.Left + 4;
-            int avatarY = e.Bounds.Top + ((e.Bounds.Height - avatarSize) / 2);
-            var avatarBounds = new Rectangle(avatarX, avatarY, avatarSize, avatarSize);
-
-            Image avatar = user != null ? GetCachedAvatar(user.UserId) : null;
-            if (avatar == null && user != null)
-            {
-                EnsureAvatarLoaded(user.UserId);
-                avatar = GetCachedAvatar(user.UserId);
-            }
-            if (avatar != null)
-            {
-                e.Graphics.DrawImage(avatar, avatarBounds);
-            }
-            else
-            {
-                DrawAvatarPlaceholder(e.Graphics, avatarBounds, user != null ? user.UserId : null);
-            }
-
-            int textX = avatarBounds.Right + 8;
-            var textBounds = new Rectangle(textX, e.Bounds.Top, e.Bounds.Right - textX - 4, e.Bounds.Height);
-            TextRenderer.DrawText(e.Graphics, label, e.Font, textBounds, foreColor, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-
-            e.DrawFocusRectangle();
-        }
-
-        private Image GetCachedAvatar(string userId)
-        {
-            if (string.IsNullOrWhiteSpace(userId))
-            {
-                return null;
-            }
-
-            lock (_avatarLock)
-            {
-                Image cached;
-                if (_avatarCache.TryGetValue(userId, out cached))
-                {
-                    return cached;
-                }
-            }
-
-            return null;
-        }
-
-        private void EnsureAvatarLoaded(string userId)
-        {
-            if (string.IsNullOrWhiteSpace(userId) || _configuration == null || !_configuration.IsComplete())
-            {
-                return;
-            }
-
-            lock (_avatarLock)
-            {
-                if (_avatarCache.ContainsKey(userId) || _avatarLoading.Contains(userId))
-                {
-                    return;
-                }
-
-                _avatarLoading.Add(userId);
-            }
-
-            Task.Run(() =>
-            {
-                Image fetched = null;
-                try
-                {
-                    fetched = FetchAvatar(userId);
-                }
-                catch (Exception ex)
-                {
-                    fetched = null;
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to fetch avatar for user '" + userId + "'.", ex);
-                }
-
-                lock (_avatarLock)
-                {
-                    _avatarLoading.Remove(userId);
-                    if (fetched != null)
-                    {
-                        Image existing;
-                        if (_avatarCache.TryGetValue(userId, out existing))
-                        {
-                            fetched.Dispose();
-                        }
-                        else
-                        {
-                            _avatarCache[userId] = fetched;
-                        }
-                    }
-                }
-
-                try
-                {
-                    BeginInvoke((Action)(() =>
-                    {
-                        _moderatorListBox.Invalidate();
-                        if (_selectedModerator != null && string.Equals(_selectedModerator.UserId, userId, StringComparison.OrdinalIgnoreCase))
-                        {
-                            _moderatorAvatarBox.Image = GetCachedAvatar(userId);
-                        }
-                    }));
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to update UI after avatar fetch.", ex);
-                }
-            });
-        }
-
-        private Image FetchAvatar(string userId)
-        {
-            string baseUrl = _configuration != null ? _configuration.GetNormalizedBaseUrl() : string.Empty;
-            if (string.IsNullOrEmpty(baseUrl))
-            {
-                return null;
-            }
-
-            string url = baseUrl + "/index.php/avatar/" + Uri.EscapeDataString(userId) + "/64";
-            var request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "GET";
-            request.Accept = "image/png,image/*;q=0.8,*/*;q=0.5";
-            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-            request.Timeout = 20000;
-
-            try
-            {
-                using (var response = (HttpWebResponse)request.GetResponse())
-                {
-                    if (response.StatusCode != HttpStatusCode.OK)
-                    {
-                        return null;
-                    }
-
-                    using (Stream stream = response.GetResponseStream())
-                    {
-                        if (stream == null)
-                        {
-                            return null;
-                        }
-
-                        using (var image = Image.FromStream(stream))
-                        {
-                            return new Bitmap(image);
-                        }
-                    }
-                }
-            }
-            catch (WebException ex)
-            {
-                var response = ex.Response as HttpWebResponse;
-                if (response != null)
-                {
-                    response.Close();
-                }
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Avatar request failed for user '" + userId + "'.", ex);
-                return null;
-            }
-        }
-
-        private void DrawAvatarPlaceholder(Graphics graphics, Rectangle bounds, string userId)
-        {
-            if (graphics == null)
-            {
-                return;
-            }
-
-            using (var fill = new SolidBrush(_themePalette.AvatarPlaceholderFill))
-            using (var border = new Pen(_themePalette.AvatarPlaceholderBorder))
-            {
-                graphics.FillEllipse(fill, bounds);
-                graphics.DrawEllipse(border, bounds);
-            }
-
-            string initial = string.IsNullOrEmpty(userId) ? "?" : userId.Trim().Substring(0, 1).ToUpperInvariant();
-            using (var textBrush = new SolidBrush(_themePalette.AvatarPlaceholderText))
-            using (var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-            {
-                graphics.DrawString(initial, SystemFonts.DefaultFont, textBrush, bounds, format);
-            }
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                lock (_avatarLock)
-                {
-                    foreach (var entry in _avatarCache)
-                    {
-                        try { entry.Value.Dispose(); }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to dispose cached avatar image for user '" + entry.Key + "'.", ex);
-                        }
-                    }
-                    _avatarCache.Clear();
-                    _avatarLoading.Clear();
-                }
-            }
-
-            base.Dispose(disposing);
-        }
-
-        private void UpdateModeratorHint()
-        {
-            _moderatorHintLabel.Visible = true;
-            if (!_systemAddressbookAvailable)
-            {
-                _moderatorHintLabel.Text = Strings.TalkSystemAddressbookRequiredMessage;
-            }
-            else if (_userDirectory.Count == 0)
-            {
-                _moderatorHintLabel.Text = Strings.TalkModeratorHintNoDirectory;
-            }
-            else
-            {
-                _moderatorHintLabel.Text = Strings.TalkModeratorHint;
-            }
         }
 
         private void SelectRoomType(TalkRoomType type)

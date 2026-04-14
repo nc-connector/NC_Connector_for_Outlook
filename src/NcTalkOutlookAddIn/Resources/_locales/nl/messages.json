@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Verbinding mislukt: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Verbindingsdiagnose"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "TLS-handshake mislukt."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector gebruikt voor deze invoegtoepassing de standaard-TLS van het besturingssysteem. Controleer certificaatvertrouwen, proxy/TLS-inspectie en het TLS-beleid van het systeem."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "Het servercertificaat kon niet worden gevalideerd."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Controleer certificaatvertrouwen, overeenkomende hostnaam en of een proxy met TLS-inspectie het certificaat vervangt."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "De servernaam kon niet worden omgezet."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Controleer de server-URL, DNS-resolutie, VPN-status en of een proxy een andere hostnaam verwacht."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "De beveiligde verbinding kon niet worden opgezet."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Controleer proxy-instellingen, firewallregels, uitgaande connectiviteit en of TLS-inspectie de verbinding verstoort."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "De verbindingspoging heeft een time-out bereikt."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Controleer of de server bereikbaar is, de latentie van proxy/firewall en of Nextcloud op tijd antwoordt."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "De verbinding met de Nextcloud-server mislukte voordat er een HTTP-antwoord werd ontvangen."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Controleer of de server bereikbaar is, certificaatvertrouwen, proxy-instellingen en het TLS-beleid van het systeem."
+  },
   "outlook_error_no_appointment": {
     "message": "Kan het huidige afspraakitem niet bepalen."
   },
@@ -1329,3 +1368,5 @@
     "message": "Uw NC Connector-seat is momenteel gepauzeerd. Neem contact op met uw Nextcloud-beheerder."
   }
 }
+
+

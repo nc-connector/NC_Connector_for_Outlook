@@ -7,7 +7,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 - [Updates / upgrade behavior](#updates--upgrade-behavior)
 - [Files & registry](#files--registry)
 - [Settings (profile XML)](#settings-profile-xml)
-- [Compose sharing lifecycle (3.0.0)](#compose-sharing-lifecycle-300)
+- [Compose sharing lifecycle (3.0.1)](#compose-sharing-lifecycle-301)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
 - [Logging / support](#logging--support)
@@ -20,7 +20,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 Silent install example:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.0.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.0.1.msi" /qn /norestart
 ```
 
 Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).
@@ -122,12 +122,15 @@ Central policy can currently control:
 - share HTML/password templates
 - Talk description language / custom invitation template
 
-## Compose sharing lifecycle (3.0.0)
+## Compose sharing lifecycle (3.0.1)
 
 ### Attachment automation and cleanup contract
 - In compose attachment mode, created server artifacts are tracked immediately after share creation.
 - Cleanup tracking is cleared only after a confirmed successful primary mail send.
 - If a compose window is closed without a successful send, the add-in deletes the created share folder artifacts server-side (best effort, with send/close grace timer handling).
+- Attachment automation evaluates new files both pre-add (`BeforeAttachmentAdd`) and post-add; if pre-add can resolve a local file path, NC flow can best-effort cancel host add before Outlook post-add handling.
+- In Microsoft 365 / Exchange environments with server-side message-size limits, Outlook can block large attachments before add-in events fire; in those cases automation cannot intercept and users should use the `Insert Nextcloud share` button instead.
+- In sharing wizard file-step, admins/users can add files and folders via Explorer drag & drop across the full step area (queue and action area), not only via explicit add buttons.
 
 ### Separate password follow-up mail
 - If `Send password separately` is enabled, the main HTML block does not contain inline password text.
@@ -195,6 +198,7 @@ Log file:
 - `%LOCALAPPDATA%\NC4OL\addin-runtime.log`
 
 Logs are categorized (e.g. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) and help with support cases.
+When debug logging is enabled, runtime decision paths (including attachment pre-add gating and fallback reasons) are written to the same file; runtime exceptions are always written regardless of debug toggle state.
 
 ## Troubleshooting
 
@@ -221,7 +225,9 @@ netstat -ano | Select-String ":7777"
 
 ### Network / Nextcloud
 - Server reachable, TLS ok?
+- NC Connector now enables strong crypto and OS-default TLS locally via `NcTalkOutlookAddIn.dll.config`. If secure-channel errors still occur, check certificate trust, DNS, proxy/TLS inspection, and machine TLS/Schannel policy before considering machine-wide registry/GPO overrides.
 - App password valid?
 - Talk installed/enabled?
 - Password Policy app optional: if missing, passwords are generated locally (fallback)
+
 

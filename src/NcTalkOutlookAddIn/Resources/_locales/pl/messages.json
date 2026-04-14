@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Połączenie nie powiodło się: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Diagnostyka połączenia"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "Uzgadnianie TLS nie powiodło się."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector używa dla tego dodatku domyślnego TLS systemu. Sprawdź zaufanie do certyfikatu, inspekcję proxy/TLS oraz politykę TLS systemu."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "Nie udało się zweryfikować certyfikatu serwera."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Sprawdź zaufanie do certyfikatu, zgodność nazwy hosta oraz czy proxy z inspekcją TLS nie podmienia certyfikatu."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "Nie udało się rozwiązać nazwy serwera."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Sprawdź adres URL serwera, rozwiązywanie DNS, stan VPN oraz czy proxy nie oczekuje innej nazwy hosta."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "Nie udało się nawiązać bezpiecznego połączenia."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Sprawdź ustawienia proxy, reguły zapory, łączność wychodzącą oraz czy inspekcja TLS nie zakłóca połączenia."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "Próba połączenia przekroczyła limit czasu."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Sprawdź dostępność serwera, opóźnienia proxy/zapory oraz czy Nextcloud odpowiada na czas."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "Połączenie z serwerem Nextcloud nie powiodło się przed odebraniem odpowiedzi HTTP."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Sprawdź dostępność serwera, zaufanie do certyfikatu, ustawienia proxy i politykę TLS systemu."
+  },
   "outlook_error_no_appointment": {
     "message": "Nie można określić bieżącej pozycji spotkania."
   },
@@ -1329,3 +1368,5 @@
     "message": "Twój seat NC Connector jest obecnie wstrzymany. Skontaktuj się z administratorem Nextcloud."
   }
 }
+
+

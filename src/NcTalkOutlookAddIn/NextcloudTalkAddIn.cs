@@ -9,10 +9,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
-using System.Net;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -21,6 +20,7 @@ using System.Web;
 using System.Windows.Forms;
 using Extensibility;
 using Microsoft.Office.Core;
+using NcTalkOutlookAddIn.Controllers;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Services;
@@ -38,7 +38,7 @@ namespace NcTalkOutlookAddIn
     [ComVisible(true)]
     [Guid("A8CC9257-A153-4A01-AB35-D66CB3D44AAA")]
     [ProgId("NcTalkOutlook.AddIn")]
-    public sealed class NextcloudTalkAddIn : IDTExtensibility2, IRibbonExtensibility
+    public sealed partial class NextcloudTalkAddIn : IDTExtensibility2, IRibbonExtensibility
     {
         private Outlook.Application _outlookApplication;
         private SettingsStorage _settingsStorage;
@@ -47,10 +47,12 @@ namespace NcTalkOutlookAddIn
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByToken = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private FreeBusyManager _freeBusyManager;
         private Outlook.Inspectors _inspectors;
+        private Outlook.ApplicationEvents_11_Event _applicationEvents;
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByEntryId = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
-        private readonly List<MailComposeSubscription> _mailComposeSubscriptions = new List<MailComposeSubscription>();
-        private readonly object _mailComposeSyncRoot = new object();
+        private readonly MailComposeSubscriptionRegistryController _mailComposeSubscriptionRegistry = new MailComposeSubscriptionRegistryController();
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
+        private readonly TalkAppointmentController _talkAppointmentController;
+        private readonly ComposeShareLifecycleController _composeShareLifecycleController;
         private readonly HashSet<string> _pendingAppointmentEnsureKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _pendingAppointmentEnsureSyncRoot = new object();
         private DateTime _lastDeferredAppointmentEnsureRestrictionLogUtc = DateTime.MinValue;
@@ -60,85 +62,52 @@ namespace NcTalkOutlookAddIn
         private const int ComposeAttachmentEvalDebounceMs = 250;
         private const int ComposeShareCleanupSendGraceMs = 15000;
 
-        private const string PropertyToken = "NcTalkRoomToken";
-        private const string PropertyRoomType = "NcTalkRoomType";
-        private const string PropertyLobby = "NcTalkLobbyEnabled";
-        private const string PropertySearchVisible = "NcTalkSearchVisible";
-        private const string PropertyPasswordSet = "NcTalkPasswordSet";
-        private const string PropertyStartEpoch = "NcTalkStartEpoch";
-        private const string PropertyDataVersion = "NcTalkDataVersion";
-        private const string PropertyAddUsers = "NcTalkAddUsers";
-        private const string PropertyAddGuests = "NcTalkAddGuests";
-        private const string PropertyDelegateId = "NcTalkDelegateId";
-        private const string PropertyDelegated = "NcTalkDelegated";
-        private const string IcalToken = "X-NCTALK-TOKEN";
-        private const string IcalUrl = "X-NCTALK-URL";
-        private const string IcalLobby = "X-NCTALK-LOBBY";
-        private const string IcalStart = "X-NCTALK-START";
-        private const string IcalEvent = "X-NCTALK-EVENT";
-        private const string IcalObjectId = "X-NCTALK-OBJECTID";
-        private const string IcalAddUsers = "X-NCTALK-ADD-USERS";
-        private const string IcalAddGuests = "X-NCTALK-ADD-GUESTS";
-        private const string IcalAddParticipants = "X-NCTALK-ADD-PARTICIPANTS";
-        private const string IcalDelegate = "X-NCTALK-DELEGATE";
-        private const string IcalDelegateName = "X-NCTALK-DELEGATE-NAME";
-        private const string IcalDelegated = "X-NCTALK-DELEGATED";
-        private const string IcalDelegateReady = "X-NCTALK-DELEGATE-READY";
-        private const string BodySectionHeader = "Nextcloud Talk";
-        private const string TalkHelpUrlMarker = "join_a_call_or_chat_as_guest.html";
-        private const string HtmlTalkBlockStartMarker = "<!-- NC4OL_TALK_BLOCK_START -->";
-        private const string HtmlTalkBlockEndMarker = "<!-- NC4OL_TALK_BLOCK_END -->";
-        private const int PropertyVersionValue = 1;
+        internal const string PropertyToken = "NcTalkRoomToken";
+        internal const string PropertyRoomType = "NcTalkRoomType";
+        internal const string PropertyLobby = "NcTalkLobbyEnabled";
+        internal const string PropertySearchVisible = "NcTalkSearchVisible";
+        internal const string PropertyPasswordSet = "NcTalkPasswordSet";
+        internal const string PropertyStartEpoch = "NcTalkStartEpoch";
+        internal const string PropertyDataVersion = "NcTalkDataVersion";
+        internal const string PropertyAddUsers = "NcTalkAddUsers";
+        internal const string PropertyAddGuests = "NcTalkAddGuests";
+        internal const string PropertyDelegateId = "NcTalkDelegateId";
+        internal const string PropertyDelegated = "NcTalkDelegated";
+        internal const string IcalToken = "X-NCTALK-TOKEN";
+        internal const string IcalUrl = "X-NCTALK-URL";
+        internal const string IcalLobby = "X-NCTALK-LOBBY";
+        internal const string IcalStart = "X-NCTALK-START";
+        internal const string IcalEvent = "X-NCTALK-EVENT";
+        internal const string IcalObjectId = "X-NCTALK-OBJECTID";
+        internal const string IcalAddUsers = "X-NCTALK-ADD-USERS";
+        internal const string IcalAddGuests = "X-NCTALK-ADD-GUESTS";
+        internal const string IcalAddParticipants = "X-NCTALK-ADD-PARTICIPANTS";
+        internal const string IcalDelegate = "X-NCTALK-DELEGATE";
+        internal const string IcalDelegateName = "X-NCTALK-DELEGATE-NAME";
+        internal const string IcalDelegated = "X-NCTALK-DELEGATED";
+        internal const string IcalDelegateReady = "X-NCTALK-DELEGATE-READY";
+        internal const int PropertyVersionValue = 1;
         private static readonly Regex TalkUrlTokenRegex = new Regex(@"https?://[^\s""'<>]+/call/(?<token>[A-Za-z0-9_-]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        private static void LogCore(string message)
+        public NextcloudTalkAddIn()
         {
-            DiagnosticsLogger.Log(LogCategories.Core, message);
+            _talkAppointmentController = new TalkAppointmentController(this);
+            _composeShareLifecycleController = new ComposeShareLifecycleController(this);
         }
 
-        private static void LogSettings(string message)
+        internal AddinSettings CurrentSettings
         {
-            DiagnosticsLogger.Log(LogCategories.Core, message);
+            get { return _currentSettings; }
         }
 
-        private static void LogTalk(string message)
+        internal SettingsStorage SettingsStorage
         {
-            DiagnosticsLogger.Log(LogCategories.Talk, message);
+            get { return _settingsStorage; }
         }
 
-        private void LogDeferredAppointmentEnsureRestriction(string message)
+        internal Outlook.Application OutlookApplication
         {
-            if (string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            lock (_pendingAppointmentEnsureSyncRoot)
-            {
-                DateTime nowUtc = DateTime.UtcNow;
-                bool shouldEmit = _lastDeferredAppointmentEnsureRestrictionLogUtc == DateTime.MinValue ||
-                                  (nowUtc - _lastDeferredAppointmentEnsureRestrictionLogUtc).TotalSeconds >= 5;
-                if (shouldEmit)
-                {
-                    if (_deferredAppointmentEnsureRestrictionSuppressedCount > 0)
-                    {
-                        message = message + " (suppressed " + _deferredAppointmentEnsureRestrictionSuppressedCount.ToString(CultureInfo.InvariantCulture) + " similar entries)";
-                    }
-
-                    DiagnosticsLogger.Log(LogCategories.Core, message);
-                    _lastDeferredAppointmentEnsureRestrictionLogUtc = nowUtc;
-                    _deferredAppointmentEnsureRestrictionSuppressedCount = 0;
-                }
-                else
-                {
-                    _deferredAppointmentEnsureRestrictionSuppressedCount++;
-                }
-            }
-        }
-
-        private static void LogFileLink(string message)
-        {
-            DiagnosticsLogger.Log(LogCategories.FileLink, message);
+            get { return _outlookApplication; }
         }
 
         /**
@@ -165,6 +134,7 @@ namespace NcTalkOutlookAddIn
             }
             _freeBusyManager = new FreeBusyManager(_settingsStorage.DataDirectory);
             _freeBusyManager.Initialize(_outlookApplication);
+            EnsureApplicationHook();
             EnsureInspectorHook();
             ApplyIfbSettings();
         }
@@ -229,17 +199,10 @@ namespace NcTalkOutlookAddIn
             }
             finally
             {
-                if (session != null && Marshal.IsComObject(session))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(session);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Outlook session COM object after profile resolution.", ex);
-                    }
-                }
+                ComInteropScope.TryRelease(
+                    session,
+                    LogCategories.Core,
+                    "Failed to release Outlook session COM object after profile resolution.");
             }
         }
 
@@ -249,44 +212,21 @@ namespace NcTalkOutlookAddIn
          */
         public void OnDisconnection(ext_DisconnectMode removeMode, ref Array custom)
         {
-            UnhookInspector();
-            UnhookMailComposeSubscriptions();
-            if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
-            {
-                try
-                {
-                    var clone = _currentSettings.Clone();
-                    clone.IfbEnabled = false;
-                    _freeBusyManager.ApplySettings(clone);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to disable IFB during add-in disconnect.", ex);
-                }
-            }
-            if (_freeBusyManager != null)
-            {
-                _freeBusyManager.Dispose();
-            }
-            _freeBusyManager = null;
-            _outlookApplication = null;
-            _uiSynchronizationContext = null;
-            lock (_pendingAppointmentEnsureSyncRoot)
-            {
-                _pendingAppointmentEnsureKeys.Clear();
-            }
+            TearDownAddInState("disconnect", true);
             LogCore("Add-in disconnected (removeMode=" + removeMode + ").");
         }
 
         /**
-         * Called after all add-ins have been loaded; currently unused.
+         * Required IDTExtensibility2 callback.
+         * Intentionally no-op because runtime wiring is already complete in OnConnection.
          */
         public void OnAddInsUpdate(ref Array custom)
         {
         }
 
         /**
-         * Called after Outlook startup is complete; currently unused.
+         * Required IDTExtensibility2 callback.
+         * Intentionally no-op because startup work is handled in OnConnection.
          */
         public void OnStartupComplete(ref Array custom)
         {
@@ -297,8 +237,19 @@ namespace NcTalkOutlookAddIn
          */
         public void OnBeginShutdown(ref Array custom)
         {
+            TearDownAddInState("shutdown", false);
+        }
+
+        /**
+         * Centralized teardown used by both OnBeginShutdown and OnDisconnection.
+         * This path must be idempotent, because Outlook can call both callbacks.
+         */
+        private void TearDownAddInState(string origin, bool clearOutlookApplication)
+        {
+            UnhookApplication();
             UnhookInspector();
             UnhookMailComposeSubscriptions();
+
             if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
             {
                 try
@@ -309,14 +260,24 @@ namespace NcTalkOutlookAddIn
                 }
                 catch (Exception ex)
                 {
-                    DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to disable IFB during Outlook shutdown.", ex);
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Ifb,
+                        "Failed to disable IFB during add-in " + (origin ?? "teardown") + ".",
+                        ex);
                 }
             }
+
             if (_freeBusyManager != null)
             {
                 _freeBusyManager.Dispose();
             }
             _freeBusyManager = null;
+
+            if (clearOutlookApplication)
+            {
+                _outlookApplication = null;
+            }
+
             _uiSynchronizationContext = null;
             lock (_pendingAppointmentEnsureSyncRoot)
             {
@@ -767,7 +728,7 @@ namespace NcTalkOutlookAddIn
             return false;
         }
 
-        private sealed class SeparatePasswordDispatchEntry
+        internal sealed class SeparatePasswordDispatchEntry
         {
             internal string ShareLabel { get; set; }
 
@@ -796,20 +757,11 @@ namespace NcTalkOutlookAddIn
                 ? ResolveMailInspectorIdentityKey(mail)
                 : inspectorIdentityOverride.Trim();
 
-            lock (_mailComposeSyncRoot)
-            {
-                foreach (var existing in _mailComposeSubscriptions)
-                {
-                    if (existing.IsFor(mail, mailIdentityKey, inspectorIdentityKey))
-                    {
-                        return existing;
-                    }
-                }
-
-                var created = new MailComposeSubscription(this, mail, mailIdentityKey, inspectorIdentityKey);
-                _mailComposeSubscriptions.Add(created);
-                return created;
-            }
+            return _mailComposeSubscriptionRegistry.GetOrCreate(
+                mail,
+                mailIdentityKey,
+                inspectorIdentityKey,
+                () => new MailComposeSubscription(this, mail, mailIdentityKey, inspectorIdentityKey));
         }
 
         private static string ResolveMailComIdentityKey(Outlook.MailItem mail)
@@ -1043,39 +995,41 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void RemoveMailComposeSubscription(MailComposeSubscription subscription)
+        private static bool AreSameComObject(object first, object second, string firstName, string secondName)
         {
-            if (subscription == null)
+            if (first == null || second == null)
             {
-                return;
+                return false;
             }
 
-            lock (_mailComposeSyncRoot)
+            if (!Marshal.IsComObject(first) || !Marshal.IsComObject(second))
             {
-                _mailComposeSubscriptions.Remove(subscription);
+                return ReferenceEquals(first, second);
             }
+
+            string firstKey = ResolveComIdentityKey(first, firstName);
+            if (string.IsNullOrWhiteSpace(firstKey))
+            {
+                return false;
+            }
+
+            string secondKey = ResolveComIdentityKey(second, secondName);
+            if (string.IsNullOrWhiteSpace(secondKey))
+            {
+                return false;
+            }
+
+            return string.Equals(firstKey, secondKey, StringComparison.Ordinal);
+        }
+
+        private void RemoveMailComposeSubscription(MailComposeSubscription subscription)
+        {
+            _mailComposeSubscriptionRegistry.Remove(subscription);
         }
 
         private void UnhookMailComposeSubscriptions()
         {
-            MailComposeSubscription[] current;
-            lock (_mailComposeSyncRoot)
-            {
-                current = _mailComposeSubscriptions.ToArray();
-                _mailComposeSubscriptions.Clear();
-            }
-
-            foreach (var subscription in current)
-            {
-                try
-                {
-                    subscription.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to dispose mail compose subscription.", ex);
-                }
-            }
+            _mailComposeSubscriptionRegistry.DisposeAll();
         }
 
         private bool TryGetAttachmentAutomationGuardState(string stage, string composeKey, out OutlookAttachmentAutomationGuardService.GuardState state)
@@ -1111,498 +1065,15 @@ namespace NcTalkOutlookAddIn
 
         private bool TryDeleteComposeShareFolder(string relativeFolder, string reason, string shareId, string shareLabel)
         {
-            if (string.IsNullOrWhiteSpace(relativeFolder))
-            {
-                return true;
-            }
-
-            EnsureSettingsLoaded();
-            if (_currentSettings == null || !SettingsAreComplete())
-            {
-                LogFileLink(
-                    "Compose share cleanup skipped (settings incomplete): relativeFolder="
-                    + relativeFolder
-                    + ", reason="
-                    + (reason ?? string.Empty));
-                return false;
-            }
-
-            var configuration = new TalkServiceConfiguration(
-                _currentSettings.ServerUrl,
-                _currentSettings.Username,
-                _currentSettings.AppPassword);
-            var service = new FileLinkService(configuration);
-            try
-            {
-                service.DeleteShareFolder(relativeFolder, CancellationToken.None);
-                LogFileLink(
-                    "Compose share cleanup delete success (relativeFolder="
-                    + relativeFolder
-                    + ", reason="
-                    + (reason ?? string.Empty)
-                    + ", shareId="
-                    + (shareId ?? string.Empty)
-                    + ", shareLabel="
-                    + (shareLabel ?? string.Empty)
-                    + ").");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(
-                    LogCategories.FileLink,
-                    "Compose share cleanup delete failure (relativeFolder="
-                    + relativeFolder
-                    + ", reason="
-                    + (reason ?? string.Empty)
-                    + ", shareId="
-                    + (shareId ?? string.Empty)
-                    + ", shareLabel="
-                    + (shareLabel ?? string.Empty)
-                    + ").",
-                    ex);
-                return false;
-            }
+            return _composeShareLifecycleController.TryDeleteComposeShareFolder(relativeFolder, reason, shareId, shareLabel);
         }
 
         private void DispatchSeparatePasswordMailQueue(string composeKey, List<SeparatePasswordDispatchEntry> queue)
         {
-            if (queue == null || queue.Count == 0 || _outlookApplication == null)
-            {
-                return;
-            }
-
-            int attemptedDispatches = 0;
-            int successfulDispatches = 0;
-            int autoSendFailures = 0;
-            int fallbackOpenedCount = 0;
-            int fallbackOpenFailures = 0;
-            string lastFailureMessage = string.Empty;
-            var sentRecipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var dispatch in queue)
-            {
-                if (dispatch == null || string.IsNullOrWhiteSpace(dispatch.Password) || string.IsNullOrWhiteSpace(dispatch.Html))
-                {
-                    continue;
-                }
-
-                attemptedDispatches++;
-                Outlook.MailItem passwordMail = null;
-                try
-                {
-                    passwordMail = _outlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
-                    if (passwordMail == null)
-                    {
-                        throw new InvalidOperationException("Password mail draft could not be created.");
-                    }
-
-                    passwordMail.Subject = BuildSeparatePasswordMailSubject(dispatch);
-                    passwordMail.HTMLBody = dispatch.Html;
-                    List<string> resolvedRecipients = ApplySeparatePasswordRecipientsForSend(passwordMail, dispatch, composeKey);
-                    int resolvedRecipientCount = resolvedRecipients.Count;
-
-                    LogFileLink(
-                        "Separate password mail send start (composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", to="
-                        + BuildNormalizedRecipientCsv(dispatch.To)
-                        + ", cc="
-                        + BuildNormalizedRecipientCsv(dispatch.Cc)
-                        + ", bcc="
-                        + BuildNormalizedRecipientCsv(dispatch.Bcc)
-                        + ", resolvedRecipients="
-                        + resolvedRecipientCount.ToString(CultureInfo.InvariantCulture)
-                        + ").");
-
-                    ((Outlook._MailItem)passwordMail).Send();
-                    successfulDispatches++;
-                    AddRecipientAddresses(sentRecipients, resolvedRecipients);
-                    LogFileLink("Separate password mail send done (composeKey=" + (composeKey ?? string.Empty) + ").");
-                }
-                catch (Exception ex)
-                {
-                    autoSendFailures++;
-                    lastFailureMessage = ex.Message ?? string.Empty;
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Separate password mail auto-send failed (composeKey=" + (composeKey ?? string.Empty) + ").",
-                        ex);
-                    bool fallbackOpened = TryOpenSeparatePasswordFallback(dispatch, composeKey);
-                    if (fallbackOpened)
-                    {
-                        fallbackOpenedCount++;
-                    }
-                    else
-                    {
-                        fallbackOpenFailures++;
-                    }
-                }
-                finally
-                {
-                    if (passwordMail != null && Marshal.IsComObject(passwordMail))
-                    {
-                        try
-                        {
-                            Marshal.ReleaseComObject(passwordMail);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release password MailItem COM object.", ex);
-                        }
-                    }
-                }
-            }
-
-            int recipientCount = sentRecipients.Count;
-            if (attemptedDispatches > 0 && successfulDispatches == attemptedDispatches && autoSendFailures == 0 && recipientCount > 0)
-            {
-                LogFileLink(
-                    "Separate password mail sent (composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ", attempted="
-                    + attemptedDispatches.ToString(CultureInfo.InvariantCulture)
-                    + ", successful="
-                    + successfulDispatches.ToString(CultureInfo.InvariantCulture)
-                    + ", recipients="
-                    + recipientCount.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-                ShowPasswordMailSuccessNotification(recipientCount);
-            }
-            else
-            {
-                LogFileLink(
-                    "Separate password mail partially sent (manual fallback required) (composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ", attempted="
-                    + attemptedDispatches.ToString(CultureInfo.InvariantCulture)
-                    + ", successful="
-                    + successfulDispatches.ToString(CultureInfo.InvariantCulture)
-                    + ", recipients="
-                    + recipientCount.ToString(CultureInfo.InvariantCulture)
-                    + ", fallbackOpened="
-                    + fallbackOpenedCount.ToString(CultureInfo.InvariantCulture)
-                    + ", fallbackOpenFailures="
-                    + fallbackOpenFailures.ToString(CultureInfo.InvariantCulture)
-                    + ", autoSendFailures="
-                    + autoSendFailures.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-
-                if (autoSendFailures > 0 && fallbackOpenedCount == 0 && !string.IsNullOrWhiteSpace(lastFailureMessage))
-                {
-                    ShowPasswordMailFailureDialog(lastFailureMessage);
-                }
-            }
+            _composeShareLifecycleController.DispatchSeparatePasswordMailQueue(composeKey, queue);
         }
 
-        private bool TryOpenSeparatePasswordFallback(SeparatePasswordDispatchEntry dispatch, string composeKey)
-        {
-            if (dispatch == null || _outlookApplication == null)
-            {
-                return false;
-            }
-
-            Outlook.MailItem fallback = null;
-            try
-            {
-                fallback = _outlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
-                if (fallback == null)
-                {
-                    return false;
-                }
-
-                string toRecipients = BuildNormalizedRecipientCsv(dispatch.To);
-                string ccRecipients = BuildNormalizedRecipientCsv(dispatch.Cc);
-                string bccRecipients = BuildNormalizedRecipientCsv(dispatch.Bcc);
-                if (CountRecipientsInCsv(toRecipients) + CountRecipientsInCsv(ccRecipients) + CountRecipientsInCsv(bccRecipients) <= 0)
-                {
-                    throw new InvalidOperationException("Separate password fallback draft has no valid recipients.");
-                }
-
-                fallback.To = toRecipients;
-                fallback.CC = ccRecipients;
-                fallback.BCC = bccRecipients;
-                fallback.Subject = BuildSeparatePasswordMailSubject(dispatch);
-                fallback.HTMLBody = dispatch.Html ?? string.Empty;
-                fallback.Display(false);
-                LogFileLink(
-                    "Separate password mail manual fallback opened (composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ", to="
-                    + toRecipients
-                    + ", cc="
-                    + ccRecipients
-                    + ", bcc="
-                    + bccRecipients
-                    + ").");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(
-                    LogCategories.FileLink,
-                    "Separate password mail manual fallback failed (composeKey=" + (composeKey ?? string.Empty) + ").",
-                    ex);
-                return false;
-            }
-            finally
-            {
-                if (fallback != null && Marshal.IsComObject(fallback))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(fallback);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release password fallback MailItem COM object.", ex);
-                    }
-                }
-            }
-        }
-
-        private List<string> ApplySeparatePasswordRecipientsForSend(Outlook.MailItem mail, SeparatePasswordDispatchEntry dispatch, string composeKey)
-        {
-            if (mail == null)
-            {
-                throw new InvalidOperationException("Password mail is not available.");
-            }
-
-            List<string> toRecipients = ExtractRecipientAddresses(dispatch != null ? dispatch.To : string.Empty);
-            List<string> ccRecipients = ExtractRecipientAddresses(dispatch != null ? dispatch.Cc : string.Empty);
-            List<string> bccRecipients = ExtractRecipientAddresses(dispatch != null ? dispatch.Bcc : string.Empty);
-            int totalRecipients = toRecipients.Count + ccRecipients.Count + bccRecipients.Count;
-            if (totalRecipients <= 0)
-            {
-                throw new InvalidOperationException("Separate password mail has no valid recipients.");
-            }
-
-            var resolvedRecipients = new List<string>();
-            Outlook.Recipients recipients = null;
-            try
-            {
-                recipients = mail.Recipients;
-                if (recipients == null)
-                {
-                    throw new InvalidOperationException("Password mail recipients collection is not available.");
-                }
-
-                AddResolvedRecipients(recipients, toRecipients, Outlook.OlMailRecipientType.olTo, composeKey, resolvedRecipients);
-                AddResolvedRecipients(recipients, ccRecipients, Outlook.OlMailRecipientType.olCC, composeKey, resolvedRecipients);
-                AddResolvedRecipients(recipients, bccRecipients, Outlook.OlMailRecipientType.olBCC, composeKey, resolvedRecipients);
-
-                bool resolvedAll = recipients.ResolveAll();
-                if (!resolvedAll)
-                {
-                    throw new InvalidOperationException("Separate password mail recipients could not be resolved.");
-                }
-
-                if (resolvedRecipients.Count <= 0)
-                {
-                    throw new InvalidOperationException("Separate password mail has no resolvable recipients.");
-                }
-
-                return resolvedRecipients;
-            }
-            finally
-            {
-                if (recipients != null && Marshal.IsComObject(recipients))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(recipients);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release password Recipients COM object.", ex);
-                    }
-                }
-            }
-        }
-
-        private void AddResolvedRecipients(
-            Outlook.Recipients recipients,
-            List<string> addresses,
-            Outlook.OlMailRecipientType type,
-            string composeKey,
-            List<string> resolvedRecipients)
-        {
-            if (recipients == null || addresses == null || addresses.Count == 0)
-            {
-                return;
-            }
-
-            for (int i = 0; i < addresses.Count; i++)
-            {
-                string address = addresses[i] ?? string.Empty;
-                Outlook.Recipient recipient = null;
-                try
-                {
-                    recipient = recipients.Add(address);
-                    if (recipient == null)
-                    {
-                        throw new InvalidOperationException("Recipient could not be added.");
-                    }
-
-                    recipient.Type = (int)type;
-                    bool resolved = recipient.Resolve();
-                    if (!resolved)
-                    {
-                        throw new InvalidOperationException(
-                            "Recipient could not be resolved (composeKey="
-                            + (composeKey ?? string.Empty)
-                            + ", address="
-                            + address
-                            + ", type="
-                            + type.ToString()
-                            + ").");
-                    }
-
-                    AddUniqueRecipient(resolvedRecipients, address);
-                }
-                finally
-                {
-                    if (recipient != null && Marshal.IsComObject(recipient))
-                    {
-                        try
-                        {
-                            Marshal.ReleaseComObject(recipient);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release password Recipient COM object.", ex);
-                        }
-                    }
-                }
-            }
-        }
-
-        private void ShowPasswordMailFailureDialog(string detailMessage)
-        {
-            if (string.IsNullOrWhiteSpace(detailMessage))
-            {
-                return;
-            }
-
-            try
-            {
-                MessageBox.Show(
-                    detailMessage.Trim(),
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to show separate password failure dialog.", ex);
-            }
-        }
-
-        private string BuildSeparatePasswordMailSubject(SeparatePasswordDispatchEntry dispatch)
-        {
-            string baseSubject = Strings.SharingPasswordMailSubject;
-            string shareLabel = dispatch != null ? (dispatch.ShareLabel ?? string.Empty).Trim() : string.Empty;
-            if (string.IsNullOrWhiteSpace(shareLabel))
-            {
-                return baseSubject;
-            }
-
-            return string.Format(CultureInfo.CurrentCulture, Strings.SharingPasswordMailSubjectWithLabel, shareLabel);
-        }
-
-        private static void AddRecipientAddresses(HashSet<string> recipients, List<string> addresses)
-        {
-            if (recipients == null || addresses == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < addresses.Count; i++)
-            {
-                string normalized = NormalizeRecipientAddress(addresses[i]);
-                if (!string.IsNullOrWhiteSpace(normalized))
-                {
-                    recipients.Add(normalized);
-                }
-            }
-        }
-
-        private static void AddUniqueRecipient(List<string> recipients, string address)
-        {
-            if (recipients == null)
-            {
-                return;
-            }
-
-            string normalized = NormalizeRecipientAddress(address);
-            if (string.IsNullOrWhiteSpace(normalized))
-            {
-                return;
-            }
-
-            for (int i = 0; i < recipients.Count; i++)
-            {
-                if (string.Equals(recipients[i], normalized, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-            }
-
-            recipients.Add(normalized);
-        }
-
-        private static List<string> ExtractRecipientAddresses(string csv)
-        {
-            var list = new List<string>();
-            if (string.IsNullOrWhiteSpace(csv))
-            {
-                return list;
-            }
-
-            string[] parts = csv.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < parts.Length; i++)
-            {
-                AddUniqueRecipient(list, parts[i]);
-            }
-
-            return list;
-        }
-
-        private static string BuildNormalizedRecipientCsv(string csv)
-        {
-            List<string> recipients = ExtractRecipientAddresses(csv);
-            return recipients.Count == 0 ? string.Empty : string.Join("; ", recipients.ToArray());
-        }
-
-        private static int CountRecipientsInCsv(string csv)
-        {
-            return ExtractRecipientAddresses(csv).Count;
-        }
-
-        private static string NormalizeRecipientAddress(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return string.Empty;
-            }
-
-            string value = raw.Trim();
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            int lt = value.LastIndexOf('<');
-            int gt = value.LastIndexOf('>');
-            if (lt >= 0 && gt > lt)
-            {
-                value = value.Substring(lt + 1, gt - lt - 1).Trim();
-            }
-
-            value = value.Trim().Trim('\'', '"');
-            return value.Trim();
-        }
-
-        private void ShowPasswordMailSuccessNotification(int recipientCount)
+        internal void ShowPasswordMailSuccessNotification(int recipientCount)
         {
             if (recipientCount <= 0)
             {
@@ -1935,7 +1406,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static string ReadAppointmentHtmlBody(Outlook.AppointmentItem appointment)
+        internal static string ReadAppointmentHtmlBody(Outlook.AppointmentItem appointment)
         {
             Outlook.Inspector inspector = null;
             object htmlEditor = null;
@@ -2009,7 +1480,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
+        internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
         {
             Outlook.Inspector inspector = null;
             object htmlEditor = null;
@@ -2109,7 +1580,7 @@ namespace NcTalkOutlookAddIn
             return null;
         }
 
-        private bool SettingsAreComplete()
+        internal bool SettingsAreComplete()
         {
             return _currentSettings != null
                    && !string.IsNullOrWhiteSpace(_currentSettings.ServerUrl)
@@ -2209,7 +1680,7 @@ namespace NcTalkOutlookAddIn
             return false;
         }
 
-        private TalkService CreateTalkService()
+        internal TalkService CreateTalkService()
         {
             return new TalkService(new TalkServiceConfiguration(
                 _currentSettings.ServerUrl,
@@ -2296,7 +1767,7 @@ namespace NcTalkOutlookAddIn
             return Strings.NormalizeLanguageOverride(trimmed);
         }
 
-        private static string NormalizeTalkEventDescriptionType(string descriptionType)
+        internal static string NormalizeTalkEventDescriptionType(string descriptionType)
         {
             return string.Equals(descriptionType, "html", StringComparison.OrdinalIgnoreCase)
                 ? "html"
@@ -2305,560 +1776,34 @@ namespace NcTalkOutlookAddIn
 
         private void ApplyRoomToAppointment(Outlook.AppointmentItem appointment, TalkRoomRequest request, TalkRoomCreationResult result)
         {
-            if (appointment == null || result == null)
-            {
-                return;
-            }
-            LogTalk("Writing talk data to appointment (token=" + result.RoomToken + ", type=" + request.RoomType + ", lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ", passwordSet=" + (!string.IsNullOrEmpty(request.Password)) + ", addUsers=" + request.AddUsers + ", addGuests=" + request.AddGuests + ", delegate=" + (string.IsNullOrEmpty(request.DelegateModeratorId) ? "n/a" : request.DelegateModeratorId) + ").");
-
-            if (!string.IsNullOrWhiteSpace(request.Title))
-            {
-                appointment.Subject = request.Title.Trim();
-            }
-
-            appointment.Location = result.RoomUrl;
-            string normalizedDescriptionType = NormalizeTalkEventDescriptionType(request.DescriptionType);
-            if (string.Equals(normalizedDescriptionType, "html", StringComparison.OrdinalIgnoreCase))
-            {
-                string updatedHtmlBody = UpdateHtmlBodyWithTalkBlock(
-                    ReadAppointmentHtmlBody(appointment),
-                    appointment.Body,
-                    result.RoomUrl,
-                    request.Password,
-                    request.DescriptionLanguage,
-                    request.InvitationTemplate);
-                if (!TryWriteAppointmentHtmlBody(appointment, updatedHtmlBody))
-                {
-                    LogTalk("Appointment HTML editor unavailable, falling back to plain-text Talk block insertion.");
-                    appointment.Body = UpdateBodyWithTalkBlock(
-                        appointment.Body,
-                        result.RoomUrl,
-                        request.Password,
-                        request.DescriptionLanguage,
-                        request.InvitationTemplate);
-                }
-            }
-            else
-            {
-                appointment.Body = UpdateBodyWithTalkBlock(
-                    appointment.Body,
-                    result.RoomUrl,
-                    request.Password,
-                    request.DescriptionLanguage,
-                    request.InvitationTemplate);
-            }
-
-            SetUserProperty(appointment, PropertyToken, Outlook.OlUserPropertyType.olText, result.RoomToken);
-            var storedRoomType = result.CreatedAsEventConversation ? TalkRoomType.EventConversation : TalkRoomType.StandardRoom;
-            SetUserProperty(appointment, PropertyRoomType, Outlook.OlUserPropertyType.olText, storedRoomType.ToString());
-            SetUserProperty(appointment, PropertyLobby, Outlook.OlUserPropertyType.olYesNo, request.LobbyEnabled);
-            SetUserProperty(appointment, PropertySearchVisible, Outlook.OlUserPropertyType.olYesNo, request.SearchVisible);
-            SetUserProperty(appointment, PropertyPasswordSet, Outlook.OlUserPropertyType.olYesNo, !string.IsNullOrEmpty(request.Password));
-            LogTalk("User fields updated (token set, lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ").");
-
-            long? startEpoch = TimeUtilities.ToUnixTimeSeconds(appointment.Start);
-            long? endEpoch = TimeUtilities.ToUnixTimeSeconds(appointment.End);
-            if (startEpoch.HasValue)
-            {
-                SetUserProperty(appointment, PropertyStartEpoch, Outlook.OlUserPropertyType.olText, startEpoch.Value.ToString(CultureInfo.InvariantCulture));
-            }
-
-            SetUserProperty(appointment, PropertyDataVersion, Outlook.OlUserPropertyType.olNumber, PropertyVersionValue);
-            SetUserProperty(appointment, PropertyAddUsers, Outlook.OlUserPropertyType.olYesNo, request.AddUsers);
-            SetUserProperty(appointment, PropertyAddGuests, Outlook.OlUserPropertyType.olYesNo, request.AddGuests);
-
-            if (!string.IsNullOrWhiteSpace(request.DelegateModeratorId))
-            {
-                string delegateId = request.DelegateModeratorId.Trim();
-                string delegateName = !string.IsNullOrWhiteSpace(request.DelegateModeratorName) ? request.DelegateModeratorName.Trim() : delegateId;
-
-                SetUserProperty(appointment, PropertyDelegateId, Outlook.OlUserPropertyType.olText, delegateId);
-                SetUserProperty(appointment, PropertyDelegated, Outlook.OlUserPropertyType.olYesNo, false);
-
-                SetUserProperty(appointment, IcalDelegate, Outlook.OlUserPropertyType.olText, delegateId);
-                SetUserProperty(appointment, IcalDelegateName, Outlook.OlUserPropertyType.olText, delegateName);
-                SetUserProperty(appointment, IcalDelegated, Outlook.OlUserPropertyType.olText, "FALSE");
-                SetUserProperty(appointment, IcalDelegateReady, Outlook.OlUserPropertyType.olText, "TRUE");
-            }
-            else
-            {
-                RemoveUserProperty(appointment, PropertyDelegateId);
-                RemoveUserProperty(appointment, PropertyDelegated);
-
-                RemoveUserProperty(appointment, IcalDelegate);
-                RemoveUserProperty(appointment, IcalDelegateName);
-                RemoveUserProperty(appointment, IcalDelegated);
-                RemoveUserProperty(appointment, IcalDelegateReady);
-            }
-
-            SetUserProperty(appointment, IcalToken, Outlook.OlUserPropertyType.olText, result.RoomToken);
-            SetUserProperty(appointment, IcalUrl, Outlook.OlUserPropertyType.olText, result.RoomUrl);
-            SetUserProperty(appointment, IcalLobby, Outlook.OlUserPropertyType.olText, request.LobbyEnabled ? "TRUE" : "FALSE");
-            if (startEpoch.HasValue)
-            {
-                SetUserProperty(appointment, IcalStart, Outlook.OlUserPropertyType.olText, startEpoch.Value.ToString(CultureInfo.InvariantCulture));
-            }
-            else
-            {
-                RemoveUserProperty(appointment, IcalStart);
-            }
-
-            SetUserProperty(appointment, IcalEvent, Outlook.OlUserPropertyType.olText, result.CreatedAsEventConversation ? "event" : "standard");
-            string objectId = (startEpoch.HasValue && endEpoch.HasValue)
-                ? (startEpoch.Value.ToString(CultureInfo.InvariantCulture) + "#" + endEpoch.Value.ToString(CultureInfo.InvariantCulture))
-                : null;
-            if (!string.IsNullOrWhiteSpace(objectId))
-            {
-                SetUserProperty(appointment, IcalObjectId, Outlook.OlUserPropertyType.olText, objectId);
-            }
-            else
-            {
-                RemoveUserProperty(appointment, IcalObjectId);
-            }
-
-            SetUserProperty(appointment, IcalAddUsers, Outlook.OlUserPropertyType.olText, request.AddUsers ? "TRUE" : "FALSE");
-            SetUserProperty(appointment, IcalAddGuests, Outlook.OlUserPropertyType.olText, request.AddGuests ? "TRUE" : "FALSE");
-            SetUserProperty(appointment, IcalAddParticipants, Outlook.OlUserPropertyType.olText, (request.AddUsers || request.AddGuests) ? "TRUE" : "FALSE");
-
-            RegisterSubscription(appointment, result);
-            TryUpdateRoomDescription(appointment, result.RoomToken, result.CreatedAsEventConversation);
+            _talkAppointmentController.ApplyRoomToAppointment(appointment, request, result);
         }
 
-        private static string UpdateBodyWithTalkBlock(string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
+        internal static string UpdateBodyWithTalkBlock(string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
         {
-            string body = RemoveExistingTalkBlock(existingBody ?? string.Empty);
-            string block = BuildTalkBodyBlock(roomUrl, password, languageOverride, invitationTemplate);
-            if (string.IsNullOrWhiteSpace(block))
-            {
-                return body.TrimEnd('\r', '\n');
-            }
-
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                return block;
-            }
-
-            return body.TrimEnd('\r', '\n') + "\r\n\r\n" + block;
+            return TalkDescriptionTemplateController.UpdateBodyWithTalkBlock(existingBody, roomUrl, password, languageOverride, invitationTemplate);
         }
 
-        private static string UpdateHtmlBodyWithTalkBlock(string existingHtmlBody, string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
+        internal static string UpdateHtmlBodyWithTalkBlock(string existingHtmlBody, string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
         {
-            string html = PrepareHtmlBody(existingHtmlBody, existingBody);
-            html = RemoveExistingTalkBlockHtml(html);
-
-            string block = BuildTalkBodyBlockHtml(roomUrl, password, languageOverride, invitationTemplate);
-            if (string.IsNullOrWhiteSpace(block))
-            {
-                return string.IsNullOrWhiteSpace(html) ? string.Empty : html.Trim();
-            }
-
-            if (string.IsNullOrWhiteSpace(html))
-            {
-                return block;
-            }
-
-            return html.TrimEnd() + Environment.NewLine + block;
-        }
-
-        private static string RemoveExistingTalkBlock(string body)
-        {
-            if (string.IsNullOrEmpty(body))
-            {
-                return body;
-            }
-
-            var lines = new List<string>();
-            using (var reader = new StringReader(body))
-            {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    lines.Add(line);
-                }
-            }
-
-            bool removed = false;
-            int index = 0;
-
-            while (index < lines.Count)
-            {
-                if (!IsTalkBlockHeaderLine(lines[index]))
-                {
-                    index++;
-                    continue;
-                }
-
-                int blockEnd = FindTalkBlockEnd(lines, index);
-                if (blockEnd < 0)
-                {
-                    index++;
-                    continue;
-                }
-
-                int blockStart = index;
-                while (blockStart > 0 && string.IsNullOrWhiteSpace(lines[blockStart - 1]))
-                {
-                    blockStart--;
-                }
-
-                int removeEnd = blockEnd;
-                while (removeEnd + 1 < lines.Count && string.IsNullOrWhiteSpace(lines[removeEnd + 1]))
-                {
-                    removeEnd++;
-                }
-
-                lines.RemoveRange(blockStart, removeEnd - blockStart + 1);
-                removed = true;
-                index = blockStart;
-            }
-
-            if (!removed)
-            {
-                return body;
-            }
-
-            return string.Join("\r\n", lines).Trim('\r', '\n');
-        }
-
-        private static string RemoveExistingTalkBlockHtml(string html)
-        {
-            if (string.IsNullOrWhiteSpace(html))
-            {
-                return string.Empty;
-            }
-
-            string updated = html;
-            int startIndex = updated.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase);
-            while (startIndex >= 0)
-            {
-                int endIndex = updated.IndexOf(HtmlTalkBlockEndMarker, startIndex, StringComparison.OrdinalIgnoreCase);
-                if (endIndex < 0)
-                {
-                    break;
-                }
-
-                endIndex += HtmlTalkBlockEndMarker.Length;
-                updated = updated.Remove(startIndex, endIndex - startIndex);
-                startIndex = updated.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase);
-            }
-
-            return updated.Trim();
-        }
-
-        private static string PrepareHtmlBody(string existingHtmlBody, string existingBody)
-        {
-            string html = string.IsNullOrWhiteSpace(existingHtmlBody) ? string.Empty : existingHtmlBody;
-            string body = string.IsNullOrWhiteSpace(existingBody) ? string.Empty : existingBody;
-            if (!string.IsNullOrWhiteSpace(html) && html.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return html;
-            }
-
-            string cleanedBody = RemoveExistingTalkBlock(body);
-            bool bodyHadLegacyBlock = !string.Equals(cleanedBody, body, StringComparison.Ordinal);
-            if (bodyHadLegacyBlock || string.IsNullOrWhiteSpace(html))
-            {
-                return ConvertPlainTextToHtml(cleanedBody);
-            }
-
-            return html;
-        }
-
-        /**
-         * Build the text block inserted into the Outlook appointment body.
-         * Backend custom templates are converted to plain text so the same policy
-         * payload can be reused for room descriptions and Outlook's plain-text body.
-         */
-        private static string BuildTalkBodyBlock(string roomUrl, string password, string languageOverride, string invitationTemplate)
-        {
-            string normalizedLanguage = NormalizeTalkDescriptionLanguage(languageOverride);
-            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(invitationTemplate))
-            {
-                return RenderTalkInvitationTemplate(invitationTemplate, roomUrl, password);
-            }
-
-            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                normalizedLanguage = "default";
-            }
-
-            string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
-            string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
-            string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
-            string helpUrl = Strings.GetInLanguage(
-                normalizedLanguage,
-                "ui_description_help_url",
-                "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
-
-            var lines = new List<string>
-            {
-                BodySectionHeader,
-                string.Empty,
-                joinLabel,
-                roomUrl ?? string.Empty,
-                string.Empty
-            };
-
-            if (!string.IsNullOrWhiteSpace(password))
-            {
-                lines.Add(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim()));
-                lines.Add(string.Empty);
-            }
-
-            lines.Add(helpLabel);
-            lines.Add(string.Empty);
-            lines.Add(helpUrl);
-            return string.Join("\r\n", lines).TrimEnd('\r', '\n');
-        }
-
-        /**
-         * Build the HTML block inserted into the Outlook appointment body when the
-         * backend explicitly requests HTML event descriptions.
-         */
-        private static string BuildTalkBodyBlockHtml(string roomUrl, string password, string languageOverride, string invitationTemplate)
-        {
-            string normalizedLanguage = NormalizeTalkDescriptionLanguage(languageOverride);
-            string innerHtml;
-
-            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(invitationTemplate))
-            {
-                innerHtml = RenderTalkInvitationTemplateHtml(invitationTemplate, roomUrl, password);
-            }
-            else
-            {
-                if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-                {
-                    normalizedLanguage = "default";
-                }
-
-                string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
-                string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
-                string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
-                string helpUrl = Strings.GetInLanguage(
-                    normalizedLanguage,
-                    "ui_description_help_url",
-                    "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
-
-                var html = new StringBuilder();
-                html.Append("<div>");
-                html.Append("<p><strong>").Append(HttpUtility.HtmlEncode(BodySectionHeader)).Append("</strong></p>");
-                html.Append("<p>")
-                    .Append(HttpUtility.HtmlEncode(joinLabel))
-                    .Append("<br><a href=\"")
-                    .Append(HttpUtility.HtmlAttributeEncode(roomUrl ?? string.Empty))
-                    .Append("\">")
-                    .Append(HttpUtility.HtmlEncode(roomUrl ?? string.Empty))
-                    .Append("</a></p>");
-
-                if (!string.IsNullOrWhiteSpace(password))
-                {
-                    html.Append("<p>")
-                        .Append(HttpUtility.HtmlEncode(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim())))
-                        .Append("</p>");
-                }
-
-                html.Append("<p>")
-                    .Append(HttpUtility.HtmlEncode(helpLabel))
-                    .Append("<br><a href=\"")
-                    .Append(HttpUtility.HtmlAttributeEncode(helpUrl))
-                    .Append("\">")
-                    .Append(HttpUtility.HtmlEncode(helpUrl))
-                    .Append("</a></p>");
-                html.Append("</div>");
-                innerHtml = html.ToString();
-            }
-
-            if (string.IsNullOrWhiteSpace(innerHtml))
-            {
-                return string.Empty;
-            }
-
-            return HtmlTalkBlockStartMarker
-                + "<div data-nc4ol-talk-block=\"true\" style=\"margin-top:16px;\">"
-                + innerHtml.Trim()
-                + "</div>"
-                + HtmlTalkBlockEndMarker;
-        }
-
-        private static bool IsTalkBlockHeaderLine(string line)
-        {
-            string normalized = NormalizeTalkBlockLine(line);
-            return string.Equals(normalized, BodySectionHeader, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static int FindTalkBlockEnd(List<string> lines, int headerIndex)
-        {
-            int maxIndex = Math.Min(lines.Count - 1, headerIndex + 40);
-            for (int i = headerIndex; i <= maxIndex; i++)
-            {
-                string rawLine = lines[i] ?? string.Empty;
-                string normalized = NormalizeTalkBlockLine(rawLine);
-                if (rawLine.IndexOf(TalkHelpUrlMarker, StringComparison.OrdinalIgnoreCase) >= 0
-                    || normalized.IndexOf(TalkHelpUrlMarker, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return i;
-                }
-            }
-
-            return -1;
+            return TalkDescriptionTemplateController.UpdateHtmlBodyWithTalkBlock(existingHtmlBody, existingBody, roomUrl, password, languageOverride, invitationTemplate);
         }
 
         private static string BuildInitialRoomDescription(string password, string languageOverride, string invitationTemplate)
         {
-            string normalizedLanguage = NormalizeTalkDescriptionLanguage(languageOverride);
-            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(invitationTemplate))
-            {
-                return RenderTalkInvitationTemplate(invitationTemplate, string.Empty, password);
-            }
-
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                return string.Empty;
-            }
-
-            if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                normalizedLanguage = "default";
-            }
-
-            string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
-            return string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim());
-        }
-
-        private static string RenderTalkInvitationTemplate(string template, string meetingUrl, string password)
-        {
-            if (string.IsNullOrWhiteSpace(template))
-            {
-                return string.Empty;
-            }
-
-            string rendered = template
-                .Replace("{MEETING_URL}", meetingUrl ?? string.Empty)
-                .Replace("{PASSWORD}", password ?? string.Empty);
-            return ConvertHtmlTemplateToPlainText(rendered);
-        }
-
-        private static string RenderTalkInvitationTemplateHtml(string template, string meetingUrl, string password)
-        {
-            if (string.IsNullOrWhiteSpace(template))
-            {
-                return string.Empty;
-            }
-
-            return template
-                .Replace("{MEETING_URL}", HttpUtility.HtmlEncode(meetingUrl ?? string.Empty))
-                .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty))
-                .Trim();
-        }
-
-        private static string NormalizeTalkBlockLine(string line)
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                return string.Empty;
-            }
-
-            string normalized = Regex.Replace(line, "<[^>]+>", string.Empty);
-            normalized = HttpUtility.HtmlDecode(normalized) ?? string.Empty;
-            normalized = normalized.Replace('\u00A0', ' ');
-            return normalized.Trim();
+            return TalkDescriptionTemplateController.BuildInitialRoomDescription(password, languageOverride, invitationTemplate);
         }
 
         /**
          * Outlook appointment bodies are plain text. Convert backend HTML/text
          * templates into a stable plain-text block before inserting them.
          */
-        private static string ConvertHtmlTemplateToPlainText(string value)
+        internal static string ConvertHtmlTemplateToPlainText(string value)
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            string text = value.Replace("\r\n", "\n").Replace('\r', '\n');
-            text = Regex.Replace(text, @"<\s*br\s*/?\s*>", "\n", RegexOptions.IgnoreCase);
-            text = Regex.Replace(text, @"<\s*/\s*(p|div|li|tr|table|h[1-6])\s*>", "\n", RegexOptions.IgnoreCase);
-            text = Regex.Replace(text, @"<\s*(p|div|li|tr|table|h[1-6])[^>]*>", "\n", RegexOptions.IgnoreCase);
-            text = Regex.Replace(text, "<[^>]+>", string.Empty, RegexOptions.IgnoreCase);
-            text = HttpUtility.HtmlDecode(text) ?? string.Empty;
-            text = text.Replace('\u00A0', ' ');
-
-            var lines = new List<string>();
-            bool lastBlank = false;
-            foreach (string rawLine in text.Split('\n'))
-            {
-                string line = (rawLine ?? string.Empty).Trim();
-                if (line.Length == 0)
-                {
-                    if (!lastBlank && lines.Count > 0)
-                    {
-                        lines.Add(string.Empty);
-                    }
-                    lastBlank = true;
-                    continue;
-                }
-
-                lines.Add(line);
-                lastBlank = false;
-            }
-
-            return string.Join("\r\n", lines).Trim();
+            return TalkDescriptionTemplateController.ConvertHtmlTemplateToPlainText(value);
         }
 
-        private static string ConvertPlainTextToHtml(string value)
-        {
-            string normalized = (value ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Trim();
-            if (string.IsNullOrWhiteSpace(normalized))
-            {
-                return string.Empty;
-            }
-
-            string[] paragraphs = Regex.Split(normalized, @"\n{2,}");
-            var html = new StringBuilder();
-            for (int i = 0; i < paragraphs.Length; i++)
-            {
-                string paragraph = (paragraphs[i] ?? string.Empty).Trim();
-                if (paragraph.Length == 0)
-                {
-                    continue;
-                }
-
-                if (html.Length > 0)
-                {
-                    html.Append(Environment.NewLine);
-                }
-
-                html.Append("<p>")
-                    .Append(HttpUtility.HtmlEncode(paragraph).Replace("\n", "<br>"))
-                    .Append("</p>");
-            }
-
-            return html.ToString();
-        }
-
-        private static string BuildDescriptionPayload(Outlook.AppointmentItem appointment)
-        {
-            if (appointment == null)
-            {
-                return null;
-            }
-
-            string body = appointment.Body ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                string htmlBody = ReadAppointmentHtmlBody(appointment);
-                if (!string.IsNullOrWhiteSpace(htmlBody))
-                {
-                    body = ConvertHtmlTemplateToPlainText(htmlBody);
-                }
-            }
-            return body.Trim();
-        }
-
-        private static void SetUserProperty(Outlook.AppointmentItem appointment, string name, Outlook.OlUserPropertyType type, object value)
+        internal static void SetUserProperty(Outlook.AppointmentItem appointment, string name, Outlook.OlUserPropertyType type, object value)
         {
             if (appointment == null)
             {
@@ -2872,77 +1817,17 @@ namespace NcTalkOutlookAddIn
 
         private bool TryStampIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
         {
-            startEpoch = 0;
-            if (appointment == null)
-            {
-                LogTalk("Failed to stamp X-NCTALK-START: appointment is null (token=" + (roomToken ?? "n/a") + ").");
-                return false;
-            }
-
-            DateTime start;
-            try
-            {
-                start = appointment.Start;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Appointment.Start while stamping X-NCTALK-START (token=" + (roomToken ?? "n/a") + ").", ex);
-                return false;
-            }
-
-            long? epoch = TimeUtilities.ToUnixTimeSeconds(start);
-            if (!epoch.HasValue || epoch.Value <= 0)
-            {
-                RemoveUserProperty(appointment, IcalStart);
-                RemoveUserProperty(appointment, PropertyStartEpoch);
-                LogTalk("Failed to stamp X-NCTALK-START: Appointment.Start is missing/invalid (token=" + (roomToken ?? "n/a") + ", start=" + start.ToString("o", CultureInfo.InvariantCulture) + ").");
-                return false;
-            }
-
-            startEpoch = epoch.Value;
-            string value = startEpoch.ToString(CultureInfo.InvariantCulture);
-            SetUserProperty(appointment, IcalStart, Outlook.OlUserPropertyType.olText, value);
-            SetUserProperty(appointment, PropertyStartEpoch, Outlook.OlUserPropertyType.olText, value);
-            LogTalk("X-NCTALK-START stamped (token=" + (roomToken ?? "n/a") + ", startEpoch=" + value + ").");
-            return true;
+            return _talkAppointmentController.TryStampIcalStartEpoch(appointment, roomToken, out startEpoch);
         }
 
         private bool TryReadRequiredIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
         {
-            startEpoch = 0;
-            string rawValue = GetUserPropertyText(appointment, IcalStart);
-            if (string.IsNullOrWhiteSpace(rawValue))
-            {
-                LogTalk("Lobby update blocked: X-NCTALK-START is missing (token=" + (roomToken ?? "n/a") + ").");
-                return false;
-            }
-
-            long parsed;
-            if (!long.TryParse(rawValue.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) || parsed <= 0)
-            {
-                LogTalk("Lobby update blocked: X-NCTALK-START is invalid (token=" + (roomToken ?? "n/a") + ", value='" + rawValue + "').");
-                return false;
-            }
-
-            startEpoch = parsed;
-            return true;
+            return _talkAppointmentController.TryReadRequiredIcalStartEpoch(appointment, roomToken, out startEpoch);
         }
 
         private static long? GetIcalStartEpochOrNull(Outlook.AppointmentItem appointment)
         {
-            string rawValue = GetUserPropertyText(appointment, IcalStart);
-            if (string.IsNullOrWhiteSpace(rawValue))
-            {
-                return null;
-            }
-
-            long parsed;
-            if (!long.TryParse(rawValue.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) || parsed <= 0)
-            {
-                return null;
-            }
-
-            return parsed;
+            return TalkAppointmentController.GetIcalStartEpochOrNull(appointment);
         }
 
         private static string GetEntryId(Outlook.AppointmentItem appointment)
@@ -3021,7 +1906,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static string GetUserPropertyText(Outlook.AppointmentItem appointment, string name)
+        internal static string GetUserPropertyText(Outlook.AppointmentItem appointment, string name)
         {
             if (appointment == null)
             {
@@ -3032,7 +1917,7 @@ namespace NcTalkOutlookAddIn
             return property != null ? property.Value as string : null;
         }
 
-        private static bool HasUserProperty(Outlook.AppointmentItem appointment, string name)
+        internal static bool HasUserProperty(Outlook.AppointmentItem appointment, string name)
         {
             if (appointment == null)
             {
@@ -3050,7 +1935,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static string GetUserPropertyTextPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
+        internal static string GetUserPropertyTextPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
         {
             string primaryValue = GetUserPropertyText(appointment, primaryName);
             if (!string.IsNullOrWhiteSpace(primaryValue))
@@ -3116,7 +2001,7 @@ namespace NcTalkOutlookAddIn
             return extracted;
         }
 
-        private static bool GetUserPropertyBoolPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
+        internal static bool GetUserPropertyBoolPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
         {
             if (HasUserProperty(appointment, primaryName))
             {
@@ -3126,7 +2011,7 @@ namespace NcTalkOutlookAddIn
             return GetUserPropertyBool(appointment, legacyName);
         }
 
-        private static bool GetUserPropertyBool(Outlook.AppointmentItem appointment, string name)
+        internal static bool GetUserPropertyBool(Outlook.AppointmentItem appointment, string name)
         {
             if (appointment == null)
             {
@@ -3253,173 +2138,19 @@ namespace NcTalkOutlookAddIn
             out bool lobbyEnabled,
             out bool isEventConversation)
         {
-            bool? resolvedLobby = null;
-            bool? resolvedEventConversation = null;
-
-            try
-            {
-                bool hasLobbyFlag = HasUserProperty(appointment, IcalLobby) || HasUserProperty(appointment, PropertyLobby);
-                if (hasLobbyFlag)
-                {
-                    resolvedLobby = GetUserPropertyBoolPrefer(appointment, IcalLobby, PropertyLobby);
-                }
-
-                var roomType = GetRoomType(appointment);
-                if (roomType.HasValue)
-                {
-                    resolvedEventConversation = roomType.Value == TalkRoomType.EventConversation;
-                }
-
-                if (!resolvedEventConversation.HasValue && TryIsEventConversationFromObjectId(appointment))
-                {
-                    resolvedEventConversation = true;
-                    PersistEventConversationTraits(appointment, roomToken);
-                    LogTalk("Conversation type inferred from X-NCTALK-OBJECTID (token=" + roomToken + ").");
-                }
-
-                TryHydrateMissingRoomTraitsFromServer(appointment, roomToken, ref resolvedLobby, ref resolvedEventConversation);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve runtime room traits (token=" + (roomToken ?? "n/a") + ").", ex);
-            }
-
-            lobbyKnown = resolvedLobby.HasValue;
-            lobbyEnabled = resolvedLobby.HasValue ? resolvedLobby.Value : fallbackLobbyEnabled;
-            isEventConversation = resolvedEventConversation.HasValue ? resolvedEventConversation.Value : fallbackIsEventConversation;
-        }
-
-        private static bool TryIsEventConversationFromObjectId(Outlook.AppointmentItem appointment)
-        {
-            try
-            {
-                string objectId = GetUserPropertyText(appointment, IcalObjectId);
-                return !string.IsNullOrWhiteSpace(objectId);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void PersistEventConversationTraits(Outlook.AppointmentItem appointment, string roomToken)
-        {
-            if (appointment == null)
-            {
-                return;
-            }
-
-            try
-            {
-                SetUserProperty(appointment, IcalEvent, Outlook.OlUserPropertyType.olText, "event");
-                SetUserProperty(appointment, PropertyRoomType, Outlook.OlUserPropertyType.olText, TalkRoomType.EventConversation.ToString());
-                LogTalk("Conversation type persisted as event (token=" + (roomToken ?? "n/a") + ").");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to persist event conversation traits (token=" + (roomToken ?? "n/a") + ").", ex);
-            }
+            _talkAppointmentController.ResolveRuntimeRoomTraits(
+                appointment,
+                roomToken,
+                fallbackLobbyEnabled,
+                fallbackIsEventConversation,
+                out lobbyKnown,
+                out lobbyEnabled,
+                out isEventConversation);
         }
 
         private void PersistLobbyTraits(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled)
         {
-            if (appointment == null)
-            {
-                return;
-            }
-
-            try
-            {
-                SetUserProperty(appointment, IcalLobby, Outlook.OlUserPropertyType.olText, lobbyEnabled ? "TRUE" : "FALSE");
-                SetUserProperty(appointment, PropertyLobby, Outlook.OlUserPropertyType.olYesNo, lobbyEnabled);
-                LogTalk("Lobby flag persisted from runtime update (token=" + (roomToken ?? "n/a") + ", lobby=" + lobbyEnabled + ").");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to persist lobby traits from runtime update (token=" + (roomToken ?? "n/a") + ").", ex);
-            }
-        }
-
-        private static bool IsEventConversationDescriptionError(TalkServiceException ex)
-        {
-            if (ex == null || string.IsNullOrWhiteSpace(ex.Message))
-            {
-                return false;
-            }
-
-            string normalized = ex.Message.Trim();
-            return string.Equals(normalized, "event", StringComparison.OrdinalIgnoreCase) ||
-                   normalized.IndexOf("event conversation", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private void TryHydrateMissingRoomTraitsFromServer(
-            Outlook.AppointmentItem appointment,
-            string roomToken,
-            ref bool? lobbyEnabled,
-            ref bool? isEventConversation)
-        {
-            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
-            {
-                return;
-            }
-
-            bool needLobby = !lobbyEnabled.HasValue;
-            bool needEvent = !isEventConversation.HasValue;
-            if (!needLobby && !needEvent)
-            {
-                return;
-            }
-
-            try
-            {
-                bool? resolvedLobby;
-                bool? resolvedEvent;
-                var service = CreateTalkService();
-                if (!service.TryReadRoomTraits(roomToken, out resolvedLobby, out resolvedEvent))
-                {
-                    return;
-                }
-
-                if (needLobby && resolvedLobby.HasValue)
-                {
-                    lobbyEnabled = resolvedLobby.Value;
-                    try
-                    {
-                        SetUserProperty(appointment, IcalLobby, Outlook.OlUserPropertyType.olText, resolvedLobby.Value ? "TRUE" : "FALSE");
-                        SetUserProperty(appointment, PropertyLobby, Outlook.OlUserPropertyType.olYesNo, resolvedLobby.Value);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to persist lobby flag after server bootstrap.", ex);
-                    }
-
-                    LogTalk("Lobby flag bootstrapped from server (token=" + roomToken + ", lobby=" + resolvedLobby.Value + ").");
-                }
-
-                if (needEvent && resolvedEvent.HasValue)
-                {
-                    isEventConversation = resolvedEvent.Value;
-                    try
-                    {
-                        SetUserProperty(appointment, IcalEvent, Outlook.OlUserPropertyType.olText, resolvedEvent.Value ? "event" : "standard");
-                        SetUserProperty(
-                            appointment,
-                            PropertyRoomType,
-                            Outlook.OlUserPropertyType.olText,
-                            resolvedEvent.Value ? TalkRoomType.EventConversation.ToString() : TalkRoomType.StandardRoom.ToString());
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to persist conversation type after server bootstrap.", ex);
-                    }
-
-                    LogTalk("Conversation type bootstrapped from server (token=" + roomToken + ", event=" + resolvedEvent.Value + ").");
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to bootstrap room traits from server (token=" + roomToken + ").", ex);
-            }
+            _talkAppointmentController.PersistLobbyTraits(appointment, roomToken, lobbyEnabled);
         }
 
         private bool IsOrganizer(Outlook.AppointmentItem appointment)
@@ -3440,7 +2171,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static void RemoveUserProperty(Outlook.AppointmentItem appointment, string name)
+        internal static void RemoveUserProperty(Outlook.AppointmentItem appointment, string name)
         {
             if (appointment == null)
             {
@@ -3482,7 +2213,7 @@ namespace NcTalkOutlookAddIn
             RemoveUserProperty(appointment, IcalDelegateReady);
         }
 
-        private void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)
+        internal void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)
         {
             if (result == null)
             {
@@ -3492,7 +2223,7 @@ namespace NcTalkOutlookAddIn
             RegisterSubscription(appointment, result.RoomToken, result.LobbyEnabled, result.CreatedAsEventConversation);
         }
 
-        private void RegisterSubscription(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled, bool isEventConversation)
+        internal void RegisterSubscription(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled, bool isEventConversation)
         {
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
@@ -3558,473 +2289,34 @@ namespace NcTalkOutlookAddIn
 
         private bool IsDelegatedToOtherUser(Outlook.AppointmentItem appointment, out string delegateId)
         {
-            delegateId = GetUserPropertyTextPrefer(appointment, IcalDelegate, PropertyDelegateId) ?? string.Empty;
-            bool delegated = GetUserPropertyBoolPrefer(appointment, IcalDelegated, PropertyDelegated);
-
-            if (!delegated || string.IsNullOrWhiteSpace(delegateId))
-            {
-                delegateId = string.Empty;
-                return false;
-            }
-
-            string currentUser = _currentSettings != null ? (_currentSettings.Username ?? string.Empty) : string.Empty;
-            if (string.IsNullOrWhiteSpace(currentUser))
-            {
-                return true;
-            }
-
-            return !string.Equals(delegateId.Trim(), currentUser.Trim(), StringComparison.OrdinalIgnoreCase);
+            return _talkAppointmentController.IsDelegatedToOtherUser(appointment, out delegateId);
         }
 
         private bool IsDelegationPending(Outlook.AppointmentItem appointment, out string delegateId)
         {
-            delegateId = GetUserPropertyTextPrefer(appointment, IcalDelegate, PropertyDelegateId) ?? string.Empty;
-            bool delegated = GetUserPropertyBoolPrefer(appointment, IcalDelegated, PropertyDelegated);
-
-            if (delegated)
-            {
-                delegateId = string.Empty;
-                return false;
-            }
-
-            return !string.IsNullOrWhiteSpace(delegateId);
+            return _talkAppointmentController.IsDelegationPending(appointment, out delegateId);
         }
 
         // Returns true when participant sync completed without runtime/service failures.
         // This status is used for deterministic pre-delegation logging in OnWrite.
         private bool TrySyncRoomParticipants(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
         {
-            if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _currentSettings == null)
-            {
-                return false;
-            }
-
-            string delegateId;
-            if (IsDelegatedToOtherUser(appointment, out delegateId))
-            {
-                LogTalk("Participant sync skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
-                return true;
-            }
-
-            bool addParticipantsLegacy = GetUserPropertyBool(appointment, IcalAddParticipants);
-            bool hasAddUsers = HasUserProperty(appointment, IcalAddUsers) || HasUserProperty(appointment, PropertyAddUsers);
-            bool hasAddGuests = HasUserProperty(appointment, IcalAddGuests) || HasUserProperty(appointment, PropertyAddGuests);
-
-            bool addUsers = hasAddUsers ? GetUserPropertyBoolPrefer(appointment, IcalAddUsers, PropertyAddUsers) : addParticipantsLegacy;
-            bool addGuests = hasAddGuests ? GetUserPropertyBoolPrefer(appointment, IcalAddGuests, PropertyAddGuests) : addParticipantsLegacy;
-            if (!addUsers && !addGuests)
-            {
-                return true;
-            }
-
-            var configuration = new TalkServiceConfiguration(_currentSettings.ServerUrl, _currentSettings.Username, _currentSettings.AppPassword);
-            if (!configuration.IsComplete())
-            {
-                LogTalk("Participant sync failed: talk service configuration incomplete.");
-                return false;
-            }
-
-            List<string> attendeeEmails = GetAppointmentAttendeeEmails(appointment);
-            if (attendeeEmails.Count == 0)
-            {
-                return true;
-            }
-
-            var cache = new IfbAddressBookCache(_settingsStorage != null ? _settingsStorage.DataDirectory : null);
-            string selfEmail;
-            cache.TryGetPrimaryEmailForUid(configuration, _currentSettings.IfbCacheHours, _currentSettings.Username, out selfEmail);
-
-            int userAdds = 0;
-            int guestAdds = 0;
-            int skipped = 0;
-            bool hadFailures = false;
-
-            try
-            {
-                var service = CreateTalkService();
-
-                foreach (string email in attendeeEmails)
-                {
-                    if (string.IsNullOrWhiteSpace(email))
-                    {
-                        continue;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(selfEmail) &&
-                        string.Equals(email, selfEmail, StringComparison.OrdinalIgnoreCase))
-                    {
-                        skipped++;
-                        continue;
-                    }
-
-                    string uid;
-                    if (cache.TryGetUid(configuration, _currentSettings.IfbCacheHours, email, out uid) &&
-                        !string.IsNullOrWhiteSpace(uid))
-                    {
-                        if (!addUsers)
-                        {
-                            skipped++;
-                            continue;
-                        }
-
-                        if (service.AddUserParticipant(roomToken, uid))
-                        {
-                            userAdds++;
-                        }
-                        else
-                        {
-                            hadFailures = true;
-                            LogTalk("Participant sync failed while adding Nextcloud user (uid=" + uid + ", token=" + roomToken + ").");
-                        }
-
-                        continue;
-                    }
-
-                    if (!addGuests)
-                    {
-                        skipped++;
-                        continue;
-                    }
-
-                    if (service.AddGuestParticipant(roomToken, email))
-                    {
-                        guestAdds++;
-                    }
-                    else
-                    {
-                        hadFailures = true;
-                        LogTalk("Participant sync failed while adding guest (email=" + email + ", token=" + roomToken + ").");
-                    }
-                }
-            }
-            catch (TalkServiceException ex)
-            {
-                hadFailures = true;
-                LogTalk("Participant sync failed: " + ex.Message);
-            }
-            catch (Exception ex)
-            {
-                hadFailures = true;
-                LogTalk("Unexpected error during participant sync: " + ex.Message);
-            }
-
-            LogTalk("Participant sync completed (users=" + userAdds + ", guests=" + guestAdds + ", skipped=" + skipped + ", failed=" + hadFailures + ", token=" + roomToken + ").");
-            return !hadFailures;
+            return _talkAppointmentController.TrySyncRoomParticipants(appointment, roomToken, isEventConversation);
         }
 
         private void TryApplyDelegation(Outlook.AppointmentItem appointment, string roomToken)
         {
-            if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _currentSettings == null)
-            {
-                return;
-            }
-
-            string delegateId;
-            if (!IsDelegationPending(appointment, out delegateId))
-            {
-                return;
-            }
-
-            string currentUser = _currentSettings.Username ?? string.Empty;
-            if (!string.IsNullOrEmpty(currentUser) &&
-                string.Equals(delegateId, currentUser, StringComparison.OrdinalIgnoreCase))
-            {
-                LogTalk("Delegation ignored (delegate == current user).");
-                RemoveUserProperty(appointment, PropertyDelegateId);
-                RemoveUserProperty(appointment, PropertyDelegated);
-                RemoveUserProperty(appointment, IcalDelegate);
-                RemoveUserProperty(appointment, IcalDelegateName);
-                RemoveUserProperty(appointment, IcalDelegated);
-                RemoveUserProperty(appointment, IcalDelegateReady);
-                return;
-            }
-
-            try
-            {
-                var service = CreateTalkService();
-                LogTalk("Starting delegation (token=" + roomToken + ", delegate=" + delegateId + ").");
-
-                service.AddUserParticipant(roomToken, delegateId);
-
-                var participants = service.GetParticipants(roomToken);
-                int attendeeId = 0;
-                foreach (var participant in participants)
-                {
-                    if (participant == null)
-                    {
-                        continue;
-                    }
-
-                    if (string.Equals(participant.ActorType, "users", StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(participant.ActorId, delegateId, StringComparison.OrdinalIgnoreCase))
-                    {
-                        attendeeId = participant.AttendeeId;
-                        break;
-                    }
-                }
-
-                if (attendeeId <= 0)
-                {
-                    LogTalk("Delegation failed: attendeeId not found (delegate=" + delegateId + ").");
-                    return;
-                }
-
-                string promoteError;
-                if (!service.PromoteModerator(roomToken, attendeeId, out promoteError))
-                {
-                    LogTalk("Delegation failed: moderator could not be assigned (" + promoteError + ").");
-                    string warning = string.IsNullOrWhiteSpace(promoteError)
-                        ? Strings.WarningModeratorTransferFailed
-                        : string.Format(Strings.WarningModeratorTransferFailedWithReasonFormat, promoteError);
-                    ShowWarning(warning);
-                    return;
-                }
-
-                bool left = service.LeaveRoom(roomToken);
-                LogTalk("Delegation completed (token=" + roomToken + ", delegate=" + delegateId + ", leftSelf=" + left + ").");
-
-                SetUserProperty(appointment, PropertyDelegated, Outlook.OlUserPropertyType.olYesNo, true);
-                SetUserProperty(appointment, IcalDelegated, Outlook.OlUserPropertyType.olText, "TRUE");
-                RemoveUserProperty(appointment, IcalDelegateReady);
-            }
-            catch (TalkServiceException ex)
-            {
-                LogTalk("Delegation failed: " + ex.Message);
-                string message = ex.Message;
-                ShowWarning(string.IsNullOrWhiteSpace(message)
-                    ? Strings.WarningModeratorTransferFailed
-                    : string.Format(Strings.WarningModeratorTransferFailedWithReasonFormat, message));
-            }
-            catch (Exception ex)
-            {
-                LogTalk("Unexpected error during delegation: " + ex.Message);
-                string message = ex.Message;
-                ShowWarning(string.IsNullOrWhiteSpace(message)
-                    ? Strings.WarningModeratorTransferFailed
-                    : string.Format(Strings.WarningModeratorTransferFailedWithReasonFormat, message));
-            }
+            _talkAppointmentController.TryApplyDelegation(appointment, roomToken);
         }
 
-        private static List<string> GetAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)
+        internal static List<string> GetAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)
         {
-            var emails = new List<string>();
-            if (appointment == null)
-            {
-                return emails;
-            }
-
-            Outlook.Recipients recipients = null;
-            try
-            {
-                recipients = appointment.Recipients;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment recipients.", ex);
-                recipients = null;
-            }
-
-            if (recipients == null)
-            {
-                return emails;
-            }
-
-            try
-            {
-                int count = recipients.Count;
-                for (int i = 1; i <= count; i++)
-                {
-                    Outlook.Recipient recipient = null;
-                    try
-                    {
-                        recipient = recipients[i];
-                        if (recipient == null)
-                        {
-                            continue;
-                        }
-
-                        int type = 0;
-                        try
-                        {
-                            type = recipient.Type;
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read recipient.Type.", ex);
-                            type = 0;
-                        }
-
-                        // 1=Required, 2=Optional, 3=Resource
-                        if (type == 3)
-                        {
-                            continue;
-                        }
-
-                        string email = TryGetRecipientSmtpAddress(recipient);
-                        if (string.IsNullOrWhiteSpace(email))
-                        {
-                            continue;
-                        }
-
-                        email = email.Trim().ToLowerInvariant();
-                        if (!emails.Contains(email))
-                        {
-                            emails.Add(email);
-                        }
-                    }
-                    finally
-                    {
-                        if (recipient != null)
-                        {
-                            try
-                            {
-                                Marshal.ReleaseComObject(recipient);
-                            }
-                            catch (Exception ex)
-                            {
-                                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to release Recipient COM object.", ex);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to enumerate appointment recipients.", ex);
-            }
-            finally
-            {
-                try
-                {
-                    Marshal.ReleaseComObject(recipients);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to release Recipients COM object.", ex);
-                }
-            }
-
-            return emails;
+            return OutlookRecipientResolverController.CollectAppointmentAttendeeEmails(appointment);
         }
 
         private static string TryGetRecipientSmtpAddress(Outlook.Recipient recipient)
         {
-            if (recipient == null)
-            {
-                return null;
-            }
-
-            string address = null;
-            try
-            {
-                address = recipient.Address;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Recipient.Address.", ex);
-                address = null;
-            }
-
-            if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
-            {
-                return address;
-            }
-
-            Outlook.AddressEntry entry = null;
-            try
-            {
-                entry = recipient.AddressEntry;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Recipient.AddressEntry.", ex);
-                entry = null;
-            }
-
-            if (entry != null)
-            {
-                try
-                {
-                    Outlook.ExchangeUser exUser = null;
-                    try
-                    {
-                        exUser = entry.GetExchangeUser();
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve Exchange user from address entry.", ex);
-                        exUser = null;
-                    }
-
-                    if (exUser != null)
-                    {
-                        try
-                        {
-                            address = exUser.PrimarySmtpAddress;
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read ExchangeUser.PrimarySmtpAddress.", ex);
-                            address = null;
-                        }
-
-                        try
-                        {
-                            Marshal.ReleaseComObject(exUser);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to release ExchangeUser COM object.", ex);
-                        }
-                    }
-                }
-                finally
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(entry);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to release AddressEntry COM object.", ex);
-                    }
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
-            {
-                return address;
-            }
-
-            try
-            {
-                Outlook.PropertyAccessor accessor = recipient.PropertyAccessor;
-                if (accessor != null)
-                {
-                    try
-                    {
-                        const string SmtpSchema = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E";
-                        address = accessor.GetProperty(SmtpSchema) as string;
-                    }
-                    finally
-                    {
-                            try
-                            {
-                                Marshal.ReleaseComObject(accessor);
-                            }
-                            catch (Exception ex)
-                            {
-                                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to release PropertyAccessor COM object.", ex);
-                            }
-                        }
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve SMTP address via PropertyAccessor.", ex);
-            }
-
-            return !string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0 ? address : null;
+            return OutlookRecipientResolverController.TryResolveRecipientSmtpAddress(recipient);
         }
 
         private bool TryDeleteRoom(string roomToken, bool isEventConversation)
@@ -4056,218 +2348,19 @@ namespace NcTalkOutlookAddIn
             return false;
         }
 
-        private static bool IsMissingOrForbiddenRoomMutationError(TalkServiceException ex)
-        {
-            if (ex == null)
-            {
-                return false;
-            }
-
-            return ex.StatusCode == HttpStatusCode.NotFound ||
-                   ex.StatusCode == HttpStatusCode.Forbidden;
-        }
-
-        private static string GetNormalizedRoomName(Outlook.AppointmentItem appointment)
-        {
-            if (appointment == null)
-            {
-                return string.Empty;
-            }
-
-            try
-            {
-                string subject = appointment.Subject;
-                return string.IsNullOrWhiteSpace(subject) ? string.Empty : subject.Trim();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment subject for room name sync.", ex);
-                return string.Empty;
-            }
-        }
-
         private bool TryUpdateLobby(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
         {
-            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
-            {
-                return false;
-            }
-
-            string delegateId;
-            if (IsDelegatedToOtherUser(appointment, out delegateId))
-            {
-                LogTalk("Lobby update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
-                return true;
-            }
-
-            try
-            {
-                var service = CreateTalkService();
-                long startEpoch;
-                if (!TryReadRequiredIcalStartEpoch(appointment, roomToken, out startEpoch))
-                {
-                    return false;
-                }
-
-                DateTime startUtc;
-                try
-                {
-                    startUtc = DateTimeOffset.FromUnixTimeSeconds(startEpoch).UtcDateTime;
-                }
-                catch (ArgumentOutOfRangeException ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "Lobby update blocked: X-NCTALK-START out of range (token=" + roomToken + ", startEpoch=" + startEpoch.ToString(CultureInfo.InvariantCulture) + ").", ex);
-                    return false;
-                }
-
-                DateTime end;
-                try
-                {
-                    end = appointment.End;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Appointment.End during lobby update (token=" + roomToken + ").", ex);
-                    return false;
-                }
-
-                if (end == DateTime.MinValue)
-                {
-                    end = startUtc;
-                }
-
-                LogTalk("Updating lobby (token=" + roomToken + ", startEpoch=" + startEpoch.ToString(CultureInfo.InvariantCulture) + ", startUtc=" + startUtc.ToString("o") + ", end=" + end.ToString("o") + ", event=" + isEventConversation + ").");
-                service.UpdateLobby(roomToken, startUtc, end, isEventConversation);
-                LogTalk("Lobby updated successfully (token=" + roomToken + ").");
-                return true;
-            }
-            catch (TalkServiceException ex)
-            {
-                if (IsMissingOrForbiddenRoomMutationError(ex))
-                {
-                    LogTalk("Lobby update skipped after access loss (token=" + roomToken + ", status=" + (int)ex.StatusCode + ").");
-                    return true;
-                }
-
-                LogTalk("Lobby could not be updated: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningLobbyUpdateFailed, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                LogTalk("Unexpected error while updating lobby: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningLobbyUpdateFailed, ex.Message));
-            }
-
-            return false;
+            return _talkAppointmentController.TryUpdateLobby(appointment, roomToken, isEventConversation);
         }
 
         private bool TryUpdateRoomName(Outlook.AppointmentItem appointment, string roomToken)
         {
-            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
-            {
-                return false;
-            }
-
-            string delegateId;
-            if (IsDelegatedToOtherUser(appointment, out delegateId))
-            {
-                LogTalk("Room name update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
-                return true;
-            }
-
-            string roomName = GetNormalizedRoomName(appointment);
-            if (string.IsNullOrWhiteSpace(roomName))
-            {
-                LogTalk("Room name update skipped (empty subject, token=" + roomToken + ").");
-                return true;
-            }
-
-            try
-            {
-                var service = CreateTalkService();
-                LogTalk("Updating room name (token=" + roomToken + ", length=" + roomName.Length + ").");
-                service.UpdateRoomName(roomToken, roomName);
-                LogTalk("Room name updated (token=" + roomToken + ").");
-                return true;
-            }
-            catch (TalkServiceException ex)
-            {
-                if (IsEventConversationDescriptionError(ex))
-                {
-                    LogTalk("Room name update skipped for event conversation (token=" + roomToken + ").");
-                    PersistEventConversationTraits(appointment, roomToken);
-                    return true;
-                }
-
-                if (IsMissingOrForbiddenRoomMutationError(ex))
-                {
-                    LogTalk("Room name update skipped after access loss (token=" + roomToken + ", status=" + (int)ex.StatusCode + ").");
-                    return true;
-                }
-
-                LogTalk("Room name could not be updated: " + ex.Message);
-            }
-            catch (Exception ex)
-            {
-                LogTalk("Unexpected error while updating room name: " + ex.Message);
-            }
-
-            return false;
+            return _talkAppointmentController.TryUpdateRoomName(appointment, roomToken);
         }
 
         private bool TryUpdateRoomDescription(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
         {
-            if (string.IsNullOrWhiteSpace(roomToken))
-            {
-                return false;
-            }
-
-            string delegateId;
-            if (IsDelegatedToOtherUser(appointment, out delegateId))
-            {
-                LogTalk("Description update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
-                return true;
-            }
-
-            string description = BuildDescriptionPayload(appointment);
-            if (description == null)
-            {
-                description = string.Empty;
-            }
-
-            try
-            {
-                var service = CreateTalkService();
-                LogTalk("Updating room description (token=" + roomToken + ", event=" + isEventConversation + ", textLength=" + description.Length + ").");
-                service.UpdateDescription(roomToken, description, isEventConversation);
-                LogTalk("Room description updated (token=" + roomToken + ").");
-                return true;
-            }
-            catch (TalkServiceException ex)
-            {
-                if (IsEventConversationDescriptionError(ex))
-                {
-                    LogTalk("Room description update skipped after event-conversation response (token=" + roomToken + ").");
-                    PersistEventConversationTraits(appointment, roomToken);
-                    return true;
-                }
-
-                if (IsMissingOrForbiddenRoomMutationError(ex))
-                {
-                    LogTalk("Room description update skipped after access loss (token=" + roomToken + ", status=" + (int)ex.StatusCode + ").");
-                    return true;
-                }
-
-                LogTalk("Room description could not be updated: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningDescriptionUpdateFailed, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                LogTalk("Unexpected error while updating room description: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningDescriptionUpdateFailed, ex.Message));
-            }
-
-            return false;
+            return _talkAppointmentController.TryUpdateRoomDescription(appointment, roomToken, isEventConversation);
         }
 
         private static string EscapeXml(string value)
@@ -4294,1633 +2387,9 @@ namespace NcTalkOutlookAddIn
                 MessageBoxIcon.Warning);
         }
 
-        private sealed class MailComposeSubscription : IDisposable
+        internal static void ShowWarningDialog(string message)
         {
-            private sealed class AttachmentBatchEntry
-            {
-                internal string Name { get; set; }
-
-                internal long SizeBytes { get; set; }
-            }
-
-            private sealed class AttachmentBatchInfo
-            {
-                internal int Count { get; set; }
-
-                internal string Name { get; set; }
-
-                internal long SizeBytes { get; set; }
-            }
-
-            private sealed class AttachmentSnapshot
-            {
-                internal int Index { get; set; }
-
-                internal string Name { get; set; }
-
-                internal long SizeBytes { get; set; }
-            }
-
-            private sealed class AttachmentAutomationSettings
-            {
-                internal bool AlwaysConnector { get; set; }
-
-                internal bool OfferAboveEnabled { get; set; }
-
-                internal int ThresholdMb { get; set; }
-
-                internal long ThresholdBytes { get; set; }
-            }
-
-            private sealed class ComposeShareCleanupEntry
-            {
-                internal string RelativeFolder { get; set; }
-
-                internal string ShareId { get; set; }
-
-                internal string ShareLabel { get; set; }
-
-                internal DateTime CreatedUtc { get; set; }
-            }
-
-            private readonly NextcloudTalkAddIn _owner;
-            private readonly Outlook.MailItem _mail;
-            private readonly Outlook.ItemEvents_10_Event _events;
-            private readonly string _mailIdentityKey;
-            private readonly string _inspectorIdentityKey;
-            private readonly string _composeKey;
-            private readonly System.Windows.Forms.Timer _attachmentEvalTimer = new System.Windows.Forms.Timer();
-            private readonly System.Windows.Forms.Timer _cleanupGraceTimer = new System.Windows.Forms.Timer();
-            private readonly List<AttachmentBatchEntry> _pendingAddedBatch = new List<AttachmentBatchEntry>();
-            private readonly List<ComposeShareCleanupEntry> _cleanupEntries = new List<ComposeShareCleanupEntry>();
-            private readonly List<SeparatePasswordDispatchEntry> _passwordDispatchQueue = new List<SeparatePasswordDispatchEntry>();
-            private bool _attachmentSuppressed;
-            private bool _attachmentPromptOpen;
-            private bool _sendPending;
-            private DateTime _sendPendingAtUtc;
-            private bool _awaitingGraceCloseResolution;
-            private bool _disposed;
-
-            internal MailComposeSubscription(NextcloudTalkAddIn owner, Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
-            {
-                _owner = owner;
-                _mail = mail;
-                _mailIdentityKey = string.IsNullOrWhiteSpace(mailIdentityKey)
-                    ? ResolveMailComIdentityKey(mail)
-                    : mailIdentityKey.Trim();
-                _inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityKey)
-                    ? ResolveMailInspectorIdentityKey(mail)
-                    : inspectorIdentityKey.Trim();
-                _composeKey = BuildComposeKey(mail, _mailIdentityKey, _inspectorIdentityKey);
-
-                _attachmentEvalTimer.Interval = ComposeAttachmentEvalDebounceMs;
-                _attachmentEvalTimer.Tick += OnAttachmentEvalTimerTick;
-
-                _cleanupGraceTimer.Interval = ComposeShareCleanupSendGraceMs;
-                _cleanupGraceTimer.Tick += OnCleanupGraceTimerTick;
-
-                _events = mail as Outlook.ItemEvents_10_Event;
-                if (_events != null)
-                {
-                    _events.AttachmentAdd += OnAttachmentAdd;
-                    _events.PropertyChange += OnPropertyChange;
-                    _events.Send += OnSend;
-                    _events.Close += OnClose;
-                }
-
-                LogFileLink(
-                    "Compose subscription registered (composeKey="
-                    + _composeKey
-                    + ", mailIdentity="
-                    + (_mailIdentityKey ?? string.Empty)
-                    + ", inspectorIdentity="
-                    + (_inspectorIdentityKey ?? string.Empty)
-                    + ").");
-            }
-
-            internal bool IsFor(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
-            {
-                if (mail == null)
-                {
-                    return false;
-                }
-
-                if (ReferenceEquals(mail, _mail) || mail == _mail)
-                {
-                    return true;
-                }
-
-                if (string.IsNullOrWhiteSpace(_mailIdentityKey))
-                {
-                    if (string.IsNullOrWhiteSpace(_inspectorIdentityKey))
-                    {
-                        return false;
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(_mailIdentityKey)
-                    && string.Equals(_mailIdentityKey, mailIdentityKey ?? string.Empty, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-
-                return !string.IsNullOrWhiteSpace(_inspectorIdentityKey)
-                    && string.Equals(_inspectorIdentityKey, inspectorIdentityKey ?? string.Empty, StringComparison.Ordinal);
-            }
-
-            internal void ArmShareCleanup(FileLinkResult result)
-            {
-                if (result == null)
-                {
-                    return;
-                }
-
-                string relativeFolder = string.IsNullOrWhiteSpace(result.RelativePath)
-                    ? string.Empty
-                    : result.RelativePath.Trim();
-                if (string.IsNullOrWhiteSpace(relativeFolder))
-                {
-                    LogFileLink("Compose share cleanup arm skipped (composeKey=" + _composeKey + ", reason=missing_relative_folder).");
-                    return;
-                }
-
-                _cleanupGraceTimer.Stop();
-                _awaitingGraceCloseResolution = false;
-                _sendPending = false;
-
-                _cleanupEntries.Add(new ComposeShareCleanupEntry
-                {
-                    RelativeFolder = relativeFolder,
-                    ShareId = result.ShareId ?? string.Empty,
-                    ShareLabel = result.FolderName ?? string.Empty,
-                    CreatedUtc = DateTime.UtcNow
-                });
-
-                LogFileLink(
-                    "Compose share cleanup armed (composeKey="
-                    + _composeKey
-                    + ", relativeFolder="
-                    + relativeFolder
-                    + ", shareId="
-                    + (result.ShareId ?? string.Empty)
-                    + ", shareLabel="
-                    + (result.FolderName ?? string.Empty)
-                    + ", armedCount="
-                    + _cleanupEntries.Count.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-            }
-
-            internal void RegisterSeparatePasswordDispatch(FileLinkResult result, FileLinkRequest request, string passwordOnlyHtml)
-            {
-                if (result == null || request == null || string.IsNullOrWhiteSpace(passwordOnlyHtml))
-                {
-                    return;
-                }
-
-                string password = result.Password ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(password))
-                {
-                    return;
-                }
-
-                var entry = new SeparatePasswordDispatchEntry
-                {
-                    ShareLabel = result.FolderName ?? string.Empty,
-                    ShareUrl = result.ShareUrl ?? string.Empty,
-                    Password = password.Trim(),
-                    Html = passwordOnlyHtml,
-                    To = BuildNormalizedRecipientCsv(ReadMailRecipientList("To")),
-                    Cc = BuildNormalizedRecipientCsv(ReadMailRecipientList("CC")),
-                    Bcc = BuildNormalizedRecipientCsv(ReadMailRecipientList("BCC"))
-                };
-
-                _passwordDispatchQueue.Add(entry);
-                LogFileLink(
-                    "Separate password dispatch registered (composeKey="
-                    + _composeKey
-                    + ", queued="
-                    + _passwordDispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
-                    + ", hasShareUrl="
-                    + (!string.IsNullOrWhiteSpace(entry.ShareUrl)).ToString(CultureInfo.InvariantCulture)
-                    + ").");
-            }
-
-            private static string BuildComposeKey(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
-            {
-                if (mail != null)
-                {
-                    try
-                    {
-                        string entryId = mail.EntryID;
-                        if (!string.IsNullOrWhiteSpace(entryId))
-                        {
-                            return entryId.Trim();
-                        }
-                    }
-                    catch (COMException ex)
-                    {
-                        uint errorCode = unchecked((uint)ex.ErrorCode);
-                        if ((errorCode & 0xFFFFu) == 0x0108u)
-                        {
-                            LogFileLink(
-                                "MailItem.EntryID unavailable while building compose key (hresult=0x"
-                                + errorCode.ToString("X8", CultureInfo.InvariantCulture)
-                                + ").");
-                        }
-                        else
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read MailItem.EntryID for compose key.", ex);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read MailItem.EntryID for compose key.", ex);
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(mailIdentityKey))
-                {
-                    return mailIdentityKey.Trim();
-                }
-
-                if (!string.IsNullOrWhiteSpace(inspectorIdentityKey))
-                {
-                    return inspectorIdentityKey.Trim();
-                }
-
-                return Guid.NewGuid().ToString("N");
-            }
-
-            private void OnAttachmentAdd(Outlook.Attachment attachment)
-            {
-                if (_disposed || _attachmentSuppressed)
-                {
-                    return;
-                }
-
-                _pendingAddedBatch.Add(new AttachmentBatchEntry
-                {
-                    Name = ReadAttachmentName(attachment),
-                    SizeBytes = ReadAttachmentSizeBytes(attachment)
-                });
-
-                LogFileLink(
-                    "Compose attachment added (composeKey="
-                    + _composeKey
-                    + ", pendingBatchCount="
-                    + _pendingAddedBatch.Count.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-                ScheduleAttachmentEvaluation();
-            }
-
-            private void OnPropertyChange(string name)
-            {
-                if (_disposed || _attachmentSuppressed)
-                {
-                    return;
-                }
-
-                string propertyName = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim();
-                if (propertyName.IndexOf("Attach", StringComparison.OrdinalIgnoreCase) < 0
-                    && !string.Equals(propertyName, "HasAttachment", StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                LogFileLink(
-                    "Compose property changed (composeKey="
-                    + _composeKey
-                    + ", property="
-                    + propertyName
-                    + ").");
-                ScheduleAttachmentEvaluation();
-            }
-
-            private void ScheduleAttachmentEvaluation()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                try
-                {
-                    _attachmentEvalTimer.Stop();
-                    _attachmentEvalTimer.Start();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to schedule compose attachment evaluation (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-            }
-
-            private void OnAttachmentEvalTimerTick(object sender, EventArgs e)
-            {
-                _attachmentEvalTimer.Stop();
-
-                try
-                {
-                    EvaluateAttachmentAutomation();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Compose attachment evaluation failed (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-            }
-
-            private void EvaluateAttachmentAutomation()
-            {
-                if (_disposed || _attachmentSuppressed)
-                {
-                    return;
-                }
-
-                OutlookAttachmentAutomationGuardService.GuardState guardState;
-                if (_owner.TryGetAttachmentAutomationGuardState("evaluate", _composeKey, out guardState))
-                {
-                    _pendingAddedBatch.Clear();
-                    return;
-                }
-
-                AttachmentAutomationSettings settings = ReadAttachmentAutomationSettings();
-                if (!settings.AlwaysConnector && !settings.OfferAboveEnabled)
-                {
-                    _pendingAddedBatch.Clear();
-                    LogFileLink("Compose attachment evaluation skipped (composeKey=" + _composeKey + ", reason=automation_disabled).");
-                    return;
-                }
-
-                List<AttachmentSnapshot> attachments = SnapshotAttachments();
-                if (attachments.Count == 0)
-                {
-                    _pendingAddedBatch.Clear();
-                    LogFileLink("Compose attachment evaluation skipped (composeKey=" + _composeKey + ", reason=no_attachments).");
-                    return;
-                }
-
-                long totalBytes = SumAttachmentBytes(attachments);
-                AttachmentBatchInfo lastAdded = BuildLastAddedBatchInfo(attachments);
-
-                LogFileLink(
-                    "Compose attachment evaluation (composeKey="
-                    + _composeKey
-                    + ", attachmentCount="
-                    + attachments.Count.ToString(CultureInfo.InvariantCulture)
-                    + ", totalBytes="
-                    + totalBytes.ToString(CultureInfo.InvariantCulture)
-                    + ", lastAddedCount="
-                    + lastAdded.Count.ToString(CultureInfo.InvariantCulture)
-                    + ", alwaysConnector="
-                    + settings.AlwaysConnector.ToString(CultureInfo.InvariantCulture)
-                    + ", offerAboveEnabled="
-                    + settings.OfferAboveEnabled.ToString(CultureInfo.InvariantCulture)
-                    + ", thresholdBytes="
-                    + settings.ThresholdBytes.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-
-                if (settings.AlwaysConnector)
-                {
-                    StartComposeAttachmentShareFlow("always", totalBytes, settings.ThresholdMb, lastAdded);
-                    return;
-                }
-
-                if (!settings.OfferAboveEnabled || totalBytes <= settings.ThresholdBytes)
-                {
-                    return;
-                }
-
-                string reasonText = string.Format(
-                    CultureInfo.CurrentCulture,
-                    Strings.AttachmentPromptReason,
-                    FormatSizeMb(totalBytes),
-                    FormatSizeMb((long)settings.ThresholdMb * 1024L * 1024L),
-                    string.IsNullOrWhiteSpace(lastAdded.Name) ? Strings.AttachmentPromptLastUnknown : lastAdded.Name,
-                    FormatSizeMb(lastAdded.SizeBytes));
-                if (_attachmentPromptOpen)
-                {
-                    LogFileLink("Compose attachment prompt skipped (composeKey=" + _composeKey + ", reason=prompt_already_open).");
-                    return;
-                }
-
-                _attachmentPromptOpen = true;
-                ComposeAttachmentPromptDecision decision;
-                try
-                {
-                    decision = ComposeAttachmentPromptForm.ShowPrompt(
-                        _owner.TryCreateMailInspectorDialogOwner(_mail),
-                        reasonText);
-                }
-                finally
-                {
-                    _attachmentPromptOpen = false;
-                }
-
-                if (_owner.TryGetAttachmentAutomationGuardState("prompt_action", _composeKey, out guardState))
-                {
-                    return;
-                }
-
-                if (decision == ComposeAttachmentPromptDecision.Share)
-                {
-                    LogFileLink(
-                        "Compose attachment threshold decision (composeKey="
-                        + _composeKey
-                        + ", decision=share, totalBytes="
-                        + totalBytes.ToString(CultureInfo.InvariantCulture)
-                        + ", thresholdBytes="
-                        + settings.ThresholdBytes.ToString(CultureInfo.InvariantCulture)
-                        + ").");
-                    StartComposeAttachmentShareFlow("threshold", totalBytes, settings.ThresholdMb, lastAdded);
-                    return;
-                }
-
-                LogFileLink(
-                    "Compose attachment threshold decision (composeKey="
-                    + _composeKey
-                    + ", decision=remove_last, removeCount="
-                    + lastAdded.Count.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-                RemoveLastAddedAttachmentBatch(lastAdded);
-            }
-
-            private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
-            {
-                _owner.EnsureSettingsLoaded();
-
-                var settings = _owner._currentSettings ?? new AddinSettings();
-                int thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(settings.SharingAttachmentsOfferAboveMb);
-                bool alwaysConnector = settings.SharingAttachmentsAlwaysConnector;
-                bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;
-
-                if (_owner._currentSettings != null)
-                {
-                    var configuration = new TalkServiceConfiguration(
-                        _owner._currentSettings.ServerUrl,
-                        _owner._currentSettings.Username,
-                        _owner._currentSettings.AppPassword);
-                    BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate");
-                    if (policyStatus != null && policyStatus.PolicyActive)
-                    {
-                        bool policyBool;
-                        int policyInt;
-
-                        if (policyStatus.IsLocked("share", "attachments_always_via_ncconnector")
-                            && policyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
-                        {
-                            alwaysConnector = policyBool;
-                        }
-
-                        if (policyStatus.IsLocked("share", "attachments_min_size_mb"))
-                        {
-                            if (policyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
-                            {
-                                thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
-                                offerAboveEnabled = true;
-                            }
-                            else if (policyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
-                            {
-                                offerAboveEnabled = false;
-                            }
-                        }
-                    }
-                }
-
-                return new AttachmentAutomationSettings
-                {
-                    AlwaysConnector = alwaysConnector,
-                    OfferAboveEnabled = offerAboveEnabled,
-                    ThresholdMb = thresholdMb,
-                    ThresholdBytes = (long)thresholdMb * 1024L * 1024L
-                };
-            }
-
-            private List<AttachmentSnapshot> SnapshotAttachments()
-            {
-                var snapshots = new List<AttachmentSnapshot>();
-                Outlook.Attachments attachments = null;
-
-                try
-                {
-                    attachments = _mail.Attachments;
-                    if (attachments == null)
-                    {
-                        return snapshots;
-                    }
-
-                    int count = attachments.Count;
-                    for (int index = 1; index <= count; index++)
-                    {
-                        Outlook.Attachment attachment = null;
-                        try
-                        {
-                            attachment = attachments[index];
-                            if (attachment == null)
-                            {
-                                continue;
-                            }
-
-                            snapshots.Add(new AttachmentSnapshot
-                            {
-                                Index = index,
-                                Name = ReadAttachmentName(attachment),
-                                SizeBytes = ReadAttachmentSizeBytes(attachment)
-                            });
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(
-                                LogCategories.FileLink,
-                                "Failed to snapshot compose attachment (composeKey="
-                                + _composeKey
-                                + ", index="
-                                + index.ToString(CultureInfo.InvariantCulture)
-                                + ").",
-                                ex);
-                        }
-                        finally
-                        {
-                            ReleaseComObject(attachment, "compose attachment snapshot");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to read compose attachments (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-                finally
-                {
-                    ReleaseComObject(attachments, "compose attachments collection snapshot");
-                }
-
-                return snapshots;
-            }
-
-            private static long SumAttachmentBytes(List<AttachmentSnapshot> snapshots)
-            {
-                long total = 0;
-                if (snapshots == null)
-                {
-                    return 0;
-                }
-
-                for (int i = 0; i < snapshots.Count; i++)
-                {
-                    total += Math.Max(0, snapshots[i].SizeBytes);
-                }
-
-                return total;
-            }
-
-            private AttachmentBatchInfo BuildLastAddedBatchInfo(List<AttachmentSnapshot> snapshots)
-            {
-                if (_pendingAddedBatch.Count > 0)
-                {
-                    long total = 0;
-                    for (int i = 0; i < _pendingAddedBatch.Count; i++)
-                    {
-                        total += Math.Max(0, _pendingAddedBatch[i].SizeBytes);
-                    }
-
-                    var info = new AttachmentBatchInfo
-                    {
-                        Count = _pendingAddedBatch.Count,
-                        Name = _pendingAddedBatch[_pendingAddedBatch.Count - 1].Name ?? string.Empty,
-                        SizeBytes = total
-                    };
-                    _pendingAddedBatch.Clear();
-                    return info;
-                }
-
-                if (snapshots == null || snapshots.Count == 0)
-                {
-                    return new AttachmentBatchInfo
-                    {
-                        Count = 0,
-                        Name = string.Empty,
-                        SizeBytes = 0
-                    };
-                }
-
-                AttachmentSnapshot latest = snapshots[snapshots.Count - 1];
-                return new AttachmentBatchInfo
-                {
-                    Count = 1,
-                    Name = latest.Name ?? string.Empty,
-                    SizeBytes = Math.Max(0, latest.SizeBytes)
-                };
-            }
-
-            private void StartComposeAttachmentShareFlow(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
-            {
-                OutlookAttachmentAutomationGuardService.GuardState guardState;
-                if (_owner.TryGetAttachmentAutomationGuardState("start_flow", _composeKey, out guardState))
-                {
-                    return;
-                }
-
-                var selections = new List<FileLinkSelection>();
-                var removeIndices = new List<int>();
-                var tempFiles = new List<string>();
-
-                CollectAttachmentSelectionsForShare(selections, removeIndices, tempFiles);
-                if (selections.Count == 0)
-                {
-                    CleanupTemporaryFiles(tempFiles);
-                    LogFileLink("Compose attachment flow skipped (composeKey=" + _composeKey + ", reason=no_collectible_files).");
-                    return;
-                }
-
-                RemoveAttachmentsByIndices(removeIndices, "share_flow");
-
-                var launchOptions = new FileLinkWizardLaunchOptions
-                {
-                    AttachmentMode = true,
-                    AttachmentTrigger = string.IsNullOrWhiteSpace(trigger) ? "always" : trigger,
-                    AttachmentTotalBytes = Math.Max(0, totalBytes),
-                    AttachmentThresholdMb = Math.Max(1, thresholdMb),
-                    AttachmentLastName = lastAdded != null ? (lastAdded.Name ?? string.Empty) : string.Empty,
-                    AttachmentLastSizeBytes = lastAdded != null ? Math.Max(0, lastAdded.SizeBytes) : 0
-                };
-                for (int i = 0; i < selections.Count; i++)
-                {
-                    launchOptions.InitialSelections.Add(new FileLinkSelection(selections[i].SelectionType, selections[i].LocalPath));
-                }
-
-                try
-                {
-                    bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
-                    LogFileLink(
-                        "Compose attachment flow completed (composeKey="
-                        + _composeKey
-                        + ", trigger="
-                        + launchOptions.AttachmentTrigger
-                        + ", queued="
-                        + selections.Count.ToString(CultureInfo.InvariantCulture)
-                        + ", wizardAccepted="
-                        + wizardAccepted.ToString(CultureInfo.InvariantCulture)
-                        + ").");
-                }
-                finally
-                {
-                    CleanupTemporaryFiles(tempFiles);
-                }
-            }
-
-            private void CollectAttachmentSelectionsForShare(List<FileLinkSelection> selections, List<int> removeIndices, List<string> temporaryFiles)
-            {
-                Outlook.Attachments attachments = null;
-                try
-                {
-                    attachments = _mail.Attachments;
-                    if (attachments == null)
-                    {
-                        return;
-                    }
-
-                    int count = attachments.Count;
-                    for (int index = 1; index <= count; index++)
-                    {
-                        Outlook.Attachment attachment = null;
-                        try
-                        {
-                            attachment = attachments[index];
-                            if (attachment == null)
-                            {
-                                continue;
-                            }
-
-                            string attachmentName = ReadAttachmentName(attachment);
-                            string localPath;
-                            if (!TryResolveAttachmentLocalPath(attachment, attachmentName, temporaryFiles, out localPath))
-                            {
-                                continue;
-                            }
-
-                            selections.Add(new FileLinkSelection(FileLinkSelectionType.File, localPath));
-                            removeIndices.Add(index);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(
-                                LogCategories.FileLink,
-                                "Failed to collect compose attachment for sharing (composeKey="
-                                + _composeKey
-                                + ", index="
-                                + index.ToString(CultureInfo.InvariantCulture)
-                                + ").",
-                                ex);
-                        }
-                        finally
-                        {
-                            ReleaseComObject(attachment, "compose attachment collect");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to collect compose attachments for sharing (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-                finally
-                {
-                    ReleaseComObject(attachments, "compose attachments collection collect");
-                }
-            }
-
-            private bool TryResolveAttachmentLocalPath(Outlook.Attachment attachment, string attachmentName, List<string> temporaryFiles, out string localPath)
-            {
-                localPath = string.Empty;
-                if (attachment == null)
-                {
-                    return false;
-                }
-
-                string pathName = ReadAttachmentPathName(attachment);
-                if (!string.IsNullOrWhiteSpace(pathName) && File.Exists(pathName))
-                {
-                    localPath = pathName;
-                    return true;
-                }
-
-                string safeName = FileLinkService.SanitizeComponent(attachmentName);
-                if (string.IsNullOrWhiteSpace(safeName))
-                {
-                    safeName = "attachment.bin";
-                }
-
-                string tempRoot = Path.Combine(Path.GetTempPath(), "NCConnectorOutlook", "Attachments", _composeKey);
-                try
-                {
-                    Directory.CreateDirectory(tempRoot);
-                    string targetPath = BuildUniqueFilePath(tempRoot, safeName);
-                    attachment.SaveAsFile(targetPath);
-                    if (!File.Exists(targetPath))
-                    {
-                        return false;
-                    }
-
-                    localPath = targetPath;
-                    if (temporaryFiles != null)
-                    {
-                        temporaryFiles.Add(targetPath);
-                    }
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to materialize compose attachment file (composeKey="
-                        + _composeKey
-                        + ", attachment="
-                        + safeName
-                        + ").",
-                        ex);
-                    return false;
-                }
-            }
-
-            private static string BuildUniqueFilePath(string directory, string fileName)
-            {
-                string candidate = Path.Combine(directory, fileName);
-                if (!File.Exists(candidate))
-                {
-                    return candidate;
-                }
-
-                for (int suffix = 1; suffix < 1000; suffix++)
-                {
-                    string slotDirectory = Path.Combine(
-                        directory,
-                        "dup_" + suffix.ToString(CultureInfo.InvariantCulture));
-                    candidate = Path.Combine(slotDirectory, fileName);
-                    if (!File.Exists(candidate))
-                    {
-                        Directory.CreateDirectory(slotDirectory);
-                        return candidate;
-                    }
-                }
-
-                string fallbackDirectory = Path.Combine(directory, Guid.NewGuid().ToString("N"));
-                Directory.CreateDirectory(fallbackDirectory);
-                return Path.Combine(fallbackDirectory, fileName);
-            }
-
-            private void RemoveAttachmentsByIndices(List<int> indices, string reason)
-            {
-                if (indices == null || indices.Count == 0)
-                {
-                    return;
-                }
-
-                indices.Sort();
-
-                Outlook.Attachments attachments = null;
-                int removed = 0;
-                _attachmentSuppressed = true;
-                _pendingAddedBatch.Clear();
-
-                try
-                {
-                    attachments = _mail.Attachments;
-                    if (attachments == null)
-                    {
-                        return;
-                    }
-
-                    for (int index = indices.Count - 1; index >= 0; index--)
-                    {
-                        int attachmentIndex = indices[index];
-                        if (attachmentIndex <= 0 || attachmentIndex > attachments.Count)
-                        {
-                            continue;
-                        }
-
-                        attachments.Remove(attachmentIndex);
-                        removed++;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to remove compose attachments (composeKey="
-                        + _composeKey
-                        + ", reason="
-                        + (reason ?? string.Empty)
-                        + ").",
-                        ex);
-                }
-                finally
-                {
-                    ReleaseComObject(attachments, "compose attachments collection remove");
-                    _attachmentSuppressed = false;
-                }
-
-                LogFileLink(
-                    "Compose attachments removed (composeKey="
-                    + _composeKey
-                    + ", reason="
-                    + (reason ?? string.Empty)
-                    + ", requested="
-                    + indices.Count.ToString(CultureInfo.InvariantCulture)
-                    + ", removed="
-                    + removed.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-            }
-
-            private void RemoveLastAddedAttachmentBatch(AttachmentBatchInfo lastAdded)
-            {
-                int removeCount = lastAdded != null ? Math.Max(1, lastAdded.Count) : 1;
-
-                Outlook.Attachments attachments = null;
-                int removed = 0;
-                _attachmentSuppressed = true;
-                _pendingAddedBatch.Clear();
-
-                try
-                {
-                    attachments = _mail.Attachments;
-                    if (attachments == null || attachments.Count <= 0)
-                    {
-                        return;
-                    }
-
-                    int totalCount = attachments.Count;
-                    int effectiveCount = Math.Min(totalCount, removeCount);
-                    for (int i = 0; i < effectiveCount; i++)
-                    {
-                        attachments.Remove(attachments.Count);
-                        removed++;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to remove last attachment batch (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-                finally
-                {
-                    ReleaseComObject(attachments, "compose attachments collection remove_last");
-                    _attachmentSuppressed = false;
-                }
-
-                LogFileLink(
-                    "Compose attachment batch removed (composeKey="
-                    + _composeKey
-                    + ", requested="
-                    + removeCount.ToString(CultureInfo.InvariantCulture)
-                    + ", removed="
-                    + removed.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-            }
-
-            private void CleanupTemporaryFiles(List<string> temporaryFiles)
-            {
-                if (temporaryFiles == null || temporaryFiles.Count == 0)
-                {
-                    return;
-                }
-
-                for (int i = 0; i < temporaryFiles.Count; i++)
-                {
-                    string path = temporaryFiles[i];
-                    if (string.IsNullOrWhiteSpace(path))
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        if (File.Exists(path))
-                        {
-                            File.Delete(path);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(
-                            LogCategories.FileLink,
-                            "Failed to delete temporary compose attachment file '" + path + "'.",
-                            ex);
-                    }
-                }
-            }
-
-            private void OnSend(ref bool cancel)
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                if (cancel)
-                {
-                    LogFileLink("Compose send cancelled before dispatch handling (composeKey=" + _composeKey + ").");
-                    return;
-                }
-
-                _sendPending = true;
-                _sendPendingAtUtc = DateTime.UtcNow;
-                _cleanupGraceTimer.Stop();
-                _awaitingGraceCloseResolution = false;
-
-                CapturePasswordDispatchRecipients();
-                LogFileLink(
-                    "Compose send state updated (composeKey="
-                    + _composeKey
-                    + ", sendPending="
-                    + _sendPending.ToString(CultureInfo.InvariantCulture)
-                    + ", cleanupArmedCount="
-                    + _cleanupEntries.Count.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-            }
-
-            private void OnClose(ref bool cancel)
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                ComposeSendState sendState = EvaluateMailSendState();
-                bool hasPendingPostSendWork = _cleanupEntries.Count > 0 || _passwordDispatchQueue.Count > 0;
-                int delayMs = 0;
-                if (_sendPending)
-                {
-                    double elapsedMs = (DateTime.UtcNow - _sendPendingAtUtc).TotalMilliseconds;
-                    delayMs = (int)Math.Max(0, ComposeShareCleanupSendGraceMs - elapsedMs);
-                }
-
-                if (sendState == ComposeSendState.Sent)
-                {
-                    ClearShareCleanupEntries("after_send_success");
-                    DispatchSeparatePasswordQueue("after_send_success");
-                    Dispose();
-                    return;
-                }
-
-                if (sendState == ComposeSendState.UnavailableAfterSend)
-                {
-                    if (hasPendingPostSendWork && delayMs > 0)
-                    {
-                        _awaitingGraceCloseResolution = true;
-                        _cleanupGraceTimer.Interval = Math.Max(250, delayMs);
-                        _cleanupGraceTimer.Start();
-
-                        LogFileLink(
-                            "Compose share cleanup delayed (composeKey="
-                            + _composeKey
-                            + ", delayMs="
-                            + delayMs.ToString(CultureInfo.InvariantCulture)
-                            + ", reason=close_send_state_unavailable).");
-                        return;
-                    }
-
-                    ClearShareCleanupEntries("after_send_state_unavailable");
-                    DispatchSeparatePasswordQueue("after_send_state_unavailable");
-                    Dispose();
-                    return;
-                }
-
-                if (hasPendingPostSendWork && _sendPending && delayMs > 0)
-                {
-                    _awaitingGraceCloseResolution = true;
-                    _cleanupGraceTimer.Interval = Math.Max(250, delayMs);
-                    _cleanupGraceTimer.Start();
-
-                    LogFileLink(
-                        "Compose share cleanup delayed (composeKey="
-                        + _composeKey
-                        + ", delayMs="
-                        + delayMs.ToString(CultureInfo.InvariantCulture)
-                        + ", reason=close_send_pending).");
-                    return;
-                }
-
-                if (hasPendingPostSendWork && _sendPending)
-                {
-                    LogFileLink(
-                        "Compose send state not confirmed after grace; applying unsent cleanup path (composeKey="
-                        + _composeKey
-                        + ", reason=close_send_pending_timeout).");
-                    DeleteShareCleanupEntries("close_send_pending_timeout_without_successful_send");
-                    ClearSeparatePasswordDispatchQueue("close_send_pending_timeout_without_successful_send");
-                    Dispose();
-                    return;
-                }
-
-                if (_cleanupEntries.Count > 0)
-                {
-                    DeleteShareCleanupEntries("close_without_successful_send");
-                }
-
-                if (_passwordDispatchQueue.Count > 0)
-                {
-                    ClearSeparatePasswordDispatchQueue("close_without_successful_send");
-                }
-
-                Dispose();
-            }
-
-            private void OnCleanupGraceTimerTick(object sender, EventArgs e)
-            {
-                _cleanupGraceTimer.Stop();
-
-                ComposeSendState sendState = EvaluateMailSendState();
-                if (sendState == ComposeSendState.Sent || sendState == ComposeSendState.UnavailableAfterSend)
-                {
-                    string reason = sendState == ComposeSendState.Sent
-                        ? "delayed_after_send_success"
-                        : "delayed_after_send_state_unavailable";
-                    ClearShareCleanupEntries(reason);
-                    DispatchSeparatePasswordQueue(reason);
-                }
-                else
-                {
-                    if (_sendPending)
-                    {
-                        LogFileLink(
-                            "Compose send state not confirmed after delayed grace; applying unsent cleanup path (composeKey="
-                            + _composeKey
-                            + ", reason=delayed_send_pending_timeout).");
-                        DeleteShareCleanupEntries("delayed_send_pending_timeout_without_successful_send");
-                        ClearSeparatePasswordDispatchQueue("delayed_send_pending_timeout_without_successful_send");
-                    }
-                    else
-                    {
-                        DeleteShareCleanupEntries("delayed_close_without_successful_send");
-                        ClearSeparatePasswordDispatchQueue("delayed_close_without_successful_send");
-                    }
-                }
-
-                Dispose();
-            }
-
-            private enum ComposeSendState
-            {
-                NotSent,
-                Sent,
-                UnavailableAfterSend
-            }
-
-            private ComposeSendState EvaluateMailSendState()
-            {
-                try
-                {
-                    return _mail != null && _mail.Sent ? ComposeSendState.Sent : ComposeSendState.NotSent;
-                }
-                catch (Exception ex)
-                {
-                    if (_sendPending && IsMailSentUnavailableAfterSend(ex))
-                    {
-                        LogFileLink(
-                            "Compose send state unavailable after send (composeKey="
-                            + _composeKey
-                            + ", hresult="
-                            + ToHResultHex(ex)
-                            + ").");
-                        return ComposeSendState.UnavailableAfterSend;
-                    }
-
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to read MailItem.Sent (composeKey=" + _composeKey + ").",
-                        ex);
-                    return ComposeSendState.NotSent;
-                }
-            }
-
-            private static bool IsMailSentUnavailableAfterSend(Exception ex)
-            {
-                var comException = ex as COMException;
-                if (comException == null)
-                {
-                    return false;
-                }
-
-                uint errorCode = unchecked((uint)comException.ErrorCode);
-                return (errorCode & 0xFFFFu) == 0x010Au;
-            }
-
-            private static string ToHResultHex(Exception ex)
-            {
-                if (ex == null)
-                {
-                    return "0x00000000";
-                }
-
-                return "0x" + unchecked((uint)ex.HResult).ToString("X8", CultureInfo.InvariantCulture);
-            }
-
-            private void ClearShareCleanupEntries(string reason)
-            {
-                if (_cleanupEntries.Count == 0)
-                {
-                    return;
-                }
-
-                for (int i = 0; i < _cleanupEntries.Count; i++)
-                {
-                    ComposeShareCleanupEntry entry = _cleanupEntries[i];
-                    LogFileLink(
-                        "Compose share cleanup cleared (composeKey="
-                        + _composeKey
-                        + ", reason="
-                        + (reason ?? string.Empty)
-                        + ", relativeFolder="
-                        + (entry.RelativeFolder ?? string.Empty)
-                        + ", shareId="
-                        + (entry.ShareId ?? string.Empty)
-                        + ", shareLabel="
-                        + (entry.ShareLabel ?? string.Empty)
-                        + ").");
-                }
-
-                _cleanupEntries.Clear();
-                _sendPending = false;
-                _awaitingGraceCloseResolution = false;
-            }
-
-            private void DeleteShareCleanupEntries(string reason)
-            {
-                if (_cleanupEntries.Count == 0)
-                {
-                    return;
-                }
-
-                List<ComposeShareCleanupEntry> entries = new List<ComposeShareCleanupEntry>(_cleanupEntries);
-                _cleanupEntries.Clear();
-                _sendPending = false;
-                _awaitingGraceCloseResolution = false;
-
-                for (int i = 0; i < entries.Count; i++)
-                {
-                    ComposeShareCleanupEntry entry = entries[i];
-                    _owner.TryDeleteComposeShareFolder(
-                        entry.RelativeFolder,
-                        reason,
-                        entry.ShareId,
-                        entry.ShareLabel);
-                }
-            }
-
-            private void ClearSeparatePasswordDispatchQueue(string reason)
-            {
-                if (_passwordDispatchQueue.Count == 0)
-                {
-                    return;
-                }
-
-                _passwordDispatchQueue.Clear();
-                LogFileLink(
-                    "Separate password dispatch cleared (composeKey="
-                    + _composeKey
-                    + ", reason="
-                    + (reason ?? string.Empty)
-                    + ").");
-            }
-
-            private void CapturePasswordDispatchRecipients()
-            {
-                if (_passwordDispatchQueue.Count == 0)
-                {
-                    return;
-                }
-
-                string to;
-                string cc;
-                string bcc;
-                bool capturedFromRecipients = TryCaptureRecipientListsFromRecipientsCollection(out to, out cc, out bcc);
-                if (!capturedFromRecipients)
-                {
-                    to = BuildNormalizedRecipientCsv(ReadMailRecipientList("To"));
-                    cc = BuildNormalizedRecipientCsv(ReadMailRecipientList("CC"));
-                    bcc = BuildNormalizedRecipientCsv(ReadMailRecipientList("BCC"));
-                }
-
-                for (int i = 0; i < _passwordDispatchQueue.Count; i++)
-                {
-                    _passwordDispatchQueue[i].To = to;
-                    _passwordDispatchQueue[i].Cc = cc;
-                    _passwordDispatchQueue[i].Bcc = bcc;
-                }
-
-                LogFileLink(
-                    "Separate password recipients captured (composeKey="
-                    + _composeKey
-                    + ", queued="
-                    + _passwordDispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
-                    + ", to="
-                    + CountRecipients(to).ToString(CultureInfo.InvariantCulture)
-                    + ", cc="
-                    + CountRecipients(cc).ToString(CultureInfo.InvariantCulture)
-                    + ", bcc="
-                    + CountRecipients(bcc).ToString(CultureInfo.InvariantCulture)
-                    + ", source="
-                    + (capturedFromRecipients ? "recipients_collection" : "mail_fields")
-                    + ").");
-            }
-
-            private bool TryCaptureRecipientListsFromRecipientsCollection(out string to, out string cc, out string bcc)
-            {
-                to = string.Empty;
-                cc = string.Empty;
-                bcc = string.Empty;
-
-                if (_mail == null)
-                {
-                    return false;
-                }
-
-                var toRecipients = new List<string>();
-                var ccRecipients = new List<string>();
-                var bccRecipients = new List<string>();
-                Outlook.Recipients recipients = null;
-                try
-                {
-                    recipients = _mail.Recipients;
-                    if (recipients == null)
-                    {
-                        return false;
-                    }
-
-                    int count = 0;
-                    try
-                    {
-                        count = recipients.Count;
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(
-                            LogCategories.FileLink,
-                            "Failed to read compose Recipients.Count (composeKey=" + _composeKey + ").",
-                            ex);
-                        count = 0;
-                    }
-
-                    for (int i = 1; i <= count; i++)
-                    {
-                        Outlook.Recipient recipient = null;
-                        try
-                        {
-                            recipient = recipients[i];
-                            if (recipient == null)
-                            {
-                                continue;
-                            }
-
-                            string address = TryGetRecipientSmtpAddress(recipient);
-                            if (string.IsNullOrWhiteSpace(address))
-                            {
-                                try
-                                {
-                                    address = NormalizeRecipientAddress(recipient.Address);
-                                }
-                                catch (Exception ex)
-                                {
-                                    DiagnosticsLogger.LogException(
-                                        LogCategories.FileLink,
-                                        "Failed to read compose recipient.Address (composeKey=" + _composeKey + ").",
-                                        ex);
-                                    address = string.Empty;
-                                }
-                            }
-
-                            if (string.IsNullOrWhiteSpace(address))
-                            {
-                                continue;
-                            }
-
-                            int recipientType = 1;
-                            try
-                            {
-                                recipientType = recipient.Type;
-                            }
-                            catch (Exception ex)
-                            {
-                                DiagnosticsLogger.LogException(
-                                    LogCategories.FileLink,
-                                    "Failed to read compose recipient.Type (composeKey=" + _composeKey + ").",
-                                    ex);
-                                recipientType = 1;
-                            }
-
-                            if (recipientType == (int)Outlook.OlMailRecipientType.olCC)
-                            {
-                                AddUniqueRecipient(ccRecipients, address);
-                            }
-                            else if (recipientType == (int)Outlook.OlMailRecipientType.olBCC)
-                            {
-                                AddUniqueRecipient(bccRecipients, address);
-                            }
-                            else
-                            {
-                                AddUniqueRecipient(toRecipients, address);
-                            }
-                        }
-                        finally
-                        {
-                            if (recipient != null && Marshal.IsComObject(recipient))
-                            {
-                                try
-                                {
-                                    Marshal.ReleaseComObject(recipient);
-                                }
-                                catch (Exception ex)
-                                {
-                                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release compose Recipient COM object.", ex);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to capture compose recipients from Recipients collection (composeKey=" + _composeKey + ").",
-                        ex);
-                    return false;
-                }
-                finally
-                {
-                    if (recipients != null && Marshal.IsComObject(recipients))
-                    {
-                        try
-                        {
-                            Marshal.ReleaseComObject(recipients);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release compose Recipients COM object.", ex);
-                        }
-                    }
-                }
-
-                to = toRecipients.Count == 0 ? string.Empty : string.Join("; ", toRecipients.ToArray());
-                cc = ccRecipients.Count == 0 ? string.Empty : string.Join("; ", ccRecipients.ToArray());
-                bcc = bccRecipients.Count == 0 ? string.Empty : string.Join("; ", bccRecipients.ToArray());
-                return toRecipients.Count + ccRecipients.Count + bccRecipients.Count > 0;
-            }
-
-            private void DispatchSeparatePasswordQueue(string reason)
-            {
-                if (_passwordDispatchQueue.Count == 0)
-                {
-                    return;
-                }
-
-                var queue = new List<SeparatePasswordDispatchEntry>(_passwordDispatchQueue);
-                _passwordDispatchQueue.Clear();
-                LogFileLink(
-                    "Separate password dispatch taken (composeKey="
-                    + _composeKey
-                    + ", reason="
-                    + (reason ?? string.Empty)
-                    + ", queued="
-                    + queue.Count.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-                _owner.DispatchSeparatePasswordMailQueue(_composeKey, queue);
-            }
-
-            private string ReadMailRecipientList(string fieldName)
-            {
-                try
-                {
-                    if (_mail == null)
-                    {
-                        return string.Empty;
-                    }
-
-                    switch ((fieldName ?? string.Empty).Trim().ToUpperInvariant())
-                    {
-                        case "TO":
-                            return _mail.To ?? string.Empty;
-                        case "CC":
-                            return _mail.CC ?? string.Empty;
-                        case "BCC":
-                            return _mail.BCC ?? string.Empty;
-                        default:
-                            return string.Empty;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to read compose recipient field '" + (fieldName ?? string.Empty) + "' (composeKey=" + _composeKey + ").",
-                        ex);
-                    return string.Empty;
-                }
-            }
-
-            private static int CountRecipients(string csv)
-            {
-                return CountRecipientsInCsv(csv);
-            }
-
-            private static string FormatSizeMb(long bytes)
-            {
-                decimal value = Math.Max(0, bytes) / (1024m * 1024m);
-                return string.Format(CultureInfo.CurrentCulture, "{0:0.0} MB", value);
-            }
-
-            private static string ReadAttachmentName(Outlook.Attachment attachment)
-            {
-                if (attachment == null)
-                {
-                    return string.Empty;
-                }
-
-                try
-                {
-                    string fileName = attachment.FileName;
-                    if (!string.IsNullOrWhiteSpace(fileName))
-                    {
-                        return fileName.Trim();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.FileName.", ex);
-                }
-
-                try
-                {
-                    string displayName = attachment.DisplayName;
-                    if (!string.IsNullOrWhiteSpace(displayName))
-                    {
-                        return displayName.Trim();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.DisplayName.", ex);
-                }
-
-                return string.Empty;
-            }
-
-            private static long ReadAttachmentSizeBytes(Outlook.Attachment attachment)
-            {
-                if (attachment == null)
-                {
-                    return 0;
-                }
-
-                try
-                {
-                    return Math.Max(0, attachment.Size);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.Size.", ex);
-                    return 0;
-                }
-            }
-
-            private static string ReadAttachmentPathName(Outlook.Attachment attachment)
-            {
-                if (attachment == null)
-                {
-                    return string.Empty;
-                }
-
-                try
-                {
-                    return attachment.PathName ?? string.Empty;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.PathName.", ex);
-                    return string.Empty;
-                }
-            }
-
-            private static void ReleaseComObject(object comObject, string description)
-            {
-                if (comObject == null || !Marshal.IsComObject(comObject))
-                {
-                    return;
-                }
-
-                try
-                {
-                    Marshal.ReleaseComObject(comObject);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to release COM object (" + (description ?? string.Empty) + ").",
-                        ex);
-                }
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                _attachmentEvalTimer.Stop();
-                _cleanupGraceTimer.Stop();
-
-                try
-                {
-                    _attachmentEvalTimer.Tick -= OnAttachmentEvalTimerTick;
-                    _cleanupGraceTimer.Tick -= OnCleanupGraceTimerTick;
-                    _attachmentEvalTimer.Dispose();
-                    _cleanupGraceTimer.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to dispose compose timers.", ex);
-                }
-
-                if (_events != null)
-                {
-                    try
-                    {
-                        _events.AttachmentAdd -= OnAttachmentAdd;
-                        _events.PropertyChange -= OnPropertyChange;
-                        _events.Send -= OnSend;
-                        _events.Close -= OnClose;
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to detach compose event handlers.", ex);
-                    }
-                }
-
-                _owner.RemoveMailComposeSubscription(this);
-                _disposed = true;
-                LogFileLink(
-                    "Compose subscription disposed (composeKey="
-                    + _composeKey
-                    + ", hadCleanup="
-                    + (_cleanupEntries.Count > 0).ToString(CultureInfo.InvariantCulture)
-                    + ", hadPasswordDispatch="
-                    + (_passwordDispatchQueue.Count > 0).ToString(CultureInfo.InvariantCulture)
-                    + ", delayed="
-                    + _awaitingGraceCloseResolution.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-            }
+            ShowWarning(message);
         }
 
         private sealed class WaitCursorScope : IDisposable
@@ -5939,668 +2408,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private sealed class AppointmentSubscription : IDisposable
-        {
-            private readonly NextcloudTalkAddIn _owner;
-            private readonly Outlook.AppointmentItem _appointment;
-            private readonly string _key;
-            private readonly string _roomToken;
-            private readonly bool _lobbyEnabled;
-            private readonly Outlook.ItemEvents_10_Event _events;
-            private readonly bool _isEventConversation;
-            private long? _lastLobbyTimer;
-            private bool _roomDeleted;
-            private bool _disposed;
-            private bool _unsavedCloseCleanupPending;
-            private int _unsavedCloseCleanupAttempts;
-            private System.Windows.Forms.Timer _unsavedCloseCleanupTimer;
-            private System.Windows.Forms.Timer _deferredWriteLobbyTimer;
-            private int _deferredWriteLobbyAttempts;
-            private string _entryId;
-            private const int UnsavedCloseCleanupMaxAttempts = 90;
-            private const int DeferredWriteLobbyMaxAttempts = 4;
-
-            internal AppointmentSubscription(
-                NextcloudTalkAddIn owner,
-                Outlook.AppointmentItem appointment,
-                string key,
-                string roomToken,
-                bool lobbyEnabled,
-                bool isEventConversation,
-                string entryId)
-            {
-                _owner = owner;
-                _appointment = appointment;
-                _key = key;
-                _roomToken = roomToken;
-                _lobbyEnabled = lobbyEnabled;
-                _isEventConversation = isEventConversation;
-                _lastLobbyTimer = GetIcalStartEpochOrNull(appointment);
-                _entryId = entryId;
-                _events = appointment as Outlook.ItemEvents_10_Event;
-                if (_events != null)
-                {
-                    _events.BeforeDelete += OnBeforeDelete;
-                    _events.Write += OnWrite;
-                    _events.Close += OnClose;
-                }
-
-                LogTalk("Subscription registered (token=" + _roomToken + ", lobby=" + _lobbyEnabled + ", event=" + _isEventConversation + ", EntryId=" + (_entryId ?? "n/a") + ").");
-            }
-
-            private void OnWrite(ref bool cancel)
-            {
-                if (_unsavedCloseCleanupPending)
-                {
-                    _unsavedCloseCleanupPending = false;
-                    _unsavedCloseCleanupAttempts = 0;
-                    StopUnsavedCloseCleanupTimer();
-                    LogTalk("OnWrite canceled pending unsaved cleanup (token=" + _roomToken + ").");
-                }
-
-                if (string.IsNullOrWhiteSpace(_roomToken))
-                {
-                    LogTalk("OnWrite ignored (no token).");
-                    return;
-                }
-
-                long currentStartEpoch = 0;
-                bool hasStampedStartEpoch = _owner.TryStampIcalStartEpoch(_appointment, _roomToken, out currentStartEpoch);
-
-                if (!_owner.IsOrganizer(_appointment))
-                {
-                    LogTalk("OnWrite ignored (not organizer, token=" + _roomToken + ", stampedStart=" + hasStampedStartEpoch + ").");
-                    _owner.RefreshEntryBinding(this);
-                    return;
-                }
-
-                string delegateId;
-                if (_owner.IsDelegatedToOtherUser(_appointment, out delegateId))
-                {
-                    LogTalk("OnWrite skipped (delegation=" + delegateId + ", token=" + _roomToken + ").");
-                    _owner.RefreshEntryBinding(this);
-                    return;
-                }
-
-                LogTalk("OnWrite for appointment (token=" + _roomToken + ").");
-
-                bool effectiveLobbyKnown;
-                bool effectiveLobbyEnabled;
-                bool effectiveIsEventConversation;
-                _owner.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
-                LogTalk("OnWrite traits resolved (token=" + _roomToken + ", lobbyKnown=" + effectiveLobbyKnown + ", lobby=" + effectiveLobbyEnabled + ", event=" + effectiveIsEventConversation + ").");
-
-                string pendingDelegateId;
-                bool delegationPending = _owner.IsDelegationPending(_appointment, out pendingDelegateId);
-                if (delegationPending)
-                {
-                    LogTalk("OnWrite delegation-pending path (token=" + _roomToken + ", delegate=" + pendingDelegateId + ").");
-                }
-
-                bool roomNameSynced = false;
-                bool lobbySynced = true;
-                bool descriptionSynced = false;
-                bool participantsSynced;
-
-                LogTalk("Updating room name during OnWrite (token=" + _roomToken + ").");
-                roomNameSynced = _owner.TryUpdateRoomName(_appointment, _roomToken);
-
-                bool shouldAttemptLobbyUpdate = effectiveLobbyEnabled || !effectiveLobbyKnown;
-                if (shouldAttemptLobbyUpdate)
-                {
-                    if (!hasStampedStartEpoch)
-                    {
-                        LogTalk("Lobby update skipped: X-NCTALK-START is unavailable after stamping attempt (token=" + _roomToken + ").");
-                        lobbySynced = false;
-                    }
-                    else if (!_lastLobbyTimer.HasValue || currentStartEpoch != _lastLobbyTimer.Value)
-                    {
-                        LogTalk("Attempting lobby update during OnWrite (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ", lobbyKnown=" + effectiveLobbyKnown + ").");
-                        if (_owner.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
-                        {
-                            _lastLobbyTimer = currentStartEpoch;
-                            if (!effectiveLobbyKnown)
-                            {
-                                _owner.PersistLobbyTraits(_appointment, _roomToken, true);
-                            }
-
-                            LogTalk("Lobby update successful (token=" + _roomToken + ").");
-                        }
-                        else
-                        {
-                            LogTalk("Lobby update failed (token=" + _roomToken + ").");
-                            lobbySynced = false;
-                        }
-                    }
-
-                    ScheduleDeferredWriteLobbyVerification();
-                }
-
-                LogTalk("Updating room description during OnWrite (token=" + _roomToken + ").");
-                descriptionSynced = _owner.TryUpdateRoomDescription(_appointment, _roomToken, effectiveIsEventConversation);
-
-                participantsSynced = _owner.TrySyncRoomParticipants(_appointment, _roomToken, effectiveIsEventConversation);
-                LogTalk(
-                    "OnWrite pre-delegation sync result (token="
-                    + _roomToken
-                    + ", roomName="
-                    + roomNameSynced
-                    + ", lobby="
-                    + lobbySynced
-                    + ", description="
-                    + descriptionSynced
-                    + ", participants="
-                    + participantsSynced
-                    + ").");
-                if (delegationPending)
-                {
-                    // Delegation is always executed when pending; pre-step failures are logged with
-                    // explicit per-step status to keep runtime behavior transparent.
-                    if (!roomNameSynced || !lobbySynced || !descriptionSynced || !participantsSynced)
-                    {
-                        LogTalk(
-                            "Delegation continues despite pre-delegation sync failures (token="
-                            + _roomToken
-                            + ", roomName="
-                            + roomNameSynced
-                            + ", lobby="
-                            + lobbySynced
-                            + ", description="
-                            + descriptionSynced
-                            + ", participants="
-                            + participantsSynced
-                            + ").");
-                    }
-
-                    _owner.TryApplyDelegation(_appointment, _roomToken);
-                }
-                _owner.RefreshEntryBinding(this);
-            }
-
-            private void OnBeforeDelete(object item, ref bool cancel)
-            {
-                if (!_owner.IsOrganizer(_appointment))
-                {
-                    LogTalk("BeforeDelete ignored (not organizer, token=" + _roomToken + ").");
-                    return;
-                }
-
-                LogTalk("BeforeDelete -> EnsureRoomDeleted (Token=" + _roomToken + ").");
-                EnsureRoomDeleted();
-            }
-
-            private void OnClose(ref bool cancel)
-            {
-                if (!_owner.IsOrganizer(_appointment))
-                {
-                    LogTalk("OnClose without organizer (token=" + _roomToken + ").");
-                    Dispose();
-                    return;
-                }
-
-                if (!_roomDeleted && _appointment != null && !_appointment.Saved)
-                {
-                    LogTalk("OnClose unsaved state observed (token=" + _roomToken + ", cancel=" + cancel + ").");
-                    if (!cancel)
-                    {
-                        ScheduleUnsavedCloseCleanup();
-                    }
-
-                    return;
-                }
-
-                LogTalk("OnClose completed (token=" + _roomToken + ", deleted=" + _roomDeleted + ").");
-            }
-
-            private void ScheduleUnsavedCloseCleanup()
-            {
-                if (_unsavedCloseCleanupPending)
-                {
-                    return;
-                }
-
-                _unsavedCloseCleanupPending = true;
-                _unsavedCloseCleanupAttempts = 0;
-                _unsavedCloseCleanupTimer = new System.Windows.Forms.Timer();
-                _unsavedCloseCleanupTimer.Interval = 1000;
-                _unsavedCloseCleanupTimer.Tick += OnUnsavedCloseCleanupTick;
-                _unsavedCloseCleanupTimer.Start();
-                LogTalk("OnClose unsaved cleanup scheduled (token=" + _roomToken + ").");
-            }
-
-            private void ScheduleDeferredWriteLobbyVerification()
-            {
-                if (_disposed || _roomDeleted || _appointment == null)
-                {
-                    return;
-                }
-
-                _deferredWriteLobbyAttempts = 0;
-                if (_deferredWriteLobbyTimer == null)
-                {
-                    _deferredWriteLobbyTimer = new System.Windows.Forms.Timer();
-                    _deferredWriteLobbyTimer.Interval = 750;
-                    _deferredWriteLobbyTimer.Tick += OnDeferredWriteLobbyTick;
-                }
-
-                _deferredWriteLobbyTimer.Stop();
-                _deferredWriteLobbyTimer.Start();
-                LogTalk("Deferred post-write lobby verification scheduled (token=" + _roomToken + ").");
-            }
-
-            private void OnDeferredWriteLobbyTick(object sender, EventArgs e)
-            {
-                if (_disposed || _roomDeleted || _appointment == null)
-                {
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    return;
-                }
-
-                _deferredWriteLobbyAttempts++;
-
-                if (!_owner.IsOrganizer(_appointment))
-                {
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    LogTalk("Deferred post-write lobby verification skipped (not organizer, token=" + _roomToken + ").");
-                    return;
-                }
-
-                string delegateId;
-                if (_owner.IsDelegatedToOtherUser(_appointment, out delegateId))
-                {
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    LogTalk("Deferred post-write lobby verification skipped (delegation=" + delegateId + ", token=" + _roomToken + ").");
-                    return;
-                }
-
-                bool effectiveLobbyKnown;
-                bool effectiveLobbyEnabled;
-                bool effectiveIsEventConversation;
-                _owner.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
-                bool shouldAttemptLobbyUpdate = effectiveLobbyEnabled || !effectiveLobbyKnown;
-                if (!shouldAttemptLobbyUpdate)
-                {
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    return;
-                }
-
-                long currentStartEpoch;
-                if (!_owner.TryStampIcalStartEpoch(_appointment, _roomToken, out currentStartEpoch))
-                {
-                    if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
-                    {
-                        _deferredWriteLobbyAttempts = 0;
-                        StopDeferredWriteLobbyTimer();
-                        LogTalk("Deferred post-write lobby verification stopped after missing X-NCTALK-START (token=" + _roomToken + ").");
-                    }
-
-                    return;
-                }
-
-                if (_lastLobbyTimer.HasValue && currentStartEpoch == _lastLobbyTimer.Value)
-                {
-                    if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
-                    {
-                        _deferredWriteLobbyAttempts = 0;
-                        StopDeferredWriteLobbyTimer();
-                        LogTalk("Deferred post-write lobby verification completed without detected start change (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
-                    }
-
-                    return;
-                }
-
-                LogTalk("Deferred post-write lobby verification applying update (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
-                if (_owner.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
-                {
-                    _lastLobbyTimer = currentStartEpoch;
-                    if (!effectiveLobbyKnown)
-                    {
-                        _owner.PersistLobbyTraits(_appointment, _roomToken, true);
-                    }
-
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    LogTalk("Deferred post-write lobby verification successful (token=" + _roomToken + ").");
-                    return;
-                }
-
-                if (_deferredWriteLobbyAttempts >= DeferredWriteLobbyMaxAttempts)
-                {
-                    _deferredWriteLobbyAttempts = 0;
-                    StopDeferredWriteLobbyTimer();
-                    LogTalk("Deferred post-write lobby verification failed after retries (token=" + _roomToken + ").");
-                }
-            }
-
-            private void OnUnsavedCloseCleanupTick(object sender, EventArgs e)
-            {
-                if (_disposed || _roomDeleted || _appointment == null)
-                {
-                    _unsavedCloseCleanupPending = false;
-                    _unsavedCloseCleanupAttempts = 0;
-                    StopUnsavedCloseCleanupTimer();
-                    return;
-                }
-
-                _unsavedCloseCleanupAttempts++;
-                bool saved;
-                bool hasSavedState = TryGetAppointmentSaved(_appointment, out saved);
-                bool inspectorOpen = IsAppointmentOpenInAnyInspector(_appointment);
-                if (saved)
-                {
-                    _unsavedCloseCleanupPending = false;
-                    _unsavedCloseCleanupAttempts = 0;
-                    StopUnsavedCloseCleanupTimer();
-                    LogTalk("Deferred OnClose cleanup skipped (token=" + _roomToken + ", saved=True).");
-                    return;
-                }
-
-                if (inspectorOpen)
-                {
-                    if (_unsavedCloseCleanupAttempts >= UnsavedCloseCleanupMaxAttempts)
-                    {
-                        _unsavedCloseCleanupPending = false;
-                        _unsavedCloseCleanupAttempts = 0;
-                        StopUnsavedCloseCleanupTimer();
-                        LogTalk("Deferred OnClose cleanup skipped after timeout (token=" + _roomToken + ", saved=" + saved + ", hasSavedState=" + hasSavedState + ", inspectorOpen=True).");
-                        return;
-                    }
-
-                    if (_unsavedCloseCleanupAttempts == 1 || (_unsavedCloseCleanupAttempts % 5) == 0)
-                    {
-                        LogTalk("Deferred OnClose cleanup waiting for inspector close (token=" + _roomToken + ", attempt=" + _unsavedCloseCleanupAttempts.ToString(CultureInfo.InvariantCulture) + ", saved=" + saved + ", hasSavedState=" + hasSavedState + ").");
-                    }
-
-                    return;
-                }
-
-                _unsavedCloseCleanupPending = false;
-                _unsavedCloseCleanupAttempts = 0;
-                StopUnsavedCloseCleanupTimer();
-
-                if (!saved)
-                {
-                    LogTalk("Deferred OnClose cleanup deleting room (token=" + _roomToken + ").");
-                    EnsureRoomDeleted();
-                    return;
-                }
-
-                LogTalk("Deferred OnClose cleanup skipped (token=" + _roomToken + ", saved=True, hasSavedState=" + hasSavedState + ", inspectorOpen=False).");
-            }
-
-            private static bool TryGetAppointmentSaved(Outlook.AppointmentItem appointment, out bool saved)
-            {
-                saved = false;
-                if (appointment == null)
-                {
-                    return false;
-                }
-
-                try
-                {
-                    saved = appointment.Saved;
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-
-            private void StopUnsavedCloseCleanupTimer()
-            {
-                if (_unsavedCloseCleanupTimer == null)
-                {
-                    return;
-                }
-
-                _unsavedCloseCleanupTimer.Stop();
-                _unsavedCloseCleanupTimer.Tick -= OnUnsavedCloseCleanupTick;
-                _unsavedCloseCleanupTimer.Dispose();
-                _unsavedCloseCleanupTimer = null;
-            }
-
-            private void StopDeferredWriteLobbyTimer()
-            {
-                if (_deferredWriteLobbyTimer == null)
-                {
-                    return;
-                }
-
-                _deferredWriteLobbyTimer.Stop();
-                _deferredWriteLobbyTimer.Tick -= OnDeferredWriteLobbyTick;
-                _deferredWriteLobbyTimer.Dispose();
-                _deferredWriteLobbyTimer = null;
-            }
-
-            private bool IsAppointmentOpenInAnyInspector(Outlook.AppointmentItem appointment)
-            {
-                if (appointment == null || _owner == null || _owner._inspectors == null)
-                {
-                    return false;
-                }
-
-                string appointmentEntryId = null;
-                try
-                {
-                    appointmentEntryId = appointment.EntryID;
-                }
-                catch
-                {
-                }
-
-                int inspectorCount = 0;
-                try
-                {
-                    inspectorCount = _owner._inspectors.Count;
-                }
-                catch
-                {
-                    return false;
-                }
-
-                for (int i = 1; i <= inspectorCount; i++)
-                {
-                    Outlook.Inspector inspector = null;
-                    object currentItem = null;
-                    Outlook.AppointmentItem currentAppointment = null;
-                    try
-                    {
-                        inspector = _owner._inspectors[i];
-                        if (inspector == null)
-                        {
-                            continue;
-                        }
-
-                        currentItem = inspector.CurrentItem;
-                        currentAppointment = currentItem as Outlook.AppointmentItem;
-                        if (currentAppointment == null)
-                        {
-                            continue;
-                        }
-
-                        if (currentAppointment == appointment || ReferenceEquals(currentAppointment, appointment))
-                        {
-                            return true;
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(appointmentEntryId))
-                        {
-                            string currentEntryId = null;
-                            try
-                            {
-                                currentEntryId = currentAppointment.EntryID;
-                            }
-                            catch
-                            {
-                            }
-
-                            if (!string.IsNullOrWhiteSpace(currentEntryId)
-                                && string.Equals(currentEntryId, appointmentEntryId, StringComparison.OrdinalIgnoreCase))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                    catch
-                    {
-                    }
-                    finally
-                    {
-                        if (currentAppointment != null && !ReferenceEquals(currentAppointment, appointment))
-                        {
-                            try
-                            {
-                                Marshal.ReleaseComObject(currentAppointment);
-                            }
-                            catch
-                            {
-                            }
-                        }
-
-                        if (currentItem != null
-                            && !ReferenceEquals(currentItem, currentAppointment)
-                            && !ReferenceEquals(currentItem, appointment))
-                        {
-                            try
-                            {
-                                Marshal.ReleaseComObject(currentItem);
-                            }
-                            catch
-                            {
-                            }
-                        }
-
-                        if (inspector != null)
-                        {
-                            try
-                            {
-                                Marshal.ReleaseComObject(inspector);
-                            }
-                            catch
-                            {
-                            }
-                        }
-                    }
-                }
-
-                return false;
-            }
-
-            private void EnsureRoomDeleted()
-            {
-                if (_roomDeleted || !_owner.IsOrganizer(_appointment))
-                {
-                    if (_roomDeleted)
-                    {
-                        LogTalk("EnsureRoomDeleted: room already deleted (token=" + _roomToken + ").");
-                    }
-
-                    return;
-                }
-
-                string delegateId;
-                if (_owner.IsDelegatedToOtherUser(_appointment, out delegateId))
-                {
-                    LogTalk("EnsureRoomDeleted skipped (delegation=" + delegateId + ", token=" + _roomToken + ").");
-                    _owner.ClearTalkProperties(_appointment);
-                    _roomDeleted = true;
-                    Dispose();
-                    return;
-                }
-
-                if (_owner.TryDeleteRoom(_roomToken, _isEventConversation))
-                {
-                    _owner.ClearTalkProperties(_appointment);
-                    _roomDeleted = true;
-                    LogTalk("EnsureRoomDeleted successful (token=" + _roomToken + ").");
-                    Dispose();
-                }
-                else
-                {
-                    LogTalk("EnsureRoomDeleted failed (token=" + _roomToken + ").");
-                }
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    LogTalk("Subscription.Dispose called again (token=" + _roomToken + ").");
-                    return;
-                }
-
-                if (_events != null)
-                {
-                    _events.BeforeDelete -= OnBeforeDelete;
-                    _events.Write -= OnWrite;
-                    _events.Close -= OnClose;
-                }
-
-                StopUnsavedCloseCleanupTimer();
-                StopDeferredWriteLobbyTimer();
-
-                _owner.UnregisterSubscription(_key, _roomToken, _entryId);
-                _disposed = true;
-                LogTalk("Subscription.Dispose completed (token=" + _roomToken + ").");
-            }
-
-            internal Outlook.AppointmentItem Appointment
-            {
-                get { return _appointment; }
-            }
-
-            internal string EntryId
-            {
-                get { return _entryId; }
-            }
-
-            internal bool IsFor(Outlook.AppointmentItem appointment)
-            {
-                if (appointment == null)
-                {
-                    return false;
-                }
-
-                if (appointment == _appointment || ReferenceEquals(appointment, _appointment))
-                {
-                    return true;
-                }
-
-                string thisEntryId = _entryId;
-                if (string.IsNullOrWhiteSpace(thisEntryId))
-                {
-                    thisEntryId = GetEntryId(_appointment);
-                }
-
-                string otherEntryId = GetEntryId(appointment);
-                if (!string.IsNullOrWhiteSpace(thisEntryId)
-                    && !string.IsNullOrWhiteSpace(otherEntryId)
-                    && string.Equals(thisEntryId, otherEntryId, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-
-                return false;
-            }
-
-            internal bool MatchesToken(string token)
-            {
-                return string.Equals(_roomToken, token, StringComparison.OrdinalIgnoreCase);
-            }
-
-            internal void UpdateEntryId(string entryId)
-            {
-                _entryId = entryId;
-                LogTalk("Subscription EntryId updated (token=" + _roomToken + ", EntryId=" + (_entryId ?? "n/a") + ").");
-            }
-        }
-
-        private void EnsureSettingsLoaded()
+        internal void EnsureSettingsLoaded()
         {
             if (_currentSettings == null)
             {
@@ -6643,85 +2451,6 @@ namespace NcTalkOutlookAddIn
             public static stdole.IPictureDisp ToPictureDisp(Image image)
             {
                 return AxHostPictureConverter.ImageToPictureDisp(image);
-            }
-        }
-
-        private void EnsureInspectorHook()
-        {
-            if (_outlookApplication == null || _inspectors != null)
-            {
-                return;
-            }
-
-            try
-            {
-                _inspectors = _outlookApplication.Inspectors;
-                if (_inspectors != null)
-                {
-                    _inspectors.NewInspector += OnNewInspector;
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook Inspectors.NewInspector.", ex);
-                _inspectors = null;
-            }
-        }
-
-        private void UnhookInspector()
-        {
-            if (_inspectors == null)
-            {
-                return;
-            }
-
-            try
-            {
-                _inspectors.NewInspector -= OnNewInspector;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Inspectors.NewInspector.", ex);
-            }
-            finally
-            {
-                try
-                {
-                    Marshal.FinalReleaseComObject(_inspectors);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Inspectors COM object.", ex);
-                }
-                _inspectors = null;
-            }
-        }
-
-        private void OnNewInspector(Outlook.Inspector inspector)
-        {
-            if (inspector == null)
-            {
-                return;
-            }
-
-            try
-            {
-                var appointment = inspector.CurrentItem as Outlook.AppointmentItem;
-                if (appointment != null)
-                {
-                    EnsureSubscriptionForAppointment(appointment);
-                }
-
-                var mail = inspector.CurrentItem as Outlook.MailItem;
-                if (mail != null)
-                {
-                    string inspectorIdentityKey = ResolveComIdentityKey(inspector, "Inspector");
-                    EnsureMailComposeSubscription(mail, inspectorIdentityKey);
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to process NewInspector event.", ex);
             }
         }
 
@@ -6771,23 +2500,19 @@ namespace NcTalkOutlookAddIn
                     existingByToken.Dispose();
                 }
 
-                var roomType = GetRoomType(appointment);
-                bool? isEventConversation = roomType.HasValue
-                    ? (bool?)(roomType.Value == TalkRoomType.EventConversation)
-                    : null;
-
-                bool hasLobbyFlag = HasUserProperty(appointment, IcalLobby) || HasUserProperty(appointment, PropertyLobby);
-                bool? lobbyEnabled = hasLobbyFlag
-                    ? (bool?)GetUserPropertyBoolPrefer(appointment, IcalLobby, PropertyLobby)
-                    : null;
-
-                TryHydrateMissingRoomTraitsFromServer(appointment, roomToken, ref lobbyEnabled, ref isEventConversation);
-
-                RegisterSubscription(
+                bool lobbyKnown;
+                bool lobbyEnabled;
+                bool isEventConversation;
+                _talkAppointmentController.ResolveRuntimeRoomTraits(
                     appointment,
                     roomToken,
-                    lobbyEnabled.HasValue && lobbyEnabled.Value,
-                    isEventConversation.HasValue && isEventConversation.Value);
+                    false,
+                    false,
+                    out lobbyKnown,
+                    out lobbyEnabled,
+                    out isEventConversation);
+
+                RegisterSubscription(appointment, roomToken, lobbyEnabled, isEventConversation);
             }
             catch (COMException ex)
             {

@@ -34,6 +34,8 @@ namespace NcTalkOutlookAddIn.Services
             RelativeFolderPath = relativeFolderPath ?? string.Empty;
             KnownFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             KnownFolderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            ReservedFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            ReservedFolderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         internal string NormalizedBaseUrl { get; private set; }
@@ -49,5 +51,10 @@ namespace NcTalkOutlookAddIn.Services
         internal HashSet<string> KnownFilePaths { get; private set; }
 
         internal HashSet<string> KnownFolderPaths { get; private set; }
+
+        // Tracks names reserved for this upload run, independent from already created DAV paths.
+        internal HashSet<string> ReservedFilePaths { get; private set; }
+
+        internal HashSet<string> ReservedFolderPaths { get; private set; }
     }
 }

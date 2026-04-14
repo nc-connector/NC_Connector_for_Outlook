@@ -26,7 +26,7 @@ namespace NcTalkOutlookAddIn.UI
      * Multi-step wizard for creating a Nextcloud share (permissions, expiration date,
      * file/folder selection, note, and upload progress).
      */
-    internal sealed class FileLinkWizardForm : Form
+    internal sealed partial class FileLinkWizardForm : Form
     {
         private const int DefaultMinPasswordLength = 8;
         private const string AttachmentShareNameBase = "email_attachment";
@@ -323,7 +323,13 @@ namespace NcTalkOutlookAddIn.UI
             SetTooltipWithFallback(_permissionCreateCheckBox, lockPermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermCreate, _permissionsLabel);
             SetTooltipWithFallback(_permissionWriteCheckBox, lockPermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermWrite, _permissionsLabel);
             SetTooltipWithFallback(_permissionDeleteCheckBox, lockPermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermDelete, _permissionsLabel);
-            SetTooltipWithFallback(_passwordToggleCheckBox, lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPassword, _passwordTextBox);
+            _disabledTooltipHints.Apply(
+                _passwordToggleCheckBox,
+                lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty,
+                lockPassword,
+                _passwordGenerateButton,
+                _passwordGenerateButton,
+                _passwordTextBox);
             SetTooltipWithFallback(
                 _passwordSeparateToggleCheckBox,
                 !separatePasswordAvailable
@@ -958,6 +964,15 @@ namespace NcTalkOutlookAddIn.UI
             _removeItemButton.Click += (s, e) => RemoveSelection();
             _fileStepActionPanel.Controls.Add(_removeItemButton);
 
+            AttachFileQueueDropTarget(panel);
+            AttachFileQueueDropTarget(_fileStepLayout);
+            AttachFileQueueDropTarget(_fileStepContentLayout);
+            AttachFileQueueDropTarget(_fileStepActionPanel);
+            AttachFileQueueDropTarget(_fileListView);
+            AttachFileQueueDropTarget(_addFilesButton);
+            AttachFileQueueDropTarget(_addFolderButton);
+            AttachFileQueueDropTarget(_removeItemButton);
+
             _fileStepContentLayout.ResumeLayout(false);
             _fileStepLayout.ResumeLayout(false);
             _fileStepLayout.PerformLayout();
@@ -1548,15 +1563,7 @@ namespace NcTalkOutlookAddIn.UI
             var validSelections = new List<FileLinkSelection>();
             foreach (var selection in _launchOptions.InitialSelections)
             {
-                if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
-                {
-                    continue;
-                }
-
-                bool exists = selection.SelectionType == FileLinkSelectionType.Directory
-                    ? Directory.Exists(selection.LocalPath)
-                    : File.Exists(selection.LocalPath);
-                if (!exists)
+                if (!SelectionPathExists(selection))
                 {
                     continue;
                 }
@@ -1889,39 +1896,6 @@ namespace NcTalkOutlookAddIn.UI
             InvalidateUpload();
         }
 
-        private bool TryAddSelection(FileLinkSelection selection, HashSet<string> existingPaths)
-        {
-            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
-            {
-                return false;
-            }
-
-            if (!_attachmentMode && existingPaths != null)
-            {
-                if (existingPaths.Contains(selection.LocalPath))
-                {
-                    return false;
-                }
-
-                existingPaths.Add(selection.LocalPath);
-            }
-
-            _items.Add(selection);
-
-            var listViewItem = new ListViewItem(selection.LocalPath)
-            {
-                Tag = selection
-            };
-            listViewItem.UseItemStyleForSubItems = false;
-            listViewItem.SubItems.Add(selection.SelectionType == FileLinkSelectionType.File ? Strings.FileLinkWizardTypeFile : Strings.FileLinkWizardTypeFolder);
-            listViewItem.SubItems.Add(string.Empty);
-            _fileListView.Items.Add(listViewItem);
-
-            var state = new SelectionUploadState(listViewItem);
-            _selectionStates[selection] = state;
-            return true;
-        }
-
         private void UpdateQueueColumnWidths()
         {
             if (_fileListView == null || _fileListView.Columns.Count < 3 || _fileListView.IsDisposed || _fileListView.Disposing)
@@ -2200,7 +2174,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void InvalidateUpload()
         {
-            FileLinkUploadContext obsoleteContext = _uploadContext;
+            FileLinkUploadContext previousContext = _uploadContext;
             _uploadCompleted = false;
             _uploadContext = null;
             _lastAutoScrolledUploadItem = null;
@@ -2210,9 +2184,9 @@ namespace NcTalkOutlookAddIn.UI
                 _allowEmptyUpload = false;
             }
 
-            if (!_shareFinalized && obsoleteContext != null)
+            if (!_shareFinalized && previousContext != null)
             {
-                TryCleanupPreparedUploadContext(obsoleteContext, "upload_invalidated");
+                TryCleanupPreparedUploadContext(previousContext, "upload_invalidated");
             }
 
             foreach (var state in _selectionStates.Values)
@@ -2608,20 +2582,24 @@ namespace NcTalkOutlookAddIn.UI
                         state.Item.SubItems[2].ForeColor = _themePalette.ErrorText;
                     }
                 }
+                FlushBufferedUploadProgress();
                 ShowUploadError(Strings.FileLinkWizardUploadCancelledMessage);
             }
             catch (TalkServiceException ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed with service error.", ex);
+                FlushBufferedUploadProgress();
                 ShowUploadError(ex.Message);
             }
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed unexpectedly.", ex);
+                FlushBufferedUploadProgress();
                 ShowUploadError(ex.Message);
             }
             finally
             {
+                FlushBufferedUploadProgress();
                 ResetUploadProgressPump();
                 _lastAutoScrolledUploadItem = null;
                 if (_cancellationSource != null)

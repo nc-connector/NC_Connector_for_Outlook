@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Connection failed: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Connection diagnostics"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "TLS handshake failed."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector uses OS-default TLS for this add-in. Check certificate trust, proxy/TLS inspection, and machine TLS policy."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "The server certificate could not be validated."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Check certificate trust, hostname matching, and whether a TLS-inspecting proxy is replacing the certificate."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "The server name could not be resolved."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Check the server URL, DNS resolution, VPN state, and whether a proxy expects a different hostname."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "The secure connection could not be established."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Check proxy settings, firewall rules, outbound connectivity, and whether TLS inspection is interfering with the connection."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "The connection attempt timed out."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Check server reachability, proxy/firewall latency, and whether the Nextcloud server responds in time."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "The connection to the Nextcloud server failed before any HTTP response was received."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Check server reachability, certificate trust, proxy settings, and machine TLS policy."
+  },
   "outlook_error_no_appointment": {
     "message": "Could not determine the current appointment item."
   },
@@ -1329,3 +1368,4 @@
     "message": "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator."
   }
 }
+

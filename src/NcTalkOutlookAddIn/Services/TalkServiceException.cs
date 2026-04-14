@@ -17,13 +17,15 @@ namespace NcTalkOutlookAddIn.Services
         internal bool IsAuthenticationError { get; private set; }
         internal HttpStatusCode StatusCode { get; private set; }
         internal string ResponseBody { get; private set; }
+        internal bool IsTransportError { get; private set; }
 
-        public TalkServiceException(string message, bool authenticationError, HttpStatusCode statusCode, string responseBody)
+        public TalkServiceException(string message, bool authenticationError, HttpStatusCode statusCode, string responseBody, bool transportError = false)
             : base(message)
         {
             IsAuthenticationError = authenticationError;
             StatusCode = statusCode;
             ResponseBody = responseBody;
+            IsTransportError = transportError;
         }
     }
 }

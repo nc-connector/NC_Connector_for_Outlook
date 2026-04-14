@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Kapcsolódás sikertelen: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Kapcsolati diagnosztika"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "A TLS-kézfogás meghiúsult."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "Az NC Connector ennél a bővítménynél a rendszer alapértelmezett TLS-beállításait használja. Ellenőrizze a tanúsítvány megbízhatóságát, a proxy/TLS-vizsgálat beavatkozását és a rendszer TLS-házirendjét."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "A kiszolgáló tanúsítványát nem sikerült ellenőrizni."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Ellenőrizze a tanúsítvány megbízhatóságát, a gazdagépnév egyezését, valamint hogy egy TLS-vizsgálatot végző proxy nem cseréli-e le a tanúsítványt."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "A kiszolgáló neve nem oldható fel."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Ellenőrizze a kiszolgáló URL-jét, a DNS-feloldást, a VPN állapotát, és hogy a proxy nem vár-e másik gazdagépnevet."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "A biztonságos kapcsolatot nem sikerült létrehozni."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Ellenőrizze a proxybeállításokat, a tűzfalszabályokat, a kimenő kapcsolatot, valamint hogy a TLS-vizsgálat nem zavarja-e a kapcsolatot."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "A kapcsolódási kísérlet időtúllépés miatt megszakadt."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Ellenőrizze a kiszolgáló elérhetőségét, a proxy/tűzfal késleltetését, és hogy a Nextcloud időben válaszol-e."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "A Nextcloud kiszolgálóhoz való kapcsolódás még a HTTP-válasz előtt meghiúsult."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Ellenőrizze a kiszolgáló elérhetőségét, a tanúsítvány megbízhatóságát, a proxybeállításokat és a rendszer TLS-házirendjét."
+  },
   "outlook_error_no_appointment": {
     "message": "Nem sikerült meghatározni az aktuális találkozót."
   },
@@ -1329,3 +1368,5 @@
     "message": "Az Ön NC Connector seatje jelenleg szünetel. Kérjük, forduljon a Nextcloud rendszergazdájához."
   }
 }
+
+

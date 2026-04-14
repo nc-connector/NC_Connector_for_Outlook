@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "連線失敗：$1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "連線診斷"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "TLS 交握失敗。"
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector 會為此增益集使用系統預設 TLS。請檢查憑證信任、代理/TLS 檢查，以及系統 TLS 原則。"
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "無法驗證伺服器憑證。"
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "請檢查憑證信任、主機名稱是否相符，以及是否有執行 TLS 檢查的代理取代了憑證。"
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "無法解析伺服器名稱。"
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "請檢查伺服器 URL、DNS 解析、VPN 狀態，以及代理是否要求使用不同的主機名稱。"
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "無法建立安全連線。"
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "請檢查代理設定、防火牆規則、對外連線能力，以及 TLS 檢查是否干擾了連線。"
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "連線嘗試已逾時。"
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "請檢查伺服器可達性、代理/防火牆延遲，以及 Nextcloud 是否能及時回應。"
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "在收到任何 HTTP 回應之前，與 Nextcloud 伺服器的連線已失敗。"
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "請檢查伺服器可達性、憑證信任、代理設定以及系統 TLS 原則。"
+  },
   "outlook_error_no_appointment": {
     "message": "無法判斷目前的約會項目。"
   },
@@ -1329,3 +1368,5 @@
     "message": "您的 NC Connector 席位目前已暫停。請聯絡您的 Nextcloud 管理員。"
   }
 }
+
+

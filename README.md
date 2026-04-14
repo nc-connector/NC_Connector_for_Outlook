@@ -51,6 +51,7 @@ See [`CHANGELOG.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/bl
 - Optional compose attachment automation:
   - always route new attachments into NC Connector, or
   - prompt above a configurable total-size threshold.
+- Compose attachment automation now runs a pre-add check (`BeforeAttachmentAdd`) and can best-effort cancel host add operations before Outlook post-add handling, when a resolvable local file path is available.
 - Threshold prompt uses exactly two actions:
   - `Share with NC Connector`
   - `Remove last selected attachments` (batch-aware, not single-file only).
@@ -58,6 +59,7 @@ See [`CHANGELOG.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/bl
   - fixed share base name `email_attachment` with deterministic suffixes (`_1`, `_2`, ...)
   - recipient permission is always read-only
   - HTML output uses ZIP download URL `/s/<token>/download` and hides the permissions row.
+- File queue input now accepts Explorer drag & drop for files and folders across the full file step (queue and action area), not only through the add buttons.
 - Optional separate password-mail flow:
   - requires the optional NC Connector backend plus an active seat assigned to the current user
   - hide inline password in main HTML block
@@ -102,14 +104,14 @@ Option `Custom` is only shown when the NC Connector backend endpoint exists. It 
 ## Installation and updates
 
 1. Close Outlook.  
-2. Run the latest MSI (for example `NCConnectorForOutlook-3.0.0.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.  
+2. Run the latest MSI (for example `NCConnectorForOutlook-3.0.1.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.  
 3. Start Outlook and click **NC Connector → Settings** in the ribbon.  
 4. Choose the login mode, run the connection test, and save. If the test succeeds, IFB is active automatically.  
 5. Verify the filelink base directory and enable debug logging if needed.
 
 Updates are applied by installing a MSI package over the existing installation (same, older, or newer version). Personal settings are kept and migrated to profile-based XML files (`settings_<OutlookProfile>.xml`) under `%LOCALAPPDATA%\NC4OL`. Uninstall removes the add-in, stops the IFB listener, and resets the registry values.
 
-### Release 3.0.0 operational notes
+### Release 3.0.1 operational notes
 
 - Runtime artifacts are consolidated in `%LOCALAPPDATA%\NC4OL`:
   - settings files (`settings_<OutlookProfile>.xml`)
@@ -121,10 +123,11 @@ Updates are applied by installing a MSI package over the existing installation (
 
 ## Troubleshooting
 
-- **Debug log**: enable it in the *Debug* tab for verbose traces. Log file: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. Runtime exceptions are written there even when debug logging is disabled.  
-- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-3.0.0.msi" ADDLOCAL=ALL`.  
+- **Debug log**: enable it in the *Debug* tab for verbose traces. Log file: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. With debug enabled, attachment pre-add decisions/fallback reasons are included. Runtime exceptions are written there even when debug logging is disabled.  
+- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-3.0.1.msi" ADDLOCAL=ALL`.  
 - **Test IFB**: `powershell -Command "Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. If behavior differs, verify the registry under `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar`.  
-- **Check TLS/proxy**: `powershell -Command "Test-NetConnection <your-domain> -Port 443"`. If you see SSL warnings, verify certificates/proxy settings.  
+- **Check TLS/proxy**: `powershell -Command "Test-NetConnection <your-domain> -Port 443"`. If you see SSL warnings, verify certificates/proxy settings. NC Connector now enables strong crypto and OS-default TLS locally via `NcTalkOutlookAddIn.dll.config`; if secure-channel errors still occur, check certificate trust, TLS-inspecting proxies, DNS, and machine TLS/Schannel policy. Machine-wide registry/GPO overrides remain an optional admin-side workaround, not an installer action.  
+- **Attachment automation does not trigger for large files**: In Microsoft 365 / Exchange environments, Outlook can block attachments before add-in events fire (for example due to server-side size limits). In those cases, use the **`Insert Nextcloud share`** button.  
 - **Sharing errors**: the debug log includes HTTP status codes and exception details. Required wizard fields are validated.
 
 ## Screenshots
@@ -162,4 +165,5 @@ Updates are applied by installing a MSI package over the existing installation (
 | --- |
 
 </details>
+
 

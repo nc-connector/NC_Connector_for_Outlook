@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Échec de la connexion : $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Diagnostic de connexion"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "La négociation TLS a échoué."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector utilise le TLS par défaut du système pour ce complément. Vérifiez la confiance du certificat, l'inspection proxy/TLS et la stratégie TLS du système."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "Le certificat du serveur n'a pas pu être validé."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Vérifiez la confiance du certificat, la correspondance du nom d'hôte et si un proxy avec inspection TLS remplace le certificat."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "Le nom du serveur n'a pas pu être résolu."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Vérifiez l'URL du serveur, la résolution DNS, l'état du VPN et si un proxy attend un autre nom d'hôte."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "La connexion sécurisée n'a pas pu être établie."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Vérifiez les paramètres du proxy, les règles du pare-feu, la connectivité sortante et si l'inspection TLS perturbe la connexion."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "La tentative de connexion a expiré."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Vérifiez la disponibilité du serveur, la latence du proxy/pare-feu et si Nextcloud répond à temps."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "La connexion au serveur Nextcloud a échoué avant la réception d'une réponse HTTP."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Vérifiez la disponibilité du serveur, la confiance du certificat, les paramètres du proxy et la stratégie TLS du système."
+  },
   "outlook_error_no_appointment": {
     "message": "Impossible de déterminer l'élément de rendez-vous actuel."
   },
@@ -1329,3 +1368,5 @@
     "message": "Votre seat NC Connector est actuellement en pause. Veuillez contacter votre administrateur Nextcloud."
   }
 }
+
+

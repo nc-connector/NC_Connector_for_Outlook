@@ -1025,6 +1025,45 @@
   "outlook_test_failure_format": {
     "message": "Připojení se nezdařilo: $1"
   },
+  "outlook_connection_diagnostics_title": {
+    "message": "Diagnostika připojení"
+  },
+  "outlook_connection_failure_tls_summary": {
+    "message": "Navázání TLS spojení selhalo."
+  },
+  "outlook_connection_failure_tls_guidance": {
+    "message": "NC Connector pro tento doplněk používá výchozí TLS systému. Zkontrolujte důvěru v certifikát, proxy/TLS inspekci a zásady TLS v systému."
+  },
+  "outlook_connection_failure_certificate_summary": {
+    "message": "Certifikát serveru se nepodařilo ověřit."
+  },
+  "outlook_connection_failure_certificate_guidance": {
+    "message": "Zkontrolujte důvěru v certifikát, shodu názvu hostitele a zda proxy s TLS inspekcí nenahrazuje certifikát."
+  },
+  "outlook_connection_failure_dns_summary": {
+    "message": "Název serveru se nepodařilo přeložit."
+  },
+  "outlook_connection_failure_dns_guidance": {
+    "message": "Zkontrolujte URL serveru, DNS překlad, stav VPN a zda proxy neočekává jiný název hostitele."
+  },
+  "outlook_connection_failure_proxy_summary": {
+    "message": "Zabezpečené připojení se nepodařilo navázat."
+  },
+  "outlook_connection_failure_proxy_guidance": {
+    "message": "Zkontrolujte nastavení proxy, pravidla firewallu, odchozí konektivitu a zda TLS inspekce nezasahuje do spojení."
+  },
+  "outlook_connection_failure_timeout_summary": {
+    "message": "Pokus o připojení vypršel."
+  },
+  "outlook_connection_failure_timeout_guidance": {
+    "message": "Zkontrolujte dostupnost serveru, latenci proxy/firewallu a zda Nextcloud odpovídá včas."
+  },
+  "outlook_connection_failure_generic_summary": {
+    "message": "Připojení k serveru Nextcloud selhalo ještě před přijetím HTTP odpovědi."
+  },
+  "outlook_connection_failure_generic_guidance": {
+    "message": "Zkontrolujte dostupnost serveru, důvěru v certifikát, nastavení proxy a zásady TLS systému."
+  },
   "outlook_error_no_appointment": {
     "message": "Nelze určit aktuální položku schůzky."
   },
@@ -1329,3 +1368,5 @@
     "message": "Váš seat NC Connector je momentálně pozastaven. Obraťte se prosím na správce Nextcloud."
   }
 }
+
+

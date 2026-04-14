@@ -8,7 +8,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 - [Updates / Upgrade-Verhalten](#updates--upgrade-verhalten)
 - [Dateien & Registry](#dateien--registry)
 - [Einstellungen (Profil-XML)](#einstellungen-profil-xml)
-- [Compose-Freigabe-Lifecycle (3.0.0)](#compose-freigabe-lifecycle-300)
+- [Compose-Freigabe-Lifecycle (3.0.1)](#compose-freigabe-lifecycle-301)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [Systemadressbuch erforderlich fuer Benutzersuche und Moderator-Auswahl](#systemadressbuch-erforderlich-fuer-benutzersuche-und-moderator-auswahl)
 - [Logging / Support](#logging--support)
@@ -22,7 +22,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 Beispiel (silent):
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.0.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.0.1.msi" /qn /norestart
 ```
 
 Danach Outlook starten. Im Ribbon erscheint der Tab **NC Connector** (Kalender/Termin + E-Mail).
@@ -114,12 +114,15 @@ Empfehlung:
 - Nur Base-URL und Defaults pre-seeden.
 - Credentials entweder ueber Login Flow v2 oder per Benutzer setzen lassen (empfohlen fuer DPAPI-Kompatibilitaet).
 
-## Compose-Freigabe-Lifecycle (3.0.0)
+## Compose-Freigabe-Lifecycle (3.0.1)
 
 ### Attachment-Automatisierung und Cleanup-Vertrag
 - Im Compose-Attachment-Modus werden serverseitige Artefakte direkt nach Share-Erstellung fuer Cleanup-Tracking registriert.
 - Cleanup wird erst nach bestaetigtem erfolgreichem Hauptversand wieder entfernt.
 - Wird das Compose-Fenster ohne erfolgreichen Versand geschlossen, loescht das Add-in die erzeugten Share-Ordner-Artefakte serverseitig (best effort, mit Grace-Timer fuer Send/Close-Race).
+- Die Anhangsautomatisierung wertet neue Dateien sowohl pre-add (`BeforeAttachmentAdd`) als auch post-add aus; kann pre-add ein lokaler Dateipfad aufgeloest werden, kann der NC-Flow den Host-Add best effort vor der normalen Outlook-Post-Add-Verarbeitung abbrechen.
+- In Microsoft-365-/Exchange-Umgebungen mit serverseitigen Nachrichtengroessenlimits kann Outlook grosse Anhaenge bereits vor den Add-in-Events blockieren; in diesen Faellen kann die Automatisierung technisch nicht greifen und der Benutzer soll stattdessen den Button `Nextcloud Freigabe hinzufuegen` verwenden.
+- Im Datei-Schritt des Sharing-Wizards koennen Dateien und Ordner per Explorer-Drag-and-drop im gesamten Schrittbereich (Queue + Aktionsbereich) hinzugefuegt werden, nicht nur ueber die Add-Buttons.
 
 ### Separater Passwort-Follow-up-Versand
 - Ist `Passwort separat senden` aktiv, enthaelt der Haupt-HTML-Block kein Inline-Passwort.
@@ -193,6 +196,7 @@ Log-Datei:
 - `%LOCALAPPDATA%\NC4OL\addin-runtime.log`
 
 Die Logs sind kategorisiert (z.B. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) und helfen bei Supportfällen.
+Wenn Debug-Logging aktiviert ist, werden auch Runtime-Entscheidungspfade (inkl. Attachment-Pre-Add-Gating und Fallback-Gruenden) in dieselbe Datei geschrieben; Runtime-Exceptions werden unabhaengig vom Debug-Schalter immer geloggt.
 
 ## Troubleshooting
 
@@ -216,7 +220,9 @@ netstat -ano | Select-String ":7777"
 ### Netzwerk / Nextcloud
 
 - Server erreichbar, TLS ok?
+- NC Connector aktiviert starke Kryptografie und die TLS-Standards des Betriebssystems add-in-lokal ueber `NcTalkOutlookAddIn.dll.config`. Wenn Secure-Channel-Fehler weiter auftreten, zuerst Zertifikatsvertrauen, DNS, Proxy/TLS-Inspection und die TLS-/Schannel-Richtlinien des Systems pruefen, bevor maschinenweite Registry-/GPO-Overrides erwogen werden.
 - App-Passwort gültig?
 - Talk installiert?
 - Password Policy App optional: bei fehlender App wird lokal generiert (Fallback)
+
 
