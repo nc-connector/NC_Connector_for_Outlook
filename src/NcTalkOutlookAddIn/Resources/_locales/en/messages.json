@@ -572,6 +572,27 @@
   "options_event_description_lang_hint": {
     "message": "Controls the language of the Talk text block in events."
   },
+  "options_tls_heading": {
+    "message": "Transport security (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Use OS default TLS policy"
+  },
+  "options_tls_enable_12_label": {
+    "message": "Enable TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "Enable TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "If disabled, NC Connector enforces the selected TLS versions in add-in runtime."
+  },
+  "options_tls_apply_failed": {
+    "message": "The selected TLS settings could not be applied: {0}"
+  },
+  "options_tls_selection_required": {
+    "message": "When OS default TLS policy is disabled, enable at least one TLS version (1.2 or 1.3)."
+  },
   "options_lang_default": {
     "message": "Default (UI)"
   },
@@ -1032,7 +1053,7 @@
     "message": "TLS handshake failed."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector uses OS-default TLS for this add-in. Check certificate trust, proxy/TLS inspection, and machine TLS policy."
+    "message": "Check the selected TLS settings in NC Connector, certificate trust, proxy/TLS inspection, and machine TLS policy."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "The server certificate could not be validated."

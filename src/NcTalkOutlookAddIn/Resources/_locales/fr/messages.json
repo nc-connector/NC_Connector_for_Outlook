@@ -1032,7 +1032,7 @@
     "message": "La négociation TLS a échoué."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector utilise le TLS par défaut du système pour ce complément. Vérifiez la confiance du certificat, l'inspection proxy/TLS et la stratégie TLS du système."
+    "message": "Vérifiez les paramètres TLS sélectionnés dans NC Connector, la confiance du certificat, l'inspection proxy/TLS et la stratégie TLS du système."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "Le certificat du serveur n'a pas pu être validé."
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Votre seat NC Connector est actuellement en pause. Veuillez contacter votre administrateur Nextcloud."
+  },
+  "options_tls_heading": {
+    "message": "Sécurité du transport (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Utiliser la stratégie TLS par défaut du système d'exploitation"
+  },
+  "options_tls_enable_12_label": {
+    "message": "Activer TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "Activer TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "Si cette option est désactivée, NC Connector applique les versions TLS sélectionnées dans le runtime du complément."
+  },
+  "options_tls_apply_failed": {
+    "message": "Impossible d'appliquer les paramètres TLS sélectionnés : $1"
+  },
+  "options_tls_selection_required": {
+    "message": "Lorsque la stratégie TLS par défaut du système d'exploitation est désactivée, activez au moins une version TLS (1.2 ou 1.3)."
   }
 }
-
-

@@ -25,7 +25,7 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 - **Nextcloud sharing** from the mail compose window (upload + link share + HTML block insertion)
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
-## Release 3.0.1 delta summary
+## Release 3.0.2 delta summary
 
 This release added parity-critical behavior that developers should preserve in future changes:
 
@@ -47,6 +47,10 @@ This release added parity-critical behavior that developers should preserve in f
 - Talk event-description templates may arrive as `html` or `plain_text`; when `html` is active, Outlook writes the Talk block into the open appointment editor HTML with stable markers so the rendered event description stays HTML while `Body` continues to provide the synchronized plain-text view.
 - Share creation now follows the documented Nextcloud OCS contract more closely: create via `POST /shares` with `label`, then update mutable metadata like `note` via form-encoded `PUT /shares/{id}` arguments.
 - Runtime settings and caches use `%LOCALAPPDATA%\\NC4OL` with profile-scoped XML settings migration.
+- Transport security settings are runtime-live in `SettingsForm` (`OS default` / `TLS 1.2` / `TLS 1.3` / combined) and are intentionally validated on apply.
+- Unsupported manual `TLS 1.3` runtime apply now fails closed (no implicit downgrade to TLS 1.2).
+- Settings connectivity operations (connection test, login flow) enforce fresh HTTP/TLS handshakes (no pooled keep-alive reuse), so TLS mode toggles are tested deterministically.
+- TLS transport diagnostics guidance text is mode-neutral and no longer assumes OS-default mode.
 
 ## Quick start
 
@@ -61,7 +65,7 @@ This release added parity-critical behavior that developers should preserve in f
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-3.0.1"
+cd "C:\\path\\to\\nc4ol-3.0.2"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages

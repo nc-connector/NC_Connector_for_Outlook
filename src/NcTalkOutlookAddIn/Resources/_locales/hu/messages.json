@@ -1032,7 +1032,7 @@
     "message": "A TLS-kézfogás meghiúsult."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "Az NC Connector ennél a bővítménynél a rendszer alapértelmezett TLS-beállításait használja. Ellenőrizze a tanúsítvány megbízhatóságát, a proxy/TLS-vizsgálat beavatkozását és a rendszer TLS-házirendjét."
+    "message": "Ellenőrizze az NC Connectorban kiválasztott TLS-beállításokat, a tanúsítvány megbízhatóságát, a proxy/TLS-vizsgálatot és a rendszer TLS-házirendjét."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "A kiszolgáló tanúsítványát nem sikerült ellenőrizni."
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Az Ön NC Connector seatje jelenleg szünetel. Kérjük, forduljon a Nextcloud rendszergazdájához."
+  },
+  "options_tls_heading": {
+    "message": "Átviteli biztonság (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Az operációs rendszer alapértelmezett TLS-házirendjének használata"
+  },
+  "options_tls_enable_12_label": {
+    "message": "A TLS 1.2 engedélyezése"
+  },
+  "options_tls_enable_13_label": {
+    "message": "A TLS 1.3 engedélyezése"
+  },
+  "options_tls_hint": {
+    "message": "Ha ki van kapcsolva, az NC Connector a kijelölt TLS-verziókat a bővítmény futásidejében kényszeríti."
+  },
+  "options_tls_apply_failed": {
+    "message": "A kijelölt TLS-beállításokat nem sikerült alkalmazni: $1"
+  },
+  "options_tls_selection_required": {
+    "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."
   }
 }
-
-

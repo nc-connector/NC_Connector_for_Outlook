@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using NcTalkOutlookAddIn.Settings;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
@@ -251,6 +252,82 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             return false;
+        }
+    }
+
+    internal static class TransportSecurityConfigurator
+    {
+        private const SecurityProtocolType Tls13Protocol = (SecurityProtocolType)12288;
+
+        internal static SecurityProtocolType ApplyFromSettings(AddinSettings settings, string source)
+        {
+            bool useSystemDefault = settings != null && settings.TransportTlsUseSystemDefault;
+            bool enableTls12 = settings == null || settings.TransportTlsEnable12;
+            bool enableTls13 = settings != null && settings.TransportTlsEnable13;
+            return Apply(useSystemDefault, enableTls12, enableTls13, source);
+        }
+
+        internal static SecurityProtocolType Apply(bool useSystemDefault, bool enableTls12, bool enableTls13, string source)
+        {
+            SecurityProtocolType protocol = BuildProtocol(useSystemDefault, enableTls12, enableTls13);
+            try
+            {
+                ServicePointManager.SecurityProtocol = protocol;
+            }
+            catch (Exception ex)
+            {
+                if ((protocol & Tls13Protocol) == Tls13Protocol)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Core,
+                        "TLS 1.3 protocol flag was selected but rejected by this runtime. No auto-fallback is applied.",
+                        ex);
+                    throw new InvalidOperationException(
+                        "TLS 1.3 was selected but is not supported by this runtime. NC Connector does not auto-fallback to TLS 1.2.",
+                        ex);
+                }
+
+                throw;
+            }
+            DiagnosticsLogger.Log(
+                LogCategories.Core,
+                "Transport security applied (source="
+                + (source ?? string.Empty)
+                + ", useSystemDefault="
+                + useSystemDefault.ToString(CultureInfo.InvariantCulture)
+                + ", enableTls12="
+                + enableTls12.ToString(CultureInfo.InvariantCulture)
+                + ", enableTls13="
+                + enableTls13.ToString(CultureInfo.InvariantCulture)
+                + ", securityProtocol="
+                + protocol
+                + ").");
+            return protocol;
+        }
+
+        internal static SecurityProtocolType BuildProtocol(bool useSystemDefault, bool enableTls12, bool enableTls13)
+        {
+            if (useSystemDefault)
+            {
+                return SecurityProtocolType.SystemDefault;
+            }
+
+            SecurityProtocolType protocol = 0;
+            if (enableTls12)
+            {
+                protocol |= SecurityProtocolType.Tls12;
+            }
+            if (enableTls13)
+            {
+                protocol |= Tls13Protocol;
+            }
+
+            if (protocol == 0)
+            {
+                protocol = SecurityProtocolType.Tls12;
+            }
+
+            return protocol;
         }
     }
 }

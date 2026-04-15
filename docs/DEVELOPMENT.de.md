@@ -20,9 +20,9 @@ Das Add-in integriert:
 - **Nextcloud Filelink** im E-Mail-Composer (Wizard, Upload, HTML-Block)
 - **IFB (Internet Free/Busy)** als lokaler HTTP-Proxy zu Nextcloud
 
-## Release 3.0.1 Delta-Ueberblick
+## Release 3.0.2 Delta-Ueberblick
 
-In 3.0.1 gelten die paritaetskritischen Verhaltensregeln weiterhin und muessen bei Folgeaenderungen stabil bleiben:
+In 3.0.2 gelten die paritaetskritischen Verhaltensregeln weiterhin und muessen bei Folgeaenderungen stabil bleiben:
 
 - Compose-Anhangsautomatisierung mit deterministischen Modi (`always` vs. Schwellwert-Prompt).
 - Compose-Anhangsautomatisierung prueft zusaetzlich pre-add (`BeforeAttachmentAdd`) und kann Host-Adds best effort vor der normalen Outlook-Post-Add-Verarbeitung abbrechen, wenn ein lokaler Pfad aufloesbar ist.
@@ -33,6 +33,10 @@ In 3.0.1 gelten die paritaetskritischen Verhaltensregeln weiterhin und muessen b
 - Talk-Defaults und Talk-Wizard mit zentralem Systemadressbuch-Verfuegbarkeitsvertrag und deterministischem Lock-Zustand.
 - Public-Link-Share-Erstellung folgt dem dokumentierten Nextcloud-OCS-Vertrag: `label` beim Create, veränderliche Metadaten wie `note` danach über den OCS-Update-Endpunkt.
 - Runtime-Settings und Caches unter `%LOCALAPPDATA%\\NC4OL` mit profilbasierter XML-Migration.
+- TLS-Transporteinstellungen sind in `SettingsForm` runtime-live schaltbar (`OS-Default` / `TLS 1.2` / `TLS 1.3` / kombiniert) und werden beim Anwenden bewusst validiert.
+- Nicht unterstuetzte manuelle `TLS 1.3`-Anwendung faellt nicht mehr still auf TLS 1.2 zurueck, sondern bricht explizit mit Fehler ab.
+- Verbindungspruefung und Login-Flow erzwingen frische HTTP/TLS-Handshakes (kein Keep-Alive-Reuse), damit TLS-Moduswechsel deterministisch getestet werden.
+- Die TLS-Fehlerhilfe in der Verbindungsdiagnose ist modusneutral und behauptet nicht mehr pauschal `OS-Default`.
 
 ## Voraussetzungen
 
@@ -49,7 +53,7 @@ Auf manchen Build-Systemen fehlen die .NET Framework Reference Assemblies für 4
 Beispiel:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2"
 
 # Optional: Reference Assemblies lokal holen (nur wenn nötig)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -62,7 +66,7 @@ $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAsse
 Der empfohlene Build läuft immer über `build.ps1`:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2"
 $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2"
 .\build.ps1 -Configuration Release
 ```
@@ -143,7 +147,7 @@ UI:
 - `src/NcTalkOutlookAddIn/UI/ComposeAttachmentPromptForm.cs` (2-Aktions-Prompt fuer Schwellwertmodus)
 - `src/NcTalkOutlookAddIn/UI/BrandedHeader.cs` (Header-Banner)
 
-Compose-Filelink-Paritaet (3.0.1):
+Compose-Filelink-Paritaet (3.0.2):
 
 - `MailComposeSubscription` in `NextcloudTalkAddIn.cs` steuert den Compose-Lifecycle fuer:
   - debouncte Anhangsauswertung (`ComposeAttachmentEvalDebounceMs`)

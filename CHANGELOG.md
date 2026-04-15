@@ -4,6 +4,20 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.0.2] - 2026-04-15
+
+### Added
+- New runtime TLS controls in Outlook settings (`Use OS default TLS policy`, `Enable TLS 1.2`, `Enable TLS 1.3`) with immediate test/login-flow usage and persisted profile-specific configuration.
+
+### Changed
+- Release line/version references were aligned to `3.0.2` across assembly and installer defaults.
+- TLS hint text in advanced settings/docs was tightened and no longer makes assumptions about machine-wide registry changes.
+- TLS diagnostics guidance text was updated to be mode-neutral (no hardcoded OS-default assumption) and aligned across all supported locale files.
+
+### Fixed
+- Admin-controlled `?` hint glyph placement in advanced settings now avoids overlapping adjacent inputs in tight rows (language override section and neighboring fields).
+- Connection diagnostics and login-flow connectivity checks now force fresh HTTP/TLS handshakes (no pooled keep-alive reuse), so runtime TLS mode switches are validated deterministically without requiring an Outlook restart.
+
 ## [3.0.1] - 2026-04-14
 
 ### Added
@@ -36,7 +50,7 @@ This project follows the principles of **Keep a Changelog** and **Semantic Versi
 - Minor UI redundancy cleanup (no behavior change) was applied in `FileLinkWizardForm`, `SettingsForm`, and `TalkLinkForm` (shared helpers for selection validation, resize wiring, and settings-option checkbox setup).
 
 ### Fixed
-- In `Always via NC Connector` mode, pre-add multi-file drag/drop is now debounced and batched into a single wizard launch instead of opening one wizard per file.
+- Pre-add multi-file drag/drop is now debounced and batched into a single wizard launch instead of opening one wizard per file.
 - Folder uploads in the FileLink wizard now correctly create required subfolders for mixed file+directory queues; reserved-name tracking no longer suppresses required DAV `MKCOL` calls.
 - Upload status/progress UI now flushes buffered per-item progress updates immediately on failure/cancel/finalize paths, preventing stale bars or missing final state labels.
 - Admin-controlled `?` hint glyphs now support explicit row anchors, preventing them from drifting into adjacent password and attachment threshold input fields in the FileLink wizard, sharing settings, and Talk password block.

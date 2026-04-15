@@ -1032,7 +1032,7 @@
     "message": "TLS 握手失败。"
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector 会为此加载项使用系统默认 TLS。请检查证书信任、代理/TLS 检查以及系统 TLS 策略。"
+    "message": "请检查 NC Connector 中选择的 TLS 设置、证书信任、代理/TLS 检查以及系统 TLS 策略。"
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "无法验证服务器证书。"
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "您的 NC Connector 席位当前已暂停。请联系您的 Nextcloud 管理员。"
+  },
+  "options_tls_heading": {
+    "message": "传输安全（TLS）"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "使用操作系统默认 TLS 策略"
+  },
+  "options_tls_enable_12_label": {
+    "message": "启用 TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "启用 TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "若禁用此项，NC Connector 将在加载项运行时强制使用所选 TLS 版本。"
+  },
+  "options_tls_apply_failed": {
+    "message": "无法应用所选 TLS 设置：$1"
+  },
+  "options_tls_selection_required": {
+    "message": "当禁用操作系统默认 TLS 策略时，请至少启用一个 TLS 版本（1.2 或 1.3）。"
   }
 }
-
-

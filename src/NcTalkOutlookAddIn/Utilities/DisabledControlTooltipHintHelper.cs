@@ -280,9 +280,62 @@ namespace NcTalkOutlookAddIn.Utilities
 
             int x = anchor.Right + HintSpacing;
             int y = anchor.Top + Math.Max(0, (anchor.Height - hint.Height) / 2);
-            int maxX = Math.Max(0, parent.ClientSize.Width - hint.Width - HintSpacing);
+            int maxX = Math.Max(HintSpacing, parent.ClientSize.Width - hint.Width - HintSpacing);
+            int rightNeighborLeft = FindNearestRightNeighborLeft(anchor, hint, parent, y, hint.Height);
+            if (rightNeighborLeft > 0)
+            {
+                maxX = Math.Min(maxX, rightNeighborLeft - hint.Width - HintSpacing);
+            }
+
+            if (x > maxX)
+            {
+                x = maxX;
+            }
+
+            if (x < HintSpacing)
+            {
+                x = HintSpacing;
+            }
+
             int maxY = Math.Max(0, parent.ClientSize.Height - hint.Height - HintSpacing);
-            hint.Location = new Point(Math.Min(x, maxX), Math.Min(y, maxY));
+            hint.Location = new Point(x, Math.Min(y, maxY));
+        }
+
+        private static int FindNearestRightNeighborLeft(Control anchor, Control hint, Control parent, int hintTop, int hintHeight)
+        {
+            if (anchor == null || parent == null)
+            {
+                return 0;
+            }
+
+            int nearestLeft = int.MaxValue;
+            int hintBottom = hintTop + hintHeight;
+
+            foreach (Control sibling in parent.Controls)
+            {
+                if (sibling == null || !sibling.Visible || ReferenceEquals(sibling, anchor) || ReferenceEquals(sibling, hint))
+                {
+                    continue;
+                }
+
+                if (sibling.Left <= anchor.Right)
+                {
+                    continue;
+                }
+
+                bool overlapsVertically = sibling.Bottom > hintTop && sibling.Top < hintBottom;
+                if (!overlapsVertically)
+                {
+                    continue;
+                }
+
+                if (sibling.Left < nearestLeft)
+                {
+                    nearestLeft = sibling.Left;
+                }
+            }
+
+            return nearestLeft == int.MaxValue ? 0 : nearestLeft;
         }
 
         private void HideHint(Control primary)

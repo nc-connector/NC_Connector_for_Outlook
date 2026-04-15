@@ -130,14 +130,20 @@ namespace NcTalkOutlookAddIn.Services
         {
             statusCode = 0;
             HttpWebResponse response = null;
+            HttpWebRequest request = null;
+            string connectionGroupName = null;
             try
             {
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = method;
                 request.Accept = "application/json";
                 request.Timeout = 60000;
                 request.Headers["OCS-APIRequest"] = "true";
                 request.UserAgent = BuildUserAgent();
+                connectionGroupName = "nc-loginflow-" + Guid.NewGuid().ToString("N");
+                request.ConnectionGroupName = connectionGroupName;
+                request.KeepAlive = false;
+                request.Pipelined = false;
 
                 if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && payload != null)
                 {
@@ -196,6 +202,21 @@ namespace NcTalkOutlookAddIn.Services
                 if (response != null)
                 {
                     response.Close();
+                }
+
+                if (request != null && !string.IsNullOrEmpty(connectionGroupName))
+                {
+                    try
+                    {
+                        request.ServicePoint.CloseConnectionGroup(connectionGroupName);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(
+                            LogCategories.Api,
+                            "Failed to close temporary login-flow connection group.",
+                            ex);
+                    }
                 }
             }
         }

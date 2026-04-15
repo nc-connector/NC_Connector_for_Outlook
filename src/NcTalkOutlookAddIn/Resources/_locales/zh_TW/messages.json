@@ -1032,7 +1032,7 @@
     "message": "TLS 交握失敗。"
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector 會為此增益集使用系統預設 TLS。請檢查憑證信任、代理/TLS 檢查，以及系統 TLS 原則。"
+    "message": "請檢查 NC Connector 中所選的 TLS 設定、憑證信任、代理/TLS 檢查，以及系統 TLS 原則。"
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "無法驗證伺服器憑證。"
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "您的 NC Connector 席位目前已暫停。請聯絡您的 Nextcloud 管理員。"
+  },
+  "options_tls_heading": {
+    "message": "傳輸安全性（TLS）"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "使用作業系統預設 TLS 原則"
+  },
+  "options_tls_enable_12_label": {
+    "message": "啟用 TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "啟用 TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "若停用此選項，NC Connector 會在增益集執行階段強制使用所選 TLS 版本。"
+  },
+  "options_tls_apply_failed": {
+    "message": "無法套用所選 TLS 設定：$1"
+  },
+  "options_tls_selection_required": {
+    "message": "當作業系統預設 TLS 原則停用時，請至少啟用一個 TLS 版本（1.2 或 1.3）。"
   }
 }
-
-

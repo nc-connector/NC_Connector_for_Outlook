@@ -4,3 +4,9 @@ C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1\installer\obj\Release\NcConnecto
 C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1\installer\obj\Release\NCConnectorForOutlook.msi
 C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1\installer\obj\Release\NCConnectorForOutlook.wixpdb
 C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.1\installer\obj\Release\NcConnectorOutlookInstaller.wixproj.BindTracking-neutral.txt
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2\installer\bin\Release\NCConnectorForOutlook.msi
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2\installer\bin\Release\NCConnectorForOutlook.wixpdb
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2\installer\obj\Release\NcConnectorOutlookInstaller.wixproj.CoreCompileInputs.cache
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2\installer\obj\Release\NCConnectorForOutlook.msi
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2\installer\obj\Release\NCConnectorForOutlook.wixpdb
+C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2\installer\obj\Release\NcConnectorOutlookInstaller.wixproj.BindTracking-neutral.txt

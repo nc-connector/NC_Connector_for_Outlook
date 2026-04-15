@@ -572,6 +572,27 @@
   "options_event_description_lang_hint": {
     "message": "Steuert die Sprache des Talk-Textblocks in Terminen."
   },
+  "options_tls_heading": {
+    "message": "Transportsicherheit (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "TLS-Richtlinie des Betriebssystems verwenden"
+  },
+  "options_tls_enable_12_label": {
+    "message": "TLS 1.2 aktivieren"
+  },
+  "options_tls_enable_13_label": {
+    "message": "TLS 1.3 aktivieren"
+  },
+  "options_tls_hint": {
+    "message": "Wenn deaktiviert, erzwingt NC Connector die ausgewählten TLS-Versionen zur Laufzeit im Add-in."
+  },
+  "options_tls_apply_failed": {
+    "message": "Die ausgewählten TLS-Einstellungen konnten nicht angewendet werden: {0}"
+  },
+  "options_tls_selection_required": {
+    "message": "Wenn die TLS-Richtlinie des Betriebssystems deaktiviert ist, muss mindestens eine TLS-Version (1.2 oder 1.3) aktiviert sein."
+  },
   "options_lang_default": {
     "message": "Standard (UI)"
   },
@@ -1032,7 +1053,7 @@
     "message": "TLS-Handshake fehlgeschlagen."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector verwendet fuer dieses Add-in die TLS-Standards des Betriebssystems. Pruefen Sie Zertifikatsvertrauen, Proxy/TLS-Inspection und die TLS-Richtlinien des Systems."
+    "message": "Pruefen Sie die in NC Connector ausgewaehlten TLS-Einstellungen, das Zertifikatsvertrauen, Proxy/TLS-Inspection und die TLS-Richtlinien des Systems."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "Das Serverzertifikat konnte nicht validiert werden."

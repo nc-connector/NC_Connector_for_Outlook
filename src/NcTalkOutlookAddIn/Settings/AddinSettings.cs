@@ -27,6 +27,9 @@ namespace NcTalkOutlookAddIn.Settings
             IfbCacheHours = 24;
             IfbPreviousFreeBusyPath = string.Empty;
             DebugLoggingEnabled = false;
+            TransportTlsUseSystemDefault = false;
+            TransportTlsEnable12 = true;
+            TransportTlsEnable13 = false;
             LastKnownServerVersion = string.Empty;
             FileLinkBasePath = "90 Freigaben - extern";
             SharingDefaultShareName = Strings.SharingDefaultShareNameLabel;
@@ -66,6 +69,12 @@ namespace NcTalkOutlookAddIn.Settings
         public string IfbPreviousFreeBusyPath { get; set; }
 
         public bool DebugLoggingEnabled { get; set; }
+
+        public bool TransportTlsUseSystemDefault { get; set; }
+
+        public bool TransportTlsEnable12 { get; set; }
+
+        public bool TransportTlsEnable13 { get; set; }
 
         public string LastKnownServerVersion { get; set; }
 

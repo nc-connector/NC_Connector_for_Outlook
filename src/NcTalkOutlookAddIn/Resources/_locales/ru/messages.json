@@ -1032,7 +1032,7 @@
     "message": "Сбой TLS-рукопожатия."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector использует для этого надстройки системный TLS по умолчанию. Проверьте доверие к сертификату, проверку прокси и TLS-инспекцию и системную политику TLS."
+    "message": "Проверьте выбранные настройки TLS в NC Connector, доверие к сертификату, proxy/TLS-инспекцию и системную TLS-политику."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "Не удалось проверить сертификат сервера."
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Ваш seat NC Connector сейчас приостановлен. Пожалуйста, обратитесь к администратору Nextcloud."
+  },
+  "options_tls_heading": {
+    "message": "Безопасность транспорта (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Использовать TLS-политику операционной системы по умолчанию"
+  },
+  "options_tls_enable_12_label": {
+    "message": "Включить TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "Включить TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "Если отключено, NC Connector принудительно использует выбранные версии TLS во время работы надстройки."
+  },
+  "options_tls_apply_failed": {
+    "message": "Не удалось применить выбранные параметры TLS: $1"
+  },
+  "options_tls_selection_required": {
+    "message": "Когда TLS-политика операционной системы по умолчанию отключена, включите как минимум одну версию TLS (1.2 или 1.3)."
   }
 }
-
-

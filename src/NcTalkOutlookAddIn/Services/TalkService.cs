@@ -213,7 +213,9 @@ namespace NcTalkOutlookAddIn.Services
 
             HttpStatusCode statusCode;
             IDictionary<string, object> data;
-            ExecuteJsonRequest("GET", url, (string)null, out statusCode, out data);
+            // Force a fresh connection for connectivity diagnostics so TLS mode changes
+            // are validated against a new handshake and not masked by pooled keep-alive sockets.
+            ExecuteJsonRequest("GET", url, (string)null, out statusCode, out data, true);
 
             if (!IsSuccessStatus(statusCode))
             {
@@ -784,22 +786,48 @@ namespace NcTalkOutlookAddIn.Services
                 payloadText = _serializer.Serialize(payload);
             }
 
-            return SendJsonRequest(method, url, payloadText, out statusCode, out parsedData);
+            return SendJsonRequest(method, url, payloadText, out statusCode, out parsedData, false);
         }
-        private string SendJsonRequest(string method, string url, string payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData)
+
+        private string ExecuteJsonRequest(string method, string url, object payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData, bool forceFreshConnection)
+        {
+            string payloadText = null;
+            if (payload is string)
+            {
+                payloadText = (string)payload;
+            }
+            else if (payload != null)
+            {
+                payloadText = _serializer.Serialize(payload);
+            }
+
+            return SendJsonRequest(method, url, payloadText, out statusCode, out parsedData, forceFreshConnection);
+        }
+
+        private string SendJsonRequest(string method, string url, string payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData, bool forceFreshConnection)
         {
             HttpWebResponse response = null;
             string responseText = null;
             parsedData = null;
+            HttpWebRequest request = null;
+            string connectionGroupName = null;
 
             try
             {
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = method;
                 request.Accept = "application/json";
                 request.Headers["OCS-APIRequest"] = "true";
                 request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
                 request.Timeout = 60000;
+
+                if (forceFreshConnection)
+                {
+                    connectionGroupName = "nc-verify-" + Guid.NewGuid().ToString("N");
+                    request.ConnectionGroupName = connectionGroupName;
+                    request.KeepAlive = false;
+                    request.Pipelined = false;
+                }
 
                 bool hasBody = !string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
                                && !string.Equals(method, "DELETE", StringComparison.OrdinalIgnoreCase);
@@ -865,6 +893,23 @@ namespace NcTalkOutlookAddIn.Services
                 if (response != null)
                 {
                     response.Close();
+                }
+
+                if (forceFreshConnection &&
+                    request != null &&
+                    !string.IsNullOrEmpty(connectionGroupName))
+                {
+                    try
+                    {
+                        request.ServicePoint.CloseConnectionGroup(connectionGroupName);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(
+                            LogCategories.Api,
+                            "Failed to close temporary verification connection group.",
+                            ex);
+                    }
                 }
             }
         }

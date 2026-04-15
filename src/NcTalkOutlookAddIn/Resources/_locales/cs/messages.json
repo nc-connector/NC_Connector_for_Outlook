@@ -1032,7 +1032,7 @@
     "message": "Navázání TLS spojení selhalo."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector pro tento doplněk používá výchozí TLS systému. Zkontrolujte důvěru v certifikát, proxy/TLS inspekci a zásady TLS v systému."
+    "message": "Zkontrolujte vybraná nastavení TLS v NC Connectoru, důvěru v certifikát, proxy/TLS inspekci a zásady TLS v systému."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "Certifikát serveru se nepodařilo ověřit."
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Váš seat NC Connector je momentálně pozastaven. Obraťte se prosím na správce Nextcloud."
+  },
+  "options_tls_heading": {
+    "message": "Zabezpečení přenosu (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Použít výchozí zásady TLS operačního systému"
+  },
+  "options_tls_enable_12_label": {
+    "message": "Povolit TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "Povolit TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "Je-li vypnuto, NC Connector vynutí vybrané verze TLS za běhu doplňku."
+  },
+  "options_tls_apply_failed": {
+    "message": "Vybraná nastavení TLS nebylo možné použít: $1"
+  },
+  "options_tls_selection_required": {
+    "message": "Když jsou výchozí zásady TLS operačního systému vypnuté, povolte alespoň jednu verzi TLS (1.2 nebo 1.3)."
   }
 }
-
-

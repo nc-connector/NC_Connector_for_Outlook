@@ -501,6 +501,13 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string AdvancedShareBlockLangLabel { get { return Get("options_share_block_lang_label", "Language for sharing HTML block"); } }
         internal static string AdvancedEventDescriptionLangLabel { get { return Get("options_event_description_lang_label", "Language for Talk description text"); } }
+        internal static string AdvancedTlsHeading { get { return Get("options_tls_heading", "Transport security (TLS)"); } }
+        internal static string AdvancedTlsUseSystemDefaultLabel { get { return Get("options_tls_use_system_default_label", "Use OS default TLS policy"); } }
+        internal static string AdvancedTlsEnable12Label { get { return Get("options_tls_enable_12_label", "Enable TLS 1.2"); } }
+        internal static string AdvancedTlsEnable13Label { get { return Get("options_tls_enable_13_label", "Enable TLS 1.3"); } }
+        internal static string AdvancedTlsHint { get { return Get("options_tls_hint", "If disabled, NC Connector enforces the selected TLS versions in add-in runtime."); } }
+        internal static string TransportTlsApplyFailed { get { return Get("options_tls_apply_failed", "Selected TLS settings could not be applied: {0}"); } }
+        internal static string TransportTlsSelectionRequired { get { return Get("options_tls_selection_required", "When OS default TLS policy is disabled, enable at least one TLS version (1.2 or 1.3)."); } }
         internal static string LanguageOverrideDefaultOption { get { return Get("options_lang_default", "Default (UI)"); } }
         internal static string LanguageOverrideCustomOption { get { return Get("options_lang_custom", "Custom (backend template)"); } }
 
@@ -692,7 +699,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string StatusTestFailure { get { return Get("outlook_test_failure_format", "Connection failed: {0}"); } }
         internal static string ConnectionDiagnosticsDialogTitle { get { return Get("outlook_connection_diagnostics_title", "Connection diagnostics"); } }
         internal static string ConnectionFailureTlsSummary { get { return Get("outlook_connection_failure_tls_summary", "TLS handshake failed."); } }
-        internal static string ConnectionFailureTlsGuidance { get { return Get("outlook_connection_failure_tls_guidance", "NC Connector uses OS-default TLS for this add-in. Check certificate trust, proxy/TLS inspection, and machine TLS policy."); } }
+        internal static string ConnectionFailureTlsGuidance { get { return Get("outlook_connection_failure_tls_guidance", "Check the selected TLS settings in NC Connector, certificate trust, proxy/TLS inspection, and machine TLS policy."); } }
         internal static string ConnectionFailureCertificateSummary { get { return Get("outlook_connection_failure_certificate_summary", "The server certificate could not be validated."); } }
         internal static string ConnectionFailureCertificateGuidance { get { return Get("outlook_connection_failure_certificate_guidance", "Check certificate trust, hostname matching, and whether a TLS-inspecting proxy is replacing the certificate."); } }
         internal static string ConnectionFailureDnsSummary { get { return Get("outlook_connection_failure_dns_summary", "The server name could not be resolved."); } }

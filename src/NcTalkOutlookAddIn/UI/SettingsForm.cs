@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -112,6 +113,11 @@ namespace NcTalkOutlookAddIn.UI
         private readonly ComboBox _shareBlockLangCombo = new ComboBox();
         private readonly Label _eventDescriptionLangLabel = new Label();
         private readonly ComboBox _eventDescriptionLangCombo = new ComboBox();
+        private readonly GroupBox _tlsSettingsGroup = new GroupBox();
+        private readonly CheckBox _tlsUseSystemDefaultCheckBox = new CheckBox();
+        private readonly CheckBox _tlsEnable12CheckBox = new CheckBox();
+        private readonly CheckBox _tlsEnable13CheckBox = new CheckBox();
+        private readonly Label _tlsHintLabel = new Label();
 
         private readonly Label _statusLabel = new Label();
         private readonly Button _saveButton = new Button();
@@ -127,6 +133,8 @@ namespace NcTalkOutlookAddIn.UI
         private bool _talkAddressbookLockActive;
         private string _talkAddressbookLockDetail = string.Empty;
         private bool _layoutApplying;
+        private bool _suppressImmediateTlsApply;
+        private readonly SecurityProtocolType _runtimeSecurityProtocolAtOpen;
         private BackendPolicyStatus _backendPolicyStatus;
 
         internal AddinSettings Result
@@ -139,6 +147,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             _outlookApplication = outlookApplication;
             _backendPolicyStatus = initialPolicyStatus;
+            _runtimeSecurityProtocolAtOpen = ServicePointManager.SecurityProtocol;
             _disabledTooltipHints = new DisabledControlTooltipHintHelper(_toolTip);
             AutoScaleMode = AutoScaleMode.Dpi;
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -159,6 +168,7 @@ namespace NcTalkOutlookAddIn.UI
             ApplyResponsiveLayout(true);
 
             UiThemeManager.ApplyToForm(this, _toolTip);
+            FormClosed += OnSettingsFormClosed;
         }
 
         private void InitializeComponents()
@@ -586,6 +596,12 @@ namespace NcTalkOutlookAddIn.UI
             int eventComboHeight = Math.Max(_eventDescriptionLangCombo.Height, _eventDescriptionLangCombo.PreferredHeight + ScaleLogical(2));
             _eventDescriptionLangLabel.Location = new Point(left, eventLabelTop);
             _eventDescriptionLangCombo.SetBounds(comboLeft, eventLabelTop - ScaleLogical(2), comboWidth, eventComboHeight);
+
+            int groupTop = _eventDescriptionLangCombo.Bottom + ScaleLogical(14);
+            int groupWidth = Math.Max(ScaleLogical(320), _advancedTab.ClientSize.Width - left - rightMargin);
+            _tlsSettingsGroup.SetBounds(left, groupTop, groupWidth, ScaleLogical(134));
+            _tlsHintLabel.MaximumSize = new Size(Math.Max(ScaleLogical(200), _tlsSettingsGroup.ClientSize.Width - ScaleLogical(20)), 0);
+            _tlsHintLabel.AutoSize = true;
         }
 
         private void ApplyDebugTabLayout()
@@ -753,6 +769,36 @@ namespace NcTalkOutlookAddIn.UI
             _eventDescriptionLangCombo.SelectionChangeCommitted += HandleLanguageComboSelectionCommitted;
             PopulateLanguageOverrideCombo(_eventDescriptionLangCombo, "talk");
             _advancedTab.Controls.Add(_eventDescriptionLangCombo);
+
+            _tlsSettingsGroup.Text = Strings.AdvancedTlsHeading;
+            _tlsSettingsGroup.Location = new Point(24, langTop + 72);
+            _tlsSettingsGroup.Size = new Size(520, 132);
+            _advancedTab.Controls.Add(_tlsSettingsGroup);
+
+            _tlsUseSystemDefaultCheckBox.Text = Strings.AdvancedTlsUseSystemDefaultLabel;
+            _tlsUseSystemDefaultCheckBox.AutoSize = true;
+            _tlsUseSystemDefaultCheckBox.Location = new Point(12, 24);
+            _tlsUseSystemDefaultCheckBox.CheckedChanged += OnTlsSelectionChanged;
+            _tlsSettingsGroup.Controls.Add(_tlsUseSystemDefaultCheckBox);
+
+            _tlsEnable12CheckBox.Text = Strings.AdvancedTlsEnable12Label;
+            _tlsEnable12CheckBox.AutoSize = true;
+            _tlsEnable12CheckBox.Location = new Point(12, 48);
+            _tlsEnable12CheckBox.CheckedChanged += OnTlsSelectionChanged;
+            _tlsSettingsGroup.Controls.Add(_tlsEnable12CheckBox);
+
+            _tlsEnable13CheckBox.Text = Strings.AdvancedTlsEnable13Label;
+            _tlsEnable13CheckBox.AutoSize = true;
+            _tlsEnable13CheckBox.Location = new Point(12, 72);
+            _tlsEnable13CheckBox.CheckedChanged += OnTlsSelectionChanged;
+            _tlsSettingsGroup.Controls.Add(_tlsEnable13CheckBox);
+
+            _tlsHintLabel.Text = Strings.AdvancedTlsHint;
+            _tlsHintLabel.AutoSize = true;
+            _tlsHintLabel.MaximumSize = new Size(492, 0);
+            _tlsHintLabel.Location = new Point(12, 94);
+            _tlsHintLabel.ForeColor = Color.DimGray;
+            _tlsSettingsGroup.Controls.Add(_tlsHintLabel);
         }
 
         private void InitializeTalkTab()
@@ -1044,62 +1090,86 @@ namespace NcTalkOutlookAddIn.UI
         private void ApplySettings(AddinSettings settings)
         {
             Result = settings.Clone();
-            _initialIfbEnabled = Result.IfbEnabled;
-            _ifbDefaultApplied = _initialIfbEnabled || !string.IsNullOrEmpty(Result.IfbPreviousFreeBusyPath);
-            _lastKnownServerVersion = Result.LastKnownServerVersion ?? string.Empty;
-            _serverUrlTextBox.Text = Result.ServerUrl;
-            _usernameTextBox.Text = Result.Username;
-            _appPasswordTextBox.Text = Result.AppPassword;
-            _manualRadio.Checked = Result.AuthMode == AuthenticationMode.Manual;
-            _loginFlowRadio.Checked = !_manualRadio.Checked;
-            _ifbEnabledCheckBox.Checked = Result.IfbEnabled;
-            SelectComboValue(_ifbDaysCombo, Result.IfbDays, 30);
-            SelectComboValue(_ifbCacheHoursCombo, Result.IfbCacheHours, 24);
-            _debugLogCheckBox.Checked = Result.DebugLoggingEnabled;
-            _fileLinkBaseTextBox.Text = Result.FileLinkBasePath ?? string.Empty;
-            _sharingDefaultShareNameTextBox.Text = Result.SharingDefaultShareName ?? string.Empty;
-            _sharingDefaultPermCreateCheckBox.Checked = Result.SharingDefaultPermCreate;
-            _sharingDefaultPermWriteCheckBox.Checked = Result.SharingDefaultPermWrite;
-            _sharingDefaultPermDeleteCheckBox.Checked = Result.SharingDefaultPermDelete;
-            _sharingDefaultPasswordCheckBox.Checked = Result.SharingDefaultPasswordEnabled;
-            _sharingDefaultPasswordSeparateCheckBox.Checked = HasBackendSeatEntitlement() && Result.SharingDefaultPasswordSeparateEnabled;
-            int expireDays = Result.SharingDefaultExpireDays;
-            if (expireDays <= 0)
+            _suppressImmediateTlsApply = true;
+            try
             {
-                expireDays = 7;
+                _initialIfbEnabled = Result.IfbEnabled;
+                _ifbDefaultApplied = _initialIfbEnabled || !string.IsNullOrEmpty(Result.IfbPreviousFreeBusyPath);
+                _lastKnownServerVersion = Result.LastKnownServerVersion ?? string.Empty;
+                _serverUrlTextBox.Text = Result.ServerUrl;
+                _usernameTextBox.Text = Result.Username;
+                _appPasswordTextBox.Text = Result.AppPassword;
+                _manualRadio.Checked = Result.AuthMode == AuthenticationMode.Manual;
+                _loginFlowRadio.Checked = !_manualRadio.Checked;
+                _ifbEnabledCheckBox.Checked = Result.IfbEnabled;
+                SelectComboValue(_ifbDaysCombo, Result.IfbDays, 30);
+                SelectComboValue(_ifbCacheHoursCombo, Result.IfbCacheHours, 24);
+                _debugLogCheckBox.Checked = Result.DebugLoggingEnabled;
+                _tlsUseSystemDefaultCheckBox.Checked = Result.TransportTlsUseSystemDefault;
+                _tlsEnable12CheckBox.Checked = Result.TransportTlsEnable12;
+                _tlsEnable13CheckBox.Checked = Result.TransportTlsEnable13;
+                _fileLinkBaseTextBox.Text = Result.FileLinkBasePath ?? string.Empty;
+                _sharingDefaultShareNameTextBox.Text = Result.SharingDefaultShareName ?? string.Empty;
+                _sharingDefaultPermCreateCheckBox.Checked = Result.SharingDefaultPermCreate;
+                _sharingDefaultPermWriteCheckBox.Checked = Result.SharingDefaultPermWrite;
+                _sharingDefaultPermDeleteCheckBox.Checked = Result.SharingDefaultPermDelete;
+                _sharingDefaultPasswordCheckBox.Checked = Result.SharingDefaultPasswordEnabled;
+                _sharingDefaultPasswordSeparateCheckBox.Checked = HasBackendSeatEntitlement() && Result.SharingDefaultPasswordSeparateEnabled;
+                int expireDays = Result.SharingDefaultExpireDays;
+                if (expireDays <= 0)
+                {
+                    expireDays = 7;
+                }
+                if (expireDays > 3650)
+                {
+                    expireDays = 3650;
+                }
+                _sharingDefaultExpireDaysUpDown.Value = expireDays;
+                _sharingAttachmentsAlwaysCheckBox.Checked = Result.SharingAttachmentsAlwaysConnector;
+                _sharingAttachmentsOfferAboveCheckBox.Checked = Result.SharingAttachmentsOfferAboveEnabled;
+                int offerAboveMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(Result.SharingAttachmentsOfferAboveMb);
+                decimal clampedOfferAbove = Math.Max(
+                    _sharingAttachmentsOfferAboveMbUpDown.Minimum,
+                    Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
+                _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
+                _talkDefaultPasswordCheckBox.Checked = Result.TalkDefaultPasswordEnabled;
+                _talkDefaultAddUsersCheckBox.Checked = Result.TalkDefaultAddUsers;
+                _talkDefaultAddGuestsCheckBox.Checked = Result.TalkDefaultAddGuests;
+                _talkDefaultLobbyCheckBox.Checked = Result.TalkDefaultLobbyEnabled;
+                _talkDefaultSearchCheckBox.Checked = Result.TalkDefaultSearchVisible;
+                SelectTalkRoomType(Result.TalkDefaultRoomType);
+                UpdateTalkRoomTypeTooltip();
+                RefreshLanguageOverrideCombos(Result.ShareBlockLang, Result.EventDescriptionLang);
+                UpdateDebugPathLabel();
+                UpdateAboutTab();
+                RefreshSharingAttachmentLockState();
+                UpdateSharingAttachmentOptionsState();
+                UpdateTlsOptionsState();
+                ApplyBackendPolicyStatus("settings_init");
+                RefreshTalkSystemAddressbookState(true, "settings_open");
             }
-            if (expireDays > 3650)
+            finally
             {
-                expireDays = 3650;
+                _suppressImmediateTlsApply = false;
             }
-            _sharingDefaultExpireDaysUpDown.Value = expireDays;
-            _sharingAttachmentsAlwaysCheckBox.Checked = Result.SharingAttachmentsAlwaysConnector;
-            _sharingAttachmentsOfferAboveCheckBox.Checked = Result.SharingAttachmentsOfferAboveEnabled;
-            int offerAboveMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(Result.SharingAttachmentsOfferAboveMb);
-            decimal clampedOfferAbove = Math.Max(
-                _sharingAttachmentsOfferAboveMbUpDown.Minimum,
-                Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
-            _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
-            _talkDefaultPasswordCheckBox.Checked = Result.TalkDefaultPasswordEnabled;
-            _talkDefaultAddUsersCheckBox.Checked = Result.TalkDefaultAddUsers;
-            _talkDefaultAddGuestsCheckBox.Checked = Result.TalkDefaultAddGuests;
-            _talkDefaultLobbyCheckBox.Checked = Result.TalkDefaultLobbyEnabled;
-            _talkDefaultSearchCheckBox.Checked = Result.TalkDefaultSearchVisible;
-            SelectTalkRoomType(Result.TalkDefaultRoomType);
-            UpdateTalkRoomTypeTooltip();
-            RefreshLanguageOverrideCombos(Result.ShareBlockLang, Result.EventDescriptionLang);
-            UpdateDebugPathLabel();
-            UpdateAboutTab();
-            RefreshSharingAttachmentLockState();
-            UpdateSharingAttachmentOptionsState();
-            ApplyBackendPolicyStatus("settings_init");
-            RefreshTalkSystemAddressbookState(true, "settings_open");
         }
 
         private void OnSaveButtonClick(object sender, EventArgs e)
         {
             RefreshBackendPolicyStatus("settings_save");
             RefreshTalkSystemAddressbookState(true, "settings_save");
+
+            if (!_tlsUseSystemDefaultCheckBox.Checked
+                && !_tlsEnable12CheckBox.Checked
+                && !_tlsEnable13CheckBox.Checked)
+            {
+                MessageBox.Show(
+                    Strings.TransportTlsSelectionRequired,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
 
             Result.ServerUrl = _serverUrlTextBox.Text.Trim();
             Result.Username = _usernameTextBox.Text.Trim();
@@ -1109,6 +1179,9 @@ namespace NcTalkOutlookAddIn.UI
             Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
             Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
             Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
+            Result.TransportTlsUseSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
+            Result.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
+            Result.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
             Result.LastKnownServerVersion = _lastKnownServerVersion ?? string.Empty;
             Result.FileLinkBasePath = _fileLinkBaseTextBox.Text.Trim();
             Result.SharingDefaultShareName = _sharingDefaultShareNameTextBox.Text.Trim();
@@ -1157,9 +1230,14 @@ namespace NcTalkOutlookAddIn.UI
 
             SetBusy(true);
             SetStatus(Strings.StatusLoginFlowStarting, false);
+            SecurityProtocolType previousSecurityProtocol = ServicePointManager.SecurityProtocol;
+            bool temporaryTlsApplied = false;
 
             try
             {
+                previousSecurityProtocol = ApplyTemporaryTlsForConnectivity("settings_login_flow");
+                temporaryTlsApplied = true;
+
                 var flowService = new TalkLoginFlowService(normalizedUrl);
                 var startInfo = flowService.StartLoginFlow();
 
@@ -1202,6 +1280,10 @@ namespace NcTalkOutlookAddIn.UI
             }
             finally
             {
+                if (temporaryTlsApplied)
+                {
+                    RestoreTemporaryTls(previousSecurityProtocol, "settings_login_flow");
+                }
                 SetBusy(false);
                 UpdateControlState();
             }
@@ -1229,9 +1311,14 @@ namespace NcTalkOutlookAddIn.UI
             SetBusy(true);
             SetStatus(Strings.StatusTestRunning, false);
             DiagnosticsLogger.Log(LogCategories.Core, "Connection test started (Server=" + baseUrl + ", User=" + user + ").");
+            SecurityProtocolType previousSecurityProtocol = ServicePointManager.SecurityProtocol;
+            bool temporaryTlsApplied = false;
 
             try
             {
+                previousSecurityProtocol = ApplyTemporaryTlsForConnectivity("settings_connection_test");
+                temporaryTlsApplied = true;
+
                 var service = new TalkService(new TalkServiceConfiguration(baseUrl, user, appPassword));
                 string responseMessage = string.Empty;
                 bool success = await Task.Run(() => service.VerifyConnection(out responseMessage));
@@ -1265,9 +1352,47 @@ namespace NcTalkOutlookAddIn.UI
             }
             finally
             {
+                if (temporaryTlsApplied)
+                {
+                    RestoreTemporaryTls(previousSecurityProtocol, "settings_connection_test");
+                }
                 SetBusy(false);
                 UpdateControlState();
             }
+        }
+
+        private SecurityProtocolType ApplyTemporaryTlsForConnectivity(string source)
+        {
+            SecurityProtocolType previous = ServicePointManager.SecurityProtocol;
+            try
+            {
+                TransportSecurityConfigurator.Apply(
+                    _tlsUseSystemDefaultCheckBox.Checked,
+                    _tlsEnable12CheckBox.Checked,
+                    _tlsEnable13CheckBox.Checked,
+                    source);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to apply temporary TLS settings (source=" + (source ?? string.Empty) + ").",
+                    ex);
+                throw;
+            }
+            return previous;
+        }
+
+        private static void RestoreTemporaryTls(SecurityProtocolType previous, string source)
+        {
+            ServicePointManager.SecurityProtocol = previous;
+            DiagnosticsLogger.Log(
+                LogCategories.Core,
+                "Transport security restored after temporary settings operation (source="
+                + (source ?? string.Empty)
+                + ", securityProtocol="
+                + previous
+                + ").");
         }
 
         private void HandleServiceFailure(string statusFormat, TalkServiceException ex)
@@ -1853,6 +1978,80 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
+        private void UpdateTlsOptionsState()
+        {
+            bool useSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
+            bool allowCustom = !useSystemDefault && !_isBusy;
+
+            _tlsEnable12CheckBox.Enabled = allowCustom;
+            _tlsEnable13CheckBox.Enabled = allowCustom;
+        }
+
+        private void OnTlsSelectionChanged(object sender, EventArgs e)
+        {
+            UpdateTlsOptionsState();
+            ApplyTlsRuntimePreview("settings_tls_changed");
+        }
+
+        private void ApplyTlsRuntimePreview(string source)
+        {
+            if (_suppressImmediateTlsApply)
+            {
+                return;
+            }
+
+            if (!_tlsUseSystemDefaultCheckBox.Checked
+                && !_tlsEnable12CheckBox.Checked
+                && !_tlsEnable13CheckBox.Checked)
+            {
+                SetStatus(Strings.TransportTlsSelectionRequired, true);
+                return;
+            }
+
+            try
+            {
+                TransportSecurityConfigurator.Apply(
+                    _tlsUseSystemDefaultCheckBox.Checked,
+                    _tlsEnable12CheckBox.Checked,
+                    _tlsEnable13CheckBox.Checked,
+                    source);
+                SetStatus(string.Empty, false);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to apply live TLS runtime preview from settings UI.",
+                    ex);
+                SetStatus(string.Format(Strings.TransportTlsApplyFailed, ex.Message), true);
+            }
+        }
+
+        private void OnSettingsFormClosed(object sender, FormClosedEventArgs e)
+        {
+            if (DialogResult == DialogResult.OK)
+            {
+                return;
+            }
+
+            try
+            {
+                ServicePointManager.SecurityProtocol = _runtimeSecurityProtocolAtOpen;
+                DiagnosticsLogger.Log(
+                    LogCategories.Core,
+                    "Transport security restored after settings dialog cancel/close (securityProtocol="
+                    + _runtimeSecurityProtocolAtOpen
+                    + ").");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to restore transport security after settings dialog cancel/close.",
+                    ex);
+            }
+        }
+
         private void UpdateControlState()
         {
             bool manual = _manualRadio.Checked;
@@ -1890,6 +2089,7 @@ namespace NcTalkOutlookAddIn.UI
             _ifbCacheHoursLabel.Enabled = !_isBusy;
             _debugLogCheckBox.Enabled = !_isBusy;
             _debugOpenLink.Enabled = !_isBusy;
+            _tlsUseSystemDefaultCheckBox.Enabled = !_isBusy;
 
             bool lockShareBase = IsPolicyLocked("share", "share_base_directory");
             bool lockShareName = IsPolicyLocked("share", "share_name_template");
@@ -1969,6 +2169,7 @@ namespace NcTalkOutlookAddIn.UI
                 _talkDefaultRoomTypeLabel);
             SetTooltipWithFallback(_eventDescriptionLangCombo, lockTalkLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkLang, _eventDescriptionLangLabel);
             UpdateSharingAttachmentOptionsState();
+            UpdateTlsOptionsState();
         }
 
         private void SetTooltipWithFallback(Control primary, string text, params Control[] fallbackTargets)

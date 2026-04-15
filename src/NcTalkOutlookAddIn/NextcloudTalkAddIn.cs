@@ -122,6 +122,7 @@ namespace NcTalkOutlookAddIn
             _settingsStorage = new SettingsStorage(outlookProfileName);
             _currentSettings = _settingsStorage.Load();
             DiagnosticsLogger.SetEnabled(_currentSettings != null && _currentSettings.DebugLoggingEnabled);
+            TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();
             LogCore("Add-in connected (Outlook version=" + (_outlookApplication != null ? _outlookApplication.Version : "unknown") + ").");
             if (!string.IsNullOrWhiteSpace(outlookProfileName))
@@ -600,7 +601,15 @@ namespace NcTalkOutlookAddIn
             {
                 if (form.ShowDialog() == DialogResult.OK)
                 {
+                    AddinSettings previousSettings = (_currentSettings ?? new AddinSettings()).Clone();
                     _currentSettings = form.Result ?? new AddinSettings();
+                    if (!TryApplyTransportSecurityFromSettings("settings_save", true))
+                    {
+                        _currentSettings = previousSettings;
+                        TryApplyTransportSecurityFromSettings("settings_save_revert", false);
+                        LogSettings("Settings save aborted because transport security settings could not be applied.");
+                        return;
+                    }
                     LogSettings("Settings applied (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ").");
                     ApplyIfbSettings();
                     if (_settingsStorage != null)
@@ -2421,7 +2430,34 @@ namespace NcTalkOutlookAddIn
                 {
                     _currentSettings = new AddinSettings();
                 }
+                TryApplyTransportSecurityFromSettings("lazy_load", false);
                 EnsureInspectorHook();
+            }
+        }
+
+        private bool TryApplyTransportSecurityFromSettings(string source, bool showWarning)
+        {
+            try
+            {
+                TransportSecurityConfigurator.ApplyFromSettings(_currentSettings, source);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to apply transport security settings (source=" + (source ?? string.Empty) + ").",
+                    ex);
+
+                if (showWarning)
+                {
+                    ShowWarning(string.Format(
+                        CultureInfo.CurrentCulture,
+                        Strings.TransportTlsApplyFailed,
+                        ex.Message));
+                }
+
+                return false;
             }
         }
 

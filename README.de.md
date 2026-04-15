@@ -104,29 +104,31 @@ Option `Benutzerdefiniert` wird nur angezeigt, wenn der NC-Connector-Backend-End
 ## Installation und Updates
 
 1. Outlook schliessen.  
-2. Aktuelle MSI (z.B. `NCConnectorForOutlook-3.0.1.msi`) ausfuehren und den UAC-Prompt bestaetigen (Administratorrechte sind erforderlich). Das Setup richtet URLACL sowie alle benoetigten Registry-Schluessel fuer IFB ein.  
+2. Aktuelle MSI (z.B. `NCConnectorForOutlook-3.0.2.msi`) ausfuehren und den UAC-Prompt bestaetigen (Administratorrechte sind erforderlich). Das Setup richtet URLACL sowie alle benoetigten Registry-Schluessel fuer IFB ein.  
 3. Outlook starten und im Ribbon **NC Connector** auf **Einstellungen** klicken.  
 4. Login-Modus waehlen, Verbindungstest ausfuehren, Einstellungen speichern. Bei erfolgreichem Test bleibt IFB automatisch aktiv.  
 5. Filelink-Basisverzeichnis pruefen und Debug-Logging bei Bedarf aktivieren.
 
 Updates erfolgen durch Installation eines MSI-Pakets ueber die bestehende Installation (gleiche, aeltere oder neuere Version). Persoenliche Einstellungen bleiben erhalten und werden in profilbasierte XML-Dateien (`settings_<OutlookProfile>.xml`) unter `%LOCALAPPDATA%\NC4OL` migriert. Die Deinstallation entfernt das Add-in, stoppt den IFB-Listener und setzt die Registry-Werte zurueck.
 
-### Release-Notizen 3.0.1 (Betrieb)
+### Release-Notizen 3.0.2 (Betrieb)
 
 - Runtime-Artefakte sind unter `%LOCALAPPDATA%\NC4OL` gebuendelt:
   - Settings-Dateien (`settings_<OutlookProfile>.xml`)
   - IFB-/Systemadressbuch-Cache
   - Debug-Log (`addin-runtime.log`)
 - Legacy-INI-Settings aus aelteren Builds werden beim ersten Start migriert und nach erfolgreicher Migration entfernt.
+- Der TLS-Modus kann live in den Einstellungen umgeschaltet werden (`OS-Default`, `TLS 1.2`, `TLS 1.3` oder `TLS 1.2 + 1.3`) und wird sofort auf Runtime-Netzwerkaufrufe angewendet.
+- Verbindungspruefung und Login-Flow erzwingen in 3.0.2 jeweils einen frischen HTTP/TLS-Handshake, damit TLS-Tests nicht durch Keep-Alive-Verbindungs-Reuse verfälscht werden.
 - Im Compose-Attachment-Modus wird das serverseitige Cleanup direkt nach Share-Erstellung armed und nur nach bestaetigtem erfolgreichem Mailversand wieder cleared.
 - Wenn separates Passwort-Senden aktiv ist, blendet die Hauptmail das Inline-Passwort aus und der Passwort-Follow-up-Versand wird erst nach bestaetigtem erfolgreichem Hauptversand gestartet. Dieses Feature ist nur mit Backend-Endpunkt + aktiv zugewiesenem Seat verfuegbar.
 
 ## Troubleshooting
 
 - **Debug-Log**: Tab *Debug* für ausführliche Traces aktivieren. Log-Datei: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. Bei aktiviertem Debug-Logging sind auch Attachment-Pre-Add-Entscheidungen/Fallback-Gruende enthalten. Laufzeit-Exceptions werden dort auch bei deaktiviertem Debug-Logging geschrieben.  
-- **Add-in nicht sichtbar**: Installation muss mit Adminrechten erfolgen. Pruefe `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` und ggf. Repair in einer Admin-Konsole: `msiexec /i "NCConnectorForOutlook-3.0.1.msi" ADDLOCAL=ALL`.  
+- **Add-in nicht sichtbar**: Installation muss mit Adminrechten erfolgen. Pruefe `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` und ggf. Repair in einer Admin-Konsole: `msiexec /i "NCConnectorForOutlook-3.0.2.msi" ADDLOCAL=ALL`.  
 - **IFB testen**: `powershell -Command "Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. Bei Abweichungen Registry unter `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar` pruefen.  
-- **TLS/Proxy pruefen**: `powershell -Command "Test-NetConnection <Ihre-Domain> -Port 443"`. Bei SSL-Warnungen Zertifikate/Proxy kontrollieren. NC Connector aktiviert starke Kryptografie und die TLS-Standards des Betriebssystems add-in-lokal ueber `NcTalkOutlookAddIn.dll.config`; wenn Secure-Channel-Fehler trotzdem auftreten, pruefen Sie Zertifikatsvertrauen, TLS-pruefende Proxys, DNS und die TLS-/Schannel-Richtlinien des Systems. Maschinenweite Registry-/GPO-Overrides bleiben eine optionale Admin-Massnahme, sind aber kein Installer-Eingriff.  
+- **TLS/Proxy pruefen**: `powershell -Command "Test-NetConnection <Ihre-Domain> -Port 443"`. Bei SSL-Warnungen Zertifikate/Proxy kontrollieren. Der TLS-Modus kann zur Laufzeit unter `Einstellungen -> Erweitert -> Transportsicherheit (TLS)` umgeschaltet werden (`OS-Default` oder erzwungene TLS-Versionen wie 1.2/1.3). Verbindungspruefung und Login-Flow verwenden in 3.0.2 frische Handshakes, damit Moduswechsel direkt wirksam getestet werden. Wenn Secure-Channel-Fehler trotzdem auftreten, pruefen Sie Zertifikatsvertrauen, TLS-pruefende Proxys, DNS und die TLS-/Schannel-Richtlinien des Systems, bevor maschinenweite Registry-/GPO-Overrides erwogen werden.  
 - **Anhangsautomatisierung greift nicht bei grossen Dateien**: In Microsoft-365-/Exchange-Umgebungen kann Outlook Anhaenge vor den Add-in-Events blockieren (z. B. bei serverseitigen Groessenlimits). In diesen Faellen den Button **`Nextcloud Freigabe hinzufuegen`** verwenden.  
 - **Filelink-Fehler**: Debug-Log liefert HTTP-Statuscodes und Exception-Meldungen. Pflichtfelder im Wizard sind validiert.
 

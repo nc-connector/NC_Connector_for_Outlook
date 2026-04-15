@@ -7,7 +7,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 - [Updates / upgrade behavior](#updates--upgrade-behavior)
 - [Files & registry](#files--registry)
 - [Settings (profile XML)](#settings-profile-xml)
-- [Compose sharing lifecycle (3.0.1)](#compose-sharing-lifecycle-301)
+- [Compose sharing lifecycle (3.0.2)](#compose-sharing-lifecycle-302)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
 - [Logging / support](#logging--support)
@@ -20,7 +20,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 Silent install example:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.1.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.0.2.msi" /qn /norestart
 ```
 
 Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).
@@ -122,7 +122,7 @@ Central policy can currently control:
 - share HTML/password templates
 - Talk description language / custom invitation template
 
-## Compose sharing lifecycle (3.0.1)
+## Compose sharing lifecycle (3.0.2)
 
 ### Attachment automation and cleanup contract
 - In compose attachment mode, created server artifacts are tracked immediately after share creation.
@@ -225,7 +225,10 @@ netstat -ano | Select-String ":7777"
 
 ### Network / Nextcloud
 - Server reachable, TLS ok?
-- NC Connector now enables strong crypto and OS-default TLS locally via `NcTalkOutlookAddIn.dll.config`. If secure-channel errors still occur, check certificate trust, DNS, proxy/TLS inspection, and machine TLS/Schannel policy before considering machine-wide registry/GPO overrides.
+- TLS behavior can now be switched in `Settings -> Advanced -> Transport security (TLS)` (`OS default` or forced TLS versions such as 1.2/1.3).
+- NC Connector applies the selected policy at runtime via `ServicePointManager.SecurityProtocol`.
+- Connection diagnostics operations (settings connection test and login flow) now enforce fresh HTTP/TLS handshakes, so TLS-mode switching is validated deterministically instead of reusing pooled keep-alive sockets.
+- If secure-channel errors still occur, check certificate trust, DNS, proxy/TLS inspection, and machine TLS/Schannel policy before considering machine-wide registry/GPO overrides.
 - App password valid?
 - Talk installed/enabled?
 - Password Policy app optional: if missing, passwords are generated locally (fallback)

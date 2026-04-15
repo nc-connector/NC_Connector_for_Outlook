@@ -1032,7 +1032,7 @@
     "message": "TLS-handshake mislukt."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector gebruikt voor deze invoegtoepassing de standaard-TLS van het besturingssysteem. Controleer certificaatvertrouwen, proxy/TLS-inspectie en het TLS-beleid van het systeem."
+    "message": "Controleer de geselecteerde TLS-instellingen in NC Connector, certificaatvertrouwen, proxy/TLS-inspectie en het TLS-beleid van het systeem."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "Het servercertificaat kon niet worden gevalideerd."
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Uw NC Connector-seat is momenteel gepauzeerd. Neem contact op met uw Nextcloud-beheerder."
+  },
+  "options_tls_heading": {
+    "message": "Transportbeveiliging (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Standaard TLS-beleid van het besturingssysteem gebruiken"
+  },
+  "options_tls_enable_12_label": {
+    "message": "TLS 1.2 inschakelen"
+  },
+  "options_tls_enable_13_label": {
+    "message": "TLS 1.3 inschakelen"
+  },
+  "options_tls_hint": {
+    "message": "Als dit is uitgeschakeld, dwingt NC Connector de geselecteerde TLS-versies af tijdens de runtime van de invoegtoepassing."
+  },
+  "options_tls_apply_failed": {
+    "message": "De geselecteerde TLS-instellingen konden niet worden toegepast: $1"
+  },
+  "options_tls_selection_required": {
+    "message": "Wanneer het standaard TLS-beleid van het besturingssysteem is uitgeschakeld, schakel dan minimaal een TLS-versie in (1.2 of 1.3)."
   }
 }
-
-

@@ -1032,7 +1032,7 @@
     "message": "Uzgadnianie TLS nie powiodło się."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector używa dla tego dodatku domyślnego TLS systemu. Sprawdź zaufanie do certyfikatu, inspekcję proxy/TLS oraz politykę TLS systemu."
+    "message": "Sprawdź wybrane ustawienia TLS w NC Connectorze, zaufanie do certyfikatu, inspekcję proxy/TLS i politykę TLS systemu."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "Nie udało się zweryfikować certyfikatu serwera."
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Twój seat NC Connector jest obecnie wstrzymany. Skontaktuj się z administratorem Nextcloud."
+  },
+  "options_tls_heading": {
+    "message": "Bezpieczeństwo transportu (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Użyj domyślnej polityki TLS systemu operacyjnego"
+  },
+  "options_tls_enable_12_label": {
+    "message": "Włącz TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "Włącz TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "Jeśli wyłączone, NC Connector wymusza wybrane wersje TLS w czasie działania dodatku."
+  },
+  "options_tls_apply_failed": {
+    "message": "Nie udało się zastosować wybranych ustawień TLS: $1"
+  },
+  "options_tls_selection_required": {
+    "message": "Gdy domyślna polityka TLS systemu operacyjnego jest wyłączona, włącz co najmniej jedną wersję TLS (1.2 lub 1.3)."
   }
 }
-
-

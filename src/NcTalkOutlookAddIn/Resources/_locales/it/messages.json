@@ -1032,7 +1032,7 @@
     "message": "Handshake TLS non riuscito."
   },
   "outlook_connection_failure_tls_guidance": {
-    "message": "NC Connector usa il TLS predefinito del sistema per questo componente aggiuntivo. Verifica l'attendibilità del certificato, l'ispezione proxy/TLS e la policy TLS del sistema."
+    "message": "Verifica le impostazioni TLS selezionate in NC Connector, l'attendibilità del certificato, l'ispezione proxy/TLS e i criteri TLS del sistema."
   },
   "outlook_connection_failure_certificate_summary": {
     "message": "Non è stato possibile convalidare il certificato del server."
@@ -1366,7 +1366,26 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Il tuo seat NC Connector è attualmente in pausa. Contatta il tuo amministratore Nextcloud."
+  },
+  "options_tls_heading": {
+    "message": "Sicurezza del trasporto (TLS)"
+  },
+  "options_tls_use_system_default_label": {
+    "message": "Usa il criterio TLS predefinito del sistema operativo"
+  },
+  "options_tls_enable_12_label": {
+    "message": "Abilita TLS 1.2"
+  },
+  "options_tls_enable_13_label": {
+    "message": "Abilita TLS 1.3"
+  },
+  "options_tls_hint": {
+    "message": "Se disattivato, NC Connector applica in runtime del componente aggiuntivo le versioni TLS selezionate."
+  },
+  "options_tls_apply_failed": {
+    "message": "Impossibile applicare le impostazioni TLS selezionate: $1"
+  },
+  "options_tls_selection_required": {
+    "message": "Quando il criterio TLS predefinito del sistema operativo è disattivato, abilita almeno una versione TLS (1.2 o 1.3)."
   }
 }
-
-

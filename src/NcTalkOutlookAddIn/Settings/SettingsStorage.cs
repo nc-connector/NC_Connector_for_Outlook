@@ -488,6 +488,9 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "IfbCacheHours", settings.IfbCacheHours.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbPreviousFreeBusyPath", Safe(settings.IfbPreviousFreeBusyPath));
             AppendElement(document, root, "DebugLoggingEnabled", settings.DebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "TransportTlsUseSystemDefault", settings.TransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "TransportTlsEnable12", settings.TransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "TransportTlsEnable13", settings.TransportTlsEnable13.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "LastKnownServerVersion", Safe(settings.LastKnownServerVersion));
             AppendElement(document, root, "FileLinkBasePath", Safe(settings.FileLinkBasePath));
             AppendElement(document, root, "SharingDefaultShareName", Safe(settings.SharingDefaultShareName));
@@ -575,6 +578,27 @@ namespace NcTalkOutlookAddIn.Settings
                     if (bool.TryParse(value, out debug))
                     {
                         settings.DebugLoggingEnabled = debug;
+                    }
+                    break;
+                case "TransportTlsUseSystemDefault":
+                    bool transportTlsUseSystemDefault;
+                    if (bool.TryParse(value, out transportTlsUseSystemDefault))
+                    {
+                        settings.TransportTlsUseSystemDefault = transportTlsUseSystemDefault;
+                    }
+                    break;
+                case "TransportTlsEnable12":
+                    bool transportTlsEnable12;
+                    if (bool.TryParse(value, out transportTlsEnable12))
+                    {
+                        settings.TransportTlsEnable12 = transportTlsEnable12;
+                    }
+                    break;
+                case "TransportTlsEnable13":
+                    bool transportTlsEnable13;
+                    if (bool.TryParse(value, out transportTlsEnable13))
+                    {
+                        settings.TransportTlsEnable13 = transportTlsEnable13;
                     }
                     break;
                 case "LastKnownServerVersion":
