@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "写入调试日志文件"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "日志匿名化"
+  },
   "outlook_debug_location_prefix": {
     "message": "位置： "
   },
@@ -1389,3 +1392,4 @@
     "message": "当禁用操作系统默认 TLS 策略时，请至少启用一个 TLS 版本（1.2 或 1.3）。"
   }
 }
+

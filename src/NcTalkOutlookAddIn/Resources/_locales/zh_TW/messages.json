@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "寫入偵錯記錄檔"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "記錄匿名化"
+  },
   "outlook_debug_location_prefix": {
     "message": "位置： "
   },
@@ -1389,3 +1392,4 @@
     "message": "當作業系統預設 TLS 原則停用時，請至少啟用一個 TLS 版本（1.2 或 1.3）。"
   }
 }
+

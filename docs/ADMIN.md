@@ -83,6 +83,7 @@ Legacy migration on first start:
   <IfbDays>30</IfbDays>
   <IfbCacheHours>24</IfbCacheHours>
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
+  <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>90 Freigaben - extern</FileLinkBasePath>
 </Settings>
 ```
@@ -193,12 +194,19 @@ Repair hint (if Admin UI shows enabled but the system address book is still unav
 
 ## Logging / support
 Enable debug logging in Settings → **Debug**.
+The debug tab also provides **Anonymize logs** (enabled by default).
 
 Log files (daily rotation):
 - `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
 
 Logs are categorized (e.g. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) and help with support cases.
 When debug logging is enabled, runtime decision paths (including attachment pre-add gating and fallback reasons) are written to the same file; runtime exceptions are always written regardless of debug toggle state.
+When anonymization is enabled, sensitive values are redacted before writing:
+- configured Nextcloud URL/base host
+- tokens and secrets in URLs/query strings/JSON payload fragments
+- `Authorization` header credentials
+- email addresses and user identifiers in common log field formats
+- local user path segments (for example `C:\\Users\\<USER>\\...`)
 Retention behavior:
 - keep the latest 7 daily log files
 - additionally remove log files older than 30 days (best effort cleanup)

@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Zapisuj plik dziennika debugowania"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Anonimizuj logi"
+  },
   "outlook_debug_location_prefix": {
     "message": "Lokalizacja: "
   },
@@ -1389,3 +1392,4 @@
     "message": "Gdy domyślna polityka TLS systemu operacyjnego jest wyłączona, włącz co najmniej jedną wersję TLS (1.2 lub 1.3)."
   }
 }
+

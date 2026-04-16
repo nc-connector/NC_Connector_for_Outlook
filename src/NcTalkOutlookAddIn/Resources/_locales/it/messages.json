@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Scrivi file di log di debug"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Anonimizza i log"
+  },
   "outlook_debug_location_prefix": {
     "message": "Posizione: "
   },
@@ -1389,3 +1392,4 @@
     "message": "Quando il criterio TLS predefinito del sistema operativo è disattivato, abilita almeno una versione TLS (1.2 o 1.3)."
   }
 }
+

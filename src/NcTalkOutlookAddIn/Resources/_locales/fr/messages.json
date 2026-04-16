@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Écrire un fichier journal de débogage"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Anonymiser les journaux"
+  },
   "outlook_debug_location_prefix": {
     "message": "Emplacement : "
   },
@@ -1389,3 +1392,4 @@
     "message": "Lorsque la stratégie TLS par défaut du système d'exploitation est désactivée, activez au moins une version TLS (1.2 ou 1.3)."
   }
 }
+

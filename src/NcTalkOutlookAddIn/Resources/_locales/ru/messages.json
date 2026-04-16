@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Записывать файл журнала отладки"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Анонимизировать журналы"
+  },
   "outlook_debug_location_prefix": {
     "message": "Расположение: "
   },
@@ -1389,3 +1392,4 @@
     "message": "Когда TLS-политика операционной системы по умолчанию отключена, включите как минимум одну версию TLS (1.2 или 1.3)."
   }
 }
+

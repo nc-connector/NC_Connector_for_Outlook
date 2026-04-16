@@ -9,7 +9,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
@@ -26,8 +28,43 @@ namespace NcTalkOutlookAddIn.Utilities
         private const int KeepDailyLogCount = 7;
         private const int CleanupOlderThanDays = 30;
         private static readonly string LegacyLogFilePath = Path.Combine(LogDirectory, LegacyLogFileName);
+        private static readonly Regex AuthorizationHeaderRegex = new Regex(
+            "(Authorization\\s*:\\s*(?:Bearer|Basic)\\s+)[^\\s,;]+",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex UrlCredentialRegex = new Regex(
+            "(https?://)[^\\s/@]+:[^\\s/@]+@",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex SecretQueryRegex = new Regex(
+            "([?&](?:access_token|refresh_token|token|password|pass|secret|code|auth|apikey|app_password)=)[^&\\s]+",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex SecretJsonRegex = new Regex(
+            "(\"(?:access_token|refresh_token|token|password|pass|secret|code|auth|apikey|app_password)\"\\s*:\\s*)\"(?:[^\"\\\\]|\\\\.)*\"",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex ShareCallTokenRegex = new Regex(
+            "(\\/(?:s|call)\\/)([A-Za-z0-9_-]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DavUserPathRegex = new Regex(
+            "(\\/dav\\/files\\/)([^\\/\\s]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex UserFieldRegex = new Regex(
+            "(\\bUser(?:name)?\\s*=\\s*)([^,\\)\\s]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex JsonUserFieldRegex = new Regex(
+            "(\"(?:user|username)\"\\s*:\\s*\")([^\"]*)(\")",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex EmailRegex = new Regex(
+            "\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex WindowsUserPathRegex = new Regex(
+            "([A-Za-z]:\\\\Users\\\\)([^\\\\]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex ProviderUserPathRegex = new Regex(
+            "(\\\\\\\\[^\\\\\\s]+\\\\[^\\\\\\s]+\\\\Users\\\\)([^\\\\]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static DateTime _lastCleanupDateLocal = DateTime.MinValue.Date;
         private static bool _enabled;
+        private static bool _anonymizationEnabled = true;
+        private static string[] _serverUrlTokens = new string[0];
 
         private struct DatedLogFile
         {
@@ -78,6 +115,15 @@ namespace NcTalkOutlookAddIn.Utilities
             }
         }
 
+        internal static void SetAnonymization(bool enabled, string serverUrl)
+        {
+            lock (SyncRoot)
+            {
+                _anonymizationEnabled = enabled;
+                _serverUrlTokens = BuildServerUrlTokens(serverUrl);
+            }
+        }
+
         internal static bool IsEnabled
         {
             get
@@ -110,12 +156,13 @@ namespace NcTalkOutlookAddIn.Utilities
                     CleanupLogsIfNeeded(nowLocal);
 
                     string logFilePath = GetDailyLogFilePath(nowLocal);
+                    string sanitizedMessage = SanitizeMessage(message ?? string.Empty);
                     string line = string.Format(
                         CultureInfo.InvariantCulture,
                         "[{0:yyyy-MM-dd HH:mm:ss.fff}] [{1}] {2}",
                         DateTime.UtcNow,
                         string.IsNullOrWhiteSpace(category) ? "GENERAL" : category.Trim().ToUpperInvariant(),
-                        message ?? string.Empty);
+                        sanitizedMessage);
                     File.AppendAllText(logFilePath, line + Environment.NewLine, Encoding.UTF8);
                 }
             }
@@ -160,6 +207,145 @@ namespace NcTalkOutlookAddIn.Utilities
             return Path.Combine(
                 LogDirectory,
                 DailyLogFilePrefix + nowLocal.ToString(DailyLogDateFormat, CultureInfo.InvariantCulture));
+        }
+
+        private static string SanitizeMessage(string message)
+        {
+            if (string.IsNullOrEmpty(message) || !_anonymizationEnabled)
+            {
+                return message ?? string.Empty;
+            }
+
+            try
+            {
+                string value = message;
+                value = AuthorizationHeaderRegex.Replace(value, "$1<REDACTED>");
+                value = UrlCredentialRegex.Replace(value, "$1<CRED>@");
+                value = SecretQueryRegex.Replace(value, "$1<REDACTED>");
+                value = SecretJsonRegex.Replace(value, "$1\"<REDACTED>\"");
+                value = ShareCallTokenRegex.Replace(value, "$1<TOKEN>");
+                value = DavUserPathRegex.Replace(value, "$1<USER>");
+                value = UserFieldRegex.Replace(value, "$1<REDACTED_USER>");
+                value = JsonUserFieldRegex.Replace(value, "$1<REDACTED_USER>$3");
+                value = WindowsUserPathRegex.Replace(value, "$1<USER>");
+                value = ProviderUserPathRegex.Replace(value, "$1<USER>");
+                value = ReplaceEmails(value);
+                value = ReplaceServerUrls(value);
+                return value;
+            }
+            catch
+            {
+                return "<LOG_REDACTION_FAILED>";
+            }
+        }
+
+        private static string ReplaceServerUrls(string value)
+        {
+            if (string.IsNullOrEmpty(value) || _serverUrlTokens == null || _serverUrlTokens.Length == 0)
+            {
+                return value;
+            }
+
+            string redacted = value;
+            for (int i = 0; i < _serverUrlTokens.Length; i++)
+            {
+                string token = _serverUrlTokens[i];
+                if (string.IsNullOrEmpty(token))
+                {
+                    continue;
+                }
+
+                redacted = Regex.Replace(redacted, Regex.Escape(token), "<NC_URL>", RegexOptions.IgnoreCase);
+            }
+
+            return redacted;
+        }
+
+        private static string ReplaceEmails(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return value;
+            }
+
+            return EmailRegex.Replace(value, match =>
+            {
+                if (match == null || string.IsNullOrEmpty(match.Value))
+                {
+                    return "<EMAIL>";
+                }
+
+                string hash = ComputeShortHash(match.Value);
+                return "<EMAIL#" + hash + ">";
+            });
+        }
+
+        private static string ComputeShortHash(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return "00000000";
+            }
+
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(value.ToLowerInvariant());
+                byte[] hash = sha.ComputeHash(bytes);
+                return BitConverter.ToString(hash, 0, 4).Replace("-", string.Empty);
+            }
+        }
+
+        private static string[] BuildServerUrlTokens(string serverUrl)
+        {
+            if (string.IsNullOrWhiteSpace(serverUrl))
+            {
+                return new string[0];
+            }
+
+            var tokens = new List<string>();
+            string trimmed = serverUrl.Trim();
+            if (trimmed.Length == 0)
+            {
+                return new string[0];
+            }
+
+            string raw = trimmed.TrimEnd('/');
+            if (!string.IsNullOrEmpty(raw))
+            {
+                tokens.Add(raw);
+            }
+
+            Uri uri;
+            if (Uri.TryCreate(trimmed, UriKind.Absolute, out uri))
+            {
+                string authority = uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+                if (!string.IsNullOrEmpty(authority))
+                {
+                    tokens.Add(authority);
+                }
+
+                if (!string.IsNullOrWhiteSpace(uri.Host))
+                {
+                    tokens.Add(uri.Host);
+                }
+            }
+
+            var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string token in tokens)
+            {
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    unique.Add(token);
+                }
+            }
+
+            var ordered = new List<string>(unique);
+            ordered.Sort(delegate (string left, string right)
+            {
+                return right.Length.CompareTo(left.Length);
+            });
+
+            return ordered.ToArray();
         }
 
         private static void CleanupLogsIfNeeded(DateTime nowLocal)

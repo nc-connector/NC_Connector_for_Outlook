@@ -1007,6 +1007,9 @@
   "outlook_debug_file_label": {
     "message": "Write debug log file"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Anonymize logs"
+  },
   "outlook_debug_location_prefix": {
     "message": "Location: "
   },
@@ -1389,4 +1392,5 @@
     "message": "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator."
   }
 }
+
 

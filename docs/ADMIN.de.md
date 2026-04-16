@@ -98,6 +98,7 @@ Beispiel (Auszug):
   <IfbDays>30</IfbDays>
   <IfbCacheHours>24</IfbCacheHours>
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
+  <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>90 Freigaben - extern</FileLinkBasePath>
 </Settings>
 ```
@@ -190,13 +191,23 @@ Reparaturhinweis (wenn im Admin-UI aktiv, aber faktisch nicht verfuegbar):
 ## Logging / Support
 
 Debug-Logging ist im Settings-Tab **Debug** aktivierbar.
+Im Debug-Tab gibt es zusaetzlich **Logs anonymisieren** (standardmaessig aktiviert).
 
-Log-Datei:
+Log-Dateien (taegliche Rotation):
 
-- `%LOCALAPPDATA%\NC4OL\addin-runtime.log`
+- `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
 
 Die Logs sind kategorisiert (z.B. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) und helfen bei Supportfällen.
 Wenn Debug-Logging aktiviert ist, werden auch Runtime-Entscheidungspfade (inkl. Attachment-Pre-Add-Gating und Fallback-Gruenden) in dieselbe Datei geschrieben; Runtime-Exceptions werden unabhaengig vom Debug-Schalter immer geloggt.
+Wenn Anonymisierung aktiv ist, werden sensible Werte vor dem Schreiben maskiert:
+- konfigurierte Nextcloud-URL/Basis-Host
+- Token/Secrets in URLs, Query-Parametern und JSON-Fragmenten
+- `Authorization`-Header-Werte
+- E-Mail-Adressen und typische Benutzerkennungen in Logfeldern
+- lokale Benutzerpfade (z.B. `C:\\Users\\<USER>\\...`)
+Aufbewahrung:
+- die letzten 7 Tageslogs bleiben erhalten
+- zusaetzlich werden Logs aelter als 30 Tage (best effort) entfernt
 
 ## Troubleshooting
 

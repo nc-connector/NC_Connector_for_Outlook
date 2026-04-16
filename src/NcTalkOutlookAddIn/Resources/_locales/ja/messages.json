@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "デバッグログファイルを出力"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "ログを匿名化する"
+  },
   "outlook_debug_location_prefix": {
     "message": "場所: "
   },
@@ -1389,3 +1392,4 @@
     "message": "OS 既定の TLS ポリシーを無効にする場合は、少なくとも 1 つの TLS バージョン（1.2 または 1.3）を有効にしてください。"
   }
 }
+

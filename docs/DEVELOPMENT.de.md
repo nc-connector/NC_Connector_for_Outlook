@@ -102,8 +102,11 @@ Was das Script macht:
 ## Logging
 
 - Aktivierung: Settings → Tab **Debug**
-- Datei: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`
+- Option (Standard aktiv): `Logs anonymisieren`
+- Datei (taeglich): `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
 - Runtime-Exceptions werden ueber `DiagnosticsLogger.LogException(...)` immer geschrieben, auch wenn Debug deaktiviert ist.
+- Aufbewahrung: letzte 7 Tageslogs behalten, Logs aelter als 30 Tage (best effort) entfernen.
+- Bei aktiver Anonymisierung werden NC-URL/Basis-Host, Token/Secrets, Authorization-Werte, E-Mails, Benutzerkennungen und lokale User-Pfadsegmente maskiert.
 
 Kategorien (Beispiele):
 

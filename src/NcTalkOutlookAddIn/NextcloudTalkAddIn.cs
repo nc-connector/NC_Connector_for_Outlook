@@ -121,7 +121,7 @@ namespace NcTalkOutlookAddIn
             string outlookProfileName = ResolveCurrentOutlookProfileName();
             _settingsStorage = new SettingsStorage(outlookProfileName);
             _currentSettings = _settingsStorage.Load();
-            DiagnosticsLogger.SetEnabled(_currentSettings != null && _currentSettings.DebugLoggingEnabled);
+            ConfigureDiagnosticsLogger(_currentSettings);
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();
             LogCore("Add-in connected (Outlook version=" + (_outlookApplication != null ? _outlookApplication.Version : "unknown") + ").");
@@ -131,7 +131,7 @@ namespace NcTalkOutlookAddIn
             }
             if (_currentSettings != null)
             {
-                LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ").");
+                LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
             }
             _freeBusyManager = new FreeBusyManager(_settingsStorage.DataDirectory);
             _freeBusyManager.Initialize(_outlookApplication);
@@ -603,14 +603,16 @@ namespace NcTalkOutlookAddIn
                 {
                     AddinSettings previousSettings = (_currentSettings ?? new AddinSettings()).Clone();
                     _currentSettings = form.Result ?? new AddinSettings();
+                    ConfigureDiagnosticsLogger(_currentSettings);
                     if (!TryApplyTransportSecurityFromSettings("settings_save", true))
                     {
                         _currentSettings = previousSettings;
+                        ConfigureDiagnosticsLogger(_currentSettings);
                         TryApplyTransportSecurityFromSettings("settings_save_revert", false);
                         LogSettings("Settings save aborted because transport security settings could not be applied.");
                         return;
                     }
-                    LogSettings("Settings applied (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ").");
+                    LogSettings("Settings applied (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
                     ApplyIfbSettings();
                     if (_settingsStorage != null)
                     {
@@ -1599,10 +1601,7 @@ namespace NcTalkOutlookAddIn
 
         private void ApplyIfbSettings()
         {
-            if (_currentSettings != null)
-            {
-                DiagnosticsLogger.SetEnabled(_currentSettings.DebugLoggingEnabled);
-            }
+            ConfigureDiagnosticsLogger(_currentSettings);
 
             if (_freeBusyManager == null || _currentSettings == null)
             {
@@ -2433,6 +2432,16 @@ namespace NcTalkOutlookAddIn
                 TryApplyTransportSecurityFromSettings("lazy_load", false);
                 EnsureInspectorHook();
             }
+        }
+
+        private static void ConfigureDiagnosticsLogger(AddinSettings settings)
+        {
+            bool debugEnabled = settings != null && settings.DebugLoggingEnabled;
+            bool anonymizationEnabled = settings == null || settings.LogAnonymizationEnabled;
+            string serverUrl = settings != null ? settings.ServerUrl : string.Empty;
+
+            DiagnosticsLogger.SetEnabled(debugEnabled);
+            DiagnosticsLogger.SetAnonymization(anonymizationEnabled, serverUrl);
         }
 
         private bool TryApplyTransportSecurityFromSettings(string source, bool showWarning)

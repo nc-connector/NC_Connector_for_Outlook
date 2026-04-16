@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Gravar arquivo de log de depuração"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Anonimizar logs"
+  },
   "outlook_debug_location_prefix": {
     "message": "Local: "
   },
@@ -1389,3 +1392,4 @@
     "message": "Quando a política TLS padrão do sistema operacional estiver desativada, ative pelo menos uma versão TLS (1.2 ou 1.3)."
   }
 }
+

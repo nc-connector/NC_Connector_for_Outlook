@@ -243,9 +243,11 @@ See `Translations.md` for the full language list and maintenance workflow.
 Debug logging is optional and is intended to make support cases reproducible.
 
 - Enable: Settings → **Debug** → “Write debug log file”
+- Optional safety control (default on): “Anonymize logs”
 - Daily log file format: `%LOCALAPPDATA%\\NC4OL\\addin-runtime.log_YYYYMMDD`
 - Runtime exceptions are always written via `DiagnosticsLogger.LogException(...)`, even when debug logging is disabled.
 - Retention: keep latest 7 daily log files and delete files older than 30 days (best effort cleanup).
+- Anonymization redacts configured NC URL/base host, token/password-like values, authorization credentials, user identifiers, email addresses, and local user path fragments before log write.
 
 Format:
 

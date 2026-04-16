@@ -22,7 +22,7 @@ If the optional NC Connector backend is installed, Talk and Sharing defaults can
 - **Internet Free/Busy Gateway (IFB)**  
 A local HTTP listener answers Outlook free/busy requests directly from Nextcloud. The installer configures registry values for search path and read URL. If the direct fetch returns HTTP 404, the add-in falls back to a scheduling POST so availability data is still provided.
 - **Debug logging at the press of a button**  
-Enable it in the Debug tab. Writes structured logs (authentication, appointment and filelink flows, IFB) to `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. Runtime exceptions are still written there even when the debug switch is off. The path is displayed in the UI.
+Enable it in the Debug tab. Writes structured logs (authentication, appointment and filelink flows, IFB) to `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. Runtime exceptions are still written there even when the debug switch is off. The path is displayed in the UI. A new `Anonymize logs` option (default: enabled) masks NC URL, tokens/secrets, emails, and local user path fragments.
 
 ## Changelog
 
@@ -116,7 +116,7 @@ Updates are applied by installing a MSI package over the existing installation (
 - Runtime artifacts are consolidated in `%LOCALAPPDATA%\NC4OL`:
   - settings files (`settings_<OutlookProfile>.xml`)
   - IFB/system-addressbook cache
-  - debug log (`addin-runtime.log`)
+  - daily debug logs (`addin-runtime.log_YYYYMMDD`, keep latest 7 and remove >30 days best effort)
 - Legacy INI settings from older builds are migrated on first start and removed after successful migration.
 - TLS mode can be switched live in Settings (`OS default`, `TLS 1.2`, `TLS 1.3`, or `TLS 1.2 + 1.3`) and is applied immediately to runtime networking.
 - Settings connectivity operations (connection test and login flow) now force a fresh HTTP/TLS handshake, so TLS-mode checks are deterministic and not masked by pooled keep-alive sockets.
@@ -125,7 +125,7 @@ Updates are applied by installing a MSI package over the existing installation (
 
 ## Troubleshooting
 
-- **Debug log**: enable it in the *Debug* tab for verbose traces. Log file: `%LOCALAPPDATA%\NC4OL\addin-runtime.log`. With debug enabled, attachment pre-add decisions/fallback reasons are included. Runtime exceptions are written there even when debug logging is disabled.  
+- **Debug log**: enable it in the *Debug* tab for verbose traces. Log file format: `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. With debug enabled, attachment pre-add decisions/fallback reasons are included. Runtime exceptions are written there even when debug logging is disabled. The `Anonymize logs` switch is enabled by default.  
 - **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-3.0.2.msi" ADDLOCAL=ALL`.  
 - **Test IFB**: `powershell -Command "Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. If behavior differs, verify the registry under `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar`.  
 - **Check TLS/proxy**: `powershell -Command "Test-NetConnection <your-domain> -Port 443"`. If you see SSL warnings, verify certificates/proxy settings. You can switch TLS mode at runtime in `Settings -> Advanced -> Transport security (TLS)` (`OS default` or forced TLS versions like 1.2/1.3). Connection test/login flow use fresh handshakes in 3.0.2, so TLS mode changes are evaluated directly. If secure-channel errors still occur, check certificate trust, TLS-inspecting proxies, DNS, and machine TLS/Schannel policy before considering machine-wide registry/GPO overrides.  

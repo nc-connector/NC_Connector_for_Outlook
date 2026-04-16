@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Debug-logbestand schrijven"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Logbestanden anonimiseren"
+  },
   "outlook_debug_location_prefix": {
     "message": "Locatie: "
   },
@@ -1389,3 +1392,4 @@
     "message": "Wanneer het standaard TLS-beleid van het besturingssysteem is uitgeschakeld, schakel dan minimaal een TLS-versie in (1.2 of 1.3)."
   }
 }
+

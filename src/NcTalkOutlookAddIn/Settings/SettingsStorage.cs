@@ -488,6 +488,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "IfbCacheHours", settings.IfbCacheHours.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbPreviousFreeBusyPath", Safe(settings.IfbPreviousFreeBusyPath));
             AppendElement(document, root, "DebugLoggingEnabled", settings.DebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "LogAnonymizationEnabled", settings.LogAnonymizationEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsUseSystemDefault", settings.TransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable12", settings.TransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable13", settings.TransportTlsEnable13.ToString(CultureInfo.InvariantCulture));
@@ -578,6 +579,13 @@ namespace NcTalkOutlookAddIn.Settings
                     if (bool.TryParse(value, out debug))
                     {
                         settings.DebugLoggingEnabled = debug;
+                    }
+                    break;
+                case "LogAnonymizationEnabled":
+                    bool logAnonymizationEnabled;
+                    if (bool.TryParse(value, out logAnonymizationEnabled))
+                    {
+                        settings.LogAnonymizationEnabled = logAnonymizationEnabled;
                     }
                     break;
                 case "TransportTlsUseSystemDefault":

@@ -515,6 +515,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string ButtonCancel { get { return Get("ui_button_cancel", "Cancel"); } }
 
         internal static string DebugCheckbox { get { return Get("outlook_debug_file_label", "Write debug log file"); } }
+        internal static string DebugAnonymizeCheckbox { get { return Get("outlook_debug_anonymize_label", "Anonymize logs"); } }
         internal static string DebugPathPrefix { get { return Get("outlook_debug_location_prefix", "Location: "); } }
         internal static string DebugOpenLog { get { return Get("outlook_debug_open_log", "Open log file"); } }
         internal static string DebugLogMissingMessage { get { return Get("outlook_debug_log_missing", "No log file has been created yet."); } }

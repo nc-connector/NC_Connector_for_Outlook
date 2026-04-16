@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Hibakeresési naplófájl írása"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Naplók anonimizálása"
+  },
   "outlook_debug_location_prefix": {
     "message": "Hely: "
   },
@@ -1389,3 +1392,4 @@
     "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."
   }
 }
+

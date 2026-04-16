@@ -1007,6 +1007,9 @@
   "outlook_debug_file_label": {
     "message": "Debug-Logdatei schreiben"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Logs anonymisieren"
+  },
   "outlook_debug_location_prefix": {
     "message": "Speicherort: "
   },
@@ -1389,4 +1392,5 @@
     "message": "Ihr NC Connector Seat ist derzeit pausiert. Bitte wenden Sie sich an Ihren Nextcloud-Administrator."
   }
 }
+
 

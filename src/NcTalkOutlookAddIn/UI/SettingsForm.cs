@@ -63,6 +63,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly ComboBox _ifbCacheHoursCombo = new ComboBox();
         private readonly Label _ifbCacheHoursLabel = new Label();
         private readonly CheckBox _debugLogCheckBox = new CheckBox();
+        private readonly CheckBox _debugAnonymizeCheckBox = new CheckBox();
         private readonly Label _debugPathLabel = new Label();
         private readonly LinkLabel _debugOpenLink = new LinkLabel();
         private readonly Label _aboutVersionLabel = new Label();
@@ -607,6 +608,8 @@ namespace NcTalkOutlookAddIn.UI
         private void ApplyDebugTabLayout()
         {
             int rightMargin = ScaleLogical(24);
+            _debugAnonymizeCheckBox.Location = new Point(_debugLogCheckBox.Left, _debugLogCheckBox.Bottom + ScaleLogical(8));
+            _debugPathLabel.Location = new Point(_debugPathLabel.Left, _debugAnonymizeCheckBox.Bottom + ScaleLogical(12));
             int width = Math.Max(ScaleLogical(220), _debugTab.ClientSize.Width - rightMargin - _debugPathLabel.Left);
             _debugPathLabel.MaximumSize = new Size(width, 0);
             _debugPathLabel.AutoSize = true;
@@ -899,13 +902,18 @@ namespace NcTalkOutlookAddIn.UI
             _debugLogCheckBox.Location = new Point(24, 20);
             _debugTab.Controls.Add(_debugLogCheckBox);
 
+            _debugAnonymizeCheckBox.Text = Strings.DebugAnonymizeCheckbox;
+            _debugAnonymizeCheckBox.AutoSize = true;
+            _debugAnonymizeCheckBox.Location = new Point(24, 50);
+            _debugTab.Controls.Add(_debugAnonymizeCheckBox);
+
             _debugPathLabel.AutoSize = true;
-            _debugPathLabel.Location = new Point(24, 60);
+            _debugPathLabel.Location = new Point(24, 90);
             _debugPathLabel.MaximumSize = new Size(420, 0);
             _debugTab.Controls.Add(_debugPathLabel);
 
             _debugOpenLink.Text = Strings.DebugOpenLog;
-            _debugOpenLink.Location = new Point(24, 110);
+            _debugOpenLink.Location = new Point(24, 140);
             _debugOpenLink.AutoSize = true;
             _debugOpenLink.LinkClicked += OnDebugOpenLinkClicked;
             _debugTab.Controls.Add(_debugOpenLink);
@@ -1105,6 +1113,7 @@ namespace NcTalkOutlookAddIn.UI
                 SelectComboValue(_ifbDaysCombo, Result.IfbDays, 30);
                 SelectComboValue(_ifbCacheHoursCombo, Result.IfbCacheHours, 24);
                 _debugLogCheckBox.Checked = Result.DebugLoggingEnabled;
+                _debugAnonymizeCheckBox.Checked = Result.LogAnonymizationEnabled;
                 _tlsUseSystemDefaultCheckBox.Checked = Result.TransportTlsUseSystemDefault;
                 _tlsEnable12CheckBox.Checked = Result.TransportTlsEnable12;
                 _tlsEnable13CheckBox.Checked = Result.TransportTlsEnable13;
@@ -1179,6 +1188,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
             Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
             Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
+            Result.LogAnonymizationEnabled = _debugAnonymizeCheckBox.Checked;
             Result.TransportTlsUseSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
             Result.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
             Result.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
@@ -2088,6 +2098,7 @@ namespace NcTalkOutlookAddIn.UI
             _ifbCacheHoursCombo.Enabled = !_isBusy;
             _ifbCacheHoursLabel.Enabled = !_isBusy;
             _debugLogCheckBox.Enabled = !_isBusy;
+            _debugAnonymizeCheckBox.Enabled = !_isBusy;
             _debugOpenLink.Enabled = !_isBusy;
             _tlsUseSystemDefaultCheckBox.Enabled = !_isBusy;
 

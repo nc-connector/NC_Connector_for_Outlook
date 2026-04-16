@@ -986,6 +986,9 @@
   "outlook_debug_file_label": {
     "message": "Zapisovat soubor ladicího logu"
   },
+  "outlook_debug_anonymize_label": {
+    "message": "Anonymizovat protokoly"
+  },
   "outlook_debug_location_prefix": {
     "message": "Umístění: "
   },
@@ -1389,3 +1392,4 @@
     "message": "Když jsou výchozí zásady TLS operačního systému vypnuté, povolte alespoň jednu verzi TLS (1.2 nebo 1.3)."
   }
 }
+
