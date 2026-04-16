@@ -273,7 +273,11 @@ namespace NcTalkOutlookAddIn.UI
             _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
             _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
             _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
-            _policyWarningLinkLabel.LinkClicked += (s, e) => OpenBrowser(Strings.PolicyAdminGuideUrl);
+            _policyWarningLinkLabel.LinkClicked += (s, e) =>
+                BrowserLauncher.OpenUrl(
+                    Strings.PolicyAdminGuideUrl,
+                    LogCategories.Core,
+                    "Failed to open policy admin guide URL.");
             _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
         }
 
@@ -882,7 +886,11 @@ namespace NcTalkOutlookAddIn.UI
             _talkAddressbookWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
             _talkAddressbookWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
             _talkAddressbookWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
-            _talkAddressbookWarningLinkLabel.LinkClicked += (s, e) => OpenBrowser(Strings.TalkSystemAddressbookAdminGuideUrl);
+            _talkAddressbookWarningLinkLabel.LinkClicked += (s, e) =>
+                BrowserLauncher.OpenUrl(
+                    Strings.TalkSystemAddressbookAdminGuideUrl,
+                    LogCategories.Core,
+                    "Failed to open system address book admin guide URL.");
             _talkAddressbookWarningPanel.Controls.Add(_talkAddressbookWarningLinkLabel);
 
             _toolTip.SetToolTip(_talkDefaultAddUsersCheckBox, Strings.TooltipAddUsers);
@@ -948,7 +956,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _aboutHomepageLink.Text = Strings.AboutHomepageLink;
             _aboutHomepageLink.AutoSize = true;
-            _aboutHomepageLink.LinkClicked += (sender, args) => OpenBrowser(NcConnectorHomepageUrl);
+            _aboutHomepageLink.LinkClicked += (sender, args) =>
+                BrowserLauncher.OpenUrl(
+                    NcConnectorHomepageUrl,
+                    LogCategories.Core,
+                    "Failed to open NC Connector homepage URL.");
             _aboutTab.Controls.Add(_aboutHomepageLink);
 
             _aboutOverviewLabel.Text = Strings.AboutOverviewText;
@@ -963,7 +975,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _aboutMoreInfoLink.Text = Strings.AboutMoreInfoLink;
             _aboutMoreInfoLink.AutoSize = true;
-            _aboutMoreInfoLink.LinkClicked += (sender, args) => OpenBrowser(NcConnectorHomepageUrl);
+            _aboutMoreInfoLink.LinkClicked += (sender, args) =>
+                BrowserLauncher.OpenUrl(
+                    NcConnectorHomepageUrl,
+                    LogCategories.Core,
+                    "Failed to open NC Connector information URL.");
             _aboutTab.Controls.Add(_aboutMoreInfoLink);
 
             _aboutSupportNoteLabel.Text = Strings.AboutSupportNote;
@@ -978,7 +994,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _aboutSupportLink.Text = Strings.AboutSupportLink;
             _aboutSupportLink.AutoSize = true;
-            _aboutSupportLink.LinkClicked += (sender, args) => OpenBrowser("https://www.paypal.com/donate/?hosted_button_id=FTZWNRNKVKUN6");
+            _aboutSupportLink.LinkClicked += (sender, args) =>
+                BrowserLauncher.OpenUrl(
+                    "https://www.paypal.com/donate/?hosted_button_id=FTZWNRNKVKUN6",
+                    LogCategories.Core,
+                    "Failed to open support donation URL.");
             _aboutTab.Controls.Add(_aboutSupportLink);
 
             ApplyAboutTabLayout();
@@ -1251,7 +1271,10 @@ namespace NcTalkOutlookAddIn.UI
                 var flowService = new TalkLoginFlowService(normalizedUrl);
                 var startInfo = flowService.StartLoginFlow();
 
-                OpenBrowser(startInfo.LoginUrl);
+                BrowserLauncher.OpenUrl(
+                    startInfo.LoginUrl,
+                    LogCategories.Core,
+                    "Failed to open browser for login flow URL.");
                 SetStatus(Strings.StatusLoginFlowBrowser, false);
 
                 var credentials = await Task.Run(() => flowService.CompleteLoginFlow(startInfo, TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(2)));
@@ -2208,28 +2231,6 @@ namespace NcTalkOutlookAddIn.UI
             _statusLabel.Text = message;
             _statusLabel.ForeColor = isError ? _themePalette.ErrorText : _themePalette.SuccessText;
             ApplyResponsiveLayout(false);
-        }
-
-        private static void OpenBrowser(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                return;
-            }
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                // The user will get an error later via timeout/cancellation.
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open browser for URL '" + url + "'.", ex);
-            }
         }
 
         private void InitializeFileLinkTab()

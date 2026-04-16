@@ -850,17 +850,7 @@ namespace NcTalkOutlookAddIn
             }
             finally
             {
-                if (inspector != null && Marshal.IsComObject(inspector))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(inspector);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release compose Inspector COM object.", ex);
-                    }
-                }
+                ComInteropScope.TryRelease(inspector, LogCategories.FileLink, "Failed to release compose Inspector COM object.");
             }
         }
 
@@ -906,17 +896,7 @@ namespace NcTalkOutlookAddIn
             }
             finally
             {
-                if (inspector != null && Marshal.IsComObject(inspector))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(inspector);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release compose prompt owner Inspector COM object.", ex);
-                    }
-                }
+                ComInteropScope.TryRelease(inspector, LogCategories.FileLink, "Failed to release compose prompt owner Inspector COM object.");
             }
         }
 
@@ -1253,17 +1233,7 @@ namespace NcTalkOutlookAddIn
             }
             finally
             {
-                if (inspector != null && Marshal.IsComObject(inspector))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(inspector);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release active Inspector COM object.", ex);
-                    }
-                }
+                ComInteropScope.TryRelease(inspector, LogCategories.FileLink, "Failed to release active Inspector COM object.");
             }
         }
 
@@ -1438,29 +1408,8 @@ namespace NcTalkOutlookAddIn
             }
             finally
             {
-                if (selection != null)
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(selection);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Word selection COM object.", ex);
-                    }
-                }
-
-                if (application != null)
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(application);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release Word application COM object.", ex);
-                    }
-                }
+                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object.");
+                ComInteropScope.TryRelease(application, LogCategories.Core, "Failed to release Word application COM object.");
             }
         }
 
@@ -1500,41 +1449,9 @@ namespace NcTalkOutlookAddIn
             }
             finally
             {
-                if (body != null && Marshal.IsComObject(body))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(body);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML body COM object.", ex);
-                    }
-                }
-
-                if (htmlEditor != null && Marshal.IsComObject(htmlEditor))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(htmlEditor);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML editor COM object.", ex);
-                    }
-                }
-
-                if (inspector != null && Marshal.IsComObject(inspector))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(inspector);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment Inspector COM object.", ex);
-                    }
-                }
+                ComInteropScope.TryRelease(body, LogCategories.Core, "Failed to release appointment HTML body COM object.");
+                ComInteropScope.TryRelease(htmlEditor, LogCategories.Core, "Failed to release appointment HTML editor COM object.");
+                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release appointment Inspector COM object.");
             }
         }
 
@@ -1574,41 +1491,9 @@ namespace NcTalkOutlookAddIn
             }
             finally
             {
-                if (body != null && Marshal.IsComObject(body))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(body);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML body COM object.", ex);
-                    }
-                }
-
-                if (htmlEditor != null && Marshal.IsComObject(htmlEditor))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(htmlEditor);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment HTML editor COM object.", ex);
-                    }
-                }
-
-                if (inspector != null && Marshal.IsComObject(inspector))
-                {
-                    try
-                    {
-                        Marshal.ReleaseComObject(inspector);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to release appointment Inspector COM object.", ex);
-                    }
-                }
+                ComInteropScope.TryRelease(body, LogCategories.Core, "Failed to release appointment HTML body COM object.");
+                ComInteropScope.TryRelease(htmlEditor, LogCategories.Core, "Failed to release appointment HTML editor COM object.");
+                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release appointment Inspector COM object.");
             }
         }
 

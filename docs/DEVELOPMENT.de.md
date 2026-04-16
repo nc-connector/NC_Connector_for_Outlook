@@ -150,6 +150,12 @@ UI:
 - `src/NcTalkOutlookAddIn/UI/ComposeAttachmentPromptForm.cs` (2-Aktions-Prompt fuer Schwellwertmodus)
 - `src/NcTalkOutlookAddIn/UI/BrandedHeader.cs` (Header-Banner)
 
+Utilities:
+
+- `src/NcTalkOutlookAddIn/Utilities/BrowserLauncher.cs` (zentraler Shell-Browserstart fuer URLs)
+- `src/NcTalkOutlookAddIn/Utilities/SizeFormatting.cs` (zentrale MB-Formatierung fuer UI-Texte)
+- `src/NcTalkOutlookAddIn/Utilities/ComInteropScope.cs` (zentrale COM-Release-/FinalRelease-Helfer)
+
 Compose-Filelink-Paritaet (3.0.2):
 
 - `MailComposeSubscription` in `NextcloudTalkAddIn.cs` steuert den Compose-Lifecycle fuer:

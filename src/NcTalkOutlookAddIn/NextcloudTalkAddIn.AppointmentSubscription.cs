@@ -6,7 +6,6 @@
 
 using System;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
@@ -529,37 +528,28 @@ namespace NcTalkOutlookAddIn
                     {
                         if (currentAppointment != null && !ReferenceEquals(currentAppointment, appointment))
                         {
-                            try
-                            {
-                                Marshal.ReleaseComObject(currentAppointment);
-                            }
-                            catch
-                            {
-                            }
+                            ComInteropScope.TryRelease(
+                                currentAppointment,
+                                LogCategories.Talk,
+                                "Failed to release current appointment COM object during unsaved-close lookup.");
                         }
 
                         if (currentItem != null
                             && !ReferenceEquals(currentItem, currentAppointment)
                             && !ReferenceEquals(currentItem, appointment))
                         {
-                            try
-                            {
-                                Marshal.ReleaseComObject(currentItem);
-                            }
-                            catch
-                            {
-                            }
+                            ComInteropScope.TryRelease(
+                                currentItem,
+                                LogCategories.Talk,
+                                "Failed to release current item COM object during unsaved-close lookup.");
                         }
 
                         if (inspector != null)
                         {
-                            try
-                            {
-                                Marshal.ReleaseComObject(inspector);
-                            }
-                            catch
-                            {
-                            }
+                            ComInteropScope.TryRelease(
+                                inspector,
+                                LogCategories.Talk,
+                                "Failed to release inspector COM object during unsaved-close lookup.");
                         }
                     }
                 }

@@ -6,7 +6,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -356,24 +355,10 @@ namespace NcTalkOutlookAddIn.UI
 
         private static void OpenPolicyAdminGuide()
         {
-            string url = Strings.PolicyAdminGuideUrl;
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                return;
-            }
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to open policy admin guide URL.", ex);
-            }
+            BrowserLauncher.OpenUrl(
+                Strings.PolicyAdminGuideUrl,
+                LogCategories.FileLink,
+                "Failed to open policy admin guide URL.");
         }
 
         protected override void OnSizeChanged(EventArgs e)
@@ -1620,16 +1605,10 @@ namespace NcTalkOutlookAddIn.UI
             return string.Format(
                 CultureInfo.CurrentCulture,
                 Strings.FileLinkWizardAttachmentModeReasonThreshold,
-                FormatSizeMb(_launchOptions.AttachmentTotalBytes),
+                SizeFormatting.FormatMegabytes(_launchOptions.AttachmentTotalBytes),
                 Math.Max(1, _launchOptions.AttachmentThresholdMb).ToString(CultureInfo.CurrentCulture) + " MB",
                 string.IsNullOrWhiteSpace(_launchOptions.AttachmentLastName) ? Strings.AttachmentPromptLastUnknown : _launchOptions.AttachmentLastName.Trim(),
-                FormatSizeMb(_launchOptions.AttachmentLastSizeBytes));
-        }
-
-        private static string FormatSizeMb(long bytes)
-        {
-            decimal value = Math.Max(0, bytes) / (1024m * 1024m);
-            return string.Format(CultureInfo.CurrentCulture, "{0:0.0} MB", value);
+                SizeFormatting.FormatMegabytes(_launchOptions.AttachmentLastSizeBytes));
         }
 
         private void ResolveAttachmentShareName()

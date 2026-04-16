@@ -103,10 +103,12 @@
     <Compile Include="Utilities\DiagnosticsLogger.cs" />
     <Compile Include="Utilities\FooterButtonLayoutHelper.cs" />
     <Compile Include="Utilities\LogCategories.cs" />
+    <Compile Include="Utilities\BrowserLauncher.cs" />
     <Compile Include="Utilities\HttpAuthUtilities.cs" />
     <Compile Include="Utilities\BrandingAssets.cs" />
     <Compile Include="Utilities\NextcloudVersionHelper.cs" />
     <Compile Include="Utilities\Strings.cs" />
+    <Compile Include="Utilities\SizeFormatting.cs" />
     <Compile Include="Utilities\TimeUtilities.cs" />
     <Compile Include="Utilities\UiThemeManager.cs" />
     <Compile Include="Utilities\DisabledControlTooltipHintHelper.cs" />

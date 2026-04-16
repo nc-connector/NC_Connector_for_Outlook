@@ -135,6 +135,10 @@ Key code locations:
   - `UI/TalkLinkForm.cs` is the Talk wizard.
   - `UI/FileLinkWizardForm.cs` is the sharing wizard.
   - `UI/BrandedHeader.cs` is the shared header banner control.
+- **Shared utilities**
+  - `Utilities/BrowserLauncher.cs` centralizes shell browser URL starts.
+  - `Utilities/SizeFormatting.cs` centralizes MB display formatting.
+  - `Utilities/ComInteropScope.cs` centralizes COM release/final-release patterns.
 
 ### End-to-end flows
 

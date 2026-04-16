@@ -407,10 +407,10 @@ namespace NcTalkOutlookAddIn
                     string reasonText = string.Format(
                         CultureInfo.CurrentCulture,
                         Strings.AttachmentPromptReason,
-                        FormatSizeMb(Math.Max(0, candidate.SizeBytes)),
-                        FormatSizeMb((long)settings.ThresholdMb * 1024L * 1024L),
+                        SizeFormatting.FormatMegabytes(Math.Max(0, candidate.SizeBytes)),
+                        SizeFormatting.FormatMegabytes((long)settings.ThresholdMb * 1024L * 1024L),
                         string.IsNullOrWhiteSpace(candidate.Name) ? Strings.AttachmentPromptLastUnknown : candidate.Name,
-                        FormatSizeMb(Math.Max(0, candidate.SizeBytes)));
+                        SizeFormatting.FormatMegabytes(Math.Max(0, candidate.SizeBytes)));
 
                     _attachmentPromptOpen = true;
                     ComposeAttachmentPromptDecision decision;
@@ -609,10 +609,10 @@ namespace NcTalkOutlookAddIn
                 string reasonText = string.Format(
                     CultureInfo.CurrentCulture,
                     Strings.AttachmentPromptReason,
-                    FormatSizeMb(totalBytes),
-                    FormatSizeMb((long)settings.ThresholdMb * 1024L * 1024L),
+                    SizeFormatting.FormatMegabytes(totalBytes),
+                    SizeFormatting.FormatMegabytes((long)settings.ThresholdMb * 1024L * 1024L),
                     string.IsNullOrWhiteSpace(lastAdded.Name) ? Strings.AttachmentPromptLastUnknown : lastAdded.Name,
-                    FormatSizeMb(lastAdded.SizeBytes));
+                    SizeFormatting.FormatMegabytes(lastAdded.SizeBytes));
                 if (_attachmentPromptOpen)
                 {
                     LogFileLink("Compose attachment prompt skipped (composeKey=" + _composeKey + ", reason=prompt_already_open).");
@@ -2001,17 +2001,7 @@ namespace NcTalkOutlookAddIn
                         }
                         finally
                         {
-                            if (recipient != null && Marshal.IsComObject(recipient))
-                            {
-                                try
-                                {
-                                    Marshal.ReleaseComObject(recipient);
-                                }
-                                catch (Exception ex)
-                                {
-                                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release compose Recipient COM object.", ex);
-                                }
-                            }
+                            ComInteropScope.TryRelease(recipient, LogCategories.FileLink, "Failed to release compose Recipient COM object.");
                         }
                     }
                 }
@@ -2025,17 +2015,7 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
-                    if (recipients != null && Marshal.IsComObject(recipients))
-                    {
-                        try
-                        {
-                            Marshal.ReleaseComObject(recipients);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release compose Recipients COM object.", ex);
-                        }
-                    }
+                    ComInteropScope.TryRelease(recipients, LogCategories.FileLink, "Failed to release compose Recipients COM object.");
                 }
 
                 to = toRecipients.Count == 0 ? string.Empty : string.Join("; ", toRecipients.ToArray());
@@ -2098,12 +2078,6 @@ namespace NcTalkOutlookAddIn
             private static int CountRecipients(string csv)
             {
                 return ComposeShareLifecycleController.CountRecipientsInCsv(csv);
-            }
-
-            private static string FormatSizeMb(long bytes)
-            {
-                decimal value = Math.Max(0, bytes) / (1024m * 1024m);
-                return string.Format(CultureInfo.CurrentCulture, "{0:0.0} MB", value);
             }
 
             private static string ReadAttachmentName(Outlook.Attachment attachment)

@@ -6,7 +6,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -347,7 +346,11 @@ namespace NcTalkOutlookAddIn.UI
             _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
             _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
             _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
-            _policyWarningLinkLabel.LinkClicked += (s, e) => OpenBrowser(Strings.PolicyAdminGuideUrl);
+            _policyWarningLinkLabel.LinkClicked += (s, e) =>
+                BrowserLauncher.OpenUrl(
+                    Strings.PolicyAdminGuideUrl,
+                    LogCategories.Talk,
+                    "Failed to open policy admin guide URL.");
             _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
 
             _okButton.Text = Strings.DialogOk;
@@ -858,30 +861,12 @@ namespace NcTalkOutlookAddIn.UI
                 ", guestsPolicyLocked=" + guestsPolicyLocked + ").");
         }
 
-        private static void OpenBrowser(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                return;
-            }
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to open URL.", ex);
-            }
-        }
-
         private static void OpenSystemAddressbookSetupGuide()
         {
-            OpenBrowser(Strings.TalkSystemAddressbookAdminGuideUrl);
+            BrowserLauncher.OpenUrl(
+                Strings.TalkSystemAddressbookAdminGuideUrl,
+                LogCategories.Talk,
+                "Failed to open system address book setup guide URL.");
         }
 
         private void UpdateRoomTypeTooltip()
