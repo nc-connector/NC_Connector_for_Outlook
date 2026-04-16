@@ -194,11 +194,14 @@ Repair hint (if Admin UI shows enabled but the system address book is still unav
 ## Logging / support
 Enable debug logging in Settings → **Debug**.
 
-Log file:
-- `%LOCALAPPDATA%\NC4OL\addin-runtime.log`
+Log files (daily rotation):
+- `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
 
 Logs are categorized (e.g. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) and help with support cases.
 When debug logging is enabled, runtime decision paths (including attachment pre-add gating and fallback reasons) are written to the same file; runtime exceptions are always written regardless of debug toggle state.
+Retention behavior:
+- keep the latest 7 daily log files
+- additionally remove log files older than 30 days (best effort cleanup)
 
 ## Troubleshooting
 

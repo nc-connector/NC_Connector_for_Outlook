@@ -5,6 +5,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Diagnostics;
 using System.IO;
@@ -19,8 +20,20 @@ namespace NcTalkOutlookAddIn.Utilities
     {
         private static readonly object SyncRoot = new object();
         private static readonly string LogDirectory = AppDataPaths.GetLocalRootDirectory();
-        private static readonly string LogFilePath = Path.Combine(LogDirectory, "addin-runtime.log");
+        private const string LegacyLogFileName = "addin-runtime.log";
+        private const string DailyLogFilePrefix = "addin-runtime.log_";
+        private const string DailyLogDateFormat = "yyyyMMdd";
+        private const int KeepDailyLogCount = 7;
+        private const int CleanupOlderThanDays = 30;
+        private static readonly string LegacyLogFilePath = Path.Combine(LogDirectory, LegacyLogFileName);
+        private static DateTime _lastCleanupDateLocal = DateTime.MinValue.Date;
         private static bool _enabled;
+
+        private struct DatedLogFile
+        {
+            internal DateTime DateLocal;
+            internal string Path;
+        }
 
         internal struct OperationScope : IDisposable
         {
@@ -54,7 +67,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string LogFileFullPath
         {
-            get { return LogFilePath; }
+            get { return GetDailyLogFilePath(DateTime.Now); }
         }
 
         internal static void SetEnabled(bool enabled)
@@ -92,14 +105,18 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 lock (SyncRoot)
                 {
+                    DateTime nowLocal = DateTime.Now;
                     Directory.CreateDirectory(LogDirectory);
+                    CleanupLogsIfNeeded(nowLocal);
+
+                    string logFilePath = GetDailyLogFilePath(nowLocal);
                     string line = string.Format(
                         CultureInfo.InvariantCulture,
                         "[{0:yyyy-MM-dd HH:mm:ss.fff}] [{1}] {2}",
                         DateTime.UtcNow,
                         string.IsNullOrWhiteSpace(category) ? "GENERAL" : category.Trim().ToUpperInvariant(),
                         message ?? string.Empty);
-                    File.AppendAllText(LogFilePath, line + Environment.NewLine, Encoding.UTF8);
+                    File.AppendAllText(logFilePath, line + Environment.NewLine, Encoding.UTF8);
                 }
             }
             catch (Exception ex)
@@ -136,6 +153,119 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static OperationScope BeginOperation(string category, string operation)
         {
             return new OperationScope(category, operation);
+        }
+
+        private static string GetDailyLogFilePath(DateTime nowLocal)
+        {
+            return Path.Combine(
+                LogDirectory,
+                DailyLogFilePrefix + nowLocal.ToString(DailyLogDateFormat, CultureInfo.InvariantCulture));
+        }
+
+        private static void CleanupLogsIfNeeded(DateTime nowLocal)
+        {
+            DateTime todayLocal = nowLocal.Date;
+            if (_lastCleanupDateLocal == todayLocal)
+            {
+                return;
+            }
+
+            _lastCleanupDateLocal = todayLocal;
+            CleanupLegacyLogFile(nowLocal);
+            CleanupDailyLogFiles(nowLocal);
+        }
+
+        private static void CleanupLegacyLogFile(DateTime nowLocal)
+        {
+            try
+            {
+                if (!File.Exists(LegacyLogFilePath))
+                {
+                    return;
+                }
+
+                DateTime cutoffLocal = nowLocal.AddDays(-CleanupOlderThanDays);
+                DateTime lastWriteLocal = File.GetLastWriteTime(LegacyLogFilePath);
+                if (lastWriteLocal < cutoffLocal)
+                {
+                    File.Delete(LegacyLogFilePath);
+                }
+            }
+            catch
+            {
+                // Cleanup failures must never affect regular logging.
+            }
+        }
+
+        private static void CleanupDailyLogFiles(DateTime nowLocal)
+        {
+            try
+            {
+                string[] files = Directory.GetFiles(LogDirectory, DailyLogFilePrefix + "*");
+                if (files == null || files.Length == 0)
+                {
+                    return;
+                }
+
+                List<DatedLogFile> datedFiles = new List<DatedLogFile>(files.Length);
+                DateTime ageCutoffLocal = nowLocal.Date.AddDays(-CleanupOlderThanDays);
+
+                foreach (string path in files)
+                {
+                    string fileName = Path.GetFileName(path);
+                    if (string.IsNullOrEmpty(fileName) || fileName.Length <= DailyLogFilePrefix.Length)
+                    {
+                        continue;
+                    }
+
+                    string datePart = fileName.Substring(DailyLogFilePrefix.Length);
+                    DateTime parsedDateLocal;
+                    if (DateTime.TryParseExact(
+                            datePart,
+                            DailyLogDateFormat,
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.None,
+                            out parsedDateLocal))
+                    {
+                        datedFiles.Add(new DatedLogFile
+                        {
+                            DateLocal = parsedDateLocal.Date,
+                            Path = path
+                        });
+                        continue;
+                    }
+
+                    DateTime lastWriteLocal = File.GetLastWriteTime(path);
+                    if (lastWriteLocal < ageCutoffLocal)
+                    {
+                        File.Delete(path);
+                    }
+                }
+
+                if (datedFiles.Count == 0)
+                {
+                    return;
+                }
+
+                datedFiles.Sort(delegate (DatedLogFile a, DatedLogFile b)
+                {
+                    return b.DateLocal.CompareTo(a.DateLocal);
+                });
+
+                for (int i = 0; i < datedFiles.Count; i++)
+                {
+                    bool beyondRetentionWindow = i >= KeepDailyLogCount;
+                    bool tooOld = datedFiles[i].DateLocal < ageCutoffLocal;
+                    if (beyondRetentionWindow || tooOld)
+                    {
+                        File.Delete(datedFiles[i].Path);
+                    }
+                }
+            }
+            catch
+            {
+                // Cleanup failures must never affect regular logging.
+            }
         }
     }
 }
