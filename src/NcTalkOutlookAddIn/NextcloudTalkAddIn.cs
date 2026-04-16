@@ -1102,23 +1102,70 @@ namespace NcTalkOutlookAddIn
                     Strings.SharingPasswordMailNotificationSuccess,
                     recipientCount.ToString(CultureInfo.CurrentCulture));
                 notifyIcon.ShowBalloonTip(5000);
-                Task.Delay(7000).ContinueWith(_ =>
-                {
-                    try
-                    {
-                        notifyIcon.Visible = false;
-                        notifyIcon.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to dispose password notification icon.", ex);
-                    }
-                });
+                ScheduleNotifyIconDispose(notifyIcon, 7000);
                 LogFileLink("Separate password notification shown (recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
             }
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Separate password notification failed.", ex);
+            }
+        }
+
+        private void ScheduleNotifyIconDispose(NotifyIcon notifyIcon, int delayMs)
+        {
+            if (notifyIcon == null)
+            {
+                return;
+            }
+
+            int effectiveDelayMs = Math.Max(0, delayMs);
+            Task.Delay(effectiveDelayMs).ContinueWith(
+                _ => DisposeNotifyIconOnUiContext(notifyIcon),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+        }
+
+        private void DisposeNotifyIconOnUiContext(NotifyIcon notifyIcon)
+        {
+            if (notifyIcon == null)
+            {
+                return;
+            }
+
+            SynchronizationContext context = _uiSynchronizationContext;
+            if (context == null)
+            {
+                DisposeNotifyIcon(notifyIcon);
+                return;
+            }
+
+            try
+            {
+                context.Post(_ => DisposeNotifyIcon(notifyIcon), null);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to marshal password notification icon dispose onto UI context.", ex);
+                DisposeNotifyIcon(notifyIcon);
+            }
+        }
+
+        private static void DisposeNotifyIcon(NotifyIcon notifyIcon)
+        {
+            if (notifyIcon == null)
+            {
+                return;
+            }
+
+            try
+            {
+                notifyIcon.Visible = false;
+                notifyIcon.Dispose();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to dispose password notification icon.", ex);
             }
         }
 
