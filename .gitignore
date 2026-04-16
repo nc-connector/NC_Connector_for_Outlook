@@ -1,0 +1,19 @@
+# Visual Studio / .NET build artifacts
+**/bin/
+**/obj/
+.vs/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build/debug artifacts
+*.pdb
+*.cache
+*.FileListAbsolute.txt
+
+# Installer outputs
+installer/bin/
+installer/obj/
