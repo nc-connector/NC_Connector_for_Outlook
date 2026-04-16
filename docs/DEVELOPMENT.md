@@ -136,7 +136,7 @@ Key code locations:
   - `UI/FileLinkWizardForm.cs` is the sharing wizard.
   - `UI/BrandedHeader.cs` is the shared header banner control.
 - **Shared utilities**
-  - `Utilities/BrowserLauncher.cs` centralizes shell browser URL starts.
+  - `Utilities/BrowserLauncher.cs` centralizes shell target starts (URLs, files, directories).
   - `Utilities/SizeFormatting.cs` centralizes MB display formatting.
   - `Utilities/ComInteropScope.cs` centralizes COM release/final-release patterns.
 

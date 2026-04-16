@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "Установить пароль"
   },
-  "talk_dialog_legacy": {
-    "message": "Открыть старый диалог"
-  },
   "talk_button_apply_fields": {
     "message": "Применить поля"
   },

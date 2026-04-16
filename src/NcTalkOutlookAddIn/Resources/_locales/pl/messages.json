@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "Ustaw hasło"
   },
-  "talk_dialog_legacy": {
-    "message": "Otwórz starsze okno"
-  },
   "talk_button_apply_fields": {
     "message": "Zastosuj pola"
   },

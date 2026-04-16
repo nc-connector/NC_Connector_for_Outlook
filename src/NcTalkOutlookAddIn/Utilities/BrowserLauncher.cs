@@ -10,14 +10,22 @@ using System.Diagnostics;
 namespace NcTalkOutlookAddIn.Utilities
 {
     /**
-     * Central utility for opening browser URLs via shell execution.
+     * Central utility for opening shell targets (URLs, files, folders).
      */
     internal static class BrowserLauncher
     {
-        internal static bool OpenUrl(string url, string logCategory, string failureContext)
+        internal static bool OpenTarget(string target, string logCategory, string failureContext)
         {
-            if (string.IsNullOrWhiteSpace(url))
+            string unused;
+            return OpenTarget(target, logCategory, failureContext, out unused);
+        }
+
+        internal static bool OpenTarget(string target, string logCategory, string failureContext, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (string.IsNullOrWhiteSpace(target))
             {
+                errorMessage = "Target is empty.";
                 return false;
             }
 
@@ -25,17 +33,22 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = url,
+                    FileName = target,
                     UseShellExecute = true
                 });
                 return true;
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(logCategory, failureContext ?? "Failed to open URL.", ex);
+                DiagnosticsLogger.LogException(logCategory, failureContext ?? "Failed to open shell target.", ex);
+                errorMessage = ex.Message ?? string.Empty;
                 return false;
             }
         }
+
+        internal static bool OpenUrl(string url, string logCategory, string failureContext)
+        {
+            return OpenTarget(url, logCategory, failureContext ?? "Failed to open URL.");
+        }
     }
 }
-

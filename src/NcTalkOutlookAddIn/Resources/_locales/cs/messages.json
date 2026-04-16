@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "Nastavit heslo"
   },
-  "talk_dialog_legacy": {
-    "message": "Otevřít starý dialog"
-  },
   "talk_button_apply_fields": {
     "message": "Použít pole"
   },

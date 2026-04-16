@@ -1052,34 +1052,30 @@ namespace NcTalkOutlookAddIn.UI
         private void OnAboutLicenseLinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             string licensePath = ResolveLicensePath();
-            try
+            if (File.Exists(licensePath))
             {
-                if (File.Exists(licensePath))
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = licensePath,
-                        UseShellExecute = true
-                    });
-                }
-                else
+                string openError;
+                bool opened = BrowserLauncher.OpenTarget(
+                    licensePath,
+                    LogCategories.Core,
+                    "Failed to open license file.",
+                    out openError);
+                if (!opened)
                 {
                     MessageBox.Show(
-                        string.Format(Strings.LicenseFileMissingMessage, licensePath),
+                        string.Format(Strings.LicenseFileOpenErrorMessage, openError ?? string.Empty),
                         Strings.DialogTitle,
                         MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
+                        MessageBoxIcon.Warning);
                 }
+                return;
             }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open license file.", ex);
-                MessageBox.Show(
-                    string.Format(Strings.LicenseFileOpenErrorMessage, ex.Message),
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-            }
+
+            MessageBox.Show(
+                string.Format(Strings.LicenseFileMissingMessage, licensePath),
+                Strings.DialogTitle,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private static string ResolveLicensePath()
@@ -1969,46 +1965,46 @@ namespace NcTalkOutlookAddIn.UI
         private void OnDebugOpenLinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             string path = DiagnosticsLogger.LogFileFullPath ?? string.Empty;
-            try
+            if (File.Exists(path))
             {
-                if (File.Exists(path))
+                bool opened = BrowserLauncher.OpenTarget(
+                    path,
+                    LogCategories.Core,
+                    "Failed to open debug log file.");
+                if (!opened)
                 {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = path,
-                        UseShellExecute = true
-                    });
+                    MessageBox.Show(
+                        Strings.DebugLogOpenErrorMessage,
+                        Strings.DialogTitle,
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                 }
-                else
-                {
-                    string directory = Path.GetDirectoryName(path);
-                    if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
-                    {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = directory,
-                            UseShellExecute = true
-                        });
-                    }
-                    else
-                    {
-                        MessageBox.Show(
-                            Strings.DebugLogMissingMessage,
-                            Strings.DialogTitle,
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information);
-                    }
-                }
+                return;
             }
-            catch (Exception ex)
+
+            string directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open debug log path.", ex);
-                MessageBox.Show(
-                    Strings.DebugLogOpenErrorMessage,
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                bool opened = BrowserLauncher.OpenTarget(
+                    directory,
+                    LogCategories.Core,
+                    "Failed to open debug log directory.");
+                if (!opened)
+                {
+                    MessageBox.Show(
+                        Strings.DebugLogOpenErrorMessage,
+                        Strings.DialogTitle,
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                }
+                return;
             }
+
+            MessageBox.Show(
+                Strings.DebugLogMissingMessage,
+                Strings.DialogTitle,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void UpdateTlsOptionsState()

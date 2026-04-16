@@ -756,7 +756,10 @@ namespace NcTalkOutlookAddIn
                         }
                         finally
                         {
-                            ReleaseComObject(attachment, "compose attachment snapshot");
+                            ComInteropScope.TryRelease(
+                                attachment,
+                                LogCategories.FileLink,
+                                "Failed to release COM object (compose attachment snapshot).");
                         }
                     }
                 }
@@ -769,7 +772,10 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
-                    ReleaseComObject(attachments, "compose attachments collection snapshot");
+                    ComInteropScope.TryRelease(
+                        attachments,
+                        LogCategories.FileLink,
+                        "Failed to release COM object (compose attachments collection snapshot).");
                 }
 
                 return snapshots;
@@ -1348,7 +1354,10 @@ namespace NcTalkOutlookAddIn
                         }
                         finally
                         {
-                            ReleaseComObject(attachment, "compose attachment collect");
+                            ComInteropScope.TryRelease(
+                                attachment,
+                                LogCategories.FileLink,
+                                "Failed to release COM object (compose attachment collect).");
                         }
                     }
                 }
@@ -1361,7 +1370,10 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
-                    ReleaseComObject(attachments, "compose attachments collection collect");
+                    ComInteropScope.TryRelease(
+                        attachments,
+                        LogCategories.FileLink,
+                        "Failed to release COM object (compose attachments collection collect).");
                 }
             }
 
@@ -1491,7 +1503,10 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
-                    ReleaseComObject(attachments, "compose attachments collection remove");
+                    ComInteropScope.TryRelease(
+                        attachments,
+                        LogCategories.FileLink,
+                        "Failed to release COM object (compose attachments collection remove).");
                     _attachmentSuppressed = false;
                 }
 
@@ -1541,7 +1556,10 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
-                    ReleaseComObject(attachments, "compose attachments collection remove_last");
+                    ComInteropScope.TryRelease(
+                        attachments,
+                        LogCategories.FileLink,
+                        "Failed to release COM object (compose attachments collection remove_last).");
                     _attachmentSuppressed = false;
                 }
 
@@ -2150,14 +2168,6 @@ namespace NcTalkOutlookAddIn
                     DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.PathName.", ex);
                     return string.Empty;
                 }
-            }
-
-            private static void ReleaseComObject(object comObject, string description)
-            {
-                ComInteropScope.TryRelease(
-                    comObject,
-                    LogCategories.FileLink,
-                    "Failed to release COM object (" + (description ?? string.Empty) + ").");
             }
 
             public void Dispose()

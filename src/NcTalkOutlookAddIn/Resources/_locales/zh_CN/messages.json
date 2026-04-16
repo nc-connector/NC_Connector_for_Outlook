@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "设置密码"
   },
-  "talk_dialog_legacy": {
-    "message": "打开旧版对话框"
-  },
   "talk_button_apply_fields": {
     "message": "应用字段"
   },

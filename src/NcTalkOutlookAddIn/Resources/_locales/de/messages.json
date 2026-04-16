@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "Passwort setzen"
   },
-  "talk_dialog_legacy": {
-    "message": "Dialog im Termin öffnen"
-  },
   "talk_button_apply_fields": {
     "message": "Felder übernehmen"
   },

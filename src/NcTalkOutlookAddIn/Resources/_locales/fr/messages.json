@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "Définir un mot de passe"
   },
-  "talk_dialog_legacy": {
-    "message": "Ouvrir le dialogue classique"
-  },
   "talk_button_apply_fields": {
     "message": "Appliquer les champs"
   },

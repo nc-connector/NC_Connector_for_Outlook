@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "パスワードを設定"
   },
-  "talk_dialog_legacy": {
-    "message": "旧ダイアログを開く"
-  },
   "talk_button_apply_fields": {
     "message": "フィールドを適用"
   },

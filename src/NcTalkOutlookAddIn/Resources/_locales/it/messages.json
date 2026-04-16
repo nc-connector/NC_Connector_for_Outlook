@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "Imposta password"
   },
-  "talk_dialog_legacy": {
-    "message": "Apri finestra di dialogo legacy"
-  },
   "talk_button_apply_fields": {
     "message": "Applica campi"
   },

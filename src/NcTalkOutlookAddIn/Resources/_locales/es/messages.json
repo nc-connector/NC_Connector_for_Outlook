@@ -332,9 +332,6 @@
   "talk_password_toggle_label": {
     "message": "Establecer contraseña"
   },
-  "talk_dialog_legacy": {
-    "message": "Abrir diálogo heredado"
-  },
   "talk_button_apply_fields": {
     "message": "Aplicar campos"
   },

@@ -50,41 +50,4 @@ namespace NcTalkOutlookAddIn.Utilities
         }
     }
 
-    /**
-     * Disposable COM wrapper used when a local COM object should always be released
-     * at scope end (for example in method-level finally-style flows).
-     */
-    internal sealed class ComObjectScope<T> : IDisposable where T : class
-    {
-        private object _instance;
-        private readonly string _category;
-        private readonly string _failureMessage;
-        private readonly bool _finalRelease;
-
-        internal ComObjectScope(T instance, string category, string failureMessage, bool finalRelease = false)
-        {
-            _instance = instance;
-            _category = category ?? string.Empty;
-            _failureMessage = failureMessage ?? string.Empty;
-            _finalRelease = finalRelease;
-        }
-
-        internal T Value
-        {
-            get { return _instance as T; }
-        }
-
-        public void Dispose()
-        {
-            object instance = _instance;
-            _instance = null;
-            if (_finalRelease)
-            {
-                ComInteropScope.TryFinalRelease(instance, _category, _failureMessage);
-                return;
-            }
-
-            ComInteropScope.TryRelease(instance, _category, _failureMessage);
-        }
-    }
 }
