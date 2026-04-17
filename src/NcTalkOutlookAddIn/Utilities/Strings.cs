@@ -28,10 +28,11 @@ namespace NcTalkOutlookAddIn.Utilities
         private const string DefaultLanguageCode = "de";
         private const string EnglishLanguageCode = "en";
 
-        private static readonly string[] SupportedLanguages = new[]
+        // Canonical override order keeps "default" first and the explicit locale order stable for UI dropdowns.
+        private static readonly string[] SupportedLanguageOverrideValues = new[]
         {
-            "de",
             "en",
+            "de",
             "fr",
             "cs",
             "es",
@@ -47,25 +48,8 @@ namespace NcTalkOutlookAddIn.Utilities
             "zh_TW"
         };
 
-        private static readonly string[] SupportedLanguageOverrides = new[]
-        {
-            "default",
-            "en",
-            "de",
-            "fr",
-            "cs",
-            "es",
-            "hu",
-            "it",
-            "ja",
-            "nl",
-            "pl",
-            "pt_BR",
-            "pt_PT",
-            "ru",
-            "zh_CN",
-            "zh_TW"
-        };
+        private static readonly string[] SupportedLanguages = BuildSupportedLanguages();
+        private static readonly string[] SupportedLanguageOverrides = BuildSupportedLanguageOverrides();
 
         internal static IReadOnlyList<string> SupportedLanguageCodes
         {
@@ -78,6 +62,41 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static readonly HashSet<string> SupportedLanguageSet = new HashSet<string>(SupportedLanguages, StringComparer.OrdinalIgnoreCase);
+
+        private static string[] BuildSupportedLanguages()
+        {
+            var values = new List<string>();
+            values.Add(DefaultLanguageCode);
+
+            for (int i = 0; i < SupportedLanguageOverrideValues.Length; i++)
+            {
+                string code = SupportedLanguageOverrideValues[i];
+                if (!string.Equals(code, DefaultLanguageCode, StringComparison.OrdinalIgnoreCase) &&
+                    !values.Contains(code))
+                {
+                    values.Add(code);
+                }
+            }
+
+            return values.ToArray();
+        }
+
+        private static string[] BuildSupportedLanguageOverrides()
+        {
+            var values = new List<string>();
+            values.Add("default");
+
+            for (int i = 0; i < SupportedLanguageOverrideValues.Length; i++)
+            {
+                string code = SupportedLanguageOverrideValues[i];
+                if (!values.Contains(code))
+                {
+                    values.Add(code);
+                }
+            }
+
+            return values.ToArray();
+        }
 
         private static readonly object InitLock = new object();
         private static bool _initialized;

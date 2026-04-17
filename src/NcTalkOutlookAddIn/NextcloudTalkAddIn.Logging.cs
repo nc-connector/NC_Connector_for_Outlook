@@ -22,7 +22,7 @@ namespace NcTalkOutlookAddIn
 
         private static void LogSettings(string message)
         {
-            DiagnosticsLogger.Log(LogCategories.Core, message);
+            LogCore(message);
         }
 
         private static void LogTalk(string message)

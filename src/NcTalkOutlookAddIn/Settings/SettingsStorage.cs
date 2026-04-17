@@ -136,10 +136,7 @@ namespace NcTalkOutlookAddIn.Settings
                 return;
             }
 
-            if (!migrated)
-            {
-                DiagnosticsLogger.Log(LogCategories.Core, "Legacy settings migration was not fully successful. Legacy INI file is kept.");
-            }
+            DiagnosticsLogger.Log(LogCategories.Core, "Legacy settings migration was not fully successful. Legacy INI file is kept.");
         }
 
         private bool TryMigrateLegacyIniToProfiles(string sourcePath)

@@ -10,7 +10,6 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -3189,29 +3188,10 @@ namespace NcTalkOutlookAddIn.UI
 
             if (string.IsNullOrWhiteSpace(generated) || generated.Trim().Length < minLength)
             {
-                generated = GenerateLocalPassword(minLength);
+                generated = PasswordGenerator.GenerateLocalPassword(minLength);
             }
 
             return generated;
-        }
-
-        private static string GenerateLocalPassword(int minLength)
-        {
-            const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-            int length = Math.Max(8, minLength);
-            var chars = new char[length];
-            using (var rng = RandomNumberGenerator.Create())
-            {
-                byte[] data = new byte[4];
-                for (int i = 0; i < chars.Length; i++)
-                {
-                    rng.GetBytes(data);
-                    int index = (int)(BitConverter.ToUInt32(data, 0) % alphabet.Length);
-                    chars[i] = alphabet[index];
-                }
-            }
-
-            return new string(chars);
         }
 
         private bool IsPasswordValid(string password)

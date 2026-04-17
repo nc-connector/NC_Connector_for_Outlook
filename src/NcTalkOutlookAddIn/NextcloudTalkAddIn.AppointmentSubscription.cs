@@ -498,7 +498,7 @@ namespace NcTalkOutlookAddIn
                             continue;
                         }
 
-                        if (currentAppointment == appointment || ReferenceEquals(currentAppointment, appointment))
+                        if (currentAppointment == appointment)
                         {
                             return true;
                         }
@@ -632,7 +632,7 @@ namespace NcTalkOutlookAddIn
                     return false;
                 }
 
-                if (appointment == _appointment || ReferenceEquals(appointment, _appointment))
+                if (appointment == _appointment)
                 {
                     return true;
                 }
