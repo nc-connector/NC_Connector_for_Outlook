@@ -327,7 +327,14 @@ namespace NcTalkOutlookAddIn.Utilities
             html = html.Replace("{EXPIRATIONDATE}", HttpUtility.HtmlEncode(expireValue));
             html = html.Replace("{RIGHTS}", rightsValue);
             html = html.Replace("{NOTE}", HttpUtility.HtmlEncode(noteValue));
-            return html;
+
+            string sanitized = HtmlTemplateSanitizer.SanitizeShareTemplateHtml(html);
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                throw new InvalidOperationException("Share HTML template sanitized to empty output.");
+            }
+
+            return sanitized;
         }
 
         /**

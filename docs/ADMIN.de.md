@@ -9,6 +9,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 - [Dateien & Registry](#dateien--registry)
 - [Einstellungen (Profil-XML)](#einstellungen-profil-xml)
 - [Compose-Freigabe-Lifecycle (3.0.2)](#compose-freigabe-lifecycle-302)
+- [Talk-Termin-Templates (HTML) — Outlook-sicheres Subset](#talk-termin-templates-html--outlook-sicheres-subset)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [Systemadressbuch erforderlich fuer Benutzersuche und Moderator-Auswahl](#systemadressbuch-erforderlich-fuer-benutzersuche-und-moderator-auswahl)
 - [Logging / Support](#logging--support)
@@ -131,6 +132,18 @@ Empfehlung:
 - Versandstrategie:
   - zuerst automatischer Versand
   - bei Fehlern ein vorbefuellter manueller Fallback-Entwurf.
+
+## Talk-Termin-Templates (HTML) — Outlook-sicheres Subset
+
+Wenn fuer Talk-Terminbeschreibungen im Backend `event_description_type=html` genutzt wird, gilt fuer stabiles Outlook-Rendering:
+
+- Templates werden zuerst sanitiziert (fail-closed, kein Raw-HTML-Fallback).
+- Der Termin-Insert laeuft ueber HTML->RTF-Bridge (`MailItem.HTMLBody` -> `AppointmentItem.RTFBody`).
+- Vor dem Insert laeuft ein expliziter Appointment-Compat-Transform:
+  - bevorzugte Tabellenstruktur (`table`, `tbody`, `tr`, `td`)
+  - Legacy-Fallbacks fuer Farben/Ausrichtung (`font color`, `bgcolor`, `align`, `valign`)
+  - Linkfarbe wird bei Bedarf zusaetzlich als `<a><font color=...>...</font></a>` abgesichert
+  - Word-kritische CSS-Features werden entfernt (`flex/grid`, `border-radius`, `overflow`, `object-fit`, `user-select`).
 
 ## Internet Free/Busy Gateway (IFB)
 

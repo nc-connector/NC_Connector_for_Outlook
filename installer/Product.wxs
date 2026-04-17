@@ -26,7 +26,16 @@
         <Component Id="cmpNcTalkCore" Guid="{AEF96F2F-5033-4A4E-956D-1E735210A517}">
           <File Id="filNcTalkDll" Source="$(var.BuildOutputDir)NcTalkOutlookAddIn.dll" KeyPath="yes" />
           <File Id="filNcTalkDllConfig" Source="$(var.BuildOutputDir)NcTalkOutlookAddIn.dll.config" />
+          <File Id="filAngleSharpDll" Source="$(var.BuildOutputDir)AngleSharp.dll" />
+          <File Id="filAngleSharpCssDll" Source="$(var.BuildOutputDir)AngleSharp.Css.dll" />
+          <File Id="filHtmlSanitizerDll" Source="$(var.BuildOutputDir)HtmlSanitizer.dll" />
+          <File Id="filSystemBuffersDll" Source="$(var.BuildOutputDir)System.Buffers.dll" />
+          <File Id="filSystemCollectionsImmutableDll" Source="$(var.BuildOutputDir)System.Collections.Immutable.dll" />
+          <File Id="filSystemMemoryDll" Source="$(var.BuildOutputDir)System.Memory.dll" />
+          <File Id="filSystemUnsafeDll" Source="$(var.BuildOutputDir)System.Runtime.CompilerServices.Unsafe.dll" />
+          <File Id="filSystemCodePagesDll" Source="$(var.BuildOutputDir)System.Text.Encoding.CodePages.dll" />
           <File Id="filLicenseTxt" Source="$(var.BuildOutputDir)LICENSE.txt" />
+          <File Id="filVendorTxt" Source="$(var.BuildOutputDir)VENDOR.md" />
         </Component>
 
         <Component Id="cmpOutlookAddinReg" Guid="{8ED9BE3B-8138-4F3D-92FD-A5DA0CECA9F6}">

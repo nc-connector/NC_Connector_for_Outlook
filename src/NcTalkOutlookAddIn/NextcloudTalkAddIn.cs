@@ -494,6 +494,24 @@ namespace NcTalkOutlookAddIn
                     _currentSettings != null ? _currentSettings.EventDescriptionLang : "default");
                 string descriptionType = ResolveTalkEventDescriptionType(policyStatus);
                 string invitationTemplate = ResolveTalkInvitationTemplate(policyStatus);
+                string initialDescription;
+                try
+                {
+                    initialDescription = BuildInitialRoomDescription(
+                        dialog.TalkPassword,
+                        descriptionLanguage,
+                        invitationTemplate);
+                }
+                catch (Exception ex)
+                {
+                    LogTalk("Talk invitation template rendering blocked: " + ex.Message);
+                    MessageBox.Show(
+                        string.Format(CultureInfo.CurrentCulture, Strings.ErrorCreateRoomUnexpected, ex.Message),
+                        Strings.DialogTitle,
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    return;
+                }
 
                 var request = new TalkRoomRequest
                 {
@@ -507,10 +525,7 @@ namespace NcTalkOutlookAddIn
                     DescriptionLanguage = descriptionLanguage,
                     DescriptionType = descriptionType,
                     InvitationTemplate = invitationTemplate,
-                    Description = BuildInitialRoomDescription(
-                        dialog.TalkPassword,
-                        descriptionLanguage,
-                        invitationTemplate),
+                    Description = initialDescription,
                     AddUsers = dialog.AddUsers,
                     AddGuests = dialog.AddGuests,
                     DelegateModeratorId = dialog.DelegateModeratorId,
@@ -717,14 +732,43 @@ namespace NcTalkOutlookAddIn
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
 
-                    string html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
+                    string html;
+                    try
+                    {
+                        html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogFileLink("Share template rendering blocked: " + ex.Message);
+                        MessageBox.Show(
+                            string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
+                            Strings.DialogTitle,
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                        return false;
+                    }
 
                     if (composeSubscription != null
                         && wizard.RequestSnapshot != null
                         && wizard.RequestSnapshot.PasswordSeparateEnabled
                         && !string.IsNullOrWhiteSpace(wizard.Result.Password))
                     {
-                        string passwordOnlyHtml = FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
+                        string passwordOnlyHtml;
+                        try
+                        {
+                            passwordOnlyHtml = FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogFileLink("Password-only template rendering blocked: " + ex.Message);
+                            MessageBox.Show(
+                                string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
+                                Strings.DialogTitle,
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                            return false;
+                        }
+
                         composeSubscription.RegisterSeparatePasswordDispatch(
                             wizard.Result,
                             wizard.RequestSnapshot,
@@ -1415,85 +1459,70 @@ namespace NcTalkOutlookAddIn
 
         internal static string ReadAppointmentHtmlBody(Outlook.AppointmentItem appointment)
         {
-            Outlook.Inspector inspector = null;
-            object htmlEditor = null;
-            object body = null;
-
-            try
-            {
-                inspector = appointment != null ? appointment.GetInspector : null;
-                if (inspector == null)
-                {
-                    return string.Empty;
-                }
-
-                htmlEditor = inspector.HTMLEditor;
-                if (htmlEditor == null)
-                {
-                    return string.Empty;
-                }
-
-                body = htmlEditor.GetType().InvokeMember("body", BindingFlags.GetProperty, null, htmlEditor, null);
-                if (body == null)
-                {
-                    return string.Empty;
-                }
-
-                object innerHtml = body.GetType().InvokeMember("innerHTML", BindingFlags.GetProperty, null, body, null);
-                return innerHtml != null ? Convert.ToString(innerHtml, CultureInfo.InvariantCulture) ?? string.Empty : string.Empty;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment HTML body.", ex);
-                return string.Empty;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(body, LogCategories.Core, "Failed to release appointment HTML body COM object.");
-                ComInteropScope.TryRelease(htmlEditor, LogCategories.Core, "Failed to release appointment HTML editor COM object.");
-                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release appointment Inspector COM object.");
-            }
+            // AppointmentItem HTMLBody is intentionally not used.
+            // Outlook builds differ here and may not expose this member reliably.
+            // The appointment HTML insertion path is handled through HTML->RTF bridge.
+            return string.Empty;
         }
 
         internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
         {
-            Outlook.Inspector inspector = null;
-            object htmlEditor = null;
-            object body = null;
+            return TryWriteAppointmentHtmlBodyWithRtfBridge(appointment, html);
+        }
+
+        private static bool TryWriteAppointmentHtmlBodyWithRtfBridge(Outlook.AppointmentItem appointment, string html)
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(html))
+            {
+                return false;
+            }
+
+            Outlook.Application application = null;
+            Outlook.MailItem stagingMail = null;
 
             try
             {
-                inspector = appointment != null ? appointment.GetInspector : null;
-                if (inspector == null)
+                application = appointment.Application;
+                if (application == null)
                 {
                     return false;
                 }
 
-                htmlEditor = inspector.HTMLEditor;
-                if (htmlEditor == null)
+                stagingMail = application.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
+                if (stagingMail == null)
                 {
                     return false;
                 }
 
-                body = htmlEditor.GetType().InvokeMember("body", BindingFlags.GetProperty, null, htmlEditor, null);
-                if (body == null)
+                string bridgeHtml = HtmlTemplateSanitizer.PrepareTalkAppointmentHtmlForOutlookRtfBridge(html);
+                if (string.IsNullOrWhiteSpace(bridgeHtml))
                 {
+                    bridgeHtml = html ?? string.Empty;
+                }
+
+                stagingMail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
+                stagingMail.HTMLBody = bridgeHtml;
+
+                var rtfBody = stagingMail.RTFBody as byte[];
+                if (rtfBody == null || rtfBody.Length == 0)
+                {
+                    DiagnosticsLogger.Log(LogCategories.Talk, "Appointment HTML->RTF bridge produced empty RTF body.");
                     return false;
                 }
 
-                body.GetType().InvokeMember("innerHTML", BindingFlags.SetProperty, null, body, new object[] { html ?? string.Empty });
+                appointment.RTFBody = rtfBody;
+                DiagnosticsLogger.Log(LogCategories.Talk, "Appointment HTML body written via HTML->RTF bridge.");
                 return true;
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to write appointment HTML body.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to write appointment HTML body via HTML->RTF bridge.", ex);
                 return false;
             }
             finally
             {
-                ComInteropScope.TryRelease(body, LogCategories.Core, "Failed to release appointment HTML body COM object.");
-                ComInteropScope.TryRelease(htmlEditor, LogCategories.Core, "Failed to release appointment HTML editor COM object.");
-                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release appointment Inspector COM object.");
+                ComInteropScope.TryRelease(stagingMail, LogCategories.Talk, "Failed to release staging MailItem COM object.");
+                ComInteropScope.TryRelease(application, LogCategories.Talk, "Failed to release Outlook application COM object for appointment HTML->RTF bridge.");
             }
         }
 

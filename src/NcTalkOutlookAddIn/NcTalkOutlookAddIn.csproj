@@ -49,6 +49,38 @@
     <Reference Include="System.Security" />
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Extensions" />
+    <Reference Include="AngleSharp">
+      <HintPath>vendor\htmlsanitizer\AngleSharp.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="AngleSharp.Css">
+      <HintPath>vendor\htmlsanitizer\AngleSharp.Css.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="HtmlSanitizer">
+      <HintPath>vendor\htmlsanitizer\HtmlSanitizer.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Buffers">
+      <HintPath>vendor\htmlsanitizer\System.Buffers.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Collections.Immutable">
+      <HintPath>vendor\htmlsanitizer\System.Collections.Immutable.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Memory">
+      <HintPath>vendor\htmlsanitizer\System.Memory.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>vendor\htmlsanitizer\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Text.Encoding.CodePages">
+      <HintPath>vendor\htmlsanitizer\System.Text.Encoding.CodePages.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="NextcloudTalkAddIn.cs" />
@@ -114,6 +146,7 @@
     <Compile Include="Utilities\DisabledControlTooltipHintHelper.cs" />
     <Compile Include="Utilities\HttpFailureDiagnostics.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
+    <Compile Include="Utilities\HtmlTemplateSanitizer.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />
     <Compile Include="Utilities\ComInteropScope.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -127,6 +160,10 @@
   <ItemGroup>
     <None Include="app.config" />
     <Content Include="LICENSE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\VENDOR.md">
+      <Link>VENDOR.md</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

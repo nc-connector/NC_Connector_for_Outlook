@@ -115,13 +115,22 @@ Runtime behavior:
 - backend custom templates stay inactive until the corresponding language override is set to `custom`
 - the `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
 - if `custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
-- `policy.talk.event_description_type` may be `html` or `plain_text`; when `html` is active, Outlook writes the Talk block into the open appointment editor as HTML so the event description renders rich text while the synchronized plain-text body remains available for downstream sync paths
+- `policy.talk.event_description_type` may be `html` or `plain_text`; when `html` is active, Outlook sanitizes the Talk HTML template, applies an appointment-compat transform (legacy color/alignment fallbacks + Word-safe CSS stripping), and writes the block via HTML->RTF bridge for stable appointment rendering
 
 Central policy can currently control:
 - Talk defaults and lock state
 - Sharing defaults and lock state
 - share HTML/password templates
 - Talk description language / custom invitation template
+
+### Talk appointment-safe HTML subset (backend templates)
+
+If backend policy/template delivery is enabled for Talk appointment descriptions (`event_description_type=html`), use this subset for robust Outlook rendering:
+
+- Prefer table-based markup for layout (`table`, `tbody`, `tr`, `td`).
+- Keep inline styles simple; avoid modern layout features (`flex`, `grid`) and advanced visual effects (`border-radius`, `overflow`, `object-fit`, `user-select`).
+- Keep links explicit with full `https://` URLs.
+- NC Connector adds legacy fallbacks automatically during appointment insert (`font color`, `bgcolor`, `align`, `valign`) and hardens anchor color rendering.
 
 ## Compose sharing lifecycle (3.0.2)
 

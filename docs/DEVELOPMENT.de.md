@@ -155,6 +155,7 @@ Utilities:
 - `src/NcTalkOutlookAddIn/Utilities/BrowserLauncher.cs` (zentraler Shell-Start fuer URLs, Dateien und Ordner)
 - `src/NcTalkOutlookAddIn/Utilities/SizeFormatting.cs` (zentrale MB-Formatierung fuer UI-Texte)
 - `src/NcTalkOutlookAddIn/Utilities/ComInteropScope.cs` (zentrale COM-Release-/FinalRelease-Helfer)
+- `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` (zentraler Sanitizer fuer Backend-HTML-Templates bei Share/Talk, fail-closed)
 
 Compose-Filelink-Paritaet (3.0.2):
 
@@ -170,17 +171,37 @@ Compose-Filelink-Paritaet (3.0.2):
   - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand.
 - `ComposeShareLifecycleController` kapselt die eigentliche Share-Cleanup-/Passwort-Dispatch-Logik; `MailComposeSubscription` haelt nur Queue- und Eventzustand.
 - `TalkAppointmentController` kapselt Appointment-Schreib-/Sync-Pfade; `NextcloudTalkAddIn` delegiert diese Aufrufe statt die komplette Fachlogik im Root zu halten.
+  - Custom-Talk-Templates aus dem Backend werden vor HTML-/Plain-Text-Rendering ueber `HtmlTemplateSanitizer` bereinigt (kein Raw-HTML-Fallback).
+  - fuer Talk-Termine laeuft vor dem Insert ein expliziter Compat-Transform (`HtmlTemplateSanitizer.PrepareTalkAppointmentHtmlForOutlookRtfBridge(...)`)
+  - Appointment-HTML wird ueber HTML->RTF-Bridge geschrieben (`MailItem.HTMLBody` -> `AppointmentItem.RTFBody`), nicht ueber `AppointmentItem.HTMLBody` und nicht ueber `HTMLEditor.body.innerHTML`.
 - `OutlookAttachmentAutomationGuardService` erzwingt den Host-Konflikt-Guard live:
   - vor Auswertung
   - vor Prompt-Aktionsverarbeitung
   - vor Wizard-Finalize im Attachment-Modus.
 - `FileLinkHtmlBuilder` erzeugt im Attachment-Modus reduziertes HTML mit ZIP-Link `/s/<token>/download`.
+- Custom-Share-Templates aus dem Backend werden im `FileLinkHtmlBuilder` vor der Einfuegung ueber `HtmlTemplateSanitizer` bereinigt (fail-closed).
 - `FileLinkWizardForm` akzeptiert im Datei-Schritt Explorer-Drag-and-drop fuer Dateien/Ordner ueber Queue und Aktionsbereich.
+
+### Appointment-sicheres HTML-Subset fuer Talk-Templates
+
+Damit Backend-Talk-Templates in Outlook-Terminen stabil gerendert werden (Word/RTF-Pipeline), gilt:
+
+- Layout bevorzugt tabellenbasiert aufbauen (`table`, `tbody`, `tr`, `td`).
+- Inline-Styles sind erlaubt, aber Word-kritische CSS-Features werden im Appointment-Compat-Transform entfernt:
+  - `display:flex|grid`, `flex*`, `grid*`, `border-radius*`, `overflow*`, `object-fit`, `user-select` (inkl. vendor-prefix Varianten).
+- Farbausrichtung bekommt zusaetzliche Legacy-Fallbacks:
+  - `style=color` -> `<font color=...>`
+  - `style=background-color` -> `bgcolor`
+  - `style=text-align` -> `align`
+  - `style=vertical-align` -> `valign`
+- Linkfarbe wird zusaetzlich abgesichert (`<a><font color=...>...</font></a>`), falls erforderlich.
+- Unsichere/nicht erlaubte Tags/Attribute entfernt der Sanitizer weiterhin fail-closed.
 
 Installer:
 
 - `installer/NcConnectorOutlookInstaller.wixproj` (WiX v4 SDK Projekt)
 - `installer/Product.wxs` (MSI Definition: Dateien + Registry + URLACL)
+- `VENDOR.md` (Lizenzhinweise fuer gebuendelte Drittanbieter-Abhaengigkeiten)
 
 ## Versionierung & Release
 
@@ -202,8 +223,9 @@ Wichtig für Updates:
 ### Release Checklist
 
 1) Version bump
-2) `.\build.ps1 -Configuration Release`
-3) MSI installieren/upgrade testen (alte Version → neue Version)
-4) Talk + Filelink + IFB Smoke-Test
-5) MSI ggf. signieren (falls in der Umgebung erforderlich)
+2) Bei geaenderten vendorten Abhaengigkeiten: `VENDOR.md` aktualisieren
+3) `.\build.ps1 -Configuration Release`
+4) MSI installieren/upgrade testen (alte Version → neue Version)
+5) Talk + Filelink + IFB Smoke-Test
+6) MSI ggf. signieren (falls in der Umgebung erforderlich)
 

@@ -101,6 +101,7 @@ Top-level:
 - `src/` — the COM add-in (WinForms UI + service layer)
 - `installer/` — WiX v4 MSI project (files + registry + URLACL)
 - `docs/` — admin/development documentation
+- `VENDOR.md` — bundled third-party sanitizer/runtime dependency notices and licenses
 - `assets/` — branding images used in README/screenshots
 - `dist/` — build output (MSI)
 
@@ -118,6 +119,7 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
 - `src/NcTalkOutlookAddIn/Utilities/` — logging, theming, i18n, small shared helpers
+- `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` — centralized sanitizer for backend-provided share/talk HTML templates
 
 ## Architecture
 
@@ -139,6 +141,7 @@ Key code locations:
   - `Utilities/BrowserLauncher.cs` centralizes shell target starts (URLs, files, directories).
   - `Utilities/SizeFormatting.cs` centralizes MB display formatting.
   - `Utilities/ComInteropScope.cs` centralizes COM release/final-release patterns.
+  - `Utilities/HtmlTemplateSanitizer.cs` applies a Thunderbird-aligned HTML policy for backend templates and fails closed if sanitization cannot be applied.
 
 ### End-to-end flows
 
@@ -151,11 +154,29 @@ Key code locations:
    - `Location` (Talk URL)
    - a localized plain-text body block (incl. password and help URL)
    - persisted metadata as Outlook `UserProperties` (including `X-NCTALK-*` keys)
+   - backend-provided custom Talk templates are sanitized before rendering (no raw HTML fallback)
+   - talk appointment HTML is passed through an explicit compatibility transform (`HtmlTemplateSanitizer.PrepareTalkAppointmentHtmlForOutlookRtfBridge(...)`) before insert
+   - appointment HTML insert uses the HTML->RTF bridge (`MailItem.HTMLBody` -> `AppointmentItem.RTFBody`), not `AppointmentItem.HTMLBody` and not `HTMLEditor.body.innerHTML`
 5. A runtime subscription is registered for the appointment (`AppointmentSubscription` inside `NextcloudTalkAddIn.cs`):
    - **Write** (save): updates lobby timer on time changes, updates room description, syncs participants, applies delegation
    - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update on the same opened appointment instead of broad calendar scanning.
    - **Close** (discard without saving): deletes the room to avoid orphans (best-effort)
    - **BeforeDelete**: deletes the room (best-effort)
+
+#### Talk appointment-safe HTML subset (backend custom templates)
+
+For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend Talk templates should stay within this subset:
+
+- Table-first layout (`table`, `tbody`, `tr`, `td`) for structure.
+- Inline styles are allowed, but NC Connector strips known Word-unreliable declarations for appointment rendering:
+  - `display:flex|grid`, `flex*`, `grid*`, `border-radius*`, `overflow*`, `object-fit`, `user-select` (vendor-prefixed variants included).
+- Color/alignment fallback is injected automatically during appointment compatibility transform:
+  - `style=color` -> `<font color=...>`
+  - `style=background-color` -> `bgcolor`
+  - `style=text-align` -> `align`
+  - `style=vertical-align` -> `valign`
+- Anchor color hardening: link color is additionally wrapped as `<a><font color=...>...</font></a>` where needed.
+- Unsupported/unsafe tags/attributes are still removed by the sanitizer (fail-closed policy).
 
 #### Sharing flow (mail compose)
 
@@ -163,6 +184,7 @@ Key code locations:
 2. `UI/FileLinkWizardForm.cs` collects sharing settings and the file/folder selection.
 3. `Services/FileLinkService.cs` performs WebDAV upload, creates the public share via OCS (`label` on create), then updates mutable metadata like `note` via the documented OCS update arguments.
 4. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
+   - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
 5. `NextcloudTalkAddIn.InsertHtmlIntoMailItem(...)` inserts the HTML into the message body.
 
 Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) with lifecycle logic delegated to `Controllers/ComposeShareLifecycleController`:
@@ -334,10 +356,11 @@ Detection logic (best-effort):
 ### Release checklist
 
 1. Bump version in `AssemblyInfo.cs`
-2. `.\build.ps1 -Configuration Release`
-3. Install/upgrade MSI test (old version → new version)
-4. Smoke test (Talk + sharing + IFB)
-5. Optional: sign the MSI (if required in your environment)
+2. If vendored dependencies changed: update `VENDOR.md`
+3. `.\build.ps1 -Configuration Release`
+4. Install/upgrade MSI test (old version → new version)
+5. Smoke test (Talk + sharing + IFB)
+6. Optional: sign the MSI (if required in your environment)
 
 ## Local testing
 

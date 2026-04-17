@@ -1,7 +1,7 @@
 <div align="center" style="background:#0082C9; padding:1px 0;"><img src="assets/header-solid-blue-1920x480.png" alt="Addon" height="80"></div>
 
 [English](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/README.md) | [Deutsch](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/README.de.md)
-[Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md) | [Development Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md) | [Translations](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md)
+[Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md) | [Development Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md) | [Translations](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md) | [VENDOR](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md)
 
 # NC Connector for Outlook
 
@@ -27,6 +27,10 @@ Im Debug-Tab aktivierbar. Schreibt strukturierte Logs (Authentifizierung, Termin
 ## Changelog
 
 Siehe [`CHANGELOG.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/CHANGELOG.md).
+
+## Drittanbieter-Lizenzen
+
+Gebuendelte Drittanbieter-Abhaengigkeiten (Sanitizer/Laufzeit) und deren Lizenzen sind in [`VENDOR.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md) dokumentiert.
 
 ## Funktionsüberblick
 

@@ -298,31 +298,35 @@ namespace NcTalkOutlookAddIn.Controllers
                     "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
 
                 var html = new StringBuilder();
-                html.Append("<div>");
-                html.Append("<p><strong>").Append(HttpUtility.HtmlEncode(BodySectionHeader)).Append("</strong></p>");
-                html.Append("<p>")
+                html.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
+                html.Append("<tbody>");
+                html.Append("<tr><td valign=\"top\" align=\"left\"><strong>")
+                    .Append(HttpUtility.HtmlEncode(BodySectionHeader))
+                    .Append("</strong></td></tr>");
+                html.Append("<tr><td valign=\"top\" align=\"left\">")
                     .Append(HttpUtility.HtmlEncode(joinLabel))
                     .Append("<br><a href=\"")
                     .Append(HttpUtility.HtmlAttributeEncode(roomUrl ?? string.Empty))
                     .Append("\">")
                     .Append(HttpUtility.HtmlEncode(roomUrl ?? string.Empty))
-                    .Append("</a></p>");
+                    .Append("</a></td></tr>");
 
                 if (!string.IsNullOrWhiteSpace(password))
                 {
-                    html.Append("<p>")
+                    html.Append("<tr><td valign=\"top\" align=\"left\">")
                         .Append(HttpUtility.HtmlEncode(string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim())))
-                        .Append("</p>");
+                        .Append("</td></tr>");
                 }
 
-                html.Append("<p>")
+                html.Append("<tr><td valign=\"top\" align=\"left\">")
                     .Append(HttpUtility.HtmlEncode(helpLabel))
                     .Append("<br><a href=\"")
                     .Append(HttpUtility.HtmlAttributeEncode(helpUrl))
                     .Append("\">")
                     .Append(HttpUtility.HtmlEncode(helpUrl))
-                    .Append("</a></p>");
-                html.Append("</div>");
+                    .Append("</a></td></tr>");
+                html.Append("</tbody>");
+                html.Append("</table>");
                 innerHtml = html.ToString();
             }
 
@@ -332,9 +336,10 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             return HtmlTalkBlockStartMarker
-                + "<div data-nc4ol-talk-block=\"true\" style=\"margin-top:16px;\">"
+                + "<table data-nc4ol-talk-block=\"true\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:16px;border-collapse:collapse;\">"
+                + "<tbody><tr><td valign=\"top\" align=\"left\">"
                 + innerHtml.Trim()
-                + "</div>"
+                + "</td></tr></tbody></table>"
                 + HtmlTalkBlockEndMarker;
         }
 
@@ -369,9 +374,15 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             string rendered = template
-                .Replace("{MEETING_URL}", meetingUrl ?? string.Empty)
-                .Replace("{PASSWORD}", password ?? string.Empty);
-            return ConvertHtmlTemplateToPlainText(rendered);
+                .Replace("{MEETING_URL}", HttpUtility.HtmlEncode(meetingUrl ?? string.Empty))
+                .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty));
+            string sanitized = HtmlTemplateSanitizer.SanitizeTalkTemplateHtml(rendered);
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                throw new InvalidOperationException("Talk invitation template sanitized to empty output.");
+            }
+
+            return ConvertHtmlTemplateToPlainText(sanitized);
         }
 
         private static string RenderTalkInvitationTemplateHtml(string template, string meetingUrl, string password)
@@ -381,10 +392,16 @@ namespace NcTalkOutlookAddIn.Controllers
                 return string.Empty;
             }
 
-            return template
+            string rendered = template
                 .Replace("{MEETING_URL}", HttpUtility.HtmlEncode(meetingUrl ?? string.Empty))
-                .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty))
-                .Trim();
+                .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty));
+            string sanitized = HtmlTemplateSanitizer.SanitizeTalkTemplateHtml(rendered);
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                throw new InvalidOperationException("Talk invitation HTML template sanitized to empty output.");
+            }
+
+            return sanitized.Trim();
         }
 
         private static string NormalizeTalkBlockLine(string line)
