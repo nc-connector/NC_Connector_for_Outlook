@@ -423,7 +423,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private static string BuildPasswordValueHtml(string password)
         {
             var passwordBuilder = new StringBuilder();
-            passwordBuilder.Append("<span style=\"display:inline-block;font-family:'Consolas','Courier New',monospace;padding:2px 6px;border:1px solid #c7c7c7;border-radius:3px;-ms-user-select:all;user-select:all;\" ondblclick=\"try{window.getSelection().selectAllChildren(this);}catch(e){}\" onclick=\"try{window.getSelection().selectAllChildren(this);}catch(e){}\">");
+            passwordBuilder.Append("<span style=\"display:inline-block;font-family:'Consolas','Courier New',monospace;padding:2px 6px;border:1px solid #c7c7c7;border-radius:3px;-ms-user-select:all;user-select:all;\">");
             passwordBuilder.Append(HttpUtility.HtmlEncode(password ?? string.Empty));
             passwordBuilder.Append("</span>");
             return passwordBuilder.ToString();
