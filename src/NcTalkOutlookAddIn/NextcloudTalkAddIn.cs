@@ -1115,6 +1115,32 @@ namespace NcTalkOutlookAddIn
                 return;
             }
 
+            SynchronizationContext notificationUiContext = _uiSynchronizationContext ?? SynchronizationContext.Current;
+            if (notificationUiContext == null)
+            {
+                LogFileLink("Separate password notification skipped (UI context unavailable, recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
+                return;
+            }
+
+            try
+            {
+                notificationUiContext.Post(
+                    _ => ShowPasswordMailSuccessNotificationOnUiContext(recipientCount, notificationUiContext),
+                    null);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Separate password notification failed.", ex);
+            }
+        }
+
+        private void ShowPasswordMailSuccessNotificationOnUiContext(int recipientCount, SynchronizationContext notificationUiContext)
+        {
+            if (recipientCount <= 0)
+            {
+                return;
+            }
+
             try
             {
                 var notifyIcon = new NotifyIcon();
@@ -1126,16 +1152,16 @@ namespace NcTalkOutlookAddIn
                     Strings.SharingPasswordMailNotificationSuccess,
                     recipientCount.ToString(CultureInfo.CurrentCulture));
                 notifyIcon.ShowBalloonTip(5000);
-                ScheduleNotifyIconDispose(notifyIcon, 7000);
+                ScheduleNotifyIconDispose(notifyIcon, 7000, notificationUiContext);
                 LogFileLink("Separate password notification shown (recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Separate password notification failed.", ex);
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Separate password notification failed on UI context.", ex);
             }
         }
 
-        private void ScheduleNotifyIconDispose(NotifyIcon notifyIcon, int delayMs)
+        private void ScheduleNotifyIconDispose(NotifyIcon notifyIcon, int delayMs, SynchronizationContext notificationUiContext)
         {
             if (notifyIcon == null)
             {
@@ -1144,21 +1170,20 @@ namespace NcTalkOutlookAddIn
 
             int effectiveDelayMs = Math.Max(0, delayMs);
             Task.Delay(effectiveDelayMs).ContinueWith(
-                _ => DisposeNotifyIconOnUiContext(notifyIcon),
+                _ => DisposeNotifyIconOnUiContext(notifyIcon, notificationUiContext),
                 CancellationToken.None,
                 TaskContinuationOptions.None,
                 TaskScheduler.Default);
         }
 
-        private void DisposeNotifyIconOnUiContext(NotifyIcon notifyIcon)
+        private void DisposeNotifyIconOnUiContext(NotifyIcon notifyIcon, SynchronizationContext notificationUiContext)
         {
             if (notifyIcon == null)
             {
                 return;
             }
 
-            SynchronizationContext context = _uiSynchronizationContext;
-            if (context == null)
+            if (notificationUiContext == null)
             {
                 DisposeNotifyIcon(notifyIcon);
                 return;
@@ -1166,7 +1191,7 @@ namespace NcTalkOutlookAddIn
 
             try
             {
-                context.Post(_ => DisposeNotifyIcon(notifyIcon), null);
+                notificationUiContext.Post(_ => DisposeNotifyIcon(notifyIcon), null);
             }
             catch (Exception ex)
             {
