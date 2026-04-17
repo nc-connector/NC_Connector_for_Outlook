@@ -5,6 +5,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
@@ -325,71 +326,61 @@ namespace NcTalkOutlookAddIn.Services
                 startUtc.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture),
                 endUtc.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture));
 
-            HttpWebResponse response = null;
-            try
+            var httpClient = new NcHttpClient(_configuration);
+            NcHttpResponse response = httpClient.Send(new NcHttpRequestOptions
             {
-                var request = (HttpWebRequest)WebRequest.Create(calendarUrl);
-                request.Method = "REPORT";
-                request.ContentType = "application/xml; charset=utf-8";
-                request.Headers["Depth"] = "1";
-                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-                request.Timeout = 60000;
+                Method = "REPORT",
+                Url = calendarUrl,
+                Payload = reportBody,
+                ContentType = "application/xml; charset=utf-8",
+                TimeoutMs = 60000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                Headers = new Dictionary<string, string> { { "Depth", "1" } }
+            });
 
-                using (var stream = request.GetRequestStream())
-                using (var writer = new StreamWriter(stream, Utf8NoBom))
-                {
-                    writer.Write(reportBody);
-                }
-
-                response = (HttpWebResponse)request.GetResponse();
-                using (var responseStream = response.GetResponseStream())
-                using (var reader = new StreamReader(responseStream ?? Stream.Null, Encoding.UTF8))
-                {
-                    string payload = reader.ReadToEnd();
-                    if (string.IsNullOrEmpty(payload))
-                    {
-                        return null;
-                    }
-
-                    if (!string.IsNullOrEmpty(response.ContentType) &&
-                        response.ContentType.IndexOf("text/calendar", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        return payload;
-                    }
-
-                    string extracted = ExtractCalendarData(payload);
-                    return string.IsNullOrEmpty(extracted) ? payload : extracted;
-                }
-            }
-            catch (WebException ex)
+            if (!response.HasHttpResponse)
             {
-                HttpStatusCode? statusCode = null;
-                HttpWebResponse errorResponse = ex.Response as HttpWebResponse;
-                if (errorResponse != null)
+                if (response.TransportException != null)
                 {
-                    statusCode = errorResponse.StatusCode;
-                    using (var responseStream = errorResponse.GetResponseStream())
-                    using (var reader = new StreamReader(responseStream ?? Stream.Null, Encoding.UTF8))
-                    {
-                        string payload = reader.ReadToEnd();
-                        if (!string.IsNullOrEmpty(payload) &&
-                            payload.IndexOf("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            return payload;
-                        }
-                    }
+                    HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
+                    DiagnosticsLogger.LogException(LogCategory, "Free/busy REPORT request failed without HTTP response.", response.TransportException);
+                    throw new FreeBusyRequestException("Free/busy request failed: " + failure.BuildUserMessage(), null, ShouldFallback(null));
                 }
 
-                DiagnosticsLogger.LogException(LogCategory, "Free/busy REPORT request failed (status=" + (statusCode.HasValue ? ((int)statusCode.Value).ToString(CultureInfo.InvariantCulture) : "unknown") + ").", ex);
-                throw new FreeBusyRequestException("Free/busy request failed: " + ex.Message, statusCode, ShouldFallback(statusCode));
+                throw new FreeBusyRequestException("Free/busy request failed: no HTTP response.", null, ShouldFallback(null));
             }
-            finally
+
+            string payloadText = response.ResponseText ?? string.Empty;
+            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
-                if (response != null)
+                if (!string.IsNullOrEmpty(payloadText) &&
+                    payloadText.IndexOf("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    response.Close();
+                    return payloadText;
                 }
+
+                throw new FreeBusyRequestException(
+                    "Free/busy request failed: HTTP " + (int)response.StatusCode,
+                    response.StatusCode,
+                    ShouldFallback(response.StatusCode),
+                    payloadText);
             }
+
+            if (string.IsNullOrEmpty(payloadText))
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(response.ContentType) &&
+                response.ContentType.IndexOf("text/calendar", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return payloadText;
+            }
+
+            string extracted = ExtractCalendarData(payloadText);
+            return string.IsNullOrEmpty(extracted) ? payloadText : extracted;
         }
 
         private string RequestFreeBusyViaScheduling(string originatorEmail, string attendeeEmail, int days)
@@ -412,57 +403,47 @@ namespace NcTalkOutlookAddIn.Services
             string uid = Guid.NewGuid().ToString();
             string payload = BuildVFreeBusyRequest(uid, originatorEmail, attendeeEmail, startUtc, endUtc);
 
-            HttpWebResponse response = null;
-            try
+            var httpClient = new NcHttpClient(_configuration);
+            NcHttpResponse response = httpClient.Send(new NcHttpRequestOptions
             {
-                var request = (HttpWebRequest)WebRequest.Create(outboxUrl);
-                request.Method = "POST";
-                request.ContentType = "text/calendar; charset=\"UTF-8\"";
-                request.Headers["Depth"] = "0";
-                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-                request.Headers["Originator"] = "mailto:" + originatorEmail;
-                request.Headers["Recipient"] = "mailto:" + attendeeEmail;
-                request.Timeout = 60000;
-
-                using (var stream = request.GetRequestStream())
-                using (var writer = new StreamWriter(stream, Utf8NoBom))
+                Method = "POST",
+                Url = outboxUrl,
+                Payload = payload,
+                ContentType = "text/calendar; charset=\"UTF-8\"",
+                TimeoutMs = 60000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                Headers = new Dictionary<string, string>
                 {
-                    writer.Write(payload);
+                    { "Depth", "0" },
+                    { "Originator", "mailto:" + originatorEmail },
+                    { "Recipient", "mailto:" + attendeeEmail }
                 }
+            });
 
-                response = (HttpWebResponse)request.GetResponse();
-                using (var responseStream = response.GetResponseStream())
-                using (var reader = new StreamReader(responseStream ?? Stream.Null, Encoding.UTF8))
-                {
-                    string responseText = reader.ReadToEnd();
-                    return ExtractFreeBusyFromScheduleResponse(responseText, attendeeEmail);
-                }
-            }
-            catch (WebException ex)
+            if (!response.HasHttpResponse)
             {
-                HttpStatusCode? statusCode = null;
-                HttpWebResponse errorResponse = ex.Response as HttpWebResponse;
-                string responseText = null;
-                if (errorResponse != null)
+                if (response.TransportException != null)
                 {
-                    statusCode = errorResponse.StatusCode;
-                    using (var responseStream = errorResponse.GetResponseStream())
-                    using (var reader = new StreamReader(responseStream ?? Stream.Null, Encoding.UTF8))
-                    {
-                        responseText = reader.ReadToEnd();
-                    }
+                    DiagnosticsLogger.LogException(LogCategory, "CalDAV scheduling request failed without HTTP response.", response.TransportException);
+                    throw new FreeBusyRequestException("CalDAV scheduling failed: " + response.TransportException.Message, null, false, null);
                 }
 
-                DiagnosticsLogger.LogException(LogCategory, "CalDAV scheduling request failed (status=" + (statusCode.HasValue ? ((int)statusCode.Value).ToString(CultureInfo.InvariantCulture) : "unknown") + ").", ex);
-                throw new FreeBusyRequestException("CalDAV scheduling failed: " + ex.Message, statusCode, false, responseText);
+                throw new FreeBusyRequestException("CalDAV scheduling failed: no HTTP response.", null, false, null);
             }
-            finally
+
+            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
-                if (response != null)
-                {
-                    response.Close();
-                }
+                string responseText = response.ResponseText;
+                throw new FreeBusyRequestException(
+                    "CalDAV scheduling failed: HTTP " + (int)response.StatusCode,
+                    response.StatusCode,
+                    false,
+                    responseText);
             }
+
+            return ExtractFreeBusyFromScheduleResponse(response.ResponseText ?? string.Empty, attendeeEmail);
         }
 
         private static string BuildVFreeBusyRequest(string uid, string originator, string attendee, DateTime start, DateTime end)

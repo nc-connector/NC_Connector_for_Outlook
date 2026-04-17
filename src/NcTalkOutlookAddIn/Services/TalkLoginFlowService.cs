@@ -7,7 +7,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -24,6 +23,7 @@ namespace NcTalkOutlookAddIn.Services
         private const string DeviceName = "NC Connector for Outlook";
         private readonly string _baseUrl;
         private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
+        private readonly NcHttpClient _httpClient = new NcHttpClient(string.Empty, string.Empty);
 
         private static void LogApi(string message)
         {
@@ -129,128 +129,58 @@ namespace NcTalkOutlookAddIn.Services
         private IDictionary<string, object> ExecuteRequest(string url, string method, string payload, out HttpStatusCode statusCode, out string responseText)
         {
             statusCode = 0;
-            HttpWebResponse response = null;
-            HttpWebRequest request = null;
-            string connectionGroupName = null;
-            try
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = method;
-                request.Accept = "application/json";
-                request.Timeout = 60000;
-                request.Headers["OCS-APIRequest"] = "true";
-                request.UserAgent = BuildUserAgent();
-                connectionGroupName = "nc-loginflow-" + Guid.NewGuid().ToString("N");
-                request.ConnectionGroupName = connectionGroupName;
-                request.KeepAlive = false;
-                request.Pipelined = false;
+                Method = method,
+                Url = url,
+                Payload = payload,
+                Accept = "application/json",
+                ContentType = "application/json",
+                TimeoutMs = 60000,
+                IncludeAuthHeader = false,
+                IncludeOcsApiHeader = true,
+                ParseJson = true,
+                ForceFreshConnection = true,
+                UserAgent = BuildUserAgent()
+            });
 
-                if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) && payload != null)
-                {
-                    byte[] bytes = Encoding.UTF8.GetBytes(payload);
-                    request.ContentType = "application/json";
-                    request.ContentLength = bytes.Length;
-                    using (Stream stream = request.GetRequestStream())
-                    {
-                        stream.Write(bytes, 0, bytes.Length);
-                    }
-                }
-                else if (!string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase))
-                {
-                    request.ContentLength = 0;
-                }
-
-                try
-                {
-                    response = (HttpWebResponse)request.GetResponse();
-                }
-                catch (WebException ex)
-                {
-                    response = ex.Response as HttpWebResponse;
-                    if (response == null)
-                    {
-                        HttpFailureInfo failure = HttpFailureDiagnostics.Analyze(ex);
-                        DiagnosticsLogger.LogException(LogCategories.Api, "Login flow request failed without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(ex, failure) + ").", ex);
-                        throw new TalkServiceException(failure.BuildUserMessage(), false, 0, null, true);
-                    }
-                }
-
-                statusCode = response.StatusCode;
-                using (Stream stream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(stream ?? Stream.Null))
-                {
-                    responseText = reader.ReadToEnd();
-                }
-
-                if (string.IsNullOrWhiteSpace(responseText))
-                {
-                    return new Dictionary<string, object>();
-                }
-
-                try
-                {
-                    return _serializer.DeserializeObject(responseText) as IDictionary<string, object> ?? new Dictionary<string, object>();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Api, "Login flow JSON parsing failed.", ex);
-                    throw new TalkServiceException("Could not parse JSON: " + ex.Message, false, response.StatusCode, responseText);
-                }
-            }
-            finally
+            if (!response.HasHttpResponse)
             {
-                if (response != null)
+                if (response.TransportException != null)
                 {
-                    response.Close();
+                    HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
+                    DiagnosticsLogger.LogException(LogCategories.Api, "Login flow request failed without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(response.TransportException, failure) + ").", response.TransportException);
+                    throw new TalkServiceException(failure.BuildUserMessage(), false, 0, null, true);
                 }
 
-                if (request != null && !string.IsNullOrEmpty(connectionGroupName))
-                {
-                    try
-                    {
-                        request.ServicePoint.CloseConnectionGroup(connectionGroupName);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(
-                            LogCategories.Api,
-                            "Failed to close temporary login-flow connection group.",
-                            ex);
-                    }
-                }
+                throw new TalkServiceException("Login flow request failed without HTTP response.", false, 0, null, true);
             }
+
+            statusCode = response.StatusCode;
+            responseText = response.ResponseText;
+
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                return new Dictionary<string, object>();
+            }
+
+            if (response.JsonParseException != null)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Api, "Login flow JSON parsing failed.", response.JsonParseException);
+                throw new TalkServiceException("Could not parse JSON: " + response.JsonParseException.Message, false, statusCode, responseText);
+            }
+
+            return response.ParsedJson ?? new Dictionary<string, object>();
         }
 
         private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
         {
-            if (parent == null)
-            {
-                return null;
-            }
-
-            object value;
-            if (parent.TryGetValue(key, out value))
-            {
-                return value as IDictionary<string, object>;
-            }
-
-            return null;
+            return NcJson.GetDictionary(parent, key);
         }
 
         private static string GetString(IDictionary<string, object> parent, string key)
         {
-            if (parent == null)
-            {
-                return null;
-            }
-
-            object value;
-            if (parent.TryGetValue(key, out value) && value != null)
-            {
-                return Convert.ToString(value, CultureInfo.InvariantCulture);
-            }
-
-            return null;
+            return NcJson.GetString(parent, key);
         }
 
         private static string BuildUserAgent()

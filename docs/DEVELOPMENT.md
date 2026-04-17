@@ -116,10 +116,13 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/Controllers/OutlookRecipientResolverController.cs` — SMTP and attendee recipient resolution
 - `src/NcTalkOutlookAddIn/Controllers/MailComposeSubscriptionRegistryController.cs` — compose-subscription registry lifecycle
 - `src/NcTalkOutlookAddIn/Services/` — Nextcloud HTTP integrations (Talk, sharing, IFB, login flow)
+  - `Services/NcHttpClient.cs` is the shared request executor for auth headers, OCS headers, timeout/decompression, and optional fresh-connection mode.
+  - All runtime HTTP calls (Talk, share/DAV, IFB, login flow, moderator avatar fetch) are routed through `NcHttpClient`.
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
 - `src/NcTalkOutlookAddIn/Utilities/` — logging, theming, i18n, small shared helpers
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` — centralized sanitizer for backend-provided share/talk HTML templates
+- `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` — centralized JSON payload normalization (`PrepareJsonPayload`), dictionary/string/int helpers, and OCS error extraction
 
 ## Architecture
 
@@ -421,6 +424,7 @@ Primary write location:
 1. Add to the appropriate service:
    - Talk: `src/NcTalkOutlookAddIn/Services/TalkService.cs`
    - Sharing: `src/NcTalkOutlookAddIn/Services/FileLinkService.cs`
+   - Use `Services/NcHttpClient.cs` + `Utilities/NcJson.cs` for new OCS/JSON calls instead of introducing service-local request/parsing helpers.
 2. Add request/response model in `src/NcTalkOutlookAddIn/Models/` (if needed).
 3. Add logging scopes and error handling.
 4. Integrate in the UI/wizard and wire it up via `NextcloudTalkAddIn.cs`.

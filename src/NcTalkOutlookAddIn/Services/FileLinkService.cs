@@ -26,7 +26,7 @@ namespace NcTalkOutlookAddIn.Services
     {
         private const int ShareTypePublicLink = 3;
         private readonly TalkServiceConfiguration _configuration;
-        private readonly JavaScriptSerializerExtended _serializer = new JavaScriptSerializerExtended();
+        private readonly NcHttpClient _httpClient;
         private static void LogApi(string message)
         {
             DiagnosticsLogger.Log(LogCategories.Api, message);
@@ -44,6 +44,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             _configuration = configuration;
+            _httpClient = new NcHttpClient(configuration);
         }
 
         internal FileLinkResult CreateFileShare(FileLinkRequest request, IProgress<FileLinkProgress> progress, CancellationToken cancellationToken)
@@ -138,48 +139,41 @@ namespace NcTalkOutlookAddIn.Services
             string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
             string username = _configuration.Username ?? string.Empty;
             string url = BuildDavUrl(normalizedBaseUrl, username, normalizedPath);
-            var request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "DELETE";
-            request.Timeout = 90000;
-            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
             LogApi("DELETE " + url);
 
-            try
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                using (var response = (HttpWebResponse)request.GetResponse())
-                {
-                    if (response.StatusCode != HttpStatusCode.NoContent
-                        && response.StatusCode != HttpStatusCode.OK
-                        && response.StatusCode != HttpStatusCode.Accepted)
-                    {
-                        throw new TalkServiceException("Share folder could not be deleted: " + normalizedPath, false, response.StatusCode, null);
-                    }
-                    LogApi("DELETE " + url + " -> " + response.StatusCode);
-                }
-            }
-            catch (WebException ex)
+                Method = "DELETE",
+                Url = url,
+                TimeoutMs = 90000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false
+            });
+
+            if (!response.HasHttpResponse)
             {
-                var httpResponse = ex.Response as HttpWebResponse;
-                if (httpResponse != null)
-                {
-                    if (httpResponse.StatusCode == HttpStatusCode.NotFound)
-                    {
-                        LogFileLink("Share folder delete skipped (already removed): " + normalizedPath);
-                        return;
-                    }
-
-                    bool authError = httpResponse.StatusCode == HttpStatusCode.Unauthorized
-                                     || httpResponse.StatusCode == HttpStatusCode.Forbidden;
-                    DiagnosticsLogger.LogException(
-                        LogCategories.Api,
-                        "Share folder delete failed (" + url + ", status=" + (int)httpResponse.StatusCode + ").",
-                        ex);
-                    throw new TalkServiceException("Share folder delete failed: " + ex.Message, authError, httpResponse.StatusCode, null);
-                }
-
-                DiagnosticsLogger.LogException(LogCategories.Api, "Share folder delete failed (" + url + ").", ex);
-                throw new TalkServiceException("Share folder delete failed: " + ex.Message, false, 0, null);
+                Exception transport = response.TransportException;
+                DiagnosticsLogger.LogException(LogCategories.Api, "Share folder delete failed (" + url + ").", transport);
+                throw new TalkServiceException("Share folder delete failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                LogFileLink("Share folder delete skipped (already removed): " + normalizedPath);
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.NoContent
+                && response.StatusCode != HttpStatusCode.OK
+                && response.StatusCode != HttpStatusCode.Accepted)
+            {
+                bool authError = response.StatusCode == HttpStatusCode.Unauthorized
+                                 || response.StatusCode == HttpStatusCode.Forbidden;
+                throw new TalkServiceException("Share folder could not be deleted: " + normalizedPath, authError, response.StatusCode, response.ResponseText);
+            }
+
+            LogApi("DELETE " + url + " -> " + response.StatusCode);
         }
 
         internal void UploadSelections(
@@ -267,45 +261,42 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             string url = BuildDavUrl(baseUrl, username, relativePath);
-            var request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "PROPFIND";
-            request.Headers["Depth"] = "0";
-            request.Timeout = 60000;
-            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-            request.ContentLength = 0;
-
             cancellationToken.ThrowIfCancellationRequested();
 
-            try
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                using (var response = (HttpWebResponse)request.GetResponse())
-                {
-                    return response.StatusCode == HttpStatusCode.OK
-                           || response.StatusCode == HttpStatusCode.NoContent
-                           || (int)response.StatusCode == 207;
-                }
-            }
-            catch (WebException ex)
+                Method = "PROPFIND",
+                Url = url,
+                ContentType = "application/xml; charset=utf-8",
+                TimeoutMs = 60000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                Headers = new Dictionary<string, string> { { "Depth", "0" } }
+            });
+
+            if (!response.HasHttpResponse)
             {
-                var httpResponse = ex.Response as HttpWebResponse;
-                if (httpResponse != null)
-                {
-                    if (httpResponse.StatusCode == HttpStatusCode.NotFound)
-                    {
-                        LogFileLink("DAV folder not found: " + url);
-                        return false;
-                    }
-
-                    bool authError = httpResponse.StatusCode == HttpStatusCode.Unauthorized
-                                     || httpResponse.StatusCode == HttpStatusCode.Forbidden;
-
-                    DiagnosticsLogger.LogException(LogCategories.Api, "DAV folder check failed (" + url + ", status=" + (int)httpResponse.StatusCode + ").", ex);
-                    throw new TalkServiceException("Folder check failed: " + ex.Message, authError, httpResponse.StatusCode, null);
-                }
-
-                DiagnosticsLogger.LogException(LogCategories.Api, "DAV folder check failed (" + url + ").", ex);
-                throw new TalkServiceException("Folder check failed: " + ex.Message, false, 0, null);
+                Exception transport = response.TransportException;
+                DiagnosticsLogger.LogException(LogCategories.Api, "DAV folder check failed (" + url + ").", transport);
+                throw new TalkServiceException("Folder check failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                LogFileLink("DAV folder not found: " + url);
+                return false;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized
+                || response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                throw new TalkServiceException("Folder check failed: HTTP " + (int)response.StatusCode, true, response.StatusCode, response.ResponseText);
+            }
+
+            return response.StatusCode == HttpStatusCode.OK
+                   || response.StatusCode == HttpStatusCode.NoContent
+                   || (int)response.StatusCode == 207;
         }
 
         private static void ReportProgress(
@@ -451,36 +442,47 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             string url = BuildDavUrl(context.NormalizedBaseUrl, context.Username, remotePath);
-            var request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "PUT";
-            request.Timeout = 120000;
-            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
             LogApi("PUT " + url);
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            using (Stream requestStream = request.GetRequestStream())
-            using (FileStream fileStream = fileInfo.OpenRead())
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                byte[] buffer = new byte[81920];
-                int bytesRead;
-                while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+                Method = "PUT",
+                Url = url,
+                TimeoutMs = 120000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                BodyWriter = requestStream =>
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    requestStream.Write(buffer, 0, bytesRead);
-                    tracker.AddBytes(bytesRead);
-                    ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Uploading, null, bytesRead);
+                    using (FileStream fileStream = fileInfo.OpenRead())
+                    {
+                        byte[] buffer = new byte[81920];
+                        int bytesRead;
+                        while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            requestStream.Write(buffer, 0, bytesRead);
+                            tracker.AddBytes(bytesRead);
+                            ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Uploading, null, bytesRead);
+                        }
+                    }
                 }
+            });
+
+            if (!response.HasHttpResponse)
+            {
+                Exception transport = response.TransportException;
+                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : localPath), false, 0, null);
             }
 
-            using (var response = (HttpWebResponse)request.GetResponse())
+            if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.NoContent)
             {
-                if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.NoContent)
-                {
-                    throw new TalkServiceException("File could not be uploaded: " + localPath, false, response.StatusCode, null);
-                }
-                LogApi("PUT " + url + " -> " + response.StatusCode);
+                throw new TalkServiceException("File could not be uploaded: " + localPath, false, response.StatusCode, response.ResponseText);
             }
+
+            LogApi("PUT " + url + " -> " + response.StatusCode);
         }
 
         private string EnsureUniqueName(
@@ -571,46 +573,37 @@ namespace NcTalkOutlookAddIn.Services
                 }
 
                 string url = BuildDavUrl(baseUrl, username, path);
-                var request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = "MKCOL";
-                request.Timeout = 60000;
-                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
                 LogApi("MKCOL " + url);
-                try
+                NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
                 {
-                    using (var response = (HttpWebResponse)request.GetResponse())
-                    {
-                        if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.MethodNotAllowed)
-                        {
-                            throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, null);
-                        }
-                        if (knownFolderPaths != null)
-                        {
-                            knownFolderPaths.Add(path);
-                        }
-                        LogApi("MKCOL " + url + " -> " + response.StatusCode);
-                    }
-                }
-                catch (WebException ex)
-                {
-                    var response = ex.Response as HttpWebResponse;
-                    if (response == null)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ").", ex);
-                        throw new TalkServiceException("Directory could not be created: " + ex.Message, false, 0, null);
-                    }
+                    Method = "MKCOL",
+                    Url = url,
+                    TimeoutMs = 60000,
+                    IncludeAuthHeader = true,
+                    IncludeOcsApiHeader = false,
+                    ParseJson = false
+                });
 
-                    if (response.StatusCode != HttpStatusCode.MethodNotAllowed && response.StatusCode != HttpStatusCode.Conflict)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ", status=" + (int)response.StatusCode + ").", ex);
-                        throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, null);
-                    }
-                    if (knownFolderPaths != null)
-                    {
-                        knownFolderPaths.Add(path);
-                    }
-                    LogApi("MKCOL " + url + " -> " + response.StatusCode);
+                if (!response.HasHttpResponse)
+                {
+                    Exception transport = response.TransportException;
+                    DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ").", transport);
+                    throw new TalkServiceException("Directory could not be created: " + (transport != null ? transport.Message : path), false, 0, null);
                 }
+
+                if (response.StatusCode != HttpStatusCode.Created
+                    && response.StatusCode != HttpStatusCode.MethodNotAllowed
+                    && response.StatusCode != HttpStatusCode.Conflict)
+                {
+                    throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, response.ResponseText);
+                }
+
+                if (knownFolderPaths != null)
+                {
+                    knownFolderPaths.Add(path);
+                }
+
+                LogApi("MKCOL " + url + " -> " + response.StatusCode);
             }
         }
 
@@ -686,108 +679,83 @@ namespace NcTalkOutlookAddIn.Services
 
         private ShareData ExecuteShareCreateRequest(string url, string formPayload, CancellationToken cancellationToken)
         {
-            var httpRequest = (HttpWebRequest)WebRequest.Create(url);
-            httpRequest.Method = "POST";
-            httpRequest.Timeout = 90000;
-            httpRequest.Accept = "application/json";
-            httpRequest.ContentType = "application/x-www-form-urlencoded";
-            httpRequest.Headers["OCS-APIRequest"] = "true";
-            httpRequest.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-
-            byte[] payload = Encoding.UTF8.GetBytes(formPayload ?? string.Empty);
-            using (Stream requestStream = httpRequest.GetRequestStream())
-            {
-                requestStream.Write(payload, 0, payload.Length);
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
 
             LogApi("POST " + url);
-            try
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                using (var response = (HttpWebResponse)httpRequest.GetResponse())
-                using (var reader = new StreamReader(response.GetResponseStream() ?? Stream.Null))
-                {
-                    LogApi("POST " + url + " -> " + response.StatusCode);
-                    string content = reader.ReadToEnd();
-                    var parsed = _serializer.Deserialize(content);
-                    return new ShareData
-                    {
-                        Url = parsed.Url,
-                        Id = parsed.Id,
-                        Token = parsed.Token
-                    };
-                }
-            }
-            catch (WebException ex)
-            {
-                var response = ex.Response as HttpWebResponse;
-                if (response != null)
-                {
-                    string responseBody = ReadResponseBody(response);
-                    string serverMessage = _serializer.TryExtractOcsErrorMessage(responseBody);
-                    string detail = string.IsNullOrWhiteSpace(serverMessage) ? ex.Message : serverMessage;
-                    bool authError = response.StatusCode == HttpStatusCode.Unauthorized
-                                     || response.StatusCode == HttpStatusCode.Forbidden;
+                Method = "POST",
+                Url = url,
+                Payload = formPayload ?? string.Empty,
+                Accept = "application/json",
+                ContentType = "application/x-www-form-urlencoded",
+                TimeoutMs = 90000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = true,
+                ParseJson = true
+            });
 
-                    DiagnosticsLogger.LogException(
-                        LogCategories.Api,
-                        "Share create failed (" + url + ", status=" + (int)response.StatusCode + ", detail=" + detail + ").",
-                        ex);
-                    throw new TalkServiceException("Share creation failed: " + detail, authError, response.StatusCode, responseBody);
+            if (!response.HasHttpResponse)
+            {
+                Exception transport = response.TransportException;
+                DiagnosticsLogger.LogException(LogCategories.Api, "Share create failed (" + url + ").", transport);
+                throw new TalkServiceException("Share creation failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
+            }
+
+            LogApi("POST " + url + " -> " + response.StatusCode);
+            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
+            {
+                string detail = NcJson.ExtractOcsErrorMessage(response.ParsedJson);
+                if (string.IsNullOrWhiteSpace(detail))
+                {
+                    detail = "HTTP " + (int)response.StatusCode;
                 }
 
-                DiagnosticsLogger.LogException(LogCategories.Api, "Share create failed (" + url + ").", ex);
-                throw new TalkServiceException("Share creation failed: " + ex.Message, false, 0, null);
+                bool authError = response.StatusCode == HttpStatusCode.Unauthorized
+                                 || response.StatusCode == HttpStatusCode.Forbidden;
+                throw new TalkServiceException("Share creation failed: " + detail, authError, response.StatusCode, response.ResponseText);
             }
+
+            return ParseShareData(response.ParsedJson, response.ResponseText);
         }
 
         private void ExecuteShareMetadataUpdateRequest(string url, string formPayload, CancellationToken cancellationToken)
         {
-            var httpRequest = (HttpWebRequest)WebRequest.Create(url);
-            httpRequest.Method = "PUT";
-            httpRequest.Timeout = 90000;
-            httpRequest.Accept = "application/json";
-            httpRequest.ContentType = "application/x-www-form-urlencoded";
-            httpRequest.Headers["OCS-APIRequest"] = "true";
-            httpRequest.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-
-            byte[] payload = Encoding.UTF8.GetBytes(formPayload ?? string.Empty);
-            using (Stream requestStream = httpRequest.GetRequestStream())
-            {
-                requestStream.Write(payload, 0, payload.Length);
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
 
             LogApi("PUT " + url);
-            try
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                using (var response = (HttpWebResponse)httpRequest.GetResponse())
-                {
-                    LogApi("PUT " + url + " -> " + response.StatusCode);
-                }
+                Method = "PUT",
+                Url = url,
+                Payload = formPayload ?? string.Empty,
+                Accept = "application/json",
+                ContentType = "application/x-www-form-urlencoded",
+                TimeoutMs = 90000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = true,
+                ParseJson = true
+            });
+
+            if (!response.HasHttpResponse)
+            {
+                Exception transport = response.TransportException;
+                DiagnosticsLogger.LogException(LogCategories.Api, "Share metadata update failed (" + url + ").", transport);
+                throw new TalkServiceException("Share metadata update failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
-            catch (WebException ex)
-            {
-                var response = ex.Response as HttpWebResponse;
-                if (response != null)
-                {
-                    string responseBody = ReadResponseBody(response);
-                    string serverMessage = _serializer.TryExtractOcsErrorMessage(responseBody);
-                    string detail = string.IsNullOrWhiteSpace(serverMessage) ? ex.Message : serverMessage;
-                    bool authError = response.StatusCode == HttpStatusCode.Unauthorized
-                                     || response.StatusCode == HttpStatusCode.Forbidden;
 
-                    DiagnosticsLogger.LogException(
-                        LogCategories.Api,
-                        "Share metadata update failed (" + url + ", status=" + (int)response.StatusCode + ", detail=" + detail + ").",
-                        ex);
-                    throw new TalkServiceException("Share metadata update failed: " + detail, authError, response.StatusCode, responseBody);
+            LogApi("PUT " + url + " -> " + response.StatusCode);
+            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
+            {
+                string detail = NcJson.ExtractOcsErrorMessage(response.ParsedJson);
+                if (string.IsNullOrWhiteSpace(detail))
+                {
+                    detail = "HTTP " + (int)response.StatusCode;
                 }
 
-                DiagnosticsLogger.LogException(LogCategories.Api, "Share metadata update failed (" + url + ").", ex);
-                throw new TalkServiceException("Share metadata update failed: " + ex.Message, false, 0, null);
+                bool authError = response.StatusCode == HttpStatusCode.Unauthorized
+                                 || response.StatusCode == HttpStatusCode.Forbidden;
+                throw new TalkServiceException("Share metadata update failed: " + detail, authError, response.StatusCode, response.ResponseText);
             }
         }
 
@@ -803,25 +771,27 @@ namespace NcTalkOutlookAddIn.Services
                 encoded);
         }
 
-        private static string ReadResponseBody(HttpWebResponse response)
+        private static ShareData ParseShareData(IDictionary<string, object> parsedJson, string responseText)
         {
-            if (response == null)
+            if (parsedJson == null)
             {
-                return null;
+                throw new TalkServiceException("Share creation failed: invalid response.", false, 0, responseText);
             }
 
-            try
+            IDictionary<string, object> data = NcJson.GetOcsData(parsedJson);
+            var result = new ShareData
             {
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream ?? Stream.Null))
-                {
-                    return reader.ReadToEnd();
-                }
-            }
-            catch
+                Id = NcJson.GetTrimmedString(data, "id"),
+                Url = NcJson.GetTrimmedString(data, "url"),
+                Token = NcJson.GetTrimmedString(data, "token")
+            };
+
+            if (string.IsNullOrWhiteSpace(result.Id) || string.IsNullOrWhiteSpace(result.Url))
             {
-                return null;
+                throw new TalkServiceException("Share creation failed: incomplete response.", false, 0, responseText);
             }
+
+            return result;
         }
 
         internal static string NormalizeRelativePath(string path)
@@ -1019,84 +989,5 @@ namespace NcTalkOutlookAddIn.Services
             internal string Token { get; set; }
         }
 
-        private sealed class JavaScriptSerializerExtended : System.Web.Script.Serialization.JavaScriptSerializer
-        {
-            internal ShareData Deserialize(string content)
-            {
-                var decoded = DeserializeObject(content) as IDictionary<string, object>;
-                if (decoded == null)
-                {
-                    throw new TalkServiceException("Share creation failed: invalid response.", false, 0, content);
-                }
-
-                var ocs = GetDictionary(decoded, "ocs");
-                var data = GetDictionary(ocs, "data");
-                return new ShareData
-                {
-                    Id = GetString(data, "id"),
-                    Url = GetString(data, "url"),
-                    Token = GetString(data, "token")
-                };
-            }
-
-            internal string TryExtractOcsErrorMessage(string content)
-            {
-                if (string.IsNullOrWhiteSpace(content))
-                {
-                    return null;
-                }
-
-                try
-                {
-                    var decoded = DeserializeObject(content) as IDictionary<string, object>;
-                    if (decoded == null)
-                    {
-                        return null;
-                    }
-
-                    var ocs = GetDictionary(decoded, "ocs");
-                    var meta = GetDictionary(ocs, "meta");
-                    string message = GetString(meta, "message");
-                    if (!string.IsNullOrWhiteSpace(message))
-                    {
-                        return message;
-                    }
-
-                    var data = GetDictionary(ocs, "data");
-                    message = GetString(data, "error");
-                    return string.IsNullOrWhiteSpace(message) ? null : message;
-                }
-                catch
-                {
-                    return null;
-                }
-            }
-
-            private static IDictionary<string, object> GetDictionary(IDictionary<string, object> json, string key)
-            {
-                if (json != null)
-                {
-                    object value;
-                    if (json.TryGetValue(key, out value))
-                    {
-                        return value as IDictionary<string, object>;
-                    }
-                }
-                return null;
-            }
-
-            private static string GetString(IDictionary<string, object> json, string key)
-            {
-                if (json != null)
-                {
-                    object value;
-                    if (json.TryGetValue(key, out value))
-                    {
-                        return value as string;
-                    }
-                }
-                return null;
-            }
-        }
     }
 }

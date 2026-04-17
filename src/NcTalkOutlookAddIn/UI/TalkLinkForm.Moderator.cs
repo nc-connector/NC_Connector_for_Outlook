@@ -323,44 +323,38 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             string url = baseUrl + "/index.php/avatar/" + Uri.EscapeDataString(userId) + "/64";
-            var request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "GET";
-            request.Accept = "image/png,image/*;q=0.8,*/*;q=0.5";
-            request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-            request.Timeout = 20000;
-
-            try
+            var httpClient = new Services.NcHttpClient(_configuration);
+            Services.NcHttpResponse response = httpClient.Send(new Services.NcHttpRequestOptions
             {
-                using (var response = (HttpWebResponse)request.GetResponse())
-                {
-                    if (response.StatusCode != HttpStatusCode.OK)
-                    {
-                        return null;
-                    }
+                Method = "GET",
+                Url = url,
+                Accept = "image/png,image/*;q=0.8,*/*;q=0.5",
+                TimeoutMs = 20000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false,
+                ReadResponseAsBytes = true
+            });
 
-                    using (Stream stream = response.GetResponseStream())
-                    {
-                        if (stream == null)
-                        {
-                            return null;
-                        }
-
-                        using (var image = Image.FromStream(stream))
-                        {
-                            return new Bitmap(image);
-                        }
-                    }
-                }
-            }
-            catch (WebException ex)
+            if (!response.HasHttpResponse || response.StatusCode != HttpStatusCode.OK)
             {
-                var response = ex.Response as HttpWebResponse;
-                if (response != null)
+                if (response.TransportException != null)
                 {
-                    response.Close();
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Avatar request failed for user '" + userId + "'.", response.TransportException);
                 }
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Avatar request failed for user '" + userId + "'.", ex);
+
                 return null;
+            }
+
+            if (response.ResponseBytes == null || response.ResponseBytes.Length == 0)
+            {
+                return null;
+            }
+
+            using (var stream = new MemoryStream(response.ResponseBytes))
+            using (var image = Image.FromStream(stream))
+            {
+                return new Bitmap(image);
             }
         }
 

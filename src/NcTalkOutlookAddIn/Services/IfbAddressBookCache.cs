@@ -312,45 +312,35 @@ namespace NcTalkOutlookAddIn.Services
                 baseUrl,
                 Uri.EscapeDataString(configuration.Username ?? string.Empty));
 
-            HttpWebResponse response = null;
             string responseText = null;
-
-            try
+            var httpClient = new NcHttpClient(configuration);
+            NcHttpResponse response = httpClient.Send(new NcHttpRequestOptions
             {
-                var request = (HttpWebRequest)WebRequest.Create(addressBookUrl);
-                request.Method = "GET";
-                request.Accept = "text/vcard,text/x-vcard,text/plain,*/*";
-                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(configuration.Username, configuration.AppPassword);
-                request.Timeout = 60000;
+                Method = "GET",
+                Url = addressBookUrl,
+                Accept = "text/vcard,text/x-vcard,text/plain,*/*",
+                TimeoutMs = 60000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = false,
+                ParseJson = false
+            });
 
-                response = (HttpWebResponse)request.GetResponse();
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream ?? Stream.Null, Encoding.UTF8))
+            if (!response.HasHttpResponse)
+            {
+                if (response.TransportException != null)
                 {
-                    responseText = reader.ReadToEnd();
+                    DiagnosticsLogger.LogException(LogCategories.Ifb, "Address book could not be loaded from server.", response.TransportException);
+                    throw new InvalidOperationException("Address book could not be loaded: " + response.TransportException.Message, response.TransportException);
                 }
+
+                throw new InvalidOperationException("Address book could not be loaded: no HTTP response.");
             }
-            catch (WebException ex)
-            {
-                HttpWebResponse errorResponse = ex.Response as HttpWebResponse;
-                if (errorResponse != null)
-                {
-                    using (var stream = errorResponse.GetResponseStream())
-                    using (var reader = new StreamReader(stream ?? Stream.Null, Encoding.UTF8))
-                    {
-                        responseText = reader.ReadToEnd();
-                    }
-                }
 
-                DiagnosticsLogger.LogException(LogCategories.Ifb, "Address book could not be loaded from server.", ex);
-                throw new InvalidOperationException("Address book could not be loaded: " + ex.Message, ex);
-            }
-            finally
+            responseText = response.ResponseText ?? string.Empty;
+            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
-                if (response != null)
-                {
-                    response.Close();
-                }
+                string status = ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture);
+                throw new InvalidOperationException("Address book could not be loaded: HTTP " + status + ".");
             }
 
             if (string.IsNullOrEmpty(responseText))

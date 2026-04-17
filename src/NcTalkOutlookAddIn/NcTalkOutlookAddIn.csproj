@@ -117,6 +117,7 @@
     <Compile Include="Services\TalkLoginFlowService.cs" />
     <Compile Include="Services\TalkServiceConfiguration.cs" />
     <Compile Include="Services\TalkServiceException.cs" />
+    <Compile Include="Services\NcHttpClient.cs" />
     <Compile Include="Services\TalkService.cs" />
     <Compile Include="Services\FileLinkDuplicateInfo.cs" />
     <Compile Include="Services\FileLinkUploadContext.cs" />
@@ -145,6 +146,7 @@
     <Compile Include="Utilities\UiThemeManager.cs" />
     <Compile Include="Utilities\DisabledControlTooltipHintHelper.cs" />
     <Compile Include="Utilities\HttpFailureDiagnostics.cs" />
+    <Compile Include="Utilities\NcJson.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
     <Compile Include="Utilities\HtmlTemplateSanitizer.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />

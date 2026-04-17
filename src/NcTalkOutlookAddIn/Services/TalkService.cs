@@ -7,7 +7,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Net;
 using System.Text;
 using System.Web.Script.Serialization;
@@ -30,6 +29,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private readonly TalkServiceConfiguration _configuration;
         private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
+        private readonly NcHttpClient _httpClient;
         private static void LogApi(string message)
         {
             DiagnosticsLogger.Log(LogCategories.Api, message);
@@ -48,6 +48,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             _configuration = configuration;
+            _httpClient = new NcHttpClient(configuration);
         }
 
         /**
@@ -755,15 +756,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string ExtractOcsMessage(IDictionary<string, object> responseData)
         {
-            IDictionary<string, object> meta = GetDictionary(GetDictionary(responseData, "ocs"), "meta");
-            IDictionary<string, object> payload = GetDictionary(GetDictionary(responseData, "ocs"), "data");
-            string message = GetString(meta, "message");
-            if (string.IsNullOrEmpty(message))
-            {
-                message = GetString(payload, "error");
-            }
-
-            return message;
+            return NcJson.ExtractOcsErrorMessage(responseData);
         }
 
         private void EnsureConfiguration()
@@ -776,17 +769,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private string ExecuteJsonRequest(string method, string url, object payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData)
         {
-            string payloadText = null;
-            if (payload is string)
-            {
-                payloadText = (string)payload;
-            }
-            else if (payload != null)
-            {
-                payloadText = _serializer.Serialize(payload);
-            }
-
-            return SendJsonRequest(method, url, payloadText, out statusCode, out parsedData, false);
+            return ExecuteJsonRequest(method, url, payload, out statusCode, out parsedData, false);
         }
 
         private string ExecuteJsonRequest(string method, string url, object payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData, bool forceFreshConnection)
@@ -801,117 +784,42 @@ namespace NcTalkOutlookAddIn.Services
                 payloadText = _serializer.Serialize(payload);
             }
 
-            return SendJsonRequest(method, url, payloadText, out statusCode, out parsedData, forceFreshConnection);
-        }
-
-        private string SendJsonRequest(string method, string url, string payload, out HttpStatusCode statusCode, out IDictionary<string, object> parsedData, bool forceFreshConnection)
-        {
-            HttpWebResponse response = null;
-            string responseText = null;
-            parsedData = null;
-            HttpWebRequest request = null;
-            string connectionGroupName = null;
-
-            try
+            LogApi(method + " " + url);
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = method;
-                request.Accept = "application/json";
-                request.Headers["OCS-APIRequest"] = "true";
-                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-                request.Timeout = 60000;
+                Method = method,
+                Url = url,
+                Payload = payloadText,
+                Accept = "application/json",
+                TimeoutMs = 60000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = true,
+                ParseJson = true,
+                ForceFreshConnection = forceFreshConnection
+            });
 
-                if (forceFreshConnection)
-                {
-                    connectionGroupName = "nc-verify-" + Guid.NewGuid().ToString("N");
-                    request.ConnectionGroupName = connectionGroupName;
-                    request.KeepAlive = false;
-                    request.Pipelined = false;
-                }
-
-                bool hasBody = !string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
-                               && !string.Equals(method, "DELETE", StringComparison.OrdinalIgnoreCase);
-
-                if (hasBody)
-                {
-                    request.ContentType = "application/json";
-                    if (!string.IsNullOrEmpty(payload))
-                    {
-                        using (StreamWriter writer = new StreamWriter(request.GetRequestStream()))
-                        {
-                            writer.Write(payload);
-                        }
-                    }
-                    else
-                    {
-                        request.ContentLength = 0;
-                    }
-                }
-
-                LogApi(method + " " + url);
-                try
-                {
-                    response = (HttpWebResponse)request.GetResponse();
-                }
-                catch (WebException ex)
-                {
-                    response = ex.Response as HttpWebResponse;
-                    if (response == null)
-                    {
-                        HttpFailureInfo failure = HttpFailureDiagnostics.Analyze(ex);
-                        DiagnosticsLogger.LogException(LogCategories.Api, "HTTP connection error without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(ex, failure) + ").", ex);
-                        throw new TalkServiceException(failure.BuildUserMessage(), false, 0, null, true);
-                    }
-                }
-
-                statusCode = response.StatusCode;
-                LogApi(method + " " + url + " -> " + statusCode);
-
-                using (Stream stream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(stream ?? Stream.Null))
-                {
-                    responseText = reader.ReadToEnd();
-                }
-
-                if (!string.IsNullOrEmpty(responseText))
-                {
-                    try
-                    {
-                        parsedData = _serializer.DeserializeObject(responseText) as IDictionary<string, object>;
-                    }
-                    catch (Exception ex)
-                    {
-                        parsedData = null;
-                        DiagnosticsLogger.LogException(LogCategories.Api, "Failed to parse JSON response.", ex);
-                    }
-                }
-
-                return responseText;
-            }
-            finally
+            if (!response.HasHttpResponse)
             {
-                if (response != null)
+                if (response.TransportException != null)
                 {
-                    response.Close();
+                    HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
+                    DiagnosticsLogger.LogException(LogCategories.Api, "HTTP connection error without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(response.TransportException, failure) + ").", response.TransportException);
+                    throw new TalkServiceException(failure.BuildUserMessage(), false, 0, null, true);
                 }
 
-                if (forceFreshConnection &&
-                    request != null &&
-                    !string.IsNullOrEmpty(connectionGroupName))
-                {
-                    try
-                    {
-                        request.ServicePoint.CloseConnectionGroup(connectionGroupName);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(
-                            LogCategories.Api,
-                            "Failed to close temporary verification connection group.",
-                            ex);
-                    }
-                }
+                throw new TalkServiceException("HTTP connection error without HTTP response.", false, 0, null, true);
             }
+
+            statusCode = response.StatusCode;
+            LogApi(method + " " + url + " -> " + statusCode);
+
+            if (response.JsonParseException != null)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Api, "Failed to parse JSON response.", response.JsonParseException);
+            }
+
+            parsedData = response.ParsedJson;
+            return response.ResponseText;
         }
 
         private static bool IsSuccessStatus(HttpStatusCode statusCode)
@@ -945,100 +853,24 @@ namespace NcTalkOutlookAddIn.Services
             return GetString(responseData, "token");
         }
 
-        private static Dictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
+        private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
         {
-            if (parent == null)
-            {
-                return null;
-            }
-
-            object value;
-            if (parent.TryGetValue(key, out value))
-            {
-                return value as Dictionary<string, object>;
-            }
-
-            return null;
+            return NcJson.GetDictionary(parent, key);
         }
 
         private static string GetString(IDictionary<string, object> parent, string key)
         {
-            if (parent == null)
-            {
-                return null;
-            }
-
-            object value;
-            if (parent.TryGetValue(key, out value) && value != null)
-            {
-                if (value is string)
-                {
-                    return (string)value;
-                }
-
-                if (value is IDictionary<string, object>)
-                {
-                    return null;
-                }
-
-                return Convert.ToString(value, CultureInfo.InvariantCulture);
-            }
-
-            return null;
+            return NcJson.GetString(parent, key);
         }
 
         private static int GetInt(IDictionary<string, object> parent, string key)
         {
-            int value;
-            return TryGetInt(parent, key, out value) ? value : 0;
+            return NcJson.GetInt(parent, key);
         }
 
         private static bool TryGetInt(IDictionary<string, object> parent, string key, out int value)
         {
-            value = 0;
-            if (parent == null)
-            {
-                return false;
-            }
-
-            object raw;
-            if (!parent.TryGetValue(key, out raw) || raw == null)
-            {
-                return false;
-            }
-
-            if (raw is int)
-            {
-                value = (int)raw;
-                return true;
-            }
-
-            if (raw is long)
-            {
-                long longValue = (long)raw;
-                if (longValue < int.MinValue || longValue > int.MaxValue)
-                {
-                    return false;
-                }
-
-                value = (int)longValue;
-                return true;
-            }
-
-            if (raw is bool)
-            {
-                value = (bool)raw ? 1 : 0;
-                return true;
-            }
-
-            int parsed;
-            if (int.TryParse(Convert.ToString(raw, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
-            {
-                value = parsed;
-                return true;
-            }
-
-            return false;
+            return NcJson.TryGetInt(parent, key, out value);
         }
 
         private static string ExtractVersion(IDictionary<string, object> payload)
@@ -1158,24 +990,11 @@ namespace NcTalkOutlookAddIn.Services
 
         private static void ThrowServiceError(HttpStatusCode statusCode, string responseText, IDictionary<string, object> responseData)
         {
-            IDictionary<string, object> meta = GetDictionary(GetDictionary(responseData, "ocs"), "meta");
-            string message = GetString(meta, "message");
-            IDictionary<string, object> payload = GetDictionary(GetDictionary(responseData, "ocs"), "data");
-            string errorDetail = GetString(payload, "error");
-
             StringBuilder builder = new StringBuilder();
-
-            if (!string.IsNullOrEmpty(message))
+            string error = NcJson.ExtractOcsErrorMessage(responseData);
+            if (!string.IsNullOrWhiteSpace(error))
             {
-                builder.Append(message);
-            }
-            if (!string.IsNullOrEmpty(errorDetail))
-            {
-                if (builder.Length > 0)
-                {
-                    builder.Append(" / ");
-                }
-                builder.Append(errorDetail);
+                builder.Append(error);
             }
             if (builder.Length == 0)
             {

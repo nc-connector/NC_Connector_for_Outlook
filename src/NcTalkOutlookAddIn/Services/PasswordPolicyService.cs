@@ -7,10 +7,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Net;
-using System.Text;
-using System.Web.Script.Serialization;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
@@ -22,7 +19,7 @@ namespace NcTalkOutlookAddIn.Services
     internal sealed class PasswordPolicyService
     {
         private readonly TalkServiceConfiguration _configuration;
-        private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
+        private readonly NcHttpClient _httpClient;
         private static readonly string[] MinLengthKeys = { "minLength", "min_length", "minimumLength", "minimum_length" };
         private static readonly string[] GenerateUrlKeys = { "api_generate", "apiGenerateUrl", "generateUrl", "generate_url" };
 
@@ -39,6 +36,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             _configuration = configuration;
+            _httpClient = new NcHttpClient(configuration);
         }
 
         internal PasswordPolicyInfo FetchPolicy()
@@ -156,81 +154,41 @@ namespace NcTalkOutlookAddIn.Services
                 return;
             }
 
-            HttpWebResponse response = null;
-            string responseText = null;
-
-            try
+            var response = _httpClient.Send(new NcHttpRequestOptions
             {
-                var request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = method;
-                request.Accept = "application/json, text/plain, */*";
-                request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
-                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-                request.Headers["OCS-APIRequest"] = "true";
-                request.Timeout = 60000;
+                Method = method,
+                Url = url,
+                Payload = payload,
+                TimeoutMs = 60000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = true,
+                ParseJson = true
+            });
 
-                bool hasBody = !string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
-                               && !string.Equals(method, "DELETE", StringComparison.OrdinalIgnoreCase);
-
-                if (hasBody)
+            if (!response.HasHttpResponse)
+            {
+                if (response.TransportException != null)
                 {
-                    request.ContentType = "application/json";
-                    if (!string.IsNullOrEmpty(payload))
-                    {
-                        byte[] bytes = Encoding.UTF8.GetBytes(payload);
-                        request.ContentLength = bytes.Length;
-                        using (var stream = request.GetRequestStream())
-                        {
-                            stream.Write(bytes, 0, bytes.Length);
-                        }
-                    }
+                    DiagnosticsLogger.LogException(LogCategories.Api, "Password policy request failed without HTTP response.", response.TransportException);
+                }
+                else
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Api, "Password policy request failed without HTTP response.", null);
                 }
 
-                response = (HttpWebResponse)request.GetResponse();
-            }
-            catch (WebException ex)
-            {
-                response = ex.Response as HttpWebResponse;
-                if (response == null)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Api, "Password policy request failed without HTTP response.", ex);
-                    return;
-                }
+                return;
             }
 
             statusCode = response.StatusCode;
             LogApi(method + " " + url + " -> " + statusCode);
 
-            try
+            if (response.JsonParseException != null)
             {
-                using (Stream stream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(stream ?? Stream.Null, Encoding.UTF8))
-                {
-                    responseText = reader.ReadToEnd();
-                }
+                DiagnosticsLogger.LogException(LogCategories.Api, "Password policy response parsing failed.", response.JsonParseException);
+                LogApi("Password policy response sample: " + GetResponseSample(response.ResponseText));
+            }
 
-                if (!string.IsNullOrEmpty(responseText))
-                {
-                    string payloadText = PrepareJsonPayload(responseText);
-                    if (!string.IsNullOrEmpty(payloadText))
-                    {
-                        parsed = _serializer.DeserializeObject(payloadText) as IDictionary<string, object>;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                parsed = null;
-                DiagnosticsLogger.LogException(LogCategories.Api, "Password policy response parsing failed.", ex);
-                LogApi("Password policy response sample: " + GetResponseSample(responseText));
-            }
-            finally
-            {
-                if (response != null)
-                {
-                    response.Close();
-                }
-            }
+            parsed = response.ParsedJson;
         }
 
         private static string ResolvePolicyUrl(string rawUrl, string baseUrl)
@@ -264,33 +222,6 @@ namespace NcTalkOutlookAddIn.Services
             return null;
         }
 
-        private static string PrepareJsonPayload(string responseText)
-        {
-            if (string.IsNullOrWhiteSpace(responseText))
-            {
-                return string.Empty;
-            }
-
-            string payload = responseText.Trim().TrimStart('\uFEFF');
-            if (payload.StartsWith(")]}',", StringComparison.Ordinal))
-            {
-                int newlineIndex = payload.IndexOf('\n');
-                payload = newlineIndex >= 0 ? payload.Substring(newlineIndex + 1) : string.Empty;
-            }
-
-            if (payload.StartsWith("while(1);", StringComparison.Ordinal))
-            {
-                payload = payload.Substring("while(1);".Length);
-            }
-
-            if (payload.StartsWith("for(;;);", StringComparison.Ordinal))
-            {
-                payload = payload.Substring("for(;;);".Length);
-            }
-
-            return payload.Trim();
-        }
-
         private static string GetResponseSample(string responseText)
         {
             if (string.IsNullOrEmpty(responseText))
@@ -304,45 +235,12 @@ namespace NcTalkOutlookAddIn.Services
 
         private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
         {
-            if (parent == null || string.IsNullOrWhiteSpace(key))
-            {
-                return null;
-            }
-
-            object value;
-            if (parent.TryGetValue(key, out value) && value != null)
-            {
-                return value as IDictionary<string, object>;
-            }
-
-            return null;
+            return NcJson.GetDictionary(parent, key);
         }
 
         private static string GetString(IDictionary<string, object> parent, string key)
         {
-            if (parent == null || string.IsNullOrWhiteSpace(key))
-            {
-                return null;
-            }
-
-            object value;
-            if (!parent.TryGetValue(key, out value) || value == null)
-            {
-                return null;
-            }
-
-            string direct = value as string;
-            if (direct != null)
-            {
-                return direct;
-            }
-
-            if (value is IDictionary<string, object>)
-            {
-                return null;
-            }
-
-            return Convert.ToString(value, CultureInfo.InvariantCulture);
+            return NcJson.GetString(parent, key);
         }
 
         private static string GetFirstString(IDictionary<string, object> parent, params string[] keys)

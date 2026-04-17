@@ -7,10 +7,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Net;
-using System.Text;
-using System.Web.Script.Serialization;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
@@ -23,11 +20,12 @@ namespace NcTalkOutlookAddIn.Services
     {
         private const string StatusEndpointPath = "/apps/ncc_backend_4mc/api/v1/status";
         private readonly TalkServiceConfiguration _configuration;
-        private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
+        private readonly NcHttpClient _httpClient;
 
         internal BackendPolicyService(TalkServiceConfiguration configuration)
         {
             _configuration = configuration;
+            _httpClient = new NcHttpClient(configuration);
         }
 
         internal BackendPolicyStatus FetchStatus()
@@ -138,71 +136,39 @@ namespace NcTalkOutlookAddIn.Services
         {
             statusCode = 0;
             parsed = null;
-            HttpWebResponse response = null;
-            string responseText = null;
 
-            try
+            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                var request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = "GET";
-                request.Accept = "application/json, text/plain, */*";
-                request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
-                request.Headers["Authorization"] = HttpAuthUtilities.BuildBasicAuthHeader(_configuration.Username, _configuration.AppPassword);
-                request.Headers["OCS-APIRequest"] = "true";
-                request.Timeout = 45000;
+                Method = "GET",
+                Url = url,
+                TimeoutMs = 45000,
+                IncludeAuthHeader = true,
+                IncludeOcsApiHeader = true,
+                ParseJson = true
+            });
 
-                try
-                {
-                    response = (HttpWebResponse)request.GetResponse();
-                }
-                catch (WebException ex)
-                {
-                    response = ex.Response as HttpWebResponse;
-                    if (response == null)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", ex);
-                        return false;
-                    }
-                }
-
-                statusCode = response.StatusCode;
-                if ((int)statusCode < 200 || (int)statusCode >= 300)
-                {
-                    return false;
-                }
-
-                using (Stream stream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(stream ?? Stream.Null, Encoding.UTF8))
-                {
-                    responseText = reader.ReadToEnd();
-                }
-
-                if (string.IsNullOrWhiteSpace(responseText))
-                {
-                    return false;
-                }
-
-                string prepared = PrepareJsonPayload(responseText);
-                if (string.IsNullOrWhiteSpace(prepared))
-                {
-                    return false;
-                }
-
-                parsed = _serializer.DeserializeObject(prepared) as IDictionary<string, object>;
-                return parsed != null;
-            }
-            catch (Exception ex)
+            if (!response.HasHttpResponse)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed.", ex);
+                if (response.TransportException != null)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", response.TransportException);
+                }
+                else
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", null);
+                }
+
                 return false;
             }
-            finally
+
+            statusCode = response.StatusCode;
+            if ((int)statusCode < 200 || (int)statusCode >= 300)
             {
-                if (response != null)
-                {
-                    response.Close();
-                }
+                return false;
             }
+
+            parsed = response.ParsedJson;
+            return parsed != null;
         }
 
         private static IDictionary<string, object> NormalizePayload(IDictionary<string, object> payload)
@@ -212,8 +178,8 @@ namespace NcTalkOutlookAddIn.Services
                 return null;
             }
 
-            IDictionary<string, object> ocs = GetDictionary(payload, "ocs");
-            IDictionary<string, object> data = GetDictionary(ocs, "data");
+            IDictionary<string, object> ocs = NcJson.GetDictionary(payload, "ocs");
+            IDictionary<string, object> data = NcJson.GetDictionary(ocs, "data");
             return data ?? payload;
         }
 
@@ -269,64 +235,14 @@ namespace NcTalkOutlookAddIn.Services
             return false;
         }
 
-        private static string PrepareJsonPayload(string responseText)
+        private static string GetString(IDictionary<string, object> parent, string key)
         {
-            if (string.IsNullOrWhiteSpace(responseText))
-            {
-                return string.Empty;
-            }
-
-            string payload = responseText.Trim().TrimStart('\uFEFF');
-            if (payload.StartsWith(")]}',", StringComparison.Ordinal))
-            {
-                int newlineIndex = payload.IndexOf('\n');
-                payload = newlineIndex >= 0 ? payload.Substring(newlineIndex + 1) : string.Empty;
-            }
-
-            if (payload.StartsWith("while(1);", StringComparison.Ordinal))
-            {
-                payload = payload.Substring("while(1);".Length);
-            }
-
-            if (payload.StartsWith("for(;;);", StringComparison.Ordinal))
-            {
-                payload = payload.Substring("for(;;);".Length);
-            }
-
-            return payload.Trim();
+            return NcJson.GetStringOrEmpty(parent, key);
         }
 
         private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
         {
-            if (parent == null || string.IsNullOrWhiteSpace(key))
-            {
-                return null;
-            }
-
-            object raw;
-            if (!parent.TryGetValue(key, out raw) || raw == null)
-            {
-                return null;
-            }
-
-            return raw as IDictionary<string, object>;
-        }
-
-        private static string GetString(IDictionary<string, object> parent, string key)
-        {
-            if (parent == null || string.IsNullOrWhiteSpace(key))
-            {
-                return string.Empty;
-            }
-
-            object raw;
-            if (!parent.TryGetValue(key, out raw) || raw == null)
-            {
-                return string.Empty;
-            }
-
-            string text = Convert.ToString(raw, CultureInfo.InvariantCulture);
-            return text == null ? string.Empty : text.Trim();
+            return NcJson.GetDictionary(parent, key);
         }
 
         private static bool GetBool(IDictionary<string, object> parent, string key)
