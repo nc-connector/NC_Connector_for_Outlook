@@ -17,3 +17,10 @@
 # Installer outputs
 installer/bin/
 installer/obj/
+
+# Local build output folders
+build/
+dist/
+
+# Local NuGet package cache (machine-specific)
+packages/

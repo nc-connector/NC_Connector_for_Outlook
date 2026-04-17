@@ -4,6 +4,23 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.0.3] - 2026-04-17
+
+### Added
+- Daily runtime log rotation with 7-file retention and 30-day cleanup.
+- Log anonymization option with redaction of sensitive runtime diagnostics.
+- Backend HTML template hardening with fail-closed sanitizer policy.
+
+### Changed
+- Shared helper refactor for URL launch, size formatting, and COM release cleanup.
+- Refactor cleanup pass to normalize shell/COM patterns and remove leftover redundancies.
+- Runtime HTTP request handling centralized via `NcHttpClient` and `NcJson`.
+- Cleanup refactor: removed duplicated helpers and redundant conditions.
+
+### Fixed
+- Password-notification icon lifecycle marshaled to the captured UI context.
+- Removed ineffective password-selection JavaScript handlers for Outlook HTML rendering.
+
 ## [3.0.2] - 2026-04-15
 
 ### Added

@@ -230,7 +230,9 @@ namespace NcTalkOutlookAddIn.Utilities
          */
         private static string ResolveEffectiveLanguage(string languageOverride, BackendPolicyStatus policyStatus)
         {
-            if (policyStatus != null && policyStatus.PolicyActive)
+            if (policyStatus != null
+                && policyStatus.PolicyActive
+                && policyStatus.IsLocked("share", "language_share_html_block"))
             {
                 string policyLang = policyStatus.GetPolicyString("share", "language_share_html_block");
                 if (!string.IsNullOrWhiteSpace(policyLang))
@@ -259,8 +261,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 return string.Empty;
             }
 
-            string language = policyStatus.GetPolicyString("share", "language_share_html_block");
-            if (!string.Equals(language, "custom", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Empty;
             }

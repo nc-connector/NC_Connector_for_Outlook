@@ -1683,7 +1683,8 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             policyString = _backendPolicyStatus.GetPolicyString("share", "language_share_html_block");
-            if (!string.IsNullOrWhiteSpace(policyString))
+            if (IsPolicyLocked("share", "language_share_html_block")
+                && !string.IsNullOrWhiteSpace(policyString))
             {
                 SelectLanguageChoice(_shareBlockLangCombo, policyString);
             }
@@ -1719,7 +1720,8 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             policyString = _backendPolicyStatus.GetPolicyString("talk", "language_talk_description");
-            if (!string.IsNullOrWhiteSpace(policyString))
+            if (IsPolicyLocked("talk", "language_talk_description")
+                && !string.IsNullOrWhiteSpace(policyString))
             {
                 SelectLanguageChoice(_eventDescriptionLangCombo, policyString);
             }

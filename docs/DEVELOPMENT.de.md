@@ -20,9 +20,9 @@ Das Add-in integriert:
 - **Nextcloud Filelink** im E-Mail-Composer (Wizard, Upload, HTML-Block)
 - **IFB (Internet Free/Busy)** als lokaler HTTP-Proxy zu Nextcloud
 
-## Release 3.0.2 Delta-Ueberblick
+## Release 3.0.3 Delta-Ueberblick
 
-In 3.0.2 gelten die paritaetskritischen Verhaltensregeln weiterhin und muessen bei Folgeaenderungen stabil bleiben:
+In 3.0.3 gelten die paritaetskritischen Verhaltensregeln weiterhin und muessen bei Folgeaenderungen stabil bleiben:
 
 - Compose-Anhangsautomatisierung mit deterministischen Modi (`always` vs. Schwellwert-Prompt).
 - Compose-Anhangsautomatisierung prueft zusaetzlich pre-add (`BeforeAttachmentAdd`) und kann Host-Adds best effort vor der normalen Outlook-Post-Add-Verarbeitung abbrechen, wenn ein lokaler Pfad aufloesbar ist.
@@ -53,7 +53,7 @@ Auf manchen Build-Systemen fehlen die .NET Framework Reference Assemblies für 4
 Beispiel:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.3"
 
 # Optional: Reference Assemblies lokal holen (nur wenn nötig)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -66,7 +66,7 @@ $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAsse
 Der empfohlene Build läuft immer über `build.ps1`:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.2"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.3"
 $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2"
 .\build.ps1 -Configuration Release
 ```
@@ -160,7 +160,7 @@ Utilities:
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` (zentraler Sanitizer fuer Backend-HTML-Templates bei Share/Talk, fail-closed)
 - `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` (zentrale JSON-Normalisierung inkl. `PrepareJsonPayload`, Dictionary-/String-/Int-Helfer und OCS-Fehlerextraktion)
 
-Compose-Filelink-Paritaet (3.0.2):
+Compose-Filelink-Paritaet (3.0.3):
 
 - `MailComposeSubscription` in `NextcloudTalkAddIn.cs` steuert den Compose-Lifecycle fuer:
   - debouncte Anhangsauswertung (`ComposeAttachmentEvalDebounceMs`)
@@ -231,4 +231,5 @@ Wichtig für Updates:
 4) MSI installieren/upgrade testen (alte Version → neue Version)
 5) Talk + Filelink + IFB Smoke-Test
 6) MSI ggf. signieren (falls in der Umgebung erforderlich)
+
 

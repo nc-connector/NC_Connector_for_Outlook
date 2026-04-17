@@ -1706,7 +1706,9 @@ namespace NcTalkOutlookAddIn
 
         private static string ResolveTalkDescriptionLanguage(BackendPolicyStatus policyStatus, string fallbackLanguageOverride)
         {
-            if (policyStatus != null && policyStatus.PolicyActive)
+            if (policyStatus != null
+                && policyStatus.PolicyActive
+                && policyStatus.IsLocked("talk", "language_talk_description"))
             {
                 string policyLanguageRaw = policyStatus.GetPolicyString("talk", "language_talk_description");
                 if (!string.IsNullOrWhiteSpace(policyLanguageRaw))

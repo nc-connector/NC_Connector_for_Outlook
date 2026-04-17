@@ -25,7 +25,7 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 - **Nextcloud sharing** from the mail compose window (upload + link share + HTML block insertion)
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
-## Release 3.0.2 delta summary
+## Release 3.0.3 delta summary
 
 This release added parity-critical behavior that developers should preserve in future changes:
 
@@ -65,7 +65,7 @@ This release added parity-critical behavior that developers should preserve in f
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-3.0.2"
+cd "C:\\path\\to\\nc4ol-3.0.3"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -434,5 +434,6 @@ Primary write location:
 1. Add a property to `src/NcTalkOutlookAddIn/Utilities/Strings.cs`.
 2. Add the key to all locale files under `src/NcTalkOutlookAddIn/Resources/_locales/`.
 3. Rebuild and verify the UI.
+
 
 
