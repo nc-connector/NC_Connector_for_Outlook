@@ -75,7 +75,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 LogTalk("CreateRoom attempt includeEvent=" + includeEvent + " lobby=" + request.LobbyEnabled + " listable=" + request.SearchVisible + " addUsers=" + request.AddUsers + " addGuests=" + request.AddGuests);
                 IDictionary<string, object> payload = BuildCreatePayload(request, includeEvent);
-                string payloadJson = _serializer.Serialize(payload);
 
                 IDictionary<string, object> responseData;
                 HttpStatusCode statusCode;
@@ -308,7 +307,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 HttpStatusCode statusCode;
                 IDictionary<string, object> parsed;
-                string payloadJson = _serializer.Serialize(payload);
                 ExecuteJsonRequest("PUT", lobbyUrl, payload, out statusCode, out parsed);
                 if (!IsSuccessStatus(statusCode) && !silent)
                 {
@@ -405,7 +403,6 @@ namespace NcTalkOutlookAddIn.Services
 
             HttpStatusCode statusCode;
             IDictionary<string, object> parsed;
-            string payloadJson = _serializer.Serialize(payload);
             ExecuteJsonRequest("PUT",
                                baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + "/listable",
                                payload,
