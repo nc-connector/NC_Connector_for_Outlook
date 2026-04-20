@@ -113,7 +113,7 @@ namespace NcTalkOutlookAddIn
                 _owner = owner;
                 _mail = mail;
                 _mailIdentityKey = string.IsNullOrWhiteSpace(mailIdentityKey)
-                    ? ResolveMailComIdentityKey(mail)
+                    ? ComInteropScope.ResolveIdentityKey(mail, LogCategories.FileLink, "MailItem")
                     : mailIdentityKey.Trim();
                 _inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityKey)
                     ? ResolveMailInspectorIdentityKey(mail)

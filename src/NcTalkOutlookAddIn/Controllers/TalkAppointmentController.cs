@@ -755,7 +755,7 @@ namespace NcTalkOutlookAddIn.Controllers
             return body.Trim();
         }
 
-        private static TalkRoomType? GetRoomType(Outlook.AppointmentItem appointment)
+        internal static TalkRoomType? GetRoomType(Outlook.AppointmentItem appointment)
         {
             string eventRaw = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalEvent);
             if (!string.IsNullOrWhiteSpace(eventRaw))
@@ -927,9 +927,28 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            var properties = appointment.UserProperties;
-            var property = properties[name] ?? properties.Add(name, type, Type.Missing, Type.Missing);
-            property.Value = value;
+            try
+            {
+                var properties = appointment.UserProperties;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
+                if (properties == null)
+                {
+                    return;
+                }
+
+                var property = properties[name] ?? properties.Add(name, type, Type.Missing, Type.Missing);
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
+                if (property == null)
+                {
+                    return;
+                }
+
+                property.Value = value;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to set user property '" + name + "'.", ex);
+            }
         }
 
         internal static string GetUserPropertyText(Outlook.AppointmentItem appointment, string name)
@@ -940,8 +959,16 @@ namespace NcTalkOutlookAddIn.Controllers
                 return null;
             }
 
-            var property = appointment.UserProperties[name];
-            return property != null ? property.Value as string : null;
+            try
+            {
+                var property = appointment.UserProperties[name];
+                return property != null ? property.Value as string : null;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read user property '" + name + "'.", ex);
+                return null;
+            }
         }
 
         internal static bool HasUserProperty(Outlook.AppointmentItem appointment, string name)
@@ -992,47 +1019,55 @@ namespace NcTalkOutlookAddIn.Controllers
                 return false;
             }
 
-            var property = appointment.UserProperties[name];
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (property == null)
+            try
             {
-                return false;
-            }
-
-            object value = property.Value;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (value == null)
-            {
-                return false;
-            }
-
-            if (value is bool)
-            {
-                return (bool)value;
-            }
-
-            if (value is int)
-            {
-                return (int)value != 0;
-            }
-
-            string text = value as string;
-            if (!string.IsNullOrEmpty(text))
-            {
-                bool boolParsed;
-                if (bool.TryParse(text, out boolParsed))
+                var property = appointment.UserProperties[name];
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                if (property == null)
                 {
-                    return boolParsed;
+                    return false;
                 }
 
-                int numericParsed;
-                if (int.TryParse(text, out numericParsed))
+                object value = property.Value;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                if (value == null)
                 {
-                    return numericParsed != 0;
+                    return false;
                 }
-            }
 
-            return false;
+                if (value is bool)
+                {
+                    return (bool)value;
+                }
+
+                if (value is int)
+                {
+                    return (int)value != 0;
+                }
+
+                string text = value as string;
+                if (!string.IsNullOrEmpty(text))
+                {
+                    bool boolParsed;
+                    if (bool.TryParse(text, out boolParsed))
+                    {
+                        return boolParsed;
+                    }
+
+                    int numericParsed;
+                    if (int.TryParse(text, out numericParsed))
+                    {
+                        return numericParsed != 0;
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read boolean user property '" + name + "'.", ex);
+                return false;
+            }
         }
 
         internal static void RemoveUserProperty(Outlook.AppointmentItem appointment, string name)
@@ -1043,11 +1078,18 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            var property = appointment.UserProperties[name];
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (property != null)
+            try
             {
-                property.Delete();
+                var property = appointment.UserProperties[name];
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                if (property != null)
+                {
+                    property.Delete();
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to remove user property '" + name + "'.", ex);
             }
         }
 
@@ -1096,4 +1138,3 @@ namespace NcTalkOutlookAddIn.Controllers
         }
     }
 }
-

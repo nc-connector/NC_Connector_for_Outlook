@@ -547,7 +547,7 @@ namespace NcTalkOutlookAddIn
                         return;
                     }
 
-                    var existingType = GetRoomType(appointment);
+                    var existingType = TalkAppointmentController.GetRoomType(appointment);
                     bool existingIsEvent = existingType.HasValue && existingType.Value == TalkRoomType.EventConversation;
                     LogTalk("Attempting to delete existing room (event=" + existingIsEvent + ").");
 
@@ -807,7 +807,7 @@ namespace NcTalkOutlookAddIn
                 return null;
             }
 
-            string mailIdentityKey = ResolveMailComIdentityKey(mail);
+            string mailIdentityKey = ComInteropScope.ResolveIdentityKey(mail, LogCategories.FileLink, "MailItem");
             string inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityOverride)
                 ? ResolveMailInspectorIdentityKey(mail)
                 : inspectorIdentityOverride.Trim();
@@ -817,46 +817,6 @@ namespace NcTalkOutlookAddIn
                 mailIdentityKey,
                 inspectorIdentityKey,
                 () => new MailComposeSubscription(this, mail, mailIdentityKey, inspectorIdentityKey));
-        }
-
-        private static string ResolveMailComIdentityKey(Outlook.MailItem mail)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null)
-            {
-                return string.Empty;
-            }
-
-            IntPtr unk = IntPtr.Zero;
-            try
-            {
-                unk = Marshal.GetIUnknownForObject(mail);
-                if (unk == IntPtr.Zero)
-                {
-                    return string.Empty;
-                }
-
-                return unchecked((ulong)unk.ToInt64()).ToString("X16", CultureInfo.InvariantCulture);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to resolve MailItem COM identity key.", ex);
-                return string.Empty;
-            }
-            finally
-            {
-                if (unk != IntPtr.Zero)
-                {
-                    try
-                    {
-                        Marshal.Release(unk);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to release MailItem COM identity pointer.", ex);
-                    }
-                }
-            }
         }
 
         private static string ResolveMailInspectorIdentityKey(Outlook.MailItem mail)
@@ -1949,38 +1909,6 @@ namespace NcTalkOutlookAddIn
 
                 _subscriptionByEntryId[newEntryId] = subscription;
             }
-        }
-
-        private static TalkRoomType? GetRoomType(Outlook.AppointmentItem appointment)
-        {
-            string eventRaw = TalkAppointmentController.GetUserPropertyText(appointment, IcalEvent);
-            if (!string.IsNullOrWhiteSpace(eventRaw))
-            {
-                string normalized = eventRaw.Trim();
-                if (string.Equals(normalized, "event", StringComparison.OrdinalIgnoreCase))
-                {
-                    return TalkRoomType.EventConversation;
-                }
-
-                if (string.Equals(normalized, "standard", StringComparison.OrdinalIgnoreCase))
-                {
-                    return TalkRoomType.StandardRoom;
-                }
-            }
-
-            string value = TalkAppointmentController.GetUserPropertyText(appointment, PropertyRoomType);
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return null;
-            }
-
-            TalkRoomType parsed;
-            if (Enum.TryParse<TalkRoomType>(value, true, out parsed))
-            {
-                return parsed;
-            }
-
-            return null;
         }
 
         private void ResolveRuntimeRoomTraits(
