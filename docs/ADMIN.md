@@ -81,6 +81,7 @@ Legacy migration on first start:
   <AuthMode>LoginFlow</AuthMode>
   <IfbEnabled>true</IfbEnabled>
   <IfbDays>30</IfbDays>
+  <IfbPort>7777</IfbPort>
   <IfbCacheHours>24</IfbCacheHours>
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
@@ -155,16 +156,23 @@ If backend policy/template delivery is enabled for Talk appointment descriptions
 ### Purpose
 IFB provides a local HTTP endpoint that Outlook can use to retrieve free/busy information from Nextcloud.
 
-Default endpoint:
-- `http://127.0.0.1:7777/nc-ifb/`
+Endpoint:
+- Configurable in `Settings -> IFB -> Local IFB port` (default `7777`).
+- Default endpoint: `http://127.0.0.1:7777/nc-ifb/`
 
 ### URLACL (HTTP.SYS reservation)
 The MSI reserves the URL namespace so the listener can run without administrative rights.
 
-Check:
+Check default reservation:
 
 ```powershell
 netsh http show urlacl | Select-String -Pattern "7777/nc-ifb"
+```
+
+If you use a custom IFB port, add URLACL for that port (administrator shell):
+
+```powershell
+netsh http add urlacl url=http://127.0.0.1:<ifb-port>/nc-ifb/ user="S-1-1-0"
 ```
 
 ### Outlook registry (per user)
@@ -234,10 +242,11 @@ Notes:
   - 32-bit: `HKLM\Software\Wow6432Node\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn`
 
 ### IFB not responding
-- Check if port 7777 is bound:
+- Check which IFB port is configured in `Settings -> IFB` (default `7777`).
+- Check if the configured port is bound:
 
 ```powershell
-netstat -ano | Select-String ":7777"
+netstat -ano | Select-String ":<ifb-port>"
 ```
 
 - Check URLACL (see above)

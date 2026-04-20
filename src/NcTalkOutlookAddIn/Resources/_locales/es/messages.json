@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "Rango (días):"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Puerto IFB local:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Caché de la libreta de direcciones (horas):"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "Cuando la política TLS predeterminada del sistema operativo está desactivada, active al menos una versión TLS (1.2 o 1.3)."
   }
 }
+
 

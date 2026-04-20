@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "范围（天）："
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "本地 IFB 端口："
+  },  "outlook_ifb_cache_hours_label": {
     "message": "通讯录缓存（小时）："
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "当禁用操作系统默认 TLS 策略时，请至少启用一个 TLS 版本（1.2 或 1.3）。"
   }
 }
+
 

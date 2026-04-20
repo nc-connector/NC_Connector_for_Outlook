@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "Période (jours) :"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Port IFB local :"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Cache du carnet d'adresses (heures) :"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "Lorsque la stratégie TLS par défaut du système d'exploitation est désactivée, activez au moins une version TLS (1.2 ou 1.3)."
   }
 }
+
 

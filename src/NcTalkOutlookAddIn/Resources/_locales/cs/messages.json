@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "Rozsah (dny):"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Místní port IFB:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Mezipaměť adresáře (hodiny):"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "Když jsou výchozí zásady TLS operačního systému vypnuté, povolte alespoň jednu verzi TLS (1.2 nebo 1.3)."
   }
 }
+
 

@@ -10,6 +10,7 @@ using Microsoft.Win32;
 using Outlook = Microsoft.Office.Interop.Outlook;
 using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Utilities;
+using System.Net;
 
 namespace NcTalkOutlookAddIn.Services
 {
@@ -62,9 +63,14 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             _server.UpdateSettings(configuration, settings.IfbDays, settings.IfbCacheHours);
+            int ifbPort = AddinSettings.NormalizeIfbPort(settings.IfbPort);
             try
             {
-                _server.Start();
+                _server.Start(ifbPort);
+            }
+            catch (HttpListenerException ex)
+            {
+                throw new InvalidOperationException(BuildIfbStartFailureMessage(ifbPort, ex), ex);
             }
             catch (Exception ex)
             {
@@ -150,13 +156,38 @@ namespace NcTalkOutlookAddIn.Services
         private static string BuildIfbUrl(AddinSettings settings)
         {
             string domain = GuessDefaultDomain(settings);
-            var builder = new StringBuilder("http://127.0.0.1:7777/nc-ifb/freebusy/%NAME%");
+            int ifbPort = AddinSettings.NormalizeIfbPort(settings.IfbPort);
+            var builder = new StringBuilder(
+                "http://127.0.0.1:"
+                + ifbPort.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                + "/nc-ifb/freebusy/%NAME%");
             if (!string.IsNullOrEmpty(domain))
             {
                 builder.Append("@").Append(domain);
             }
             builder.Append(".vfb");
             return builder.ToString();
+        }
+
+        private static string BuildIfbStartFailureMessage(int ifbPort, HttpListenerException ex)
+        {
+            // HTTP.sys URLACL fehlt oder wird durch Policy blockiert.
+            if (ex != null && ex.ErrorCode == 5)
+            {
+                return "IFB server could not be started on port "
+                       + ifbPort.ToString()
+                       + ": access denied (URL reservation missing).";
+            }
+
+            // Prefix ist bereits von einem anderen Prozess belegt.
+            if (ex != null && ex.ErrorCode == 32)
+            {
+                return "IFB server could not be started on port "
+                       + ifbPort.ToString()
+                       + ": port/prefix is already in use.";
+            }
+
+            return "IFB server could not be started: " + (ex != null ? ex.Message : "Unknown listener error.");
         }
 
         private static string GuessDefaultDomain(AddinSettings settings)

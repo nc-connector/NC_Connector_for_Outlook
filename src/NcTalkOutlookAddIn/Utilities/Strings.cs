@@ -523,6 +523,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string CheckIfbEnabled { get { return Get("outlook_ifb_enabled", "Enable IFB endpoint"); } }
         internal static string LabelIfbDays { get { return Get("outlook_ifb_days_label", "Range (days):"); } }
+        internal static string LabelIfbPort { get { return Get("outlook_ifb_port_label", "Local IFB port:"); } }
         internal static string LabelIfbCacheHours { get { return Get("outlook_ifb_cache_hours_label", "Address book cache (hours):"); } }
 
         internal static string AdvancedShareBlockLangLabel { get { return Get("options_share_block_lang_label", "Language for sharing HTML block"); } }

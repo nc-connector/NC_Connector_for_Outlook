@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "Tartomány (napok):"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Helyi IFB-port:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Címjegyzék gyorsítótár (órák):"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."
   }
 }
+
 

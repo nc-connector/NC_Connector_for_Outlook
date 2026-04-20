@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "範圍（天）："
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "本機 IFB 連接埠："
+  },  "outlook_ifb_cache_hours_label": {
     "message": "通訊錄快取（小時）："
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "當作業系統預設 TLS 原則停用時，請至少啟用一個 TLS 版本（1.2 或 1.3）。"
   }
 }
+
 

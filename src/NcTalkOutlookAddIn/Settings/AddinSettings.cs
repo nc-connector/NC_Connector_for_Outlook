@@ -16,6 +16,10 @@ namespace NcTalkOutlookAddIn.Settings
      */
     internal class AddinSettings
     {
+        internal const int DefaultIfbPort = 7777;
+        internal const int MinIfbPort = 1024;
+        internal const int MaxIfbPort = 49151;
+
         public AddinSettings()
         {
             ServerUrl = string.Empty;
@@ -25,6 +29,7 @@ namespace NcTalkOutlookAddIn.Settings
             IfbEnabled = false;
             IfbDays = 30;
             IfbCacheHours = 24;
+            IfbPort = DefaultIfbPort;
             IfbPreviousFreeBusyPath = string.Empty;
             DebugLoggingEnabled = false;
             LogAnonymizationEnabled = true;
@@ -66,6 +71,8 @@ namespace NcTalkOutlookAddIn.Settings
         public int IfbDays { get; set; }
 
         public int IfbCacheHours { get; set; }
+
+        public int IfbPort { get; set; }
 
         public string IfbPreviousFreeBusyPath { get; set; }
 
@@ -123,6 +130,16 @@ namespace NcTalkOutlookAddIn.Settings
         {
             var copy = (AddinSettings)MemberwiseClone();
             return copy;
+        }
+
+        internal static int NormalizeIfbPort(int port)
+        {
+            if (port < MinIfbPort || port > MaxIfbPort)
+            {
+                return DefaultIfbPort;
+            }
+
+            return port;
         }
     }
 }

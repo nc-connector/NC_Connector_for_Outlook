@@ -112,6 +112,7 @@ Option `Benutzerdefiniert` wird nur angezeigt, wenn der NC-Connector-Backend-End
 3. Outlook starten und im Ribbon **NC Connector** auf **Einstellungen** klicken.  
 4. Login-Modus waehlen, Verbindungstest ausfuehren, Einstellungen speichern. Bei erfolgreichem Test bleibt IFB automatisch aktiv.  
 5. Filelink-Basisverzeichnis pruefen und Debug-Logging bei Bedarf aktivieren.
+6. Optional: unter `Einstellungen -> IFB` einen eigenen lokalen IFB-Port setzen (Standard `7777`).
 
 Updates erfolgen durch Installation eines MSI-Pakets ueber die bestehende Installation (gleiche, aeltere oder neuere Version). Persoenliche Einstellungen bleiben erhalten und werden in profilbasierte XML-Dateien (`settings_<OutlookProfile>.xml`) unter `%LOCALAPPDATA%\NC4OL` migriert. Die Deinstallation entfernt das Add-in, stoppt den IFB-Listener und setzt die Registry-Werte zurueck.
 
@@ -131,7 +132,7 @@ Updates erfolgen durch Installation eines MSI-Pakets ueber die bestehende Instal
 
 - **Debug-Log**: Tab *Debug* für ausführliche Traces aktivieren. Log-Dateiformat: `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. Bei aktiviertem Debug-Logging sind auch Attachment-Pre-Add-Entscheidungen/Fallback-Gruende enthalten. Laufzeit-Exceptions werden dort auch bei deaktiviertem Debug-Logging geschrieben. Der Schalter `Logs anonymisieren` ist standardmaessig aktiv.  
 - **Add-in nicht sichtbar**: Installation muss mit Adminrechten erfolgen. Pruefe `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` und ggf. Repair in einer Admin-Konsole: `msiexec /i "NCConnectorForOutlook-3.0.3.msi" ADDLOCAL=ALL`.  
-- **IFB testen**: `powershell -Command "Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. Bei Abweichungen Registry unter `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar` pruefen.  
+- **IFB testen**: mit dem in `Einstellungen -> IFB` konfigurierten Port (Standard `7777`): `powershell -Command "Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. Bei Abweichungen Registry unter `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar` pruefen.  
 - **TLS/Proxy pruefen**: `powershell -Command "Test-NetConnection <Ihre-Domain> -Port 443"`. Bei SSL-Warnungen Zertifikate/Proxy kontrollieren. Der TLS-Modus kann zur Laufzeit unter `Einstellungen -> Erweitert -> Transportsicherheit (TLS)` umgeschaltet werden (`OS-Default` oder erzwungene TLS-Versionen wie 1.2/1.3). Verbindungspruefung und Login-Flow verwenden in 3.0.3 frische Handshakes, damit Moduswechsel direkt wirksam getestet werden. Wenn Secure-Channel-Fehler trotzdem auftreten, pruefen Sie Zertifikatsvertrauen, TLS-pruefende Proxys, DNS und die TLS-/Schannel-Richtlinien des Systems, bevor maschinenweite Registry-/GPO-Overrides erwogen werden.  
 - **Anhangsautomatisierung greift nicht bei grossen Dateien**: In Microsoft-365-/Exchange-Umgebungen kann Outlook Anhaenge vor den Add-in-Events blockieren (z. B. bei serverseitigen Groessenlimits). In diesen Faellen den Button **`Nextcloud Freigabe hinzufuegen`** verwenden.  
 - **Filelink-Fehler**: Debug-Log liefert HTTP-Statuscodes und Exception-Meldungen. Pflichtfelder im Wizard sind validiert.

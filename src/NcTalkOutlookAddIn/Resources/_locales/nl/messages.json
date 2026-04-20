@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "Bereik (dagen):"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Lokale IFB-poort:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Adresboekcache (uren):"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "Wanneer het standaard TLS-beleid van het besturingssysteem is uitgeschakeld, schakel dan minimaal een TLS-versie in (1.2 of 1.3)."
   }
 }
+
 

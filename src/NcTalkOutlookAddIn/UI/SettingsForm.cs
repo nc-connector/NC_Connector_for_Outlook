@@ -60,6 +60,8 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _ifbEnabledCheckBox = new CheckBox();
         private readonly ComboBox _ifbDaysCombo = new ComboBox();
         private readonly Label _ifbDaysLabel = new Label();
+        private readonly Label _ifbPortLabel = new Label();
+        private readonly NumericUpDown _ifbPortUpDown = new NumericUpDown();
         private readonly ComboBox _ifbCacheHoursCombo = new ComboBox();
         private readonly Label _ifbCacheHoursLabel = new Label();
         private readonly CheckBox _debugLogCheckBox = new CheckBox();
@@ -575,9 +577,15 @@ namespace NcTalkOutlookAddIn.UI
             int daysLabelTop = _ifbEnabledCheckBox.Bottom + rowGap;
             _ifbDaysLabel.Location = new Point(left, daysLabelTop);
 
-            int comboLeft = _ifbDaysLabel.Right + labelToComboGap;
+            int portLabelTop = _ifbDaysLabel.Bottom + rowGap;
+            _ifbPortLabel.Location = new Point(left, portLabelTop);
+
+            int comboLeft = Math.Max(_ifbDaysLabel.Right, _ifbPortLabel.Right) + labelToComboGap;
             int comboHeight = Math.Max(_ifbDaysCombo.Height, _ifbDaysCombo.PreferredHeight + ScaleLogical(2));
             _ifbDaysCombo.SetBounds(comboLeft, daysLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbDaysCombo.Width), comboHeight);
+
+            int portHeight = Math.Max(_ifbPortUpDown.Height, _ifbPortUpDown.PreferredHeight + ScaleLogical(2));
+            _ifbPortUpDown.SetBounds(comboLeft, portLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(110), _ifbPortUpDown.Width), portHeight);
         }
 
         private void ApplyAdvancedTabLayout()
@@ -724,6 +732,18 @@ namespace NcTalkOutlookAddIn.UI
             _ifbDaysCombo.Width = 100;
             _ifbDaysCombo.Items.AddRange(new object[] { "10", "30", "60", "90" });
             _ifbTab.Controls.Add(_ifbDaysCombo);
+
+            _ifbPortLabel.Text = Strings.LabelIfbPort;
+            _ifbPortLabel.Location = new Point(24, 94);
+            _ifbPortLabel.AutoSize = true;
+            _ifbTab.Controls.Add(_ifbPortLabel);
+
+            _ifbPortUpDown.Location = new Point(200, 92);
+            _ifbPortUpDown.Width = 110;
+            _ifbPortUpDown.Minimum = AddinSettings.MinIfbPort;
+            _ifbPortUpDown.Maximum = AddinSettings.MaxIfbPort;
+            _ifbPortUpDown.Value = AddinSettings.DefaultIfbPort;
+            _ifbTab.Controls.Add(_ifbPortUpDown);
         }
 
         private void InitializeAdvancedTab()
@@ -1130,6 +1150,9 @@ namespace NcTalkOutlookAddIn.UI
                 _loginFlowRadio.Checked = !_manualRadio.Checked;
                 _ifbEnabledCheckBox.Checked = Result.IfbEnabled;
                 SelectComboValue(_ifbDaysCombo, Result.IfbDays, 30);
+                _ifbPortUpDown.Value = Math.Max(
+                    _ifbPortUpDown.Minimum,
+                    Math.Min(_ifbPortUpDown.Maximum, AddinSettings.NormalizeIfbPort(Result.IfbPort)));
                 SelectComboValue(_ifbCacheHoursCombo, Result.IfbCacheHours, 24);
                 _debugLogCheckBox.Checked = Result.DebugLoggingEnabled;
                 _debugAnonymizeCheckBox.Checked = Result.LogAnonymizationEnabled;
@@ -1205,6 +1228,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.AuthMode = _loginFlowRadio.Checked ? AuthenticationMode.LoginFlow : AuthenticationMode.Manual;
             Result.IfbEnabled = _ifbEnabledCheckBox.Checked;
             Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
+            Result.IfbPort = AddinSettings.NormalizeIfbPort((int)_ifbPortUpDown.Value);
             Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
             Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
             Result.LogAnonymizationEnabled = _debugAnonymizeCheckBox.Checked;
@@ -2123,6 +2147,10 @@ namespace NcTalkOutlookAddIn.UI
             _ifbDaysLabel.Visible = showDays;
             _ifbDaysCombo.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
             _ifbDaysLabel.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
+            _ifbPortUpDown.Visible = showDays;
+            _ifbPortLabel.Visible = showDays;
+            _ifbPortUpDown.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
+            _ifbPortLabel.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
 
             _ifbCacheHoursCombo.Enabled = !_isBusy;
             _ifbCacheHoursLabel.Enabled = !_isBusy;

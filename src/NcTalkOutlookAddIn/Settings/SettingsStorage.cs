@@ -489,6 +489,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "IfbEnabled", settings.IfbEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbDays", settings.IfbDays.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbCacheHours", settings.IfbCacheHours.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "IfbPort", AddinSettings.NormalizeIfbPort(settings.IfbPort).ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbPreviousFreeBusyPath", Safe(settings.IfbPreviousFreeBusyPath));
             AppendElement(document, root, "DebugLoggingEnabled", settings.DebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "LogAnonymizationEnabled", settings.LogAnonymizationEnabled.ToString(CultureInfo.InvariantCulture));
@@ -573,6 +574,13 @@ namespace NcTalkOutlookAddIn.Settings
                     if (int.TryParse(value, out cacheHours))
                     {
                         settings.IfbCacheHours = cacheHours;
+                    }
+                    break;
+                case "IfbPort":
+                    int ifbPort;
+                    if (int.TryParse(value, out ifbPort))
+                    {
+                        settings.IfbPort = AddinSettings.NormalizeIfbPort(ifbPort);
                     }
                     break;
                 case "IfbPreviousFreeBusyPath":

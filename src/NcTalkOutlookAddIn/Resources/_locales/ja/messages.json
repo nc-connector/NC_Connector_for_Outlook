@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "範囲（日）:"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "ローカル IFB ポート:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "アドレス帳キャッシュ（時間）:"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "OS 既定の TLS ポリシーを無効にする場合は、少なくとも 1 つの TLS バージョン（1.2 または 1.3）を有効にしてください。"
   }
 }
+
 

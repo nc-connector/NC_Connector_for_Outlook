@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "Intervallo (giorni):"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Porta IFB locale:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Cache rubrica (ore):"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "Quando il criterio TLS predefinito del sistema operativo è disattivato, abilita almeno una versione TLS (1.2 o 1.3)."
   }
 }
+
 

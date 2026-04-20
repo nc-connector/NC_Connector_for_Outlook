@@ -998,7 +998,9 @@
   "outlook_ifb_days_label": {
     "message": "Zeitraum (Tage):"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Lokaler IFB-Port:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Adressbuch-Cache (Stunden):"
   },
   "outlook_debug_file_label": {
@@ -1389,5 +1391,6 @@
     "message": "Ihr NC Connector Seat ist derzeit pausiert. Bitte wenden Sie sich an Ihren Nextcloud-Administrator."
   }
 }
+
 
 

@@ -21,7 +21,10 @@ namespace NcTalkOutlookAddIn.Services
      */
     internal sealed class FreeBusyServer : IDisposable
     {
-        private const string Prefix = "http://127.0.0.1:7777/nc-ifb/";
+        private const int DefaultPort = 7777;
+        private const int MinPort = 1024;
+        private const int MaxPort = 49151;
+        private const string PrefixPath = "/nc-ifb/";
         private const string LogCategory = LogCategories.Ifb;
         private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
 
@@ -35,6 +38,8 @@ namespace NcTalkOutlookAddIn.Services
         private TalkServiceConfiguration _configuration;
         private int _defaultDays = 30;
         private int _cacheHours = 24;
+        private int _listenPort = DefaultPort;
+        private string _listenPrefix = BuildPrefix(DefaultPort);
 
         internal FreeBusyServer(IfbAddressBookCache addressBookCache)
         {
@@ -56,14 +61,28 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        internal void Start()
+        internal void Start(int port)
         {
             lock (_syncRoot)
             {
+                int normalizedPort = NormalizePort(port);
+
                 // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_listener != null && _listener.IsListening)
                 {
-                    return;
+                    if (_listenPort == normalizedPort)
+                    {
+                        return;
+                    }
+
+                    DiagnosticsLogger.Log(
+                        LogCategory,
+                        "Restarting listener due to port change (oldPort="
+                        + _listenPort.ToString(CultureInfo.InvariantCulture)
+                        + ", newPort="
+                        + normalizedPort.ToString(CultureInfo.InvariantCulture)
+                        + ").");
+                    StopListenerLocked();
                 }
 
                 // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
@@ -72,11 +91,13 @@ namespace NcTalkOutlookAddIn.Services
                     throw new InvalidOperationException("IFB cannot be started: credentials are incomplete.");
                 }
 
+                _listenPort = normalizedPort;
+                _listenPrefix = BuildPrefix(_listenPort);
                 _listener = new HttpListener();
-                _listener.Prefixes.Add(Prefix);
+                _listener.Prefixes.Add(_listenPrefix);
                 _listener.Start();
 
-                DiagnosticsLogger.Log(LogCategory, "Listener started (prefix=" + Prefix + ").");
+                DiagnosticsLogger.Log(LogCategory, "Listener started (prefix=" + _listenPrefix + ").");
 
                 _cancellation = new CancellationTokenSource();
                 _listenerTask = Task.Run(() => ListenLoop(_cancellation.Token));
@@ -87,50 +108,72 @@ namespace NcTalkOutlookAddIn.Services
         {
             lock (_syncRoot)
             {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_cancellation != null)
-                {
-                    _cancellation.Cancel();
-                    _cancellation.Dispose();
-                    _cancellation = null;
-                }
+                StopListenerLocked();
+            }
+        }
 
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_listener != null)
-                {
-                    try
-                    {
-                        DiagnosticsLogger.Log(LogCategory, "Stopping listener.");
-                        _listener.Stop();
-                        _listener.Close();
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategory, "Failed to stop IFB listener.", ex);
-                    }
-                    finally
-                    {
-                        _listener = null;
-                    }
-                }
+        private void StopListenerLocked()
+        {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (_cancellation != null)
+            {
+                _cancellation.Cancel();
+                _cancellation.Dispose();
+                _cancellation = null;
+            }
 
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_listenerTask != null)
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (_listener != null)
+            {
+                try
                 {
-                    try
-                    {
-                        _listenerTask.Wait(1000);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategory, "Failed while waiting for IFB listener task shutdown.", ex);
-                    }
-                    finally
-                    {
-                        _listenerTask = null;
-                    }
+                    DiagnosticsLogger.Log(LogCategory, "Stopping listener.");
+                    _listener.Stop();
+                    _listener.Close();
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategory, "Failed to stop IFB listener.", ex);
+                }
+                finally
+                {
+                    _listener = null;
                 }
             }
+
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (_listenerTask != null)
+            {
+                try
+                {
+                    _listenerTask.Wait(1000);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategory, "Failed while waiting for IFB listener task shutdown.", ex);
+                }
+                finally
+                {
+                    _listenerTask = null;
+                }
+            }
+        }
+
+        private static string BuildPrefix(int port)
+        {
+            return "http://127.0.0.1:"
+                   + port.ToString(CultureInfo.InvariantCulture)
+                   + PrefixPath;
+        }
+
+        private static int NormalizePort(int port)
+        {
+            if (port < MinPort || port > MaxPort)
+            {
+                return DefaultPort;
+            }
+
+            return port;
         }
 
         private void ListenLoop(CancellationToken token)

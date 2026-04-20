@@ -97,6 +97,7 @@ Beispiel (Auszug):
   <AuthMode>LoginFlow</AuthMode>
   <IfbEnabled>true</IfbEnabled>
   <IfbDays>30</IfbDays>
+  <IfbPort>7777</IfbPort>
   <IfbCacheHours>24</IfbCacheHours>
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
@@ -151,18 +152,25 @@ Wenn fuer Talk-Terminbeschreibungen im Backend `event_description_type=html` gen
 
 IFB stellt eine lokale HTTP-Quelle bereit, über die Outlook Free/Busy-Informationen aus Nextcloud beziehen kann.
 
-Standard-Endpunkt:
+Endpunkt:
 
-- `http://127.0.0.1:7777/nc-ifb/`
+- Konfigurierbar unter `Einstellungen -> IFB -> Lokaler IFB-Port` (Standard `7777`).
+- Standard-Endpunkt: `http://127.0.0.1:7777/nc-ifb/`
 
 ### URLACL (HTTP.SYS Reservation)
 
 Die MSI reserviert den URL-Namespace für alle authentifizierten Benutzer, damit der Listener ohne Admin-Rechte laufen kann.
 
-Prüfen:
+Standard-Reservation pruefen:
 
 ```powershell
 netsh http show urlacl | Select-String -Pattern "7777/nc-ifb"
+```
+
+Wenn ein eigener IFB-Port verwendet wird, URLACL fuer diesen Port hinterlegen (Admin-Shell):
+
+```powershell
+netsh http add urlacl url=http://127.0.0.1:<ifb-port>/nc-ifb/ user="S-1-1-0"
 ```
 
 ### Outlook Registry (per User)
@@ -232,10 +240,11 @@ Aufbewahrung:
 
 ### IFB reagiert nicht
 
-- Prüfen, ob Port 7777 gebunden ist:
+- Pruefen, welcher IFB-Port in `Einstellungen -> IFB` gesetzt ist (Standard `7777`).
+- Pruefen, ob dieser Port gebunden ist:
 
 ```powershell
-netstat -ano | Select-String ":7777"
+netstat -ano | Select-String ":<ifb-port>"
 ```
 
 - URLACL prüfen (siehe oben)

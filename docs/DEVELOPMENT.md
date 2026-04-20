@@ -222,7 +222,7 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
 #### IFB flow
 
 1. User enables IFB in Settings.
-2. `Services/FreeBusyServer.cs` starts a local HTTP listener (default: `http://127.0.0.1:7777/nc-ifb/`).
+2. `Services/FreeBusyServer.cs` starts a local HTTP listener on the configured IFB port (`Settings -> IFB -> Local IFB port`, default: `7777`).
 3. `Services/FreeBusyManager.cs` updates Outlook registry values so Outlook requests free/busy data via the local endpoint.
 
 ## Network endpoints
@@ -249,7 +249,7 @@ Sharing:
 
 IFB (DAV via proxy):
 
-- Local listener: `http://127.0.0.1:7777/nc-ifb/...`
+- Local listener: `http://127.0.0.1:<ifb-port>/nc-ifb/...` (default `<ifb-port>=7777`)
 - The proxy talks to CalDAV and Addressbook endpoints under `remote.php/dav/...`
 
 ## Localization (i18n)
@@ -376,7 +376,7 @@ Note: there is currently no automated test suite in this repository. Use the smo
 3. Calendar: add attendees, save again (participant sync).
 4. Mail: run the sharing wizard, upload 1–2 small files, insert the HTML block, and send to yourself.
 5. IFB: enable IFB, then verify the local endpoint responds:
-   - `Invoke-WebRequest http://127.0.0.1:7777/nc-ifb/ -UseBasicParsing`
+   - `Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/ -UseBasicParsing`
 
 ## X-NCTALK-* property reference
 

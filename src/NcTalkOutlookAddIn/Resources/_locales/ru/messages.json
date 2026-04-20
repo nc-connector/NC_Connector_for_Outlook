@@ -977,7 +977,9 @@
   "outlook_ifb_days_label": {
     "message": "Диапазон (дни):"
   },
-  "outlook_ifb_cache_hours_label": {
+  "outlook_ifb_port_label": {
+    "message": "Локальный порт IFB:"
+  },  "outlook_ifb_cache_hours_label": {
     "message": "Кэш адресной книги (часы):"
   },
   "outlook_debug_file_label": {
@@ -1389,4 +1391,5 @@
     "message": "Когда TLS-политика операционной системы по умолчанию отключена, включите как минимум одну версию TLS (1.2 или 1.3)."
   }
 }
+
 

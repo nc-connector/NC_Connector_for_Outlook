@@ -132,7 +132,7 @@ namespace NcTalkOutlookAddIn
             // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_currentSettings != null)
             {
-                LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
+                LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", IfbPort=" + _currentSettings.IfbPort + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
             }
             _freeBusyManager = new FreeBusyManager(_settingsStorage.DataDirectory);
             _freeBusyManager.Initialize(_outlookApplication);
@@ -635,7 +635,7 @@ namespace NcTalkOutlookAddIn
                         LogSettings("Settings save aborted because transport security settings could not be applied.");
                         return;
                     }
-                    LogSettings("Settings applied (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
+                    LogSettings("Settings applied (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", IfbPort=" + _currentSettings.IfbPort + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
                     ApplyIfbSettings();
                     // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (_settingsStorage != null)
@@ -1643,7 +1643,7 @@ namespace NcTalkOutlookAddIn
 
             try
             {
-                LogCore("Applying IFB (Enabled=" + _currentSettings.IfbEnabled + ", Days=" + _currentSettings.IfbDays + ", CacheHours=" + _currentSettings.IfbCacheHours + ").");
+                LogCore("Applying IFB (Enabled=" + _currentSettings.IfbEnabled + ", Days=" + _currentSettings.IfbDays + ", Port=" + _currentSettings.IfbPort + ", CacheHours=" + _currentSettings.IfbCacheHours + ").");
                 _freeBusyManager.ApplySettings(_currentSettings);
             }
             catch (Exception ex)

@@ -97,7 +97,8 @@ Was das Script macht:
    - Ribbon: **NC Connector → Talk-Link einfügen**
 4) E-Mail erstellen:
    - Ribbon: **NC Connector → Nextcloud Freigabe hinzufügen**
-5) Optional: IFB in Settings aktivieren und Free/Busy prüfen
+5) Optional: IFB in Settings aktivieren, Port pruefen (`Einstellungen -> IFB`, Standard `7777`) und Endpunkt testen
+   - `Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/ -UseBasicParsing`
 
 ## Logging
 
@@ -139,7 +140,7 @@ Services:
 
 - `src/NcTalkOutlookAddIn/Services/TalkService.cs` (Talk API Calls)
 - `src/NcTalkOutlookAddIn/Services/FileLinkService.cs` (DAV/Share Flow)
-- `src/NcTalkOutlookAddIn/Services/FreeBusyServer.cs` + `FreeBusyManager.cs` (IFB)
+- `src/NcTalkOutlookAddIn/Services/FreeBusyServer.cs` + `FreeBusyManager.cs` (IFB; Port ueber Settings konfigurierbar, Standard `7777`)
 - `src/NcTalkOutlookAddIn/Services/PasswordPolicyService.cs` (Nextcloud Password Policy + Fallback)
 - `src/NcTalkOutlookAddIn/Services/NcHttpClient.cs` (zentraler Request-Executor fuer Auth-Header, OCS-Header, Timeout/Decompression und optionalen Fresh-Connection-Mode)
   - Alle Runtime-HTTP-Aufrufe (Talk, Share/DAV, IFB, Login-Flow, Moderator-Avatar-Fetch) laufen zentral ueber `NcHttpClient`.
