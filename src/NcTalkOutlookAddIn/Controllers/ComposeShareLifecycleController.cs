@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
+using NcTalkOutlookAddIn.Models;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Utilities;
@@ -84,7 +85,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        internal void DispatchSeparatePasswordMailQueue(string composeKey, List<NextcloudTalkAddIn.SeparatePasswordDispatchEntry> queue)
+        internal void DispatchSeparatePasswordMailQueue(string composeKey, List<SeparatePasswordDispatchEntry> queue)
         {
             // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (queue == null || queue.Count == 0 || _owner.OutlookApplication == null)
@@ -306,7 +307,7 @@ namespace NcTalkOutlookAddIn.Controllers
             return value.Trim();
         }
 
-        private bool TryOpenSeparatePasswordFallback(NextcloudTalkAddIn.SeparatePasswordDispatchEntry dispatch, string composeKey)
+        private bool TryOpenSeparatePasswordFallback(SeparatePasswordDispatchEntry dispatch, string composeKey)
         {
             // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (dispatch == null || _owner.OutlookApplication == null)
@@ -369,7 +370,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private List<string> ApplySeparatePasswordRecipientsForSend(
             Outlook.MailItem mail,
-            NextcloudTalkAddIn.SeparatePasswordDispatchEntry dispatch,
+            SeparatePasswordDispatchEntry dispatch,
             string composeKey)
         {
             // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
@@ -476,7 +477,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        private static string BuildSeparatePasswordMailSubject(NextcloudTalkAddIn.SeparatePasswordDispatchEntry dispatch)
+        private static string BuildSeparatePasswordMailSubject(SeparatePasswordDispatchEntry dispatch)
         {
             string baseSubject = Strings.SharingPasswordMailSubject;
             string shareLabel = dispatch != null ? (dispatch.ShareLabel ?? string.Empty).Trim() : string.Empty;

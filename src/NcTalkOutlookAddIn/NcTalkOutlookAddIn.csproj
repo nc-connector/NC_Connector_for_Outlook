@@ -109,6 +109,7 @@
     <Compile Include="Models\NextcloudUser.cs" />
     <Compile Include="Models\PasswordPolicyInfo.cs" />
     <Compile Include="Models\TalkParticipant.cs" />
+    <Compile Include="Models\SeparatePasswordDispatchEntry.cs" />
     <Compile Include="Controllers\TalkDescriptionTemplateController.cs" />
     <Compile Include="Controllers\TalkAppointmentController.cs" />
     <Compile Include="Controllers\SettingsWorkflowController.cs" />
@@ -157,6 +158,7 @@
     <Compile Include="Utilities\NcJson.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
     <Compile Include="Utilities\HtmlTemplateSanitizer.cs" />
+    <Compile Include="Utilities\PictureConverter.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />
     <Compile Include="Utilities\ComInteropScope.cs" />
     <Compile Include="Utilities\NativeWindowOwner.cs" />

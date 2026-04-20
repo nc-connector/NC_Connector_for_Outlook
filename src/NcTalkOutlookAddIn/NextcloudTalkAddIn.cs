@@ -280,23 +280,6 @@ namespace NcTalkOutlookAddIn
             return _fileLinkLaunchController.RunFileLinkWizardForMail(mail, launchOptions);
         }
 
-        internal sealed class SeparatePasswordDispatchEntry
-        {
-            internal string ShareLabel { get; set; }
-
-            internal string ShareUrl { get; set; }
-
-            internal string Password { get; set; }
-
-            internal string Html { get; set; }
-
-            internal string To { get; set; }
-
-            internal string Cc { get; set; }
-
-            internal string Bcc { get; set; }
-        }
-
         internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null)
         {
             // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
@@ -951,35 +934,6 @@ namespace NcTalkOutlookAddIn
                 }
 
                 return false;
-            }
-        }
-
-        private static class PictureConverter
-        {
-            /**
-             * Internal helper class that wraps Image -> IPictureDisp conversion.
-             */
-            private sealed class AxHostPictureConverter : AxHost
-            {
-                public AxHostPictureConverter() : base(string.Empty)
-                {
-                }
-
-                /**
-                 * Converts an Image using WinForms infrastructure.
-                 */
-                public static stdole.IPictureDisp ImageToPictureDisp(Image image)
-                {
-                    return (stdole.IPictureDisp)GetIPictureDispFromPicture(image);
-                }
-            }
-
-            /**
-             * Exposes the conversion for callers.
-             */
-            public static stdole.IPictureDisp ToPictureDisp(Image image)
-            {
-                return AxHostPictureConverter.ImageToPictureDisp(image);
             }
         }
 
