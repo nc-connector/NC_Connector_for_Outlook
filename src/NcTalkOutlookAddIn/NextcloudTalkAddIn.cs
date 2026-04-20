@@ -531,7 +531,7 @@ namespace NcTalkOutlookAddIn
                 };
                 LogTalk("Room request prepared (title='" + request.Title + "', type=" + request.RoomType + ", lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ", passwordSet=" + (!string.IsNullOrEmpty(request.Password)) + ").");
 
-                string existingToken = GetUserPropertyTextPrefer(appointment, IcalToken, PropertyToken);
+                string existingToken = TalkAppointmentController.GetUserPropertyTextPrefer(appointment, IcalToken, PropertyToken);
                 if (!string.IsNullOrWhiteSpace(existingToken))
                 {
                     LogTalk("Existing room found (token=" + existingToken + "), replacement requested.");
@@ -1763,19 +1763,6 @@ namespace NcTalkOutlookAddIn
             return TalkDescriptionTemplateController.ConvertHtmlTemplateToPlainText(value);
         }
 
-        internal static void SetUserProperty(Outlook.AppointmentItem appointment, string name, Outlook.OlUserPropertyType type, object value)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
-            {
-                return;
-            }
-
-            var properties = appointment.UserProperties;
-            var property = properties[name] ?? properties.Add(name, type, Type.Missing, Type.Missing);
-            property.Value = value;
-        }
-
         private bool TryStampIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
         {
             return _talkAppointmentController.TryStampIcalStartEpoch(appointment, roomToken, out startEpoch);
@@ -1870,48 +1857,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        internal static string GetUserPropertyText(Outlook.AppointmentItem appointment, string name)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
-            {
-                return null;
-            }
-
-            var property = appointment.UserProperties[name];
-            return property != null ? property.Value as string : null;
-        }
-
-        internal static bool HasUserProperty(Outlook.AppointmentItem appointment, string name)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                return appointment.UserProperties[name] != null;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to check user property '" + name + "'.", ex);
-                return false;
-            }
-        }
-
-        internal static string GetUserPropertyTextPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
-        {
-            string primaryValue = GetUserPropertyText(appointment, primaryName);
-            if (!string.IsNullOrWhiteSpace(primaryValue))
-            {
-                return primaryValue;
-            }
-
-            return GetUserPropertyText(appointment, legacyName);
-        }
-
         private static string ExtractTokenFromTalkUrlText(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -1931,7 +1876,7 @@ namespace NcTalkOutlookAddIn
 
         private string ResolveRoomTokenForAppointment(Outlook.AppointmentItem appointment)
         {
-            string roomToken = GetUserPropertyTextPrefer(appointment, IcalToken, PropertyToken);
+            string roomToken = TalkAppointmentController.GetUserPropertyTextPrefer(appointment, IcalToken, PropertyToken);
             if (!string.IsNullOrWhiteSpace(roomToken))
             {
                 return roomToken.Trim();
@@ -1955,8 +1900,8 @@ namespace NcTalkOutlookAddIn
 
             try
             {
-                SetUserProperty(appointment, IcalToken, Outlook.OlUserPropertyType.olText, extracted);
-                SetUserProperty(appointment, PropertyToken, Outlook.OlUserPropertyType.olText, extracted);
+                TalkAppointmentController.SetUserProperty(appointment, IcalToken, Outlook.OlUserPropertyType.olText, extracted);
+                TalkAppointmentController.SetUserProperty(appointment, PropertyToken, Outlook.OlUserPropertyType.olText, extracted);
                 LogTalk("Room token bootstrapped from location (token=" + extracted + ").");
             }
             catch (Exception ex)
@@ -1965,67 +1910,6 @@ namespace NcTalkOutlookAddIn
             }
 
             return extracted;
-        }
-
-        internal static bool GetUserPropertyBoolPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
-        {
-            if (HasUserProperty(appointment, primaryName))
-            {
-                return GetUserPropertyBool(appointment, primaryName);
-            }
-
-            return GetUserPropertyBool(appointment, legacyName);
-        }
-
-        internal static bool GetUserPropertyBool(Outlook.AppointmentItem appointment, string name)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
-            {
-                return false;
-            }
-
-            var property = appointment.UserProperties[name];
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (property == null)
-            {
-                return false;
-            }
-
-            object value = property.Value;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (value == null)
-            {
-                return false;
-            }
-
-            if (value is bool)
-            {
-                return (bool)value;
-            }
-
-            if (value is int)
-            {
-                return (int)value != 0;
-            }
-
-            string text = value as string;
-            if (!string.IsNullOrEmpty(text))
-            {
-                bool boolParsed;
-                if (bool.TryParse(text, out boolParsed))
-                {
-                    return boolParsed;
-                }
-
-                int numericParsed;
-                if (int.TryParse(text, out numericParsed))
-                {
-                    return numericParsed != 0;
-                }
-            }
-
-            return false;
         }
 
         private void RefreshEntryBinding(AppointmentSubscription subscription)
@@ -2069,7 +1953,7 @@ namespace NcTalkOutlookAddIn
 
         private static TalkRoomType? GetRoomType(Outlook.AppointmentItem appointment)
         {
-            string eventRaw = GetUserPropertyText(appointment, IcalEvent);
+            string eventRaw = TalkAppointmentController.GetUserPropertyText(appointment, IcalEvent);
             if (!string.IsNullOrWhiteSpace(eventRaw))
             {
                 string normalized = eventRaw.Trim();
@@ -2084,7 +1968,7 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            string value = GetUserPropertyText(appointment, PropertyRoomType);
+            string value = TalkAppointmentController.GetUserPropertyText(appointment, PropertyRoomType);
             if (string.IsNullOrWhiteSpace(value))
             {
                 return null;
@@ -2142,48 +2026,9 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        internal static void RemoveUserProperty(Outlook.AppointmentItem appointment, string name)
+        internal void ClearTalkProperties(Outlook.AppointmentItem appointment)
         {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
-            {
-                return;
-            }
-
-            var property = appointment.UserProperties[name];
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (property != null)
-            {
-                property.Delete();
-            }
-        }
-
-        private void ClearTalkProperties(Outlook.AppointmentItem appointment)
-        {
-            RemoveUserProperty(appointment, PropertyToken);
-            RemoveUserProperty(appointment, PropertyRoomType);
-            RemoveUserProperty(appointment, PropertyLobby);
-            RemoveUserProperty(appointment, PropertySearchVisible);
-            RemoveUserProperty(appointment, PropertyPasswordSet);
-            RemoveUserProperty(appointment, PropertyStartEpoch);
-            RemoveUserProperty(appointment, PropertyDataVersion);
-            RemoveUserProperty(appointment, PropertyAddUsers);
-            RemoveUserProperty(appointment, PropertyAddGuests);
-            RemoveUserProperty(appointment, PropertyDelegateId);
-            RemoveUserProperty(appointment, PropertyDelegated);
-            RemoveUserProperty(appointment, IcalToken);
-            RemoveUserProperty(appointment, IcalUrl);
-            RemoveUserProperty(appointment, IcalLobby);
-            RemoveUserProperty(appointment, IcalStart);
-            RemoveUserProperty(appointment, IcalEvent);
-            RemoveUserProperty(appointment, IcalObjectId);
-            RemoveUserProperty(appointment, IcalAddUsers);
-            RemoveUserProperty(appointment, IcalAddGuests);
-            RemoveUserProperty(appointment, IcalAddParticipants);
-            RemoveUserProperty(appointment, IcalDelegate);
-            RemoveUserProperty(appointment, IcalDelegateName);
-            RemoveUserProperty(appointment, IcalDelegated);
-            RemoveUserProperty(appointment, IcalDelegateReady);
+            _talkAppointmentController.ClearTalkProperties(appointment);
         }
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)

@@ -89,75 +89,75 @@ namespace NcTalkOutlookAddIn.Controllers
                     request.InvitationTemplate);
             }
 
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyToken, Outlook.OlUserPropertyType.olText, result.RoomToken);
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyToken, Outlook.OlUserPropertyType.olText, result.RoomToken);
             var storedRoomType = result.CreatedAsEventConversation ? TalkRoomType.EventConversation : TalkRoomType.StandardRoom;
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyRoomType, Outlook.OlUserPropertyType.olText, storedRoomType.ToString());
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby, Outlook.OlUserPropertyType.olYesNo, request.LobbyEnabled);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertySearchVisible, Outlook.OlUserPropertyType.olYesNo, request.SearchVisible);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyPasswordSet, Outlook.OlUserPropertyType.olYesNo, !string.IsNullOrEmpty(request.Password));
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyRoomType, Outlook.OlUserPropertyType.olText, storedRoomType.ToString());
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby, Outlook.OlUserPropertyType.olYesNo, request.LobbyEnabled);
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertySearchVisible, Outlook.OlUserPropertyType.olYesNo, request.SearchVisible);
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyPasswordSet, Outlook.OlUserPropertyType.olYesNo, !string.IsNullOrEmpty(request.Password));
             NextcloudTalkAddIn.LogTalkMessage("User fields updated (token set, lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ").");
 
             long? startEpoch = TimeUtilities.ToUnixTimeSeconds(appointment.Start);
             long? endEpoch = TimeUtilities.ToUnixTimeSeconds(appointment.End);
             if (startEpoch.HasValue)
             {
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyStartEpoch, Outlook.OlUserPropertyType.olText, startEpoch.Value.ToString(CultureInfo.InvariantCulture));
+                SetUserProperty(appointment, NextcloudTalkAddIn.PropertyStartEpoch, Outlook.OlUserPropertyType.olText, startEpoch.Value.ToString(CultureInfo.InvariantCulture));
             }
 
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDataVersion, Outlook.OlUserPropertyType.olNumber, NextcloudTalkAddIn.PropertyVersionValue);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyAddUsers, Outlook.OlUserPropertyType.olYesNo, request.AddUsers);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyAddGuests, Outlook.OlUserPropertyType.olYesNo, request.AddGuests);
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDataVersion, Outlook.OlUserPropertyType.olNumber, NextcloudTalkAddIn.PropertyVersionValue);
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyAddUsers, Outlook.OlUserPropertyType.olYesNo, request.AddUsers);
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyAddGuests, Outlook.OlUserPropertyType.olYesNo, request.AddGuests);
 
             if (!string.IsNullOrWhiteSpace(request.DelegateModeratorId))
             {
                 string delegateId = request.DelegateModeratorId.Trim();
                 string delegateName = !string.IsNullOrWhiteSpace(request.DelegateModeratorName) ? request.DelegateModeratorName.Trim() : delegateId;
 
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegateId, Outlook.OlUserPropertyType.olText, delegateId);
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated, Outlook.OlUserPropertyType.olYesNo, false);
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate, Outlook.OlUserPropertyType.olText, delegateId);
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName, Outlook.OlUserPropertyType.olText, delegateName);
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated, Outlook.OlUserPropertyType.olText, "FALSE");
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady, Outlook.OlUserPropertyType.olText, "TRUE");
+                SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegateId, Outlook.OlUserPropertyType.olText, delegateId);
+                SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated, Outlook.OlUserPropertyType.olYesNo, false);
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate, Outlook.OlUserPropertyType.olText, delegateId);
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName, Outlook.OlUserPropertyType.olText, delegateName);
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated, Outlook.OlUserPropertyType.olText, "FALSE");
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady, Outlook.OlUserPropertyType.olText, "TRUE");
             }
             else
             {
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegateId);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegateId);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
             }
 
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalToken, Outlook.OlUserPropertyType.olText, result.RoomToken);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalUrl, Outlook.OlUserPropertyType.olText, result.RoomUrl);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalLobby, Outlook.OlUserPropertyType.olText, request.LobbyEnabled ? "TRUE" : "FALSE");
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalToken, Outlook.OlUserPropertyType.olText, result.RoomToken);
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalUrl, Outlook.OlUserPropertyType.olText, result.RoomUrl);
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalLobby, Outlook.OlUserPropertyType.olText, request.LobbyEnabled ? "TRUE" : "FALSE");
             if (startEpoch.HasValue)
             {
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalStart, Outlook.OlUserPropertyType.olText, startEpoch.Value.ToString(CultureInfo.InvariantCulture));
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalStart, Outlook.OlUserPropertyType.olText, startEpoch.Value.ToString(CultureInfo.InvariantCulture));
             }
             else
             {
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalStart);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalStart);
             }
 
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, result.CreatedAsEventConversation ? "event" : "standard");
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, result.CreatedAsEventConversation ? "event" : "standard");
             string objectId = (startEpoch.HasValue && endEpoch.HasValue)
                 ? (startEpoch.Value.ToString(CultureInfo.InvariantCulture) + "#" + endEpoch.Value.ToString(CultureInfo.InvariantCulture))
                 : null;
             if (!string.IsNullOrWhiteSpace(objectId))
             {
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalObjectId, Outlook.OlUserPropertyType.olText, objectId);
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalObjectId, Outlook.OlUserPropertyType.olText, objectId);
             }
             else
             {
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalObjectId);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalObjectId);
             }
 
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalAddUsers, Outlook.OlUserPropertyType.olText, request.AddUsers ? "TRUE" : "FALSE");
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalAddGuests, Outlook.OlUserPropertyType.olText, request.AddGuests ? "TRUE" : "FALSE");
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalAddParticipants, Outlook.OlUserPropertyType.olText, (request.AddUsers || request.AddGuests) ? "TRUE" : "FALSE");
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalAddUsers, Outlook.OlUserPropertyType.olText, request.AddUsers ? "TRUE" : "FALSE");
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalAddGuests, Outlook.OlUserPropertyType.olText, request.AddGuests ? "TRUE" : "FALSE");
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalAddParticipants, Outlook.OlUserPropertyType.olText, (request.AddUsers || request.AddGuests) ? "TRUE" : "FALSE");
 
             _owner.RegisterSubscription(appointment, result);
             TryUpdateRoomDescription(appointment, result.RoomToken, result.CreatedAsEventConversation);
@@ -187,16 +187,16 @@ namespace NcTalkOutlookAddIn.Controllers
             long? epoch = TimeUtilities.ToUnixTimeSeconds(start);
             if (!epoch.HasValue || epoch.Value <= 0)
             {
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalStart);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyStartEpoch);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalStart);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyStartEpoch);
                 NextcloudTalkAddIn.LogTalkMessage("Failed to stamp X-NCTALK-START: Appointment.Start is missing/invalid (token=" + (roomToken ?? "n/a") + ", start=" + start.ToString("o", CultureInfo.InvariantCulture) + ").");
                 return false;
             }
 
             startEpoch = epoch.Value;
             string value = startEpoch.ToString(CultureInfo.InvariantCulture);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalStart, Outlook.OlUserPropertyType.olText, value);
-            NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyStartEpoch, Outlook.OlUserPropertyType.olText, value);
+            SetUserProperty(appointment, NextcloudTalkAddIn.IcalStart, Outlook.OlUserPropertyType.olText, value);
+            SetUserProperty(appointment, NextcloudTalkAddIn.PropertyStartEpoch, Outlook.OlUserPropertyType.olText, value);
             NextcloudTalkAddIn.LogTalkMessage("X-NCTALK-START stamped (token=" + (roomToken ?? "n/a") + ", startEpoch=" + value + ").");
             return true;
         }
@@ -204,7 +204,7 @@ namespace NcTalkOutlookAddIn.Controllers
         internal bool TryReadRequiredIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
         {
             startEpoch = 0;
-            string rawValue = NextcloudTalkAddIn.GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalStart);
+            string rawValue = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalStart);
             if (string.IsNullOrWhiteSpace(rawValue))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Lobby update blocked: X-NCTALK-START is missing (token=" + (roomToken ?? "n/a") + ").");
@@ -224,7 +224,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal static long? GetIcalStartEpochOrNull(Outlook.AppointmentItem appointment)
         {
-            string rawValue = NextcloudTalkAddIn.GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalStart);
+            string rawValue = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalStart);
             if (string.IsNullOrWhiteSpace(rawValue))
             {
                 return null;
@@ -253,11 +253,11 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                bool hasLobbyFlag = NextcloudTalkAddIn.HasUserProperty(appointment, NextcloudTalkAddIn.IcalLobby)
-                    || NextcloudTalkAddIn.HasUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby);
+                bool hasLobbyFlag = HasUserProperty(appointment, NextcloudTalkAddIn.IcalLobby)
+                    || HasUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby);
                 if (hasLobbyFlag)
                 {
-                    resolvedLobby = NextcloudTalkAddIn.GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalLobby, NextcloudTalkAddIn.PropertyLobby);
+                    resolvedLobby = GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalLobby, NextcloudTalkAddIn.PropertyLobby);
                 }
 
                 TalkRoomType? roomType = GetRoomType(appointment);
@@ -295,8 +295,8 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalLobby, Outlook.OlUserPropertyType.olText, lobbyEnabled ? "TRUE" : "FALSE");
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby, Outlook.OlUserPropertyType.olYesNo, lobbyEnabled);
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalLobby, Outlook.OlUserPropertyType.olText, lobbyEnabled ? "TRUE" : "FALSE");
+                SetUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby, Outlook.OlUserPropertyType.olYesNo, lobbyEnabled);
                 NextcloudTalkAddIn.LogTalkMessage("Lobby flag persisted from runtime update (token=" + (roomToken ?? "n/a") + ", lobby=" + lobbyEnabled + ").");
             }
             catch (Exception ex)
@@ -307,8 +307,8 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal bool IsDelegatedToOtherUser(Outlook.AppointmentItem appointment, out string delegateId)
         {
-            delegateId = NextcloudTalkAddIn.GetUserPropertyTextPrefer(appointment, NextcloudTalkAddIn.IcalDelegate, NextcloudTalkAddIn.PropertyDelegateId) ?? string.Empty;
-            bool delegated = NextcloudTalkAddIn.GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalDelegated, NextcloudTalkAddIn.PropertyDelegated);
+            delegateId = GetUserPropertyTextPrefer(appointment, NextcloudTalkAddIn.IcalDelegate, NextcloudTalkAddIn.PropertyDelegateId) ?? string.Empty;
+            bool delegated = GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalDelegated, NextcloudTalkAddIn.PropertyDelegated);
 
             if (!delegated || string.IsNullOrWhiteSpace(delegateId))
             {
@@ -327,8 +327,8 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal bool IsDelegationPending(Outlook.AppointmentItem appointment, out string delegateId)
         {
-            delegateId = NextcloudTalkAddIn.GetUserPropertyTextPrefer(appointment, NextcloudTalkAddIn.IcalDelegate, NextcloudTalkAddIn.PropertyDelegateId) ?? string.Empty;
-            bool delegated = NextcloudTalkAddIn.GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalDelegated, NextcloudTalkAddIn.PropertyDelegated);
+            delegateId = GetUserPropertyTextPrefer(appointment, NextcloudTalkAddIn.IcalDelegate, NextcloudTalkAddIn.PropertyDelegateId) ?? string.Empty;
+            bool delegated = GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalDelegated, NextcloudTalkAddIn.PropertyDelegated);
 
             if (delegated)
             {
@@ -354,12 +354,12 @@ namespace NcTalkOutlookAddIn.Controllers
                 return true;
             }
 
-            bool addParticipantsLegacy = NextcloudTalkAddIn.GetUserPropertyBool(appointment, NextcloudTalkAddIn.IcalAddParticipants);
-            bool hasAddUsers = NextcloudTalkAddIn.HasUserProperty(appointment, NextcloudTalkAddIn.IcalAddUsers) || NextcloudTalkAddIn.HasUserProperty(appointment, NextcloudTalkAddIn.PropertyAddUsers);
-            bool hasAddGuests = NextcloudTalkAddIn.HasUserProperty(appointment, NextcloudTalkAddIn.IcalAddGuests) || NextcloudTalkAddIn.HasUserProperty(appointment, NextcloudTalkAddIn.PropertyAddGuests);
+            bool addParticipantsLegacy = GetUserPropertyBool(appointment, NextcloudTalkAddIn.IcalAddParticipants);
+            bool hasAddUsers = HasUserProperty(appointment, NextcloudTalkAddIn.IcalAddUsers) || HasUserProperty(appointment, NextcloudTalkAddIn.PropertyAddUsers);
+            bool hasAddGuests = HasUserProperty(appointment, NextcloudTalkAddIn.IcalAddGuests) || HasUserProperty(appointment, NextcloudTalkAddIn.PropertyAddGuests);
 
-            bool addUsers = hasAddUsers ? NextcloudTalkAddIn.GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalAddUsers, NextcloudTalkAddIn.PropertyAddUsers) : addParticipantsLegacy;
-            bool addGuests = hasAddGuests ? NextcloudTalkAddIn.GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalAddGuests, NextcloudTalkAddIn.PropertyAddGuests) : addParticipantsLegacy;
+            bool addUsers = hasAddUsers ? GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalAddUsers, NextcloudTalkAddIn.PropertyAddUsers) : addParticipantsLegacy;
+            bool addGuests = hasAddGuests ? GetUserPropertyBoolPrefer(appointment, NextcloudTalkAddIn.IcalAddGuests, NextcloudTalkAddIn.PropertyAddGuests) : addParticipantsLegacy;
             if (!addUsers && !addGuests)
             {
                 return true;
@@ -479,12 +479,12 @@ namespace NcTalkOutlookAddIn.Controllers
                 && string.Equals(delegateId, currentUser, StringComparison.OrdinalIgnoreCase))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Delegation ignored (delegate == current user).");
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegateId);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated);
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegateId);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated);
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
                 return;
             }
 
@@ -534,9 +534,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 bool left = service.LeaveRoom(roomToken);
                 NextcloudTalkAddIn.LogTalkMessage("Delegation completed (token=" + roomToken + ", delegate=" + delegateId + ", leftSelf=" + left + ").");
 
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated, Outlook.OlUserPropertyType.olYesNo, true);
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated, Outlook.OlUserPropertyType.olText, "TRUE");
-                NextcloudTalkAddIn.RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
+                SetUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated, Outlook.OlUserPropertyType.olYesNo, true);
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated, Outlook.OlUserPropertyType.olText, "TRUE");
+                RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
             }
             catch (TalkServiceException ex)
             {
@@ -757,7 +757,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private static TalkRoomType? GetRoomType(Outlook.AppointmentItem appointment)
         {
-            string eventRaw = NextcloudTalkAddIn.GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalEvent);
+            string eventRaw = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalEvent);
             if (!string.IsNullOrWhiteSpace(eventRaw))
             {
                 string normalized = eventRaw.Trim();
@@ -772,7 +772,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
             }
 
-            string value = NextcloudTalkAddIn.GetUserPropertyText(appointment, NextcloudTalkAddIn.PropertyRoomType);
+            string value = GetUserPropertyText(appointment, NextcloudTalkAddIn.PropertyRoomType);
             if (string.IsNullOrWhiteSpace(value))
             {
                 return null;
@@ -791,7 +791,7 @@ namespace NcTalkOutlookAddIn.Controllers
         {
             try
             {
-                string objectId = NextcloudTalkAddIn.GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalObjectId);
+                string objectId = GetUserPropertyText(appointment, NextcloudTalkAddIn.IcalObjectId);
                 return !string.IsNullOrWhiteSpace(objectId);
             }
             catch
@@ -810,8 +810,8 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, "event");
-                NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyRoomType, Outlook.OlUserPropertyType.olText, TalkRoomType.EventConversation.ToString());
+                SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, "event");
+                SetUserProperty(appointment, NextcloudTalkAddIn.PropertyRoomType, Outlook.OlUserPropertyType.olText, TalkRoomType.EventConversation.ToString());
                 NextcloudTalkAddIn.LogTalkMessage("Conversation type persisted as event (token=" + (roomToken ?? "n/a") + ").");
             }
             catch (Exception ex)
@@ -854,8 +854,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     lobbyEnabled = resolvedLobby.Value;
                     try
                     {
-                        NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalLobby, Outlook.OlUserPropertyType.olText, resolvedLobby.Value ? "TRUE" : "FALSE");
-                        NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby, Outlook.OlUserPropertyType.olYesNo, resolvedLobby.Value);
+                        SetUserProperty(appointment, NextcloudTalkAddIn.IcalLobby, Outlook.OlUserPropertyType.olText, resolvedLobby.Value ? "TRUE" : "FALSE");
+                        SetUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby, Outlook.OlUserPropertyType.olYesNo, resolvedLobby.Value);
                     }
                     catch (Exception ex)
                     {
@@ -870,8 +870,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     isEventConversation = resolvedEvent.Value;
                     try
                     {
-                        NextcloudTalkAddIn.SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, resolvedEvent.Value ? "event" : "standard");
-                        NextcloudTalkAddIn.SetUserProperty(
+                        SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, resolvedEvent.Value ? "event" : "standard");
+                        SetUserProperty(
                             appointment,
                             NextcloudTalkAddIn.PropertyRoomType,
                             Outlook.OlUserPropertyType.olText,
@@ -888,6 +888,166 @@ namespace NcTalkOutlookAddIn.Controllers
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to bootstrap room traits from server (token=" + roomToken + ").", ex);
+            }
+        }
+
+        internal void ClearTalkProperties(Outlook.AppointmentItem appointment)
+        {
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyToken);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyRoomType);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyLobby);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertySearchVisible);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyPasswordSet);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyStartEpoch);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDataVersion);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyAddUsers);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyAddGuests);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegateId);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.PropertyDelegated);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalToken);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalUrl);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalLobby);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalStart);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalEvent);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalObjectId);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalAddUsers);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalAddGuests);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalAddParticipants);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegate);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateName);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegated);
+            RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
+        }
+
+        internal static void SetUserProperty(Outlook.AppointmentItem appointment, string name, Outlook.OlUserPropertyType type, object value)
+        {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
+            if (appointment == null)
+            {
+                return;
+            }
+
+            var properties = appointment.UserProperties;
+            var property = properties[name] ?? properties.Add(name, type, Type.Missing, Type.Missing);
+            property.Value = value;
+        }
+
+        internal static string GetUserPropertyText(Outlook.AppointmentItem appointment, string name)
+        {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
+            if (appointment == null)
+            {
+                return null;
+            }
+
+            var property = appointment.UserProperties[name];
+            return property != null ? property.Value as string : null;
+        }
+
+        internal static bool HasUserProperty(Outlook.AppointmentItem appointment, string name)
+        {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
+            if (appointment == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return appointment.UserProperties[name] != null;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to check user property '" + name + "'.", ex);
+                return false;
+            }
+        }
+
+        internal static string GetUserPropertyTextPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
+        {
+            string primaryValue = GetUserPropertyText(appointment, primaryName);
+            if (!string.IsNullOrWhiteSpace(primaryValue))
+            {
+                return primaryValue;
+            }
+
+            return GetUserPropertyText(appointment, legacyName);
+        }
+
+        internal static bool GetUserPropertyBoolPrefer(Outlook.AppointmentItem appointment, string primaryName, string legacyName)
+        {
+            if (HasUserProperty(appointment, primaryName))
+            {
+                return GetUserPropertyBool(appointment, primaryName);
+            }
+
+            return GetUserPropertyBool(appointment, legacyName);
+        }
+
+        internal static bool GetUserPropertyBool(Outlook.AppointmentItem appointment, string name)
+        {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
+            if (appointment == null)
+            {
+                return false;
+            }
+
+            var property = appointment.UserProperties[name];
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (property == null)
+            {
+                return false;
+            }
+
+            object value = property.Value;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (value == null)
+            {
+                return false;
+            }
+
+            if (value is bool)
+            {
+                return (bool)value;
+            }
+
+            if (value is int)
+            {
+                return (int)value != 0;
+            }
+
+            string text = value as string;
+            if (!string.IsNullOrEmpty(text))
+            {
+                bool boolParsed;
+                if (bool.TryParse(text, out boolParsed))
+                {
+                    return boolParsed;
+                }
+
+                int numericParsed;
+                if (int.TryParse(text, out numericParsed))
+                {
+                    return numericParsed != 0;
+                }
+            }
+
+            return false;
+        }
+
+        internal static void RemoveUserProperty(Outlook.AppointmentItem appointment, string name)
+        {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
+            if (appointment == null)
+            {
+                return;
+            }
+
+            var property = appointment.UserProperties[name];
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (property != null)
+            {
+                property.Delete();
             }
         }
 
@@ -936,3 +1096,4 @@ namespace NcTalkOutlookAddIn.Controllers
         }
     }
 }
+
