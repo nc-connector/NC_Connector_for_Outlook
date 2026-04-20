@@ -55,6 +55,7 @@ namespace NcTalkOutlookAddIn
         private readonly ComposeShareLifecycleController _composeShareLifecycleController;
         private readonly FileLinkLaunchController _fileLinkLaunchController;
         private readonly TalkRibbonController _talkRibbonController;
+        private readonly MailInteropController _mailInteropController;
         private readonly HashSet<string> _pendingAppointmentEnsureKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _pendingAppointmentEnsureSyncRoot = new object();
         private DateTime _lastDeferredAppointmentEnsureRestrictionLogUtc = DateTime.MinValue;
@@ -98,6 +99,7 @@ namespace NcTalkOutlookAddIn
             _composeShareLifecycleController = new ComposeShareLifecycleController(this);
             _fileLinkLaunchController = new FileLinkLaunchController(this);
             _talkRibbonController = new TalkRibbonController(this);
+            _mailInteropController = new MailInteropController(this);
         }
 
         internal AddinSettings CurrentSettings
@@ -501,120 +503,12 @@ namespace NcTalkOutlookAddIn
 
         private static string ResolveMailInspectorIdentityKey(Outlook.MailItem mail)
         {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null)
-            {
-                return string.Empty;
-            }
-
-            Outlook.Inspector inspector = null;
-            try
-            {
-                inspector = mail.GetInspector;
-                return ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
-            }
-            catch (COMException ex)
-            {
-                uint errorCode = unchecked((uint)ex.ErrorCode);
-                if ((errorCode & 0xFFFFu) == 0x0108u)
-                {
-                    LogFileLink(
-                        "MailItem.GetInspector unavailable while resolving compose inspector identity (hresult=0x"
-                        + errorCode.ToString("X8", CultureInfo.InvariantCulture)
-                        + ").");
-                }
-                else
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read MailItem.GetInspector for compose identity.", ex);
-                }
-                return string.Empty;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read MailItem.GetInspector for compose identity.", ex);
-                return string.Empty;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(inspector, LogCategories.FileLink, "Failed to release compose Inspector COM object.");
-            }
+            return MailInteropController.ResolveMailInspectorIdentityKey(mail);
         }
 
         private IWin32Window TryCreateMailInspectorDialogOwner(Outlook.MailItem mail)
         {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null)
-            {
-                return null;
-            }
-
-            Outlook.Inspector inspector = null;
-            try
-            {
-                inspector = mail.GetInspector;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (inspector == null)
-                {
-                    return null;
-                }
-
-                int hwnd = ReadInspectorWindowHandle(inspector);
-
-                return hwnd > 0 ? new NativeWindowOwner(new IntPtr(hwnd)) : null;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to resolve compose prompt owner inspector.", ex);
-                return null;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(inspector, LogCategories.FileLink, "Failed to release compose prompt owner Inspector COM object.");
-            }
-        }
-
-        private static int ReadInspectorWindowHandle(Outlook.Inspector inspector)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (inspector == null)
-            {
-                return 0;
-            }
-
-            foreach (string propertyName in new[] { "HWND", "Hwnd" })
-            {
-                try
-                {
-                    PropertyInfo property = inspector.GetType().GetProperty(propertyName);
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
-                    if (property == null)
-                    {
-                        continue;
-                    }
-
-                    object value = property.GetValue(inspector, null);
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
-                    if (value == null)
-                    {
-                        continue;
-                    }
-
-                    int hwnd;
-                    if (int.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out hwnd) && hwnd > 0)
-                    {
-                        return hwnd;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to read inspector window handle property '" + propertyName + "'.",
-                        ex);
-                }
-            }
-
-            return 0;
+            return _mailInteropController.TryCreateMailInspectorDialogOwner(mail);
         }
 
         private void RemoveMailComposeSubscription(MailComposeSubscription subscription)
@@ -786,341 +680,22 @@ namespace NcTalkOutlookAddIn
 
         internal Outlook.MailItem GetActiveMailItem()
         {
-            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-            if (_outlookApplication == null)
-            {
-                return null;
-            }
-
-            Outlook.Inspector inspector = null;
-            try
-            {
-                inspector = _outlookApplication.ActiveInspector();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook ActiveInspector.", ex);
-                inspector = null;
-            }
-
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (inspector != null)
-            {
-                try
-                {
-                    return inspector.CurrentItem as Outlook.MailItem;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read CurrentItem from ActiveInspector.", ex);
-                }
-            }
-
-            Outlook.Explorer explorer = null;
-            try
-            {
-                explorer = _outlookApplication.ActiveExplorer();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook ActiveExplorer.", ex);
-                explorer = null;
-            }
-
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
-            if (explorer != null)
-            {
-                object inlineResponse = null;
-                try
-                {
-                    inlineResponse = explorer.ActiveInlineResponse;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read ActiveInlineResponse from Explorer.", ex);
-                    inlineResponse = null;
-                }
-
-                var mailItem = inlineResponse as Outlook.MailItem;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (mailItem != null)
-                {
-                    return mailItem;
-                }
-            }
-
-            return null;
+            return _mailInteropController.GetActiveMailItem();
         }
 
         internal string ResolveActiveInspectorIdentityKey()
         {
-            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-            if (_outlookApplication == null)
-            {
-                return string.Empty;
-            }
-
-            Outlook.Inspector inspector = null;
-            try
-            {
-                inspector = _outlookApplication.ActiveInspector();
-                return ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "ActiveInspector");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to resolve active inspector identity key.", ex);
-                return string.Empty;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(inspector, LogCategories.FileLink, "Failed to release active Inspector COM object.");
-            }
+            return _mailInteropController.ResolveActiveInspectorIdentityKey();
         }
 
         internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
         {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null || string.IsNullOrWhiteSpace(html))
-            {
-                return;
-            }
-
-            if (TryInsertHtmlIntoMailBody(mail, html))
-            {
-                LogCore("Inserted HTML block into mail (HTMLBody primary).");
-                return;
-            }
-
-            IDataObject previousClipboard = null;
-            bool restoreClipboard = false;
-
-            try
-            {
-                previousClipboard = Clipboard.GetDataObject();
-                restoreClipboard = previousClipboard != null;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read clipboard data object.", ex);
-                previousClipboard = null;
-                restoreClipboard = false;
-            }
-
-            try
-            {
-                Clipboard.SetText(html, TextDataFormat.Html);
-                if (TryPasteClipboardIntoMailInspector(mail))
-                {
-                    LogCore("Inserted HTML block into mail (WordEditor).");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogCore("Failed to insert HTML via WordEditor: " + ex.Message);
-            }
-            finally
-            {
-                if (restoreClipboard)
-                {
-                    try
-                    {
-                        Clipboard.SetDataObject(previousClipboard);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore clipboard after HTML insertion.", ex);
-                    }
-                }
-            }
-
-            LogCore("Failed to insert HTML into mail: all insertion paths exhausted.");
-            MessageBox.Show(
-                string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, "all insertion paths exhausted"),
-                Strings.DialogTitle,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
-        }
-
-        private bool TryInsertHtmlIntoMailBody(Outlook.MailItem mail, string html)
-        {
-            try
-            {
-                string existing = mail.HTMLBody ?? string.Empty;
-                string insertHtml = "<br><br>" + html;
-                int bodyTagIndex = existing.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
-                if (bodyTagIndex >= 0)
-                {
-                    int bodyTagEnd = existing.IndexOf(">", bodyTagIndex);
-                    if (bodyTagEnd >= 0)
-                    {
-                        mail.HTMLBody = existing.Insert(bodyTagEnd + 1, insertHtml);
-                    }
-                    else
-                    {
-                        mail.HTMLBody = insertHtml + existing;
-                    }
-                }
-                else
-                {
-                    mail.HTMLBody = insertHtml + existing;
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LogCore("Failed to insert HTML via HTMLBody path: " + ex.Message);
-                return false;
-            }
-        }
-
-        private bool TryPasteClipboardIntoMailInspector(Outlook.MailItem mail)
-        {
-            Outlook.Inspector inspector = null;
-            object wordEditor = null;
-            object application = null;
-            object selection = null;
-
-            try
-            {
-                inspector = mail.GetInspector;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access MailItem.GetInspector for HTML paste.", ex);
-                inspector = null;
-            }
-
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (inspector == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                wordEditor = inspector.WordEditor;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access Inspector.WordEditor for HTML paste.", ex);
-                wordEditor = null;
-            }
-
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (wordEditor == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                application = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
-                if (application == null)
-                {
-                    return false;
-                }
-
-                selection = application.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, application, null);
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
-                if (selection == null)
-                {
-                    return false;
-                }
-
-                // Insert near the top so we are reliably above the signature block.
-                try
-                {
-                    // wdStory = 6
-                    selection.GetType().InvokeMember("HomeKey", BindingFlags.InvokeMethod, null, selection, new object[] { 6, 0 });
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move cursor in Word editor before pasting HTML (best-effort).", ex);
-                }
-
-                selection.GetType().InvokeMember("Paste", BindingFlags.InvokeMethod, null, selection, null);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to paste HTML into Word editor.", ex);
-                return false;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object.");
-                ComInteropScope.TryRelease(application, LogCategories.Core, "Failed to release Word application COM object.");
-            }
+            _mailInteropController.InsertHtmlIntoMail(mail, html);
         }
 
         internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
         {
-            return TryWriteAppointmentHtmlBodyWithRtfBridge(appointment, html);
-        }
-
-        private static bool TryWriteAppointmentHtmlBodyWithRtfBridge(Outlook.AppointmentItem appointment, string html)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null || string.IsNullOrWhiteSpace(html))
-            {
-                return false;
-            }
-
-            Outlook.Application application = null;
-            Outlook.MailItem stagingMail = null;
-
-            try
-            {
-                application = appointment.Application;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
-                if (application == null)
-                {
-                    return false;
-                }
-
-                stagingMail = application.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (stagingMail == null)
-                {
-                    return false;
-                }
-
-                string bridgeHtml = HtmlTemplateSanitizer.PrepareTalkAppointmentHtmlForOutlookRtfBridge(html);
-                if (string.IsNullOrWhiteSpace(bridgeHtml))
-                {
-                    bridgeHtml = html ?? string.Empty;
-                }
-
-                stagingMail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
-                stagingMail.HTMLBody = bridgeHtml;
-
-                var rtfBody = stagingMail.RTFBody as byte[];
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
-                if (rtfBody == null || rtfBody.Length == 0)
-                {
-                    DiagnosticsLogger.Log(LogCategories.Talk, "Appointment HTML->RTF bridge produced empty RTF body.");
-                    return false;
-                }
-
-                appointment.RTFBody = rtfBody;
-                DiagnosticsLogger.Log(LogCategories.Talk, "Appointment HTML body written via HTML->RTF bridge.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to write appointment HTML body via HTML->RTF bridge.", ex);
-                return false;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(stagingMail, LogCategories.Talk, "Failed to release staging MailItem COM object.");
-                ComInteropScope.TryRelease(application, LogCategories.Talk, "Failed to release Outlook application COM object for appointment HTML->RTF bridge.");
-            }
+            return MailInteropController.TryWriteAppointmentHtmlBody(appointment, html);
         }
 
         internal Outlook.AppointmentItem GetActiveAppointment()

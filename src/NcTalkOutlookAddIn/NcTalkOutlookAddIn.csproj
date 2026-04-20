@@ -114,6 +114,7 @@
     <Compile Include="Controllers\OutlookRecipientResolverController.cs" />
     <Compile Include="Controllers\MailComposeSubscriptionRegistryController.cs" />
     <Compile Include="Controllers\ComposeShareLifecycleController.cs" />
+    <Compile Include="Controllers\MailInteropController.cs" />
     <Compile Include="Services\FreeBusyManager.cs" />
     <Compile Include="Services\FreeBusyServer.cs" />
     <Compile Include="Services\IfbAddressBookCache.cs" />
