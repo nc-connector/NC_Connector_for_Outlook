@@ -553,16 +553,6 @@ namespace NcTalkOutlookAddIn
             return true;
         }
 
-        private bool TryDeleteComposeShareFolder(string relativeFolder, string reason, string shareId, string shareLabel)
-        {
-            return _composeShareLifecycleController.TryDeleteComposeShareFolder(relativeFolder, reason, shareId, shareLabel);
-        }
-
-        private void DispatchSeparatePasswordMailQueue(string composeKey, List<SeparatePasswordDispatchEntry> queue)
-        {
-            _composeShareLifecycleController.DispatchSeparatePasswordMailQueue(composeKey, queue);
-        }
-
         internal void ShowPasswordMailSuccessNotification(int recipientCount)
         {
             if (recipientCount <= 0)
@@ -1068,30 +1058,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void ResolveRuntimeRoomTraits(
-            Outlook.AppointmentItem appointment,
-            string roomToken,
-            bool fallbackLobbyEnabled,
-            bool fallbackIsEventConversation,
-            out bool lobbyKnown,
-            out bool lobbyEnabled,
-            out bool isEventConversation)
-        {
-            _talkAppointmentController.ResolveRuntimeRoomTraits(
-                appointment,
-                roomToken,
-                fallbackLobbyEnabled,
-                fallbackIsEventConversation,
-                out lobbyKnown,
-                out lobbyEnabled,
-                out isEventConversation);
-        }
-
-        private void PersistLobbyTraits(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled)
-        {
-            _talkAppointmentController.PersistLobbyTraits(appointment, roomToken, lobbyEnabled);
-        }
-
         private bool IsOrganizer(Outlook.AppointmentItem appointment)
         {
             // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
@@ -1109,11 +1075,6 @@ namespace NcTalkOutlookAddIn
                 default:
                     return false;
             }
-        }
-
-        internal void ClearTalkProperties(Outlook.AppointmentItem appointment)
-        {
-            _talkAppointmentController.ClearTalkProperties(appointment);
         }
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)
@@ -1192,28 +1153,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private bool IsDelegatedToOtherUser(Outlook.AppointmentItem appointment, out string delegateId)
-        {
-            return _talkAppointmentController.IsDelegatedToOtherUser(appointment, out delegateId);
-        }
-
-        private bool IsDelegationPending(Outlook.AppointmentItem appointment, out string delegateId)
-        {
-            return _talkAppointmentController.IsDelegationPending(appointment, out delegateId);
-        }
-
-        // Returns true when participant sync completed without runtime/service failures.
-        // This status is used for deterministic pre-delegation logging in OnWrite.
-        private bool TrySyncRoomParticipants(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
-        {
-            return _talkAppointmentController.TrySyncRoomParticipants(appointment, roomToken, isEventConversation);
-        }
-
-        private void TryApplyDelegation(Outlook.AppointmentItem appointment, string roomToken)
-        {
-            _talkAppointmentController.TryApplyDelegation(appointment, roomToken);
-        }
-
         internal static List<string> GetAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)
         {
             return OutlookRecipientResolverController.CollectAppointmentAttendeeEmails(appointment);
@@ -1251,21 +1190,6 @@ namespace NcTalkOutlookAddIn
             }
 
             return false;
-        }
-
-        private bool TryUpdateLobby(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
-        {
-            return _talkAppointmentController.TryUpdateLobby(appointment, roomToken, isEventConversation);
-        }
-
-        private bool TryUpdateRoomName(Outlook.AppointmentItem appointment, string roomToken)
-        {
-            return _talkAppointmentController.TryUpdateRoomName(appointment, roomToken);
-        }
-
-        private bool TryUpdateRoomDescription(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
-        {
-            return _talkAppointmentController.TryUpdateRoomDescription(appointment, roomToken, isEventConversation);
         }
 
         private static string EscapeXml(string value)

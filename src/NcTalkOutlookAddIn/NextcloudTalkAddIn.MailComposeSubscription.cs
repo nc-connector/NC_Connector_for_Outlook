@@ -1880,7 +1880,7 @@ namespace NcTalkOutlookAddIn
                 for (int i = 0; i < entries.Count; i++)
                 {
                     ComposeShareCleanupEntry entry = entries[i];
-                    _owner.TryDeleteComposeShareFolder(
+                    _owner._composeShareLifecycleController.TryDeleteComposeShareFolder(
                         entry.RelativeFolder,
                         reason,
                         entry.ShareId,
@@ -2087,7 +2087,7 @@ namespace NcTalkOutlookAddIn
                     + ", queued="
                     + queue.Count.ToString(CultureInfo.InvariantCulture)
                     + ").");
-                _owner.DispatchSeparatePasswordMailQueue(_composeKey, queue);
+                _owner._composeShareLifecycleController.DispatchSeparatePasswordMailQueue(_composeKey, queue);
             }
 
             private string ReadMailRecipientList(string fieldName)

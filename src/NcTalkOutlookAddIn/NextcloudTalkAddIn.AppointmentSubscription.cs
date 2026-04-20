@@ -91,7 +91,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 string delegateId;
-                if (_owner.IsDelegatedToOtherUser(_appointment, out delegateId))
+                if (_owner._talkAppointmentController.IsDelegatedToOtherUser(_appointment, out delegateId))
                 {
                     LogTalk("OnWrite skipped (delegation=" + delegateId + ", token=" + _roomToken + ").");
                     _owner.RefreshEntryBinding(this);
@@ -103,11 +103,11 @@ namespace NcTalkOutlookAddIn
                 bool effectiveLobbyKnown;
                 bool effectiveLobbyEnabled;
                 bool effectiveIsEventConversation;
-                _owner.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
+                _owner._talkAppointmentController.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
                 LogTalk("OnWrite traits resolved (token=" + _roomToken + ", lobbyKnown=" + effectiveLobbyKnown + ", lobby=" + effectiveLobbyEnabled + ", event=" + effectiveIsEventConversation + ").");
 
                 string pendingDelegateId;
-                bool delegationPending = _owner.IsDelegationPending(_appointment, out pendingDelegateId);
+                bool delegationPending = _owner._talkAppointmentController.IsDelegationPending(_appointment, out pendingDelegateId);
                 if (delegationPending)
                 {
                     LogTalk("OnWrite delegation-pending path (token=" + _roomToken + ", delegate=" + pendingDelegateId + ").");
@@ -119,7 +119,7 @@ namespace NcTalkOutlookAddIn
                 bool participantsSynced;
 
                 LogTalk("Updating room name during OnWrite (token=" + _roomToken + ").");
-                roomNameSynced = _owner.TryUpdateRoomName(_appointment, _roomToken);
+                roomNameSynced = _owner._talkAppointmentController.TryUpdateRoomName(_appointment, _roomToken);
 
                 bool shouldAttemptLobbyUpdate = effectiveLobbyEnabled || !effectiveLobbyKnown;
                 if (shouldAttemptLobbyUpdate)
@@ -132,12 +132,12 @@ namespace NcTalkOutlookAddIn
                     else if (!_lastLobbyTimer.HasValue || currentStartEpoch != _lastLobbyTimer.Value)
                     {
                         LogTalk("Attempting lobby update during OnWrite (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ", lobbyKnown=" + effectiveLobbyKnown + ").");
-                        if (_owner.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
+                        if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
                         {
                             _lastLobbyTimer = currentStartEpoch;
                             if (!effectiveLobbyKnown)
                             {
-                                _owner.PersistLobbyTraits(_appointment, _roomToken, true);
+                                _owner._talkAppointmentController.PersistLobbyTraits(_appointment, _roomToken, true);
                             }
 
                             LogTalk("Lobby update successful (token=" + _roomToken + ").");
@@ -153,9 +153,9 @@ namespace NcTalkOutlookAddIn
                 }
 
                 LogTalk("Updating room description during OnWrite (token=" + _roomToken + ").");
-                descriptionSynced = _owner.TryUpdateRoomDescription(_appointment, _roomToken, effectiveIsEventConversation);
+                descriptionSynced = _owner._talkAppointmentController.TryUpdateRoomDescription(_appointment, _roomToken, effectiveIsEventConversation);
 
-                participantsSynced = _owner.TrySyncRoomParticipants(_appointment, _roomToken, effectiveIsEventConversation);
+                participantsSynced = _owner._talkAppointmentController.TrySyncRoomParticipants(_appointment, _roomToken, effectiveIsEventConversation);
                 LogTalk(
                     "OnWrite pre-delegation sync result (token="
                     + _roomToken
@@ -188,7 +188,7 @@ namespace NcTalkOutlookAddIn
                             + ").");
                     }
 
-                    _owner.TryApplyDelegation(_appointment, _roomToken);
+                    _owner._talkAppointmentController.TryApplyDelegation(_appointment, _roomToken);
                 }
                 _owner.RefreshEntryBinding(this);
             }
@@ -288,7 +288,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 string delegateId;
-                if (_owner.IsDelegatedToOtherUser(_appointment, out delegateId))
+                if (_owner._talkAppointmentController.IsDelegatedToOtherUser(_appointment, out delegateId))
                 {
                     _deferredWriteLobbyAttempts = 0;
                     StopDeferredWriteLobbyTimer();
@@ -299,7 +299,7 @@ namespace NcTalkOutlookAddIn
                 bool effectiveLobbyKnown;
                 bool effectiveLobbyEnabled;
                 bool effectiveIsEventConversation;
-                _owner.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
+                _owner._talkAppointmentController.ResolveRuntimeRoomTraits(_appointment, _roomToken, _lobbyEnabled, _isEventConversation, out effectiveLobbyKnown, out effectiveLobbyEnabled, out effectiveIsEventConversation);
                 bool shouldAttemptLobbyUpdate = effectiveLobbyEnabled || !effectiveLobbyKnown;
                 if (!shouldAttemptLobbyUpdate)
                 {
@@ -334,12 +334,12 @@ namespace NcTalkOutlookAddIn
                 }
 
                 LogTalk("Deferred post-write lobby verification applying update (token=" + _roomToken + ", startEpoch=" + currentStartEpoch.ToString(CultureInfo.InvariantCulture) + ").");
-                if (_owner.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
+                if (_owner._talkAppointmentController.TryUpdateLobby(_appointment, _roomToken, effectiveIsEventConversation))
                 {
                     _lastLobbyTimer = currentStartEpoch;
                     if (!effectiveLobbyKnown)
                     {
-                        _owner.PersistLobbyTraits(_appointment, _roomToken, true);
+                        _owner._talkAppointmentController.PersistLobbyTraits(_appointment, _roomToken, true);
                     }
 
                     _deferredWriteLobbyAttempts = 0;
@@ -584,10 +584,10 @@ namespace NcTalkOutlookAddIn
                 }
 
                 string delegateId;
-                if (_owner.IsDelegatedToOtherUser(_appointment, out delegateId))
+                if (_owner._talkAppointmentController.IsDelegatedToOtherUser(_appointment, out delegateId))
                 {
                     LogTalk("EnsureRoomDeleted skipped (delegation=" + delegateId + ", token=" + _roomToken + ").");
-                    _owner.ClearTalkProperties(_appointment);
+                    _owner._talkAppointmentController.ClearTalkProperties(_appointment);
                     _roomDeleted = true;
                     Dispose();
                     return;
@@ -595,7 +595,7 @@ namespace NcTalkOutlookAddIn
 
                 if (_owner.TryDeleteRoom(_roomToken, _isEventConversation))
                 {
-                    _owner.ClearTalkProperties(_appointment);
+                    _owner._talkAppointmentController.ClearTalkProperties(_appointment);
                     _roomDeleted = true;
                     LogTalk("EnsureRoomDeleted successful (token=" + _roomToken + ").");
                     Dispose();
