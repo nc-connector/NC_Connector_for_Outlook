@@ -108,6 +108,9 @@
     <Compile Include="Models\TalkParticipant.cs" />
     <Compile Include="Controllers\TalkDescriptionTemplateController.cs" />
     <Compile Include="Controllers\TalkAppointmentController.cs" />
+    <Compile Include="Controllers\SettingsWorkflowController.cs" />
+    <Compile Include="Controllers\FileLinkLaunchController.cs" />
+    <Compile Include="Controllers\TalkRibbonController.cs" />
     <Compile Include="Controllers\OutlookRecipientResolverController.cs" />
     <Compile Include="Controllers\MailComposeSubscriptionRegistryController.cs" />
     <Compile Include="Controllers\ComposeShareLifecycleController.cs" />

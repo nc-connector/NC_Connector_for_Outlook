@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Copyright (c) 2025 Bastian Kleinschmidt
  * Licensed under the GNU Affero General Public License v3.0.
  * See LICENSE.txt for details.
@@ -53,6 +53,8 @@ namespace NcTalkOutlookAddIn
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
         private readonly TalkAppointmentController _talkAppointmentController;
         private readonly ComposeShareLifecycleController _composeShareLifecycleController;
+        private readonly FileLinkLaunchController _fileLinkLaunchController;
+        private readonly TalkRibbonController _talkRibbonController;
         private readonly HashSet<string> _pendingAppointmentEnsureKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _pendingAppointmentEnsureSyncRoot = new object();
         private DateTime _lastDeferredAppointmentEnsureRestrictionLogUtc = DateTime.MinValue;
@@ -94,6 +96,8 @@ namespace NcTalkOutlookAddIn
         {
             _talkAppointmentController = new TalkAppointmentController(this);
             _composeShareLifecycleController = new ComposeShareLifecycleController(this);
+            _fileLinkLaunchController = new FileLinkLaunchController(this);
+            _talkRibbonController = new TalkRibbonController(this);
         }
 
         internal AddinSettings CurrentSettings
@@ -130,7 +134,7 @@ namespace NcTalkOutlookAddIn
             {
                 LogCore("Using Outlook profile settings: " + outlookProfileName + ".");
             }
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (_currentSettings != null)
             {
                 LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", IfbPort=" + _currentSettings.IfbPort + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
@@ -153,7 +157,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 LanguageSettings languageSettings = _outlookApplication.LanguageSettings;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                 if (languageSettings == null)
                 {
                     return;
@@ -257,7 +261,7 @@ namespace NcTalkOutlookAddIn
             UnhookInspector();
             UnhookMailComposeSubscriptions();
 
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
             {
                 try
@@ -275,7 +279,7 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (_freeBusyManager != null)
             {
                 _freeBusyManager.Dispose();
@@ -398,258 +402,43 @@ namespace NcTalkOutlookAddIn
         public async void OnTalkButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
-
-            if (!SettingsAreComplete())
-            {
-                LogTalk("Talk link cancelled: settings are incomplete.");
-                MessageBox.Show(
-                    Strings.ErrorMissingCredentials,
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                OnSettingsButtonPressed(control);
-                return;
-            }
-
-            if (!EnsureAuthenticationValid(control))
-            {
-                LogTalk("Talk link cancelled: authentication failed.");
-                return;
-            }
-
-            Outlook.AppointmentItem appointment = GetActiveAppointment();
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
-            {
-                LogTalk("Talk link cancelled: no active appointment found.");
-                MessageBox.Show(
-                    Strings.ErrorNoAppointment,
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            var subject = appointment.Subject ?? string.Empty;
-            var start = appointment.Start == DateTime.MinValue ? DateTime.Now : appointment.Start;
-            var end = appointment.End == DateTime.MinValue ? start.AddHours(1) : appointment.End;
-            LogTalk("Talk link started (subject='" + subject + "', start=" + start.ToString("o") + ", end=" + end.ToString("o") + ").");
-
-            var configuration = new TalkServiceConfiguration(_currentSettings.ServerUrl, _currentSettings.Username, _currentSettings.AppPassword);
-            Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => FetchBackendPolicyStatus(configuration, "talk_wizard_open"));
-            Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => FetchPasswordPolicyForTalkWizard(configuration));
-            await Task.WhenAll(policyStatusTask, passwordPolicyTask);
-            BackendPolicyStatus policyStatus = policyStatusTask.Result;
-            PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
-
-            var addressbookCache = new IfbAddressBookCache(_settingsStorage != null ? _settingsStorage.DataDirectory : null);
-            LogTalk("System address book status check requested (context=talk_click, forceRefresh=True).");
-            var talkClickAddressbookStatus = addressbookCache.GetSystemAddressbookStatus(
-                configuration,
-                _currentSettings.IfbCacheHours,
-                true);
-            LogTalk(
-                "System address book status result (context=talk_click, available=" + talkClickAddressbookStatus.Available +
-                ", count=" + talkClickAddressbookStatus.Count +
-                ", hasError=" + (!string.IsNullOrWhiteSpace(talkClickAddressbookStatus.Error)) + ").");
-            if (!talkClickAddressbookStatus.Available && !string.IsNullOrWhiteSpace(talkClickAddressbookStatus.Error))
-            {
-                LogTalk("System address book unavailable on talk click: " + talkClickAddressbookStatus.Error);
-            }
-
-            List<NextcloudUser> userDirectory;
-            try
-            {
-                userDirectory = talkClickAddressbookStatus.Available
-                    ? addressbookCache.GetUsers(configuration, _currentSettings.IfbCacheHours, false)
-                    : new List<NextcloudUser>();
-            }
-            catch (Exception ex)
-            {
-                LogTalk("System address book could not be loaded: " + ex.Message);
-                userDirectory = new List<NextcloudUser>();
-            }
-
-            using (var dialog = new TalkLinkForm(
-                _currentSettings ?? new AddinSettings(),
-                configuration,
-                passwordPolicy,
-                policyStatus,
-                userDirectory,
-                talkClickAddressbookStatus,
-                subject,
-                start,
-                end))
-            {
-                if (dialog.ShowDialog() != DialogResult.OK)
-                {
-                    LogTalk("Talk link dialog cancelled.");
-                    return;
-                }
-
-                string descriptionLanguage = ResolveTalkDescriptionLanguage(
-                    policyStatus,
-                    _currentSettings != null ? _currentSettings.EventDescriptionLang : "default");
-                string descriptionType = ResolveTalkEventDescriptionType(policyStatus);
-                string invitationTemplate = ResolveTalkInvitationTemplate(policyStatus);
-                string initialDescription;
-                try
-                {
-                    initialDescription = BuildInitialRoomDescription(
-                        dialog.TalkPassword,
-                        descriptionLanguage,
-                        invitationTemplate);
-                }
-                catch (Exception ex)
-                {
-                    LogTalk("Talk invitation template rendering blocked: " + ex.Message);
-                    MessageBox.Show(
-                        string.Format(CultureInfo.CurrentCulture, Strings.ErrorCreateRoomUnexpected, ex.Message),
-                        Strings.DialogTitle,
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                    return;
-                }
-
-                var request = new TalkRoomRequest
-                {
-                    Title = dialog.TalkTitle,
-                    Password = dialog.TalkPassword,
-                    LobbyEnabled = dialog.LobbyUntilStart,
-                    SearchVisible = dialog.SearchVisible,
-                    RoomType = dialog.SelectedRoomType,
-                    AppointmentStart = start,
-                    AppointmentEnd = end,
-                    DescriptionLanguage = descriptionLanguage,
-                    DescriptionType = descriptionType,
-                    InvitationTemplate = invitationTemplate,
-                    Description = initialDescription,
-                    AddUsers = dialog.AddUsers,
-                    AddGuests = dialog.AddGuests,
-                    DelegateModeratorId = dialog.DelegateModeratorId,
-                    DelegateModeratorName = dialog.DelegateModeratorName
-                };
-                LogTalk("Room request prepared (title='" + request.Title + "', type=" + request.RoomType + ", lobby=" + request.LobbyEnabled + ", search=" + request.SearchVisible + ", passwordSet=" + (!string.IsNullOrEmpty(request.Password)) + ").");
-
-                string existingToken = TalkAppointmentController.GetUserPropertyTextPrefer(appointment, IcalToken, PropertyToken);
-                if (!string.IsNullOrWhiteSpace(existingToken))
-                {
-                    LogTalk("Existing room found (token=" + existingToken + "), replacement requested.");
-                    var overwrite = MessageBox.Show(
-                        Strings.ConfirmReplaceRoom,
-                        Strings.DialogTitle,
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question);
-
-                    if (overwrite != DialogResult.Yes)
-                    {
-                        LogTalk("Replacement declined, operation ended.");
-                        return;
-                    }
-
-                    var existingType = TalkAppointmentController.GetRoomType(appointment);
-                    bool existingIsEvent = existingType.HasValue && existingType.Value == TalkRoomType.EventConversation;
-                    LogTalk("Attempting to delete existing room (event=" + existingIsEvent + ").");
-
-                    if (!TryDeleteRoom(existingToken, existingIsEvent))
-                    {
-                        LogTalk("Deleting existing room failed.");
-                        return;
-                    }
-                }
-
-                TalkRoomCreationResult result;
-                try
-                {
-                    using (new WaitCursorScope())
-                    {
-                        LogTalk("Sending CreateRoom request to Nextcloud.");
-                        var service = CreateTalkService();
-                        result = service.CreateRoom(request);
-                    }
-                    LogTalk("Room created successfully (token=" + result.RoomToken + ", URL=" + result.RoomUrl + ", event=" + result.CreatedAsEventConversation + ").");
-                }
-                catch (TalkServiceException ex)
-                {
-                    LogTalk("Talk room could not be created: " + ex.Message);
-                    MessageBox.Show(
-                        string.Format(Strings.ErrorCreateRoom, ex.Message),
-                        Strings.DialogTitle,
-                        MessageBoxButtons.OK,
-                        ex.IsAuthenticationError ? MessageBoxIcon.Warning : MessageBoxIcon.Error);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    LogTalk("Unexpected error while creating talk room: " + ex.Message);
-                    MessageBox.Show(
-                        string.Format(Strings.ErrorCreateRoomUnexpected, ex.Message),
-                        Strings.DialogTitle,
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                    return;
-                }
-
-                ApplyRoomToAppointment(appointment, request, result);
-                LogTalk("Room data stored in appointment (EntryID=" + (appointment.EntryID ?? "n/a") + ").");
-
-                MessageBox.Show(
-                    string.Format(Strings.InfoRoomCreated, request.Title),
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-            }
+            await _talkRibbonController.OnTalkButtonPressedAsync(control);
         }
 
         public async void OnSettingsButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
-            LogSettings("Settings dialog opened.");
-            var configuration = new TalkServiceConfiguration(
-                _currentSettings != null ? _currentSettings.ServerUrl : string.Empty,
-                _currentSettings != null ? _currentSettings.Username : string.Empty,
-                _currentSettings != null ? _currentSettings.AppPassword : string.Empty);
-            BackendPolicyStatus initialPolicyStatus = await Task.Run(() => FetchBackendPolicyStatus(configuration, "settings_open_initial"));
-            using (var form = new SettingsForm(_currentSettings, _outlookApplication, initialPolicyStatus))
-            {
-                if (form.ShowDialog() == DialogResult.OK)
-                {
-                    AddinSettings previousSettings = (_currentSettings ?? new AddinSettings()).Clone();
-                    _currentSettings = form.Result ?? new AddinSettings();
-                    ConfigureDiagnosticsLogger(_currentSettings);
-                    if (!TryApplyTransportSecurityFromSettings("settings_save", true))
-                    {
-                        _currentSettings = previousSettings;
-                        ConfigureDiagnosticsLogger(_currentSettings);
-                        TryApplyTransportSecurityFromSettings("settings_save_revert", false);
-                        LogSettings("Settings save aborted because transport security settings could not be applied.");
-                        return;
-                    }
-                    LogSettings("Settings applied (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", IfbPort=" + _currentSettings.IfbPort + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
-                    ApplyIfbSettings();
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (_settingsStorage != null)
-                    {
-                        _settingsStorage.Save(_currentSettings);
-                    }
-                }
-                else
-                {
-                    LogSettings("Settings dialog closed without changes.");
-                }
-            }
+            await CreateSettingsWorkflowController().RunAsync();
         }
 
-        /**
-         * Returns the embedded app icon as a COM-compatible PictureDisp.
-         */
+        private SettingsWorkflowController CreateSettingsWorkflowController()
+        {
+            return new SettingsWorkflowController(
+                _outlookApplication,
+                () => _currentSettings,
+                settings => _currentSettings = settings,
+                (configuration, trigger) => FetchBackendPolicyStatus(configuration, trigger),
+                settings => ConfigureDiagnosticsLogger(settings),
+                (source, showWarning) => TryApplyTransportSecurityFromSettings(source, showWarning),
+                () => ApplyIfbSettings(),
+                settings =>
+                {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollstaendigem Runtime-Zustand kontrolliert abbrechen.
+                    if (_settingsStorage != null)
+                    {
+                        _settingsStorage.Save(settings);
+                    }
+                },
+                message => LogSettings(message));
+        }
+
         public stdole.IPictureDisp OnGetButtonImage(IRibbonControl control)
         {
             string resourceName = "NcTalkOutlookAddIn.Resources.app.png";
 
             using (Stream resourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
             {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollstaendigem Runtime-Zustand kontrolliert abbrechen.
                 if (resourceStream == null)
                 {
                     return null;
@@ -665,121 +454,12 @@ namespace NcTalkOutlookAddIn
         public void OnFileLinkButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
-            if (!SettingsAreComplete())
-            {
-                MessageBox.Show(
-                    Strings.ErrorMissingCredentials,
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                OnSettingsButtonPressed(control);
-                return;
-            }
-
-            Outlook.MailItem mail = GetActiveMailItem();
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null)
-            {
-                MessageBox.Show(
-                    Strings.ErrorNoMailItem,
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                return;
-            }
-
-            EnsureMailComposeSubscription(mail, ResolveActiveInspectorIdentityKey());
-            RunFileLinkWizardForMail(mail, null);
+            _fileLinkLaunchController.OnFileLinkButtonPressed(control);
         }
 
-        private bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
+        internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null || _currentSettings == null)
-            {
-                return false;
-            }
-
-            var configuration = new TalkServiceConfiguration(
-                _currentSettings.ServerUrl,
-                _currentSettings.Username,
-                _currentSettings.AppPassword);
-            // Keep this method synchronous for existing callers and prefetch both policies in parallel.
-            Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => FetchBackendPolicyStatus(configuration, "sharing_wizard_open"));
-            Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => FetchPasswordPolicyForFileLinkWizard(configuration));
-            Task.WhenAll(policyStatusTask, passwordPolicyTask).GetAwaiter().GetResult();
-            BackendPolicyStatus policyStatus = policyStatusTask.Result;
-
-            string basePath = string.IsNullOrWhiteSpace(_currentSettings.FileLinkBasePath)
-                ? "90 Freigaben - extern"
-                : _currentSettings.FileLinkBasePath;
-
-            PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
-
-            using (var wizard = new FileLinkWizardForm(_currentSettings ?? new AddinSettings(), configuration, passwordPolicy, policyStatus, basePath, launchOptions))
-            {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
-                {
-                    string languageOverride = _currentSettings != null ? _currentSettings.ShareBlockLang : "default";
-                    LogFileLink("Share created (folder=\"" + wizard.Result.FolderName + "\").");
-
-                    MailComposeSubscription composeSubscription = EnsureMailComposeSubscription(mail, ResolveActiveInspectorIdentityKey());
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (composeSubscription != null)
-                    {
-                        composeSubscription.ArmShareCleanup(wizard.Result);
-                    }
-
-                    string html;
-                    try
-                    {
-                        html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogFileLink("Share template rendering blocked: " + ex.Message);
-                        MessageBox.Show(
-                            string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
-                            Strings.DialogTitle,
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                        return false;
-                    }
-
-                    if (composeSubscription != null
-                        && wizard.RequestSnapshot != null
-                        && wizard.RequestSnapshot.PasswordSeparateEnabled
-                        && !string.IsNullOrWhiteSpace(wizard.Result.Password))
-                    {
-                        string passwordOnlyHtml;
-                        try
-                        {
-                            passwordOnlyHtml = FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
-                        }
-                        catch (Exception ex)
-                        {
-                            LogFileLink("Password-only template rendering blocked: " + ex.Message);
-                            MessageBox.Show(
-                                string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
-                                Strings.DialogTitle,
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error);
-                            return false;
-                        }
-
-                        composeSubscription.RegisterSeparatePasswordDispatch(
-                            wizard.Result,
-                            wizard.RequestSnapshot,
-                            passwordOnlyHtml);
-                    }
-
-                    InsertHtmlIntoMail(mail, html);
-                    return true;
-                }
-            }
-
-            return false;
+            return _fileLinkLaunchController.RunFileLinkWizardForMail(mail, launchOptions);
         }
 
         internal sealed class SeparatePasswordDispatchEntry
@@ -799,7 +479,7 @@ namespace NcTalkOutlookAddIn
             internal string Bcc { get; set; }
         }
 
-        private MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null)
+        internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null)
         {
             // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null)
@@ -906,14 +586,14 @@ namespace NcTalkOutlookAddIn
                 try
                 {
                     PropertyInfo property = inspector.GetType().GetProperty(propertyName);
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                     if (property == null)
                     {
                         continue;
                     }
 
                     object value = property.GetValue(inspector, null);
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                     if (value == null)
                     {
                         continue;
@@ -960,7 +640,7 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (state == null || !state.LockActive)
             {
                 return false;
@@ -997,7 +677,7 @@ namespace NcTalkOutlookAddIn
             }
 
             SynchronizationContext notificationUiContext = _uiSynchronizationContext ?? SynchronizationContext.Current;
-            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
+            // Kontext kann auÃŸerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (notificationUiContext == null)
             {
                 LogFileLink("Separate password notification skipped (UI context unavailable, recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
@@ -1045,7 +725,7 @@ namespace NcTalkOutlookAddIn
 
         private void ScheduleNotifyIconDispose(NotifyIcon notifyIcon, int delayMs, SynchronizationContext notificationUiContext)
         {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (notifyIcon == null)
             {
                 return;
@@ -1061,13 +741,13 @@ namespace NcTalkOutlookAddIn
 
         private void DisposeNotifyIconOnUiContext(NotifyIcon notifyIcon, SynchronizationContext notificationUiContext)
         {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (notifyIcon == null)
             {
                 return;
             }
 
-            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
+            // Kontext kann auÃŸerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (notificationUiContext == null)
             {
                 DisposeNotifyIcon(notifyIcon);
@@ -1087,7 +767,7 @@ namespace NcTalkOutlookAddIn
 
         private static void DisposeNotifyIcon(NotifyIcon notifyIcon)
         {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (notifyIcon == null)
             {
                 return;
@@ -1104,7 +784,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private Outlook.MailItem GetActiveMailItem()
+        internal Outlook.MailItem GetActiveMailItem()
         {
             // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_outlookApplication == null)
@@ -1147,7 +827,7 @@ namespace NcTalkOutlookAddIn
                 explorer = null;
             }
 
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (explorer != null)
             {
                 object inlineResponse = null;
@@ -1172,7 +852,7 @@ namespace NcTalkOutlookAddIn
             return null;
         }
 
-        private string ResolveActiveInspectorIdentityKey()
+        internal string ResolveActiveInspectorIdentityKey()
         {
             // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_outlookApplication == null)
@@ -1197,7 +877,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
+        internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
         {
             // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null || string.IsNullOrWhiteSpace(html))
@@ -1337,14 +1017,14 @@ namespace NcTalkOutlookAddIn
             try
             {
                 application = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                 if (application == null)
                 {
                     return false;
                 }
 
                 selection = application.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, application, null);
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                 if (selection == null)
                 {
                     return false;
@@ -1397,7 +1077,7 @@ namespace NcTalkOutlookAddIn
             try
             {
                 application = appointment.Application;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                 if (application == null)
                 {
                     return false;
@@ -1420,7 +1100,7 @@ namespace NcTalkOutlookAddIn
                 stagingMail.HTMLBody = bridgeHtml;
 
                 var rtfBody = stagingMail.RTFBody as byte[];
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                 if (rtfBody == null || rtfBody.Length == 0)
                 {
                     DiagnosticsLogger.Log(LogCategories.Talk, "Appointment HTML->RTF bridge produced empty RTF body.");
@@ -1443,7 +1123,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private Outlook.AppointmentItem GetActiveAppointment()
+        internal Outlook.AppointmentItem GetActiveAppointment()
         {
             // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_outlookApplication == null)
@@ -1502,74 +1182,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        /**
-         * Runs a quick connection test and offers to open the settings on failures.
-         */
-        private bool EnsureAuthenticationValid(IRibbonControl control)
-        {
-            try
-            {
-                using (new WaitCursorScope())
-                {
-                    var service = CreateTalkService();
-                    string response;
-                    LogTalk("Starting credential verification request.");
-                    if (service.VerifyConnection(out response))
-                    {
-                        UpdateStoredServerVersion(response);
-                        LogTalk("Credentials verified (response=" + (string.IsNullOrEmpty(response) ? "OK" : response) + ").");
-                        return true;
-                    }
-
-                    string message = string.IsNullOrEmpty(response)
-                        ? Strings.ErrorCredentialsNotVerified
-                        : string.Format(CultureInfo.CurrentCulture, Strings.ErrorCredentialsNotVerifiedFormat, response);
-                    LogTalk("Invalid credentials: " + message);
-                    return PromptOpenSettings(message, control);
-                }
-            }
-            catch (TalkServiceException ex)
-            {
-                string message;
-                if ((int)ex.StatusCode == 0)
-                {
-                    message = Strings.ErrorServerUnavailable;
-                }
-                else if (ex.IsAuthenticationError)
-                {
-                    message = string.Format(Strings.ErrorAuthenticationRejected, ex.Message);
-                }
-                else
-                {
-                    message = string.Format(Strings.ErrorConnectionFailed, ex.Message);
-                }
-
-                LogTalk("Connection check failed: " + message);
-                return PromptOpenSettings(message, control);
-            }
-            catch (Exception ex)
-            {
-                LogTalk("Unexpected error during connection check: " + ex.Message);
-                return PromptOpenSettings(string.Format(Strings.ErrorUnknownAuthentication, ex.Message), control);
-            }
-        }
-
-        private bool PromptOpenSettings(string message, IRibbonControl control)
-        {
-            var result = MessageBox.Show(
-                string.Format(Strings.PromptOpenSettings, message),
-                Strings.DialogTitle,
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (result == DialogResult.Yes)
-            {
-                OnSettingsButtonPressed(control);
-            }
-
-            return false;
-        }
-
         internal TalkService CreateTalkService()
         {
             return new TalkService(new TalkServiceConfiguration(
@@ -1578,7 +1190,7 @@ namespace NcTalkOutlookAddIn
                 _currentSettings.AppPassword));
         }
 
-        private BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
+        internal BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
         {
             try
             {
@@ -1600,7 +1212,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private PasswordPolicyInfo FetchPasswordPolicyForTalkWizard(TalkServiceConfiguration configuration)
+        internal PasswordPolicyInfo FetchPasswordPolicyForTalkWizard(TalkServiceConfiguration configuration)
         {
             try
             {
@@ -1613,7 +1225,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private PasswordPolicyInfo FetchPasswordPolicyForFileLinkWizard(TalkServiceConfiguration configuration)
+        internal PasswordPolicyInfo FetchPasswordPolicyForFileLinkWizard(TalkServiceConfiguration configuration)
         {
             try
             {
@@ -1626,7 +1238,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private static string ResolveTalkDescriptionLanguage(BackendPolicyStatus policyStatus, string fallbackLanguageOverride)
+        internal static string ResolveTalkDescriptionLanguage(BackendPolicyStatus policyStatus, string fallbackLanguageOverride)
         {
             if (policyStatus != null
                 && policyStatus.PolicyActive
@@ -1642,9 +1254,9 @@ namespace NcTalkOutlookAddIn
             return NormalizeTalkDescriptionLanguage(fallbackLanguageOverride);
         }
 
-        private static string ResolveTalkInvitationTemplate(BackendPolicyStatus policyStatus)
+        internal static string ResolveTalkInvitationTemplate(BackendPolicyStatus policyStatus)
         {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (policyStatus == null || !policyStatus.PolicyActive)
             {
                 return string.Empty;
@@ -1653,9 +1265,9 @@ namespace NcTalkOutlookAddIn
             return policyStatus.GetPolicyString("talk", "talk_invitation_template");
         }
 
-        private static string ResolveTalkEventDescriptionType(BackendPolicyStatus policyStatus)
+        internal static string ResolveTalkEventDescriptionType(BackendPolicyStatus policyStatus)
         {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (policyStatus != null && policyStatus.PolicyActive)
             {
                 string policyTypeRaw = policyStatus.GetPolicyString("talk", "event_description_type");
@@ -1694,7 +1306,7 @@ namespace NcTalkOutlookAddIn
                 : "plain_text";
         }
 
-        private void ApplyRoomToAppointment(Outlook.AppointmentItem appointment, TalkRoomRequest request, TalkRoomCreationResult result)
+        internal void ApplyRoomToAppointment(Outlook.AppointmentItem appointment, TalkRoomRequest request, TalkRoomCreationResult result)
         {
             _talkAppointmentController.ApplyRoomToAppointment(appointment, request, result);
         }
@@ -1709,7 +1321,7 @@ namespace NcTalkOutlookAddIn
             return TalkDescriptionTemplateController.UpdateHtmlBodyWithTalkBlock(existingHtmlBody, existingBody, roomUrl, password, languageOverride, invitationTemplate);
         }
 
-        private static string BuildInitialRoomDescription(string password, string languageOverride, string invitationTemplate)
+        internal static string BuildInitialRoomDescription(string password, string languageOverride, string invitationTemplate)
         {
             return TalkDescriptionTemplateController.BuildInitialRoomDescription(password, languageOverride, invitationTemplate);
         }
@@ -1781,7 +1393,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void UpdateStoredServerVersion(string response)
+        internal void UpdateStoredServerVersion(string response)
         {
             // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_currentSettings == null || string.IsNullOrWhiteSpace(response))
@@ -1802,7 +1414,7 @@ namespace NcTalkOutlookAddIn
             }
 
             _currentSettings.LastKnownServerVersion = versionText;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (_settingsStorage != null)
             {
                 try
@@ -1874,7 +1486,7 @@ namespace NcTalkOutlookAddIn
 
         private void RefreshEntryBinding(AppointmentSubscription subscription)
         {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (subscription == null)
             {
                 return;
@@ -1961,7 +1573,7 @@ namespace NcTalkOutlookAddIn
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)
         {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
             if (result == null)
             {
                 return;
@@ -2067,7 +1679,7 @@ namespace NcTalkOutlookAddIn
             return OutlookRecipientResolverController.TryResolveRecipientSmtpAddress(recipient);
         }
 
-        private bool TryDeleteRoom(string roomToken, bool isEventConversation)
+        internal bool TryDeleteRoom(string roomToken, bool isEventConversation)
         {
             if (string.IsNullOrWhiteSpace(roomToken))
             {
@@ -2145,7 +1757,7 @@ namespace NcTalkOutlookAddIn
             // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_currentSettings == null)
             {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollstÃ¤ndigem Runtime-Zustand kontrolliert abbrechen.
                 if (_settingsStorage != null)
                 {
                     _currentSettings = _settingsStorage.Load();
@@ -2321,7 +1933,7 @@ namespace NcTalkOutlookAddIn
             }
 
             SynchronizationContext context = _uiSynchronizationContext;
-            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
+            // Kontext kann auÃŸerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (context == null)
             {
                 LogDeferredAppointmentEnsureRestriction(
@@ -2411,3 +2023,5 @@ namespace NcTalkOutlookAddIn
 
     }
 }
+
+

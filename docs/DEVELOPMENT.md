@@ -65,7 +65,7 @@ This release added parity-critical behavior that developers should preserve in f
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-3.0.3"
+cd "C:\\path\\to\\nc4ol-3.0.4"
 
 # Optional: reference assemblies (only if needed)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -110,6 +110,9 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.cs` — entry point, ribbon XML, Outlook event wiring, orchestration
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.cs` — compose runtime subscription lifecycle
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.AppointmentSubscription.cs` — appointment runtime subscription lifecycle
+- `src/NcTalkOutlookAddIn/Controllers/SettingsWorkflowController.cs` — settings open/save/revert orchestration
+- `src/NcTalkOutlookAddIn/Controllers/FileLinkLaunchController.cs` — FileLink ribbon launch + wizard orchestration
+- `src/NcTalkOutlookAddIn/Controllers/TalkRibbonController.cs` — Talk ribbon flow orchestration (auth gate, wizard, room create/replace)
 - `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` — appointment lifecycle orchestration for Talk room metadata/sync
 - `src/NcTalkOutlookAddIn/Controllers/ComposeShareLifecycleController.cs` — compose share cleanup + separate-password dispatch flow
 - `src/NcTalkOutlookAddIn/Controllers/TalkDescriptionTemplateController.cs` — Talk template/body block rendering
@@ -130,6 +133,9 @@ Key code locations:
 
 - **COM add-in lifecycle**
   - `NextcloudTalkAddIn.OnConnection(...)` loads settings, enables logging (optional), initializes IFB, and wires Outlook events.
+- **Workflow controllers**
+  - `SettingsWorkflowController`, `FileLinkLaunchController`, and `TalkRibbonController` own ribbon-triggered UI/runtime workflows.
+  - `NextcloudTalkAddIn.cs` remains the COM/ribbon/event composition root and delegates feature flows to controllers.
 - **Service layer**
   - `Services/TalkService.cs` calls the Talk OCS API.
   - `Services/FileLinkService.cs` uploads via WebDAV and creates shares via OCS.
@@ -428,6 +434,7 @@ Primary write location:
 2. Add request/response model in `src/NcTalkOutlookAddIn/Models/` (if needed).
 3. Add logging scopes and error handling.
 4. Integrate in the UI/wizard and wire it up via `NextcloudTalkAddIn.cs`.
+5. For ribbon-triggered flows, prefer adding orchestration in the matching controller (`SettingsWorkflowController`, `FileLinkLaunchController`, `TalkRibbonController`) and keep `NextcloudTalkAddIn.cs` as a thin delegate layer.
 
 ### Add a new localized string
 

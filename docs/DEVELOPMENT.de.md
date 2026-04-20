@@ -53,7 +53,7 @@ Auf manchen Build-Systemen fehlen die .NET Framework Reference Assemblies für 4
 Beispiel:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.3"
+cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.0.4"
 
 # Optional: Reference Assemblies lokal holen (nur wenn nötig)
 nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
@@ -127,6 +127,12 @@ Root:
   Runtime-Subscription fuer Compose-Attachments/Share-Cleanup/Password-Dispatch.
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.AppointmentSubscription.cs`
   Runtime-Subscription fuer Termin-Write/Close/Delete und Lifecycle-Cleanup.
+- `src/NcTalkOutlookAddIn/Controllers/SettingsWorkflowController.cs`
+  Orchestrierung fuer Settings-Open/Save/Revert.
+- `src/NcTalkOutlookAddIn/Controllers/FileLinkLaunchController.cs`
+  Orchestrierung fuer FileLink-Ribbon-Start und Wizard-Flow.
+- `src/NcTalkOutlookAddIn/Controllers/TalkRibbonController.cs`
+  Orchestrierung fuer Talk-Ribbon-Flow (Auth-Gate, Wizard, Room-Create/Replace).
 
 Controller:
 
@@ -175,6 +181,7 @@ Compose-Filelink-Paritaet (3.0.3):
   - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand.
 - `ComposeShareLifecycleController` kapselt die eigentliche Share-Cleanup-/Passwort-Dispatch-Logik; `MailComposeSubscription` haelt nur Queue- und Eventzustand.
 - `TalkAppointmentController` kapselt Appointment-Schreib-/Sync-Pfade; `NextcloudTalkAddIn` delegiert diese Aufrufe statt die komplette Fachlogik im Root zu halten.
+- Ribbon-getriggerte Flows werden im Controller-Slice gehalten (`SettingsWorkflowController`, `FileLinkLaunchController`, `TalkRibbonController`); `NextcloudTalkAddIn.cs` bleibt schlanke Delegate-/Composition-Root-Schicht.
   - Custom-Talk-Templates aus dem Backend werden vor HTML-/Plain-Text-Rendering ueber `HtmlTemplateSanitizer` bereinigt (kein Raw-HTML-Fallback).
   - fuer Talk-Termine laeuft vor dem Insert ein expliziter Compat-Transform (`HtmlTemplateSanitizer.PrepareTalkAppointmentHtmlForOutlookRtfBridge(...)`)
   - Appointment-HTML wird ueber HTML->RTF-Bridge geschrieben (`MailItem.HTMLBody` -> `AppointmentItem.RTFBody`), nicht ueber `AppointmentItem.HTMLBody` und nicht ueber `HTMLEditor.body.innerHTML`.
