@@ -152,6 +152,8 @@
     <Compile Include="Utilities\HtmlTemplateSanitizer.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />
     <Compile Include="Utilities\ComInteropScope.cs" />
+    <Compile Include="Utilities\NativeWindowOwner.cs" />
+    <Compile Include="Utilities\WaitCursorScope.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UI\BrandedHeader.cs" />
   </ItemGroup>

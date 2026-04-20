@@ -5,6 +5,7 @@
  */
 
 using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace NcTalkOutlookAddIn.Utilities
@@ -49,6 +50,85 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(category, failureMessage, ex);
             }
+        }
+
+        internal static string ResolveIdentityKey(object comObject, string category, string objectName)
+        {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (comObject == null || !Marshal.IsComObject(comObject))
+            {
+                return string.Empty;
+            }
+
+            IntPtr unk = IntPtr.Zero;
+            try
+            {
+                unk = Marshal.GetIUnknownForObject(comObject);
+                if (unk == IntPtr.Zero)
+                {
+                    return string.Empty;
+                }
+
+                return unchecked((ulong)unk.ToInt64()).ToString("X16", CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    category,
+                    "Failed to resolve COM identity key for " + (objectName ?? "object") + ".",
+                    ex);
+                return string.Empty;
+            }
+            finally
+            {
+                if (unk != IntPtr.Zero)
+                {
+                    try
+                    {
+                        Marshal.Release(unk);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(
+                            category,
+                            "Failed to release COM identity pointer for " + (objectName ?? "object") + ".",
+                            ex);
+                    }
+                }
+            }
+        }
+
+        internal static bool AreSameObject(
+            object first,
+            object second,
+            string category,
+            string firstName,
+            string secondName)
+        {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
+            if (first == null || second == null)
+            {
+                return false;
+            }
+
+            if (!Marshal.IsComObject(first) || !Marshal.IsComObject(second))
+            {
+                return ReferenceEquals(first, second);
+            }
+
+            string firstKey = ResolveIdentityKey(first, category, firstName);
+            if (string.IsNullOrWhiteSpace(firstKey))
+            {
+                return false;
+            }
+
+            string secondKey = ResolveIdentityKey(second, category, secondName);
+            if (string.IsNullOrWhiteSpace(secondKey))
+            {
+                return false;
+            }
+
+            return string.Equals(firstKey, secondKey, StringComparison.Ordinal);
         }
     }
 

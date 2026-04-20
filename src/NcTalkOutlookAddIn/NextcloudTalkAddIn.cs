@@ -871,7 +871,7 @@ namespace NcTalkOutlookAddIn
             try
             {
                 inspector = mail.GetInspector;
-                return ResolveComIdentityKey(inspector, "Inspector");
+                return ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
             }
             catch (COMException ex)
             {
@@ -897,21 +897,6 @@ namespace NcTalkOutlookAddIn
             finally
             {
                 ComInteropScope.TryRelease(inspector, LogCategories.FileLink, "Failed to release compose Inspector COM object.");
-            }
-        }
-
-        private sealed class NativeWindowOwner : IWin32Window
-        {
-            private readonly IntPtr _handle;
-
-            internal NativeWindowOwner(IntPtr handle)
-            {
-                _handle = handle;
-            }
-
-            public IntPtr Handle
-            {
-                get { return _handle; }
             }
         }
 
@@ -990,80 +975,6 @@ namespace NcTalkOutlookAddIn
             }
 
             return 0;
-        }
-
-        private static string ResolveComIdentityKey(object comObject, string objectName)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (comObject == null || !Marshal.IsComObject(comObject))
-            {
-                return string.Empty;
-            }
-
-            IntPtr unk = IntPtr.Zero;
-            try
-            {
-                unk = Marshal.GetIUnknownForObject(comObject);
-                if (unk == IntPtr.Zero)
-                {
-                    return string.Empty;
-                }
-
-                return unchecked((ulong)unk.ToInt64()).ToString("X16", CultureInfo.InvariantCulture);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(
-                    LogCategories.FileLink,
-                    "Failed to resolve COM identity key for " + (objectName ?? "object") + ".",
-                    ex);
-                return string.Empty;
-            }
-            finally
-            {
-                if (unk != IntPtr.Zero)
-                {
-                    try
-                    {
-                        Marshal.Release(unk);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(
-                            LogCategories.FileLink,
-                            "Failed to release COM identity pointer for " + (objectName ?? "object") + ".",
-                            ex);
-                    }
-                }
-            }
-        }
-
-        private static bool AreSameComObject(object first, object second, string firstName, string secondName)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (first == null || second == null)
-            {
-                return false;
-            }
-
-            if (!Marshal.IsComObject(first) || !Marshal.IsComObject(second))
-            {
-                return ReferenceEquals(first, second);
-            }
-
-            string firstKey = ResolveComIdentityKey(first, firstName);
-            if (string.IsNullOrWhiteSpace(firstKey))
-            {
-                return false;
-            }
-
-            string secondKey = ResolveComIdentityKey(second, secondName);
-            if (string.IsNullOrWhiteSpace(secondKey))
-            {
-                return false;
-            }
-
-            return string.Equals(firstKey, secondKey, StringComparison.Ordinal);
         }
 
         private void RemoveMailComposeSubscription(MailComposeSubscription subscription)
@@ -1313,7 +1224,7 @@ namespace NcTalkOutlookAddIn
             try
             {
                 inspector = _outlookApplication.ActiveInspector();
-                return ResolveComIdentityKey(inspector, "ActiveInspector");
+                return ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "ActiveInspector");
             }
             catch (Exception ex)
             {
@@ -2454,22 +2365,6 @@ namespace NcTalkOutlookAddIn
         internal static void ShowWarningDialog(string message)
         {
             ShowWarning(message);
-        }
-
-        private sealed class WaitCursorScope : IDisposable
-        {
-            private readonly Cursor _previous;
-
-            public WaitCursorScope()
-            {
-                _previous = Cursor.Current;
-                Cursor.Current = Cursors.WaitCursor;
-            }
-
-            public void Dispose()
-            {
-                Cursor.Current = _previous;
-            }
         }
 
         internal void EnsureSettingsLoaded()

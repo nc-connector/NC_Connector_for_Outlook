@@ -129,7 +129,7 @@ namespace NcTalkOutlookAddIn
                 // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (mail != null)
                 {
-                    string inspectorIdentityKey = ResolveComIdentityKey(inspector, "Inspector");
+                    string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
                     EnsureMailComposeSubscription(mail, inspectorIdentityKey);
                 }
             }
@@ -190,7 +190,12 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
-                if (!AreSameComObject(mail, inlineResponseMail, "ItemLoad.MailItem", "Explorer.ActiveInlineResponse"))
+                if (!ComInteropScope.AreSameObject(
+                    mail,
+                    inlineResponseMail,
+                    LogCategories.FileLink,
+                    "ItemLoad.MailItem",
+                    "Explorer.ActiveInlineResponse"))
                 {
                     if (DiagnosticsLogger.IsEnabled)
                     {
