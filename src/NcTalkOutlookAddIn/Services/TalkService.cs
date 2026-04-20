@@ -498,16 +498,19 @@ namespace NcTalkOutlookAddIn.Services
 
             object listObj = null;
             IDictionary<string, object> ocs = GetDictionary(parsed, "ocs");
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (ocs != null)
             {
                 ocs.TryGetValue("data", out listObj);
             }
 
             object[] list = listObj as object[];
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (list == null)
             {
                 // Some Talk versions wrap the list under { data: { participants: [...] } }.
                 var dataDict = listObj as IDictionary<string, object>;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (dataDict != null)
                 {
                     object participantsObj;
@@ -518,6 +521,7 @@ namespace NcTalkOutlookAddIn.Services
                 }
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (list == null)
             {
                 return participants;
@@ -526,6 +530,7 @@ namespace NcTalkOutlookAddIn.Services
             foreach (object entry in list)
             {
                 var dict = entry as IDictionary<string, object>;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (dict == null)
                 {
                     continue;
@@ -705,6 +710,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (description == null)
             {
                 return;
@@ -797,6 +803,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (!response.HasHttpResponse)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
@@ -810,6 +817,7 @@ namespace NcTalkOutlookAddIn.Services
             statusCode = response.StatusCode;
             LogApi(method + " " + url + " -> " + statusCode);
 
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Failed to parse JSON response.", response.JsonParseException);
@@ -826,6 +834,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string ExtractRoomToken(IDictionary<string, object> responseData)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (responseData == null)
             {
                 return null;
@@ -833,6 +842,7 @@ namespace NcTalkOutlookAddIn.Services
 
             IDictionary<string, object> ocs = GetDictionary(responseData, "ocs");
             IDictionary<string, object> data = GetDictionary(ocs, "data");
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (data != null)
             {
                 string token = GetString(data, "token");
@@ -872,6 +882,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string ExtractVersion(IDictionary<string, object> payload)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (payload == null)
             {
                 return null;
@@ -896,6 +907,7 @@ namespace NcTalkOutlookAddIn.Services
 
             IDictionary<string, object> nextcloud = GetDictionary(payload, "nextcloud");
             IDictionary<string, object> system = GetDictionary(nextcloud, "system");
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (system != null)
             {
                 result = ComposeVersion(
@@ -918,6 +930,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string BuildVersionFromParts(IDictionary<string, object> dictionary)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (dictionary == null)
             {
                 return null;
@@ -1004,6 +1017,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static bool IsEventConversationDescriptionLockError(TalkServiceException ex)
         {
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (ex == null || ex.StatusCode != HttpStatusCode.BadRequest)
             {
                 return false;
@@ -1020,6 +1034,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string BuildEventObjectId(TalkRoomRequest request)
         {
+            // Keep null-safe to preserve fail-soft behavior on partial room request objects.
             if (request == null)
             {
                 return null;

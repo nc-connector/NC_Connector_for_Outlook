@@ -55,6 +55,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 }
 
                 Icon icon = CreateIconFromPng(AppIconPng, size);
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (icon != null)
                 {
                     IconCache[size] = icon;
@@ -70,6 +71,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 var assembly = Assembly.GetExecutingAssembly();
                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (stream == null)
                     {
                         return null;
@@ -90,6 +92,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static Icon CreateIconFromPng(Image image, int size)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (image == null)
             {
                 return null;

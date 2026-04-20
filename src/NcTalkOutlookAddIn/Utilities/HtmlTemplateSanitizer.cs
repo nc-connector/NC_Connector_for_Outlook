@@ -173,6 +173,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 var parser = new HtmlParser();
                 var document = parser.ParseDocument(html);
                 var body = document != null ? document.Body : null;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (body == null)
                 {
                     return html;
@@ -285,6 +286,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                     }
                 }
 
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (appointmentCompatMode && body.QuerySelector("table") == null)
                 {
                     var wrapperTable = document.CreateElement("table");
@@ -368,6 +370,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
 
         private static Assembly ResolveSanitizerDependency(object sender, ResolveEventArgs args)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (string.IsNullOrWhiteSpace(args == null ? null : args.Name))
             {
                 return null;
@@ -549,11 +552,13 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             NormalizationReport normalizationReport,
             bool emptied)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (inputStats == null)
             {
                 inputStats = new HtmlStructureStats();
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (outputStats == null)
             {
                 outputStats = new HtmlStructureStats();
@@ -588,6 +593,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             Dictionary<string, int> outputCounts,
             int maxEntries)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (inputCounts == null || inputCounts.Count == 0)
             {
                 return "none";
@@ -636,6 +642,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 var parser = new HtmlParser();
                 var document = parser.ParseDocument(html);
                 var body = document != null ? document.Body : null;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (body == null)
                 {
                     return stats;
@@ -687,6 +694,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             var parser = new HtmlParser();
             var document = parser.ParseDocument(html);
             var body = document != null ? document.Body : null;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (body == null)
             {
                 return html;
@@ -890,6 +898,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
 
         private static bool TryWrapElementChildrenInFontColor(IDocument document, IElement targetElement, string color)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (document == null || targetElement == null || string.IsNullOrWhiteSpace(color))
             {
                 return false;

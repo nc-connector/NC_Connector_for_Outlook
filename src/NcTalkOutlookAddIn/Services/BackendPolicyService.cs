@@ -30,6 +30,7 @@ namespace NcTalkOutlookAddIn.Services
 
         internal BackendPolicyStatus FetchStatus()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_configuration == null || !_configuration.IsComplete())
             {
                 return BuildLocalStatus(
@@ -149,6 +150,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (!response.HasHttpResponse)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", response.TransportException);
@@ -173,6 +175,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static IDictionary<string, object> NormalizePayload(IDictionary<string, object> payload)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (payload == null)
             {
                 return null;
@@ -216,6 +219,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static bool ShouldWarnForSeat(IDictionary<string, object> status)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (status == null)
             {
                 return false;
@@ -247,12 +251,14 @@ namespace NcTalkOutlookAddIn.Services
 
         private static bool GetBool(IDictionary<string, object> parent, string key)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return false;
             }
 
             object raw;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (!parent.TryGetValue(key, out raw) || raw == null)
             {
                 return false;

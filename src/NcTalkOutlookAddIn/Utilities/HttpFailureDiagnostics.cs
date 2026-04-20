@@ -53,6 +53,7 @@ namespace NcTalkOutlookAddIn.Utilities
     {
         internal static HttpFailureInfo Analyze(WebException ex)
         {
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (ex == null)
             {
                 return BuildInfo(HttpFailureKind.Generic, string.Empty);
@@ -65,6 +66,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string BuildLogSummary(WebException ex, HttpFailureInfo info)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (info == null)
             {
                 return "kind=unknown";
@@ -183,6 +185,7 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             SocketException socket = FindSocketException(ex);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (socket != null)
             {
                 switch (socket.SocketErrorCode)
@@ -208,6 +211,7 @@ namespace NcTalkOutlookAddIn.Utilities
             while (ex != null)
             {
                 SocketException socket = ex as SocketException;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (socket != null)
                 {
                     return socket;
@@ -237,6 +241,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static bool ContainsAny(string source, params string[] fragments)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (string.IsNullOrEmpty(source) || fragments == null)
             {
                 return false;

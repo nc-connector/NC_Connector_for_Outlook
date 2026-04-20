@@ -146,6 +146,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (!response.HasHttpResponse)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
@@ -164,6 +165,7 @@ namespace NcTalkOutlookAddIn.Services
                 return new Dictionary<string, object>();
             }
 
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Login flow JSON parsing failed.", response.JsonParseException);

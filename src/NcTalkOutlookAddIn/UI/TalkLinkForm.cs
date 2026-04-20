@@ -397,6 +397,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void InitializeSettingsOptionCheckBox(CheckBox checkBox, string text)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (checkBox == null)
             {
                 return;
@@ -618,6 +619,7 @@ namespace NcTalkOutlookAddIn.UI
         private static bool DetermineEventConversationSupport(AddinSettings defaults, out string versionText)
         {
             versionText = string.Empty;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (defaults == null)
             {
                 return true;
@@ -948,6 +950,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private int GetMinPasswordLength()
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_passwordPolicy != null && _passwordPolicy.MinLength > 0)
             {
                 return _passwordPolicy.MinLength;
@@ -973,6 +976,7 @@ namespace NcTalkOutlookAddIn.UI
 
             try
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_configuration != null && _passwordPolicy != null && _passwordPolicy.HasPolicy)
                 {
                     var policyService = new PasswordPolicyService(_configuration);
@@ -998,6 +1002,7 @@ namespace NcTalkOutlookAddIn.UI
             foreach (var item in _roomTypeComboBox.Items)
             {
                 var option = item as RoomTypeOption;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (option != null && option.Value == type)
                 {
                     _roomTypeComboBox.SelectedItem = option;

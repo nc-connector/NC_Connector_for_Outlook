@@ -26,6 +26,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal void ApplyRoomToAppointment(Outlook.AppointmentItem appointment, TalkRoomRequest request, TalkRoomCreationResult result)
         {
+            // COM lifecycle guard: appointment/result may be unavailable during event teardown.
             if (appointment == null || result == null)
             {
                 return;
@@ -164,6 +165,7 @@ namespace NcTalkOutlookAddIn.Controllers
         internal bool TryStampIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
         {
             startEpoch = 0;
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 NextcloudTalkAddIn.LogTalkMessage("Failed to stamp X-NCTALK-START: appointment is null (token=" + (roomToken ?? "n/a") + ").");
@@ -284,6 +286,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal void PersistLobbyTraits(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return;
@@ -337,6 +340,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal bool TrySyncRoomParticipants(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _owner.CurrentSettings == null)
             {
                 return false;
@@ -457,6 +461,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal void TryApplyDelegation(Outlook.AppointmentItem appointment, string roomToken)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken) || _owner.CurrentSettings == null)
             {
                 return;
@@ -494,6 +499,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 for (int i = 0; i < participants.Count; i++)
                 {
                     TalkParticipant participant = participants[i];
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (participant == null)
                     {
                         continue;
@@ -551,6 +557,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal bool TryUpdateLobby(Outlook.AppointmentItem appointment, string roomToken, bool isEventConversation)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return false;
@@ -626,6 +633,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal bool TryUpdateRoomName(Outlook.AppointmentItem appointment, string roomToken)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return false;
@@ -693,6 +701,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             string description = BuildDescriptionPayload(appointment);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (description == null)
             {
                 description = string.Empty;
@@ -735,6 +744,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private static string BuildDescriptionPayload(Outlook.AppointmentItem appointment)
         {
+            // Defensive fallback: upstream callers are internal, but COM callbacks can still race.
             if (appointment == null)
             {
                 return null;
@@ -800,6 +810,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private void PersistEventConversationTraits(Outlook.AppointmentItem appointment, string roomToken)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return;
@@ -823,6 +834,7 @@ namespace NcTalkOutlookAddIn.Controllers
             ref bool? lobbyEnabled,
             ref bool? isEventConversation)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return;
@@ -889,6 +901,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private static bool IsEventConversationDescriptionError(TalkServiceException ex)
         {
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (ex == null || string.IsNullOrWhiteSpace(ex.Message))
             {
                 return false;
@@ -901,6 +914,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private static bool IsMissingOrForbiddenRoomMutationError(TalkServiceException ex)
         {
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (ex == null)
             {
                 return false;
@@ -911,6 +925,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private static string GetNormalizedRoomName(Outlook.AppointmentItem appointment)
         {
+            // Keep null-tolerant: caller paths run inside Outlook event handlers with COM races.
             if (appointment == null)
             {
                 return string.Empty;

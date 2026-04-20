@@ -26,6 +26,7 @@ namespace NcTalkOutlookAddIn.Controllers
             string inspectorIdentityKey,
             Func<NextcloudTalkAddIn.MailComposeSubscription> factory)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null || factory == null)
             {
                 return null;
@@ -36,6 +37,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 for (int i = 0; i < _subscriptions.Count; i++)
                 {
                     NextcloudTalkAddIn.MailComposeSubscription existing = _subscriptions[i];
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (existing != null && existing.IsFor(mail, mailIdentityKey, inspectorIdentityKey))
                     {
                         return existing;
@@ -43,6 +45,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
 
                 NextcloudTalkAddIn.MailComposeSubscription created = factory();
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (created != null)
                 {
                     _subscriptions.Add(created);
@@ -54,6 +57,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal void Remove(NextcloudTalkAddIn.MailComposeSubscription subscription)
         {
+            // Idempotent unsubscribe path: disposal races can call Remove with null.
             if (subscription == null)
             {
                 return;
@@ -78,6 +82,7 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 try
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (current[i] != null)
                     {
                         current[i].Dispose();

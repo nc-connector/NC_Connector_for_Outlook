@@ -20,6 +20,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static void ApplyButtonSize(Button button, out int minWidth)
         {
             minWidth = 96;
+            // Layout helper is used in dynamic form states; null means "skip sizing" rather than fail.
             if (button == null)
             {
                 return;
@@ -43,6 +44,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static int LayoutCentered(Control container, IList<Button> buttons, int horizontalPadding, int bottomPadding, int spacing, bool uniformWidths)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (container == null || buttons == null || buttons.Count == 0)
             {
                 return 0;
@@ -135,6 +137,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private static int CalculateTotalWidth(IList<Button> buttons, int spacing)
         {
             int total = 0;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (buttons == null)
             {
                 return total;

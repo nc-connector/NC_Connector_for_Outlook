@@ -135,6 +135,7 @@ namespace NcTalkOutlookAddIn.Services
                     request.Headers["OCS-APIRequest"] = "true";
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (options.Headers != null)
                 {
                     foreach (var kvp in options.Headers)
@@ -163,6 +164,7 @@ namespace NcTalkOutlookAddIn.Services
                         ? "application/json"
                         : options.ContentType;
 
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (options.BodyWriter != null)
                     {
                         using (Stream stream = request.GetRequestStream())
@@ -173,6 +175,7 @@ namespace NcTalkOutlookAddIn.Services
                     else
                     {
                         byte[] bytes = options.PayloadBytes;
+                        // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                         if (bytes == null)
                         {
                             string payload = options.Payload ?? string.Empty;
@@ -198,6 +201,7 @@ namespace NcTalkOutlookAddIn.Services
                 catch (WebException ex)
                 {
                     response = ex.Response as HttpWebResponse;
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (response == null)
                     {
                         result.HasHttpResponse = false;
@@ -230,6 +234,7 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (result.ResponseText == null && result.ResponseBytes != null && result.ResponseBytes.Length > 0)
                 {
                     Encoding responseEncoding = options.ResponseEncoding ?? Encoding.UTF8;
@@ -251,6 +256,7 @@ namespace NcTalkOutlookAddIn.Services
             }
             finally
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (response != null)
                 {
                     response.Close();

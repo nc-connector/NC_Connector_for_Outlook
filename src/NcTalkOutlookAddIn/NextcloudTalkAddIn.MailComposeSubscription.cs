@@ -132,6 +132,7 @@ namespace NcTalkOutlookAddIn
                 _cleanupGraceTimer.Tick += OnCleanupGraceTimerTick;
 
                 _events = mail as Outlook.ItemEvents_10_Event;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_events != null)
                 {
                     _events.BeforeAttachmentAdd += OnBeforeAttachmentAdd;
@@ -153,6 +154,7 @@ namespace NcTalkOutlookAddIn
 
             internal bool IsFor(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (mail == null)
                 {
                     return false;
@@ -183,6 +185,7 @@ namespace NcTalkOutlookAddIn
 
             internal void ArmShareCleanup(FileLinkResult result)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (result == null)
                 {
                     return;
@@ -225,6 +228,7 @@ namespace NcTalkOutlookAddIn
 
             internal void RegisterSeparatePasswordDispatch(FileLinkResult result, FileLinkRequest request, string passwordOnlyHtml)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (result == null || request == null || string.IsNullOrWhiteSpace(passwordOnlyHtml))
                 {
                     return;
@@ -260,6 +264,7 @@ namespace NcTalkOutlookAddIn
 
             private static string BuildComposeKey(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (mail != null)
                 {
                     try
@@ -669,6 +674,7 @@ namespace NcTalkOutlookAddIn
                 bool alwaysConnector = settings.SharingAttachmentsAlwaysConnector;
                 bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_owner._currentSettings != null)
                 {
                     var configuration = new TalkServiceConfiguration(
@@ -676,6 +682,7 @@ namespace NcTalkOutlookAddIn
                         _owner._currentSettings.Username,
                         _owner._currentSettings.AppPassword);
                     BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate");
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (policyStatus != null && policyStatus.PolicyActive)
                     {
                         bool policyBool;
@@ -719,6 +726,7 @@ namespace NcTalkOutlookAddIn
                 try
                 {
                     attachments = _mail.Attachments;
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (attachments == null)
                     {
                         return snapshots;
@@ -731,6 +739,7 @@ namespace NcTalkOutlookAddIn
                         try
                         {
                             attachment = attachments[index];
+                            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                             if (attachment == null)
                             {
                                 continue;
@@ -784,6 +793,7 @@ namespace NcTalkOutlookAddIn
             private static long SumAttachmentBytes(List<AttachmentSnapshot> snapshots)
             {
                 long total = 0;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (snapshots == null)
                 {
                     return 0;
@@ -817,6 +827,7 @@ namespace NcTalkOutlookAddIn
                     return info;
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (snapshots == null || snapshots.Count == 0)
                 {
                     return new AttachmentBatchInfo
@@ -906,6 +917,7 @@ namespace NcTalkOutlookAddIn
                 path = string.Empty;
                 pathIsTemporary = false;
 
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (attachment == null)
                 {
                     LogFileLink("Compose before-attachment-add candidate build skipped (composeKey=" + _composeKey + ", reason=attachment_null).");
@@ -1000,6 +1012,7 @@ namespace NcTalkOutlookAddIn
             private bool TryMaterializeBeforeAddAttachmentToTemp(Outlook.Attachment attachment, string attachmentName, out string path)
             {
                 path = string.Empty;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (attachment == null)
                 {
                     return false;
@@ -1041,6 +1054,7 @@ namespace NcTalkOutlookAddIn
 
             private string TryResolveBeforeAddPathFromAttachmentMetadata(Outlook.Attachment attachment)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (attachment == null)
                 {
                     return string.Empty;
@@ -1257,6 +1271,7 @@ namespace NcTalkOutlookAddIn
                     for (int i = 0; i < batch.Count; i++)
                     {
                         BeforeAddShareEntry entry = batch[i];
+                        // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                         if (entry == null || string.IsNullOrWhiteSpace(entry.LocalPath) || !File.Exists(entry.LocalPath))
                         {
                             continue;
@@ -1314,6 +1329,7 @@ namespace NcTalkOutlookAddIn
                 try
                 {
                     attachments = _mail.Attachments;
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (attachments == null)
                     {
                         return;
@@ -1326,6 +1342,7 @@ namespace NcTalkOutlookAddIn
                         try
                         {
                             attachment = attachments[index];
+                            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                             if (attachment == null)
                             {
                                 continue;
@@ -1380,6 +1397,7 @@ namespace NcTalkOutlookAddIn
             private bool TryResolveAttachmentLocalPath(Outlook.Attachment attachment, string attachmentName, List<string> temporaryFiles, out string localPath)
             {
                 localPath = string.Empty;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (attachment == null)
                 {
                     return false;
@@ -1410,6 +1428,7 @@ namespace NcTalkOutlookAddIn
                     }
 
                     localPath = targetPath;
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (temporaryFiles != null)
                     {
                         temporaryFiles.Add(targetPath);
@@ -1458,6 +1477,7 @@ namespace NcTalkOutlookAddIn
 
             private void RemoveAttachmentsByIndices(List<int> indices, string reason)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (indices == null || indices.Count == 0)
                 {
                     return;
@@ -1473,6 +1493,7 @@ namespace NcTalkOutlookAddIn
                 try
                 {
                     attachments = _mail.Attachments;
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (attachments == null)
                     {
                         return;
@@ -1534,6 +1555,7 @@ namespace NcTalkOutlookAddIn
                 try
                 {
                     attachments = _mail.Attachments;
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (attachments == null || attachments.Count <= 0)
                     {
                         return;
@@ -1575,6 +1597,7 @@ namespace NcTalkOutlookAddIn
 
             private void CleanupTemporaryFiles(List<string> temporaryFiles)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (temporaryFiles == null || temporaryFiles.Count == 0)
                 {
                     return;
@@ -1792,6 +1815,7 @@ namespace NcTalkOutlookAddIn
             private static bool IsMailSentUnavailableAfterSend(Exception ex)
             {
                 var comException = ex as COMException;
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (comException == null)
                 {
                     return false;
@@ -1803,6 +1827,7 @@ namespace NcTalkOutlookAddIn
 
             private static string ToHResultHex(Exception ex)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (ex == null)
                 {
                     return "0x00000000";
@@ -1926,6 +1951,7 @@ namespace NcTalkOutlookAddIn
                 cc = string.Empty;
                 bcc = string.Empty;
 
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (_mail == null)
                 {
                     return false;
@@ -1938,6 +1964,7 @@ namespace NcTalkOutlookAddIn
                 try
                 {
                     recipients = _mail.Recipients;
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (recipients == null)
                     {
                         return false;
@@ -1963,6 +1990,7 @@ namespace NcTalkOutlookAddIn
                         try
                         {
                             recipient = recipients[i];
+                            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                             if (recipient == null)
                             {
                                 continue;
@@ -2066,6 +2094,7 @@ namespace NcTalkOutlookAddIn
             {
                 try
                 {
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (_mail == null)
                     {
                         return string.Empty;
@@ -2100,6 +2129,7 @@ namespace NcTalkOutlookAddIn
 
             private static string ReadAttachmentName(Outlook.Attachment attachment)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (attachment == null)
                 {
                     return string.Empty;
@@ -2136,6 +2166,7 @@ namespace NcTalkOutlookAddIn
 
             private static long ReadAttachmentSizeBytes(Outlook.Attachment attachment)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (attachment == null)
                 {
                     return 0;
@@ -2154,6 +2185,7 @@ namespace NcTalkOutlookAddIn
 
             private static string ReadAttachmentPathName(Outlook.Attachment attachment)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (attachment == null)
                 {
                     return string.Empty;
@@ -2187,6 +2219,7 @@ namespace NcTalkOutlookAddIn
                     for (int i = 0; i < _pendingBeforeAddShareEntries.Count; i++)
                     {
                         BeforeAddShareEntry pendingEntry = _pendingBeforeAddShareEntries[i];
+                        // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                         if (pendingEntry == null || !pendingEntry.CleanupLocalPathAfterFlow || string.IsNullOrWhiteSpace(pendingEntry.LocalPath))
                         {
                             continue;
@@ -2213,6 +2246,7 @@ namespace NcTalkOutlookAddIn
                     DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to dispose compose timers.", ex);
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_events != null)
                 {
                     try

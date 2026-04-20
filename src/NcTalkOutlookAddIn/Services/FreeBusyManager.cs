@@ -36,6 +36,7 @@ namespace NcTalkOutlookAddIn.Services
 
         internal void ApplySettings(AddinSettings settings)
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_application == null || settings == null)
             {
                 return;
@@ -214,6 +215,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 using (var key = OpenOrCreateSubKey(path))
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (key == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' (value '" + valueName + "').");
@@ -294,6 +296,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 using (var key = OpenOrCreateSubKey(path))
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (key == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' while restoring.");
@@ -344,6 +347,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(path, false))
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (key == null)
                     {
                         return false;
@@ -376,6 +380,7 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 var key = Registry.CurrentUser.OpenSubKey(path, true);
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (key != null)
                 {
                     return key;

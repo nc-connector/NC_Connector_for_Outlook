@@ -129,6 +129,7 @@ namespace NcTalkOutlookAddIn
             {
                 LogCore("Using Outlook profile settings: " + outlookProfileName + ".");
             }
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_currentSettings != null)
             {
                 LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
@@ -144,12 +145,14 @@ namespace NcTalkOutlookAddIn
         {
             try
             {
+                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
                 if (_outlookApplication == null)
                 {
                     return;
                 }
 
                 LanguageSettings languageSettings = _outlookApplication.LanguageSettings;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (languageSettings == null)
                 {
                     return;
@@ -168,6 +171,7 @@ namespace NcTalkOutlookAddIn
 
         private string ResolveCurrentOutlookProfileName()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_outlookApplication == null)
             {
                 return string.Empty;
@@ -177,6 +181,7 @@ namespace NcTalkOutlookAddIn
             try
             {
                 session = _outlookApplication.Session;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (session == null)
                 {
                     return string.Empty;
@@ -251,6 +256,7 @@ namespace NcTalkOutlookAddIn
             UnhookInspector();
             UnhookMailComposeSubscriptions();
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
             {
                 try
@@ -268,6 +274,7 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_freeBusyManager != null)
             {
                 _freeBusyManager.Dispose();
@@ -405,6 +412,7 @@ namespace NcTalkOutlookAddIn
             }
 
             Outlook.AppointmentItem appointment = GetActiveAppointment();
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 LogTalk("Talk link cancelled: no active appointment found.");
@@ -629,6 +637,7 @@ namespace NcTalkOutlookAddIn
                     }
                     LogSettings("Settings applied (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
                     ApplyIfbSettings();
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (_settingsStorage != null)
                     {
                         _settingsStorage.Save(_currentSettings);
@@ -650,6 +659,7 @@ namespace NcTalkOutlookAddIn
 
             using (Stream resourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (resourceStream == null)
                 {
                     return null;
@@ -677,6 +687,7 @@ namespace NcTalkOutlookAddIn
             }
 
             Outlook.MailItem mail = GetActiveMailItem();
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null)
             {
                 MessageBox.Show(
@@ -693,6 +704,7 @@ namespace NcTalkOutlookAddIn
 
         private bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null || _currentSettings == null)
             {
                 return false;
@@ -721,12 +733,14 @@ namespace NcTalkOutlookAddIn
 
             using (var wizard = new FileLinkWizardForm(_currentSettings ?? new AddinSettings(), configuration, passwordPolicy, policyStatus, basePath, launchOptions))
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
                 {
                     string languageOverride = _currentSettings != null ? _currentSettings.ShareBlockLang : "default";
                     LogFileLink("Share created (folder=\"" + wizard.Result.FolderName + "\").");
 
                     MailComposeSubscription composeSubscription = EnsureMailComposeSubscription(mail, ResolveActiveInspectorIdentityKey());
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (composeSubscription != null)
                     {
                         composeSubscription.ArmShareCleanup(wizard.Result);
@@ -802,6 +816,7 @@ namespace NcTalkOutlookAddIn
 
         private MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null)
             {
                 return null;
@@ -821,6 +836,7 @@ namespace NcTalkOutlookAddIn
 
         private static string ResolveMailComIdentityKey(Outlook.MailItem mail)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null)
             {
                 return string.Empty;
@@ -860,6 +876,7 @@ namespace NcTalkOutlookAddIn
 
         private static string ResolveMailInspectorIdentityKey(Outlook.MailItem mail)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null)
             {
                 return string.Empty;
@@ -915,6 +932,7 @@ namespace NcTalkOutlookAddIn
 
         private IWin32Window TryCreateMailInspectorDialogOwner(Outlook.MailItem mail)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null)
             {
                 return null;
@@ -924,6 +942,7 @@ namespace NcTalkOutlookAddIn
             try
             {
                 inspector = mail.GetInspector;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (inspector == null)
                 {
                     return null;
@@ -946,6 +965,7 @@ namespace NcTalkOutlookAddIn
 
         private static int ReadInspectorWindowHandle(Outlook.Inspector inspector)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (inspector == null)
             {
                 return 0;
@@ -956,12 +976,14 @@ namespace NcTalkOutlookAddIn
                 try
                 {
                     PropertyInfo property = inspector.GetType().GetProperty(propertyName);
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (property == null)
                     {
                         continue;
                     }
 
                     object value = property.GetValue(inspector, null);
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (value == null)
                     {
                         continue;
@@ -987,6 +1009,7 @@ namespace NcTalkOutlookAddIn
 
         private static string ResolveComIdentityKey(object comObject, string objectName)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (comObject == null || !Marshal.IsComObject(comObject))
             {
                 return string.Empty;
@@ -1032,6 +1055,7 @@ namespace NcTalkOutlookAddIn
 
         private static bool AreSameComObject(object first, object second, string firstName, string secondName)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (first == null || second == null)
             {
                 return false;
@@ -1080,6 +1104,7 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (state == null || !state.LockActive)
             {
                 return false;
@@ -1116,6 +1141,7 @@ namespace NcTalkOutlookAddIn
             }
 
             SynchronizationContext notificationUiContext = _uiSynchronizationContext ?? SynchronizationContext.Current;
+            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (notificationUiContext == null)
             {
                 LogFileLink("Separate password notification skipped (UI context unavailable, recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
@@ -1163,6 +1189,7 @@ namespace NcTalkOutlookAddIn
 
         private void ScheduleNotifyIconDispose(NotifyIcon notifyIcon, int delayMs, SynchronizationContext notificationUiContext)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (notifyIcon == null)
             {
                 return;
@@ -1178,11 +1205,13 @@ namespace NcTalkOutlookAddIn
 
         private void DisposeNotifyIconOnUiContext(NotifyIcon notifyIcon, SynchronizationContext notificationUiContext)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (notifyIcon == null)
             {
                 return;
             }
 
+            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (notificationUiContext == null)
             {
                 DisposeNotifyIcon(notifyIcon);
@@ -1202,6 +1231,7 @@ namespace NcTalkOutlookAddIn
 
         private static void DisposeNotifyIcon(NotifyIcon notifyIcon)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (notifyIcon == null)
             {
                 return;
@@ -1220,6 +1250,7 @@ namespace NcTalkOutlookAddIn
 
         private Outlook.MailItem GetActiveMailItem()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_outlookApplication == null)
             {
                 return null;
@@ -1236,6 +1267,7 @@ namespace NcTalkOutlookAddIn
                 inspector = null;
             }
 
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (inspector != null)
             {
                 try
@@ -1259,6 +1291,7 @@ namespace NcTalkOutlookAddIn
                 explorer = null;
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (explorer != null)
             {
                 object inlineResponse = null;
@@ -1273,6 +1306,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 var mailItem = inlineResponse as Outlook.MailItem;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (mailItem != null)
                 {
                     return mailItem;
@@ -1284,6 +1318,7 @@ namespace NcTalkOutlookAddIn
 
         private string ResolveActiveInspectorIdentityKey()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_outlookApplication == null)
             {
                 return string.Empty;
@@ -1308,6 +1343,7 @@ namespace NcTalkOutlookAddIn
 
         private void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null || string.IsNullOrWhiteSpace(html))
             {
                 return;
@@ -1420,6 +1456,7 @@ namespace NcTalkOutlookAddIn
                 inspector = null;
             }
 
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (inspector == null)
             {
                 return false;
@@ -1435,6 +1472,7 @@ namespace NcTalkOutlookAddIn
                 wordEditor = null;
             }
 
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (wordEditor == null)
             {
                 return false;
@@ -1443,12 +1481,14 @@ namespace NcTalkOutlookAddIn
             try
             {
                 application = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (application == null)
                 {
                     return false;
                 }
 
                 selection = application.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, application, null);
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (selection == null)
                 {
                     return false;
@@ -1497,6 +1537,7 @@ namespace NcTalkOutlookAddIn
 
         private static bool TryWriteAppointmentHtmlBodyWithRtfBridge(Outlook.AppointmentItem appointment, string html)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null || string.IsNullOrWhiteSpace(html))
             {
                 return false;
@@ -1508,12 +1549,14 @@ namespace NcTalkOutlookAddIn
             try
             {
                 application = appointment.Application;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (application == null)
                 {
                     return false;
                 }
 
                 stagingMail = application.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (stagingMail == null)
                 {
                     return false;
@@ -1529,6 +1572,7 @@ namespace NcTalkOutlookAddIn
                 stagingMail.HTMLBody = bridgeHtml;
 
                 var rtfBody = stagingMail.RTFBody as byte[];
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (rtfBody == null || rtfBody.Length == 0)
                 {
                     DiagnosticsLogger.Log(LogCategories.Talk, "Appointment HTML->RTF bridge produced empty RTF body.");
@@ -1553,6 +1597,7 @@ namespace NcTalkOutlookAddIn
 
         private Outlook.AppointmentItem GetActiveAppointment()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_outlookApplication == null)
             {
                 return null;
@@ -1569,6 +1614,7 @@ namespace NcTalkOutlookAddIn
                 inspector = null;
             }
 
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (inspector != null)
             {
                 return inspector.CurrentItem as Outlook.AppointmentItem;
@@ -1589,6 +1635,7 @@ namespace NcTalkOutlookAddIn
         {
             ConfigureDiagnosticsLogger(_currentSettings);
 
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_freeBusyManager == null || _currentSettings == null)
             {
                 return;
@@ -1722,6 +1769,7 @@ namespace NcTalkOutlookAddIn
 
         private static string ResolveTalkInvitationTemplate(BackendPolicyStatus policyStatus)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (policyStatus == null || !policyStatus.PolicyActive)
             {
                 return string.Empty;
@@ -1732,6 +1780,7 @@ namespace NcTalkOutlookAddIn
 
         private static string ResolveTalkEventDescriptionType(BackendPolicyStatus policyStatus)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (policyStatus != null && policyStatus.PolicyActive)
             {
                 string policyTypeRaw = policyStatus.GetPolicyString("talk", "event_description_type");
@@ -1801,6 +1850,7 @@ namespace NcTalkOutlookAddIn
 
         internal static void SetUserProperty(Outlook.AppointmentItem appointment, string name, Outlook.OlUserPropertyType type, object value)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return;
@@ -1853,6 +1903,7 @@ namespace NcTalkOutlookAddIn
 
         private static string TryGetGlobalAppointmentIdForDeferredKey(Outlook.AppointmentItem appointment)
         {
+            // Deferred ensure path can run after appointment release; null means "no stable key".
             if (appointment == null)
             {
                 return null;
@@ -1870,6 +1921,7 @@ namespace NcTalkOutlookAddIn
 
         private void UpdateStoredServerVersion(string response)
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_currentSettings == null || string.IsNullOrWhiteSpace(response))
             {
                 return;
@@ -1888,6 +1940,7 @@ namespace NcTalkOutlookAddIn
             }
 
             _currentSettings.LastKnownServerVersion = versionText;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_settingsStorage != null)
             {
                 try
@@ -1904,6 +1957,7 @@ namespace NcTalkOutlookAddIn
 
         internal static string GetUserPropertyText(Outlook.AppointmentItem appointment, string name)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return null;
@@ -1915,6 +1969,7 @@ namespace NcTalkOutlookAddIn
 
         internal static bool HasUserProperty(Outlook.AppointmentItem appointment, string name)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return false;
@@ -2009,18 +2064,21 @@ namespace NcTalkOutlookAddIn
 
         internal static bool GetUserPropertyBool(Outlook.AppointmentItem appointment, string name)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return false;
             }
 
             var property = appointment.UserProperties[name];
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (property == null)
             {
                 return false;
             }
 
             object value = property.Value;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (value == null)
             {
                 return false;
@@ -2057,6 +2115,7 @@ namespace NcTalkOutlookAddIn
 
         private void RefreshEntryBinding(AppointmentSubscription subscription)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (subscription == null)
             {
                 return;
@@ -2151,6 +2210,7 @@ namespace NcTalkOutlookAddIn
 
         private bool IsOrganizer(Outlook.AppointmentItem appointment)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return false;
@@ -2169,12 +2229,14 @@ namespace NcTalkOutlookAddIn
 
         internal static void RemoveUserProperty(Outlook.AppointmentItem appointment, string name)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return;
             }
 
             var property = appointment.UserProperties[name];
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (property != null)
             {
                 property.Delete();
@@ -2211,6 +2273,7 @@ namespace NcTalkOutlookAddIn
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (result == null)
             {
                 return;
@@ -2221,6 +2284,7 @@ namespace NcTalkOutlookAddIn
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled, bool isEventConversation)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return;
@@ -2406,13 +2470,16 @@ namespace NcTalkOutlookAddIn
 
         internal void EnsureSettingsLoaded()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_currentSettings == null)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_settingsStorage != null)
                 {
                     _currentSettings = _settingsStorage.Load();
                 }
 
+                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
                 if (_currentSettings == null)
                 {
                     _currentSettings = new AddinSettings();
@@ -2494,6 +2561,7 @@ namespace NcTalkOutlookAddIn
 
         private void EnsureSubscriptionForAppointment(Outlook.AppointmentItem appointment, bool allowDeferredRetry)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return;
@@ -2578,12 +2646,14 @@ namespace NcTalkOutlookAddIn
 
         private bool QueueDeferredAppointmentSubscriptionEnsure(Outlook.AppointmentItem appointment, COMException triggerException)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (appointment == null)
             {
                 return false;
             }
 
             SynchronizationContext context = _uiSynchronizationContext;
+            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (context == null)
             {
                 LogDeferredAppointmentEnsureRestriction(
@@ -2662,6 +2732,7 @@ namespace NcTalkOutlookAddIn
 
         private static bool IsOutlookEventProcedureRestriction(COMException ex)
         {
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (ex == null)
             {
                 return false;

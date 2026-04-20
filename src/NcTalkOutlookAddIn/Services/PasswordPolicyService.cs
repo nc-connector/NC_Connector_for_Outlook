@@ -62,6 +62,7 @@ namespace NcTalkOutlookAddIn.Services
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (root == null)
                 {
                     LogApi("Password policy fetch returned no parsable JSON payload.");
@@ -71,6 +72,7 @@ namespace NcTalkOutlookAddIn.Services
                 var ocs = GetDictionary(root, "ocs");
                 var data = GetDictionary(ocs, "data");
                 var caps = GetDictionary(data, "capabilities");
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (caps == null)
                 {
                     LogApi("Password policy capabilities block missing.");
@@ -78,6 +80,7 @@ namespace NcTalkOutlookAddIn.Services
                 }
 
                 var policy = GetDictionary(caps, "password_policy") ?? GetDictionary(caps, "passwordPolicy");
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (policy == null)
                 {
                     LogApi("Password policy block missing.");
@@ -109,6 +112,7 @@ namespace NcTalkOutlookAddIn.Services
 
         internal string GeneratePassword(PasswordPolicyInfo policy)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (policy == null || !policy.HasPolicy || string.IsNullOrEmpty(policy.GenerateUrl) || !_configuration.IsComplete())
             {
                 return null;
@@ -128,6 +132,7 @@ namespace NcTalkOutlookAddIn.Services
                 HttpStatusCode statusCode;
                 ExecuteJsonRequest("GET", apiUrl, null, out statusCode, out root);
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (statusCode != HttpStatusCode.OK || root == null)
                 {
                     return null;
@@ -167,6 +172,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (!response.HasHttpResponse)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Api, "Password policy request failed without HTTP response.", response.TransportException);
@@ -182,6 +188,7 @@ namespace NcTalkOutlookAddIn.Services
             statusCode = response.StatusCode;
             LogApi(method + " " + url + " -> " + statusCode);
 
+            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Password policy response parsing failed.", response.JsonParseException);
@@ -245,6 +252,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string GetFirstString(IDictionary<string, object> parent, params string[] keys)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null || keys == null)
             {
                 return null;
@@ -264,12 +272,14 @@ namespace NcTalkOutlookAddIn.Services
 
         private static int GetInt(IDictionary<string, object> parent, string key)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return 0;
             }
 
             object rawObject;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (!parent.TryGetValue(key, out rawObject) || rawObject == null)
             {
                 return 0;
@@ -287,6 +297,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static int GetFirstPositiveInt(IDictionary<string, object> parent, params string[] keys)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null || keys == null)
             {
                 return 0;

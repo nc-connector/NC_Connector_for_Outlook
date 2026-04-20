@@ -54,6 +54,7 @@ namespace NcTalkOutlookAddIn.UI
             int added = 0;
             foreach (var user in _userDirectory)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (user == null)
                 {
                     continue;
@@ -85,6 +86,7 @@ namespace NcTalkOutlookAddIn.UI
         private void SelectModeratorFromList()
         {
             var selected = _moderatorListBox.SelectedItem as NextcloudUser;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (selected == null)
             {
                 return;
@@ -164,6 +166,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void SetModeratorAvatar(NextcloudUser user)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (user == null)
             {
                 _moderatorAvatarBox.Image = null;
@@ -209,11 +212,13 @@ namespace NcTalkOutlookAddIn.UI
             var avatarBounds = new Rectangle(avatarX, avatarY, avatarSize, avatarSize);
 
             Image avatar = user != null ? GetCachedAvatar(user.UserId) : null;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (avatar == null && user != null)
             {
                 EnsureAvatarLoaded(user.UserId);
                 avatar = GetCachedAvatar(user.UserId);
             }
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (avatar != null)
             {
                 e.Graphics.DrawImage(avatar, avatarBounds);
@@ -251,6 +256,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void EnsureAvatarLoaded(string userId)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (string.IsNullOrWhiteSpace(userId) || _configuration == null || !_configuration.IsComplete())
             {
                 return;
@@ -282,6 +288,7 @@ namespace NcTalkOutlookAddIn.UI
                 lock (_avatarLock)
                 {
                     _avatarLoading.Remove(userId);
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (fetched != null)
                     {
                         Image existing;
@@ -301,6 +308,7 @@ namespace NcTalkOutlookAddIn.UI
                     BeginInvoke((Action)(() =>
                     {
                         _moderatorListBox.Invalidate();
+                        // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                         if (_selectedModerator != null && string.Equals(_selectedModerator.UserId, userId, StringComparison.OrdinalIgnoreCase))
                         {
                             _moderatorAvatarBox.Image = GetCachedAvatar(userId);
@@ -338,6 +346,7 @@ namespace NcTalkOutlookAddIn.UI
 
             if (!response.HasHttpResponse || response.StatusCode != HttpStatusCode.OK)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Talk, "Avatar request failed for user '" + userId + "'.", response.TransportException);
@@ -346,6 +355,7 @@ namespace NcTalkOutlookAddIn.UI
                 return null;
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (response.ResponseBytes == null || response.ResponseBytes.Length == 0)
             {
                 return null;
@@ -360,6 +370,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void DrawAvatarPlaceholder(Graphics graphics, Rectangle bounds, string userId)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (graphics == null)
             {
                 return;

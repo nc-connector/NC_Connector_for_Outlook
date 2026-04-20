@@ -60,11 +60,13 @@ namespace NcTalkOutlookAddIn.Services
         {
             lock (_syncRoot)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_listener != null && _listener.IsListening)
                 {
                     return;
                 }
 
+                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
                 if (_configuration == null || !_configuration.IsComplete())
                 {
                     throw new InvalidOperationException("IFB cannot be started: credentials are incomplete.");
@@ -85,6 +87,7 @@ namespace NcTalkOutlookAddIn.Services
         {
             lock (_syncRoot)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_cancellation != null)
                 {
                     _cancellation.Cancel();
@@ -92,6 +95,7 @@ namespace NcTalkOutlookAddIn.Services
                     _cancellation = null;
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_listener != null)
                 {
                     try
@@ -110,6 +114,7 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_listenerTask != null)
                 {
                     try
@@ -136,6 +141,7 @@ namespace NcTalkOutlookAddIn.Services
                 try
                 {
                     context = _listener.GetContext();
+                    // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
                     if (context != null)
                     {
                         DiagnosticsLogger.Log(LogCategory, "HTTP " + context.Request.HttpMethod + " " + context.Request.RawUrl);
@@ -157,6 +163,7 @@ namespace NcTalkOutlookAddIn.Services
                     return;
                 }
 
+                // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
                 if (context != null)
                 {
                     Task.Run(() => HandleRequest(context), token);
@@ -342,6 +349,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (!response.HasHttpResponse)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
@@ -424,6 +432,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (!response.HasHttpResponse)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategory, "CalDAV scheduling request failed without HTTP response.", response.TransportException);

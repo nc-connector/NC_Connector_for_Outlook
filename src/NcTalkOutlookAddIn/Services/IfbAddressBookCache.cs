@@ -58,6 +58,7 @@ namespace NcTalkOutlookAddIn.Services
 
         internal SystemAddressbookStatus GetSystemAddressbookStatus(TalkServiceConfiguration configuration, int cacheHours, bool forceRefresh)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (configuration == null || !configuration.IsComplete())
             {
                 const string detail = "Talk credentials are incomplete.";
@@ -102,6 +103,7 @@ namespace NcTalkOutlookAddIn.Services
         internal bool TryGetUid(TalkServiceConfiguration configuration, int cacheHours, string email, out string uid)
         {
             uid = null;
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (configuration == null || !configuration.IsComplete() || string.IsNullOrWhiteSpace(email))
             {
                 return false;
@@ -117,6 +119,7 @@ namespace NcTalkOutlookAddIn.Services
         internal bool TryGetPrimaryEmailForUid(TalkServiceConfiguration configuration, int cacheHours, string uid, out string email)
         {
             email = null;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (configuration == null || !configuration.IsComplete() || string.IsNullOrWhiteSpace(uid))
             {
                 return false;
@@ -132,6 +135,7 @@ namespace NcTalkOutlookAddIn.Services
         internal bool TryResolveEmail(TalkServiceConfiguration configuration, int cacheHours, string emailOrLocalPart, out string resolvedEmail)
         {
             resolvedEmail = null;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (configuration == null || !configuration.IsComplete())
             {
                 return false;
@@ -188,6 +192,7 @@ namespace NcTalkOutlookAddIn.Services
         internal List<NextcloudUser> GetUsers(TalkServiceConfiguration configuration, int cacheHours, bool forceRefresh)
         {
             var users = new List<NextcloudUser>();
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (configuration == null || !configuration.IsComplete())
             {
                 return users;
@@ -243,6 +248,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 string json = File.ReadAllText(_cacheFilePath);
                 var data = _serializer.Deserialize<CacheContainer>(json);
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (data == null || data.GeneratedUtc <= DateTime.MinValue || data.Entries == null)
                 {
                     return false;
@@ -258,6 +264,7 @@ namespace NcTalkOutlookAddIn.Services
                 var localMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var entry in data.Entries)
                 {
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (entry == null || string.IsNullOrWhiteSpace(entry.Email) || string.IsNullOrWhiteSpace(entry.Uid))
                     {
                         continue;
@@ -327,6 +334,7 @@ namespace NcTalkOutlookAddIn.Services
 
             if (!response.HasHttpResponse)
             {
+                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
                 if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Ifb, "Address book could not be loaded from server.", response.TransportException);
@@ -355,12 +363,14 @@ namespace NcTalkOutlookAddIn.Services
 
             foreach (var entry in entries)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (entry == null || string.IsNullOrWhiteSpace(entry.Uid))
                 {
                     continue;
                 }
 
                 string uidKey = entry.Uid.Trim();
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (entry.Emails != null)
                 {
                     foreach (var email in entry.Emails)

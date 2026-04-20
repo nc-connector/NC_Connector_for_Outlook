@@ -89,6 +89,7 @@ namespace NcTalkOutlookAddIn.Models
             }
 
             IDictionary<string, object> policy = GetDomainDictionary(domain, true);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (policy == null)
             {
                 return null;
@@ -115,6 +116,7 @@ namespace NcTalkOutlookAddIn.Models
             }
 
             IDictionary<string, object> policy = GetDomainDictionary(domain, true);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (policy == null)
             {
                 return false;
@@ -134,6 +136,7 @@ namespace NcTalkOutlookAddIn.Models
             }
 
             IDictionary<string, object> editable = GetDomainDictionary(domain, false);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (editable == null)
             {
                 return false;
@@ -161,6 +164,7 @@ namespace NcTalkOutlookAddIn.Models
         {
             value = false;
             object raw = GetPolicyValue(domain, key);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (raw == null)
             {
                 return false;
@@ -176,6 +180,7 @@ namespace NcTalkOutlookAddIn.Models
         {
             value = 0;
             object raw = GetPolicyValue(domain, key);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (raw == null)
             {
                 return false;
@@ -190,6 +195,7 @@ namespace NcTalkOutlookAddIn.Models
         internal string GetPolicyString(string domain, string key)
         {
             object raw = GetPolicyValue(domain, key);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (raw == null)
             {
                 return string.Empty;
@@ -213,6 +219,7 @@ namespace NcTalkOutlookAddIn.Models
         internal static bool TryConvertBool(object raw, out bool value)
         {
             value = false;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (raw == null)
             {
                 return false;
@@ -283,6 +290,7 @@ namespace NcTalkOutlookAddIn.Models
         internal static bool TryConvertInt(object raw, out int value)
         {
             value = 0;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (raw == null)
             {
                 return false;

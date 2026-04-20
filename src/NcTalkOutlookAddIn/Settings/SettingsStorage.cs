@@ -102,6 +102,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal void Save(AddinSettings settings)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (settings == null)
             {
                 settings = new AddinSettings();
@@ -295,6 +296,7 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 using (RegistryKey officeRoot = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Office", false))
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (officeRoot != null)
                     {
                         foreach (string version in officeRoot.GetSubKeyNames())
@@ -319,6 +321,7 @@ namespace NcTalkOutlookAddIn.Settings
                 try
                 {
                     profileRoot = Registry.CurrentUser.OpenSubKey(path, false);
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (profileRoot == null)
                     {
                         continue;
@@ -340,6 +343,7 @@ namespace NcTalkOutlookAddIn.Settings
                 }
                 finally
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (profileRoot != null)
                     {
                         profileRoot.Dispose();
@@ -431,6 +435,7 @@ namespace NcTalkOutlookAddIn.Settings
             document.Load(path);
 
             XmlElement root = document.DocumentElement;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (root == null || !string.Equals(root.Name, "Settings", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException("Profile settings XML root element is missing.");
@@ -439,6 +444,7 @@ namespace NcTalkOutlookAddIn.Settings
             foreach (XmlNode child in root.ChildNodes)
             {
                 XmlElement element = child as XmlElement;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (element == null)
                 {
                     continue;
@@ -524,6 +530,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         private static void ApplySettingValue(AddinSettings settings, string key, string value)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (settings == null || string.IsNullOrWhiteSpace(key))
             {
                 return;

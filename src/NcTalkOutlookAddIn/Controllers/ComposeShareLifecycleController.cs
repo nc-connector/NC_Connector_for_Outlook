@@ -35,6 +35,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             _owner.EnsureSettingsLoaded();
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_owner.CurrentSettings == null || !_owner.SettingsAreComplete())
             {
                 NextcloudTalkAddIn.LogFileLinkMessage(
@@ -85,6 +86,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal void DispatchSeparatePasswordMailQueue(string composeKey, List<NextcloudTalkAddIn.SeparatePasswordDispatchEntry> queue)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (queue == null || queue.Count == 0 || _owner.OutlookApplication == null)
             {
                 return;
@@ -99,6 +101,7 @@ namespace NcTalkOutlookAddIn.Controllers
             var sentRecipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var dispatch in queue)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (dispatch == null || string.IsNullOrWhiteSpace(dispatch.Password) || string.IsNullOrWhiteSpace(dispatch.Html))
                 {
                     continue;
@@ -109,6 +112,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 try
                 {
                     passwordMail = _owner.OutlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (passwordMail == null)
                     {
                         throw new InvalidOperationException("Password mail draft could not be created.");
@@ -209,6 +213,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal static void AddRecipientAddresses(HashSet<string> recipients, List<string> addresses)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (recipients == null || addresses == null)
             {
                 return;
@@ -226,6 +231,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal static void AddUniqueRecipient(List<string> recipients, string address)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (recipients == null)
             {
                 return;
@@ -302,6 +308,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private bool TryOpenSeparatePasswordFallback(NextcloudTalkAddIn.SeparatePasswordDispatchEntry dispatch, string composeKey)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (dispatch == null || _owner.OutlookApplication == null)
             {
                 return false;
@@ -311,6 +318,7 @@ namespace NcTalkOutlookAddIn.Controllers
             try
             {
                 fallback = _owner.OutlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (fallback == null)
                 {
                     return false;
@@ -364,6 +372,7 @@ namespace NcTalkOutlookAddIn.Controllers
             NextcloudTalkAddIn.SeparatePasswordDispatchEntry dispatch,
             string composeKey)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (mail == null)
             {
                 throw new InvalidOperationException("Password mail is not available.");
@@ -383,6 +392,7 @@ namespace NcTalkOutlookAddIn.Controllers
             try
             {
                 recipients = mail.Recipients;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (recipients == null)
                 {
                     throw new InvalidOperationException("Password mail recipients collection is not available.");
@@ -421,6 +431,7 @@ namespace NcTalkOutlookAddIn.Controllers
             string composeKey,
             List<string> resolvedRecipients)
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (recipients == null || addresses == null || addresses.Count == 0)
             {
                 return;
@@ -433,6 +444,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 try
                 {
                     recipient = recipients.Add(address);
+                    // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                     if (recipient == null)
                     {
                         throw new InvalidOperationException("Recipient could not be added.");

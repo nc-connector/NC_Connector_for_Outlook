@@ -106,6 +106,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void PopulateLanguageOverrideCombo(ComboBox combo, string domain)
         {
+            // Dialog lifecycle guard: combo controls can be null during partial init/dispose transitions.
             if (combo == null)
             {
                 return;
@@ -147,6 +148,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private static void SelectLanguageChoice(ComboBox combo, string value)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (combo == null)
             {
                 return;
@@ -171,6 +173,7 @@ namespace NcTalkOutlookAddIn.UI
                 foreach (var item in combo.Items)
                 {
                     var option = item as LanguageOption;
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (option != null && option.Enabled)
                     {
                         combo.SelectedItem = option;
@@ -184,6 +187,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private static string GetSelectedLanguageChoice(ComboBox combo)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (combo == null)
             {
                 return "default";
@@ -196,6 +200,7 @@ namespace NcTalkOutlookAddIn.UI
         private void HandleLanguageComboDrawItem(object sender, DrawItemEventArgs e)
         {
             ComboBox combo = sender as ComboBox;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (combo == null || e.Index < 0 || e.Index >= combo.Items.Count)
             {
                 return;
@@ -213,12 +218,14 @@ namespace NcTalkOutlookAddIn.UI
         private void HandleLanguageComboSelectionCommitted(object sender, EventArgs e)
         {
             ComboBox combo = sender as ComboBox;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (combo == null)
             {
                 return;
             }
 
             var selected = combo.SelectedItem as LanguageOption;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (selected == null)
             {
                 return;
@@ -238,6 +245,7 @@ namespace NcTalkOutlookAddIn.UI
             foreach (var item in _talkDefaultRoomTypeCombo.Items)
             {
                 var option = item as TalkRoomTypeOption;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (option != null && option.Value == value)
                 {
                     _talkDefaultRoomTypeCombo.SelectedItem = option;

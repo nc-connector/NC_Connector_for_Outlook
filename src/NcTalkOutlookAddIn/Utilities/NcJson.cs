@@ -58,12 +58,14 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return null;
             }
 
             object value;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (!parent.TryGetValue(key, out value) || value == null)
             {
                 return null;
@@ -74,12 +76,14 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string GetString(IDictionary<string, object> parent, string key)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return null;
             }
 
             object value;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (!parent.TryGetValue(key, out value) || value == null)
             {
                 return null;
@@ -108,12 +112,14 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static bool TryGetInt(IDictionary<string, object> parent, string key, out int value)
         {
             value = 0;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return false;
             }
 
             object raw;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (!parent.TryGetValue(key, out raw) || raw == null)
             {
                 return false;

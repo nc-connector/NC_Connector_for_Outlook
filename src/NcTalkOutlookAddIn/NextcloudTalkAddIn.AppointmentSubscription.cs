@@ -53,6 +53,7 @@ namespace NcTalkOutlookAddIn
                 _lastLobbyTimer = GetIcalStartEpochOrNull(appointment);
                 _entryId = entryId;
                 _events = appointment as Outlook.ItemEvents_10_Event;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_events != null)
                 {
                     _events.BeforeDelete += OnBeforeDelete;
@@ -213,6 +214,7 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (!_roomDeleted && _appointment != null && !_appointment.Saved)
                 {
                     LogTalk("OnClose unsaved state observed (token=" + _roomToken + ", cancel=" + cancel + ").");
@@ -245,12 +247,14 @@ namespace NcTalkOutlookAddIn
 
             private void ScheduleDeferredWriteLobbyVerification()
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (_disposed || _roomDeleted || _appointment == null)
                 {
                     return;
                 }
 
                 _deferredWriteLobbyAttempts = 0;
+                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
                 if (_deferredWriteLobbyTimer == null)
                 {
                     _deferredWriteLobbyTimer = new System.Windows.Forms.Timer();
@@ -265,6 +269,7 @@ namespace NcTalkOutlookAddIn
 
             private void OnDeferredWriteLobbyTick(object sender, EventArgs e)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (_disposed || _roomDeleted || _appointment == null)
                 {
                     _deferredWriteLobbyAttempts = 0;
@@ -353,6 +358,7 @@ namespace NcTalkOutlookAddIn
 
             private void OnUnsavedCloseCleanupTick(object sender, EventArgs e)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (_disposed || _roomDeleted || _appointment == null)
                 {
                     _unsavedCloseCleanupPending = false;
@@ -410,6 +416,7 @@ namespace NcTalkOutlookAddIn
             private static bool TryGetAppointmentSaved(Outlook.AppointmentItem appointment, out bool saved)
             {
                 saved = false;
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (appointment == null)
                 {
                     return false;
@@ -428,6 +435,7 @@ namespace NcTalkOutlookAddIn
 
             private void StopUnsavedCloseCleanupTimer()
             {
+                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
                 if (_unsavedCloseCleanupTimer == null)
                 {
                     return;
@@ -441,6 +449,7 @@ namespace NcTalkOutlookAddIn
 
             private void StopDeferredWriteLobbyTimer()
             {
+                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
                 if (_deferredWriteLobbyTimer == null)
                 {
                     return;
@@ -454,6 +463,7 @@ namespace NcTalkOutlookAddIn
 
             private bool IsAppointmentOpenInAnyInspector(Outlook.AppointmentItem appointment)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (appointment == null || _owner == null || _owner._inspectors == null)
                 {
                     return false;
@@ -486,6 +496,7 @@ namespace NcTalkOutlookAddIn
                     try
                     {
                         inspector = _owner._inspectors[i];
+                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                         if (inspector == null)
                         {
                             continue;
@@ -493,6 +504,7 @@ namespace NcTalkOutlookAddIn
 
                         currentItem = inspector.CurrentItem;
                         currentAppointment = currentItem as Outlook.AppointmentItem;
+                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                         if (currentAppointment == null)
                         {
                             continue;
@@ -526,6 +538,7 @@ namespace NcTalkOutlookAddIn
                     }
                     finally
                     {
+                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                         if (currentAppointment != null && !ReferenceEquals(currentAppointment, appointment))
                         {
                             ComInteropScope.TryRelease(
@@ -544,6 +557,7 @@ namespace NcTalkOutlookAddIn
                                 "Failed to release current item COM object during unsaved-close lookup.");
                         }
 
+                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                         if (inspector != null)
                         {
                             ComInteropScope.TryRelease(
@@ -600,6 +614,7 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_events != null)
                 {
                     _events.BeforeDelete -= OnBeforeDelete;
@@ -627,6 +642,7 @@ namespace NcTalkOutlookAddIn
 
             internal bool IsFor(Outlook.AppointmentItem appointment)
             {
+                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
                 if (appointment == null)
                 {
                     return false;

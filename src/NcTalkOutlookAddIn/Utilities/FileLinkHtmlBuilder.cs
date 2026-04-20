@@ -103,6 +103,7 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.AppendLine("</tr>");
             builder.AppendLine("</table>");
             builder.AppendLine("<div style=\"padding:18px 18px 12px 18px;\">");
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
             {
                 builder.AppendFormat(
@@ -256,6 +257,7 @@ namespace NcTalkOutlookAddIn.Utilities
          */
         private static string ResolvePolicyTemplate(BackendPolicyStatus policyStatus, bool passwordOnly, string effectiveLanguage)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (policyStatus == null || !policyStatus.PolicyActive)
             {
                 return string.Empty;
@@ -283,6 +285,7 @@ namespace NcTalkOutlookAddIn.Utilities
             bool separatePassword,
             bool passwordOnly)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (string.IsNullOrWhiteSpace(template) || result == null)
             {
                 return string.Empty;
@@ -305,6 +308,7 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             string noteValue = string.Empty;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
             {
                 noteValue = request.Note.Trim();
@@ -528,6 +532,7 @@ namespace NcTalkOutlookAddIn.Utilities
             const string resource = "NcTalkOutlookAddIn.Resources.header-solid-blue-164x48.png";
             using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource))
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (stream == null)
                 {
                     return string.Empty;

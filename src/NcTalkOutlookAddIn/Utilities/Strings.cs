@@ -185,6 +185,7 @@ namespace NcTalkOutlookAddIn.Utilities
             try
             {
                 CultureInfo culture = provider();
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (culture == null)
                 {
                     return;
@@ -347,6 +348,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (stream == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Core, "Locale resource not found: " + resourceName);
@@ -360,10 +362,12 @@ namespace NcTalkOutlookAddIn.Utilities
                         var parsed = serializer.Deserialize<Dictionary<string, LocaleMessage>>(json);
 
                         var dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                         if (parsed != null)
                         {
                             foreach (var item in parsed)
                             {
+                                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                                 if (item.Value == null || string.IsNullOrEmpty(item.Value.message))
                                 {
                                     continue;
@@ -417,6 +421,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 foreach (string code in _languageCandidates)
                 {
                     Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (dictionary == null)
                     {
                         continue;
@@ -452,6 +457,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 foreach (string code in new[] { normalized, EnglishLanguageCode, DefaultLanguageCode })
                 {
                     Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (dictionary == null)
                     {
                         continue;
@@ -480,6 +486,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 parts.Add(title.Trim());
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (lines != null)
             {
                 foreach (string line in lines)

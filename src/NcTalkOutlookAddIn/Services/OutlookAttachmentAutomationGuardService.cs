@@ -147,6 +147,7 @@ namespace NcTalkOutlookAddIn.Services
         private static bool TryReadRegistryInteger(RegistryKey root, string relativePath, string[] valueNames, out int value)
         {
             value = 0;
+            // Guard remains tolerant because registry probing is best-effort diagnostics.
             if (root == null || string.IsNullOrWhiteSpace(relativePath) || valueNames == null)
             {
                 return false;
@@ -163,6 +164,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     object raw = Registry.GetValue(root.Name + "\\" + relativePath, valueName, null);
                     int parsed;
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (raw != null && int.TryParse(Convert.ToString(raw), out parsed))
                     {
                         value = parsed;
@@ -183,6 +185,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static bool? TryReadRegistryBoolean(RegistryKey root, string relativePath, string[] valueNames)
         {
+            // Guard remains tolerant because registry probing is best-effort diagnostics.
             if (root == null || string.IsNullOrWhiteSpace(relativePath) || valueNames == null)
             {
                 return null;
@@ -198,6 +201,7 @@ namespace NcTalkOutlookAddIn.Services
                 try
                 {
                     object raw = Registry.GetValue(root.Name + "\\" + relativePath, valueName, null);
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (raw == null)
                     {
                         continue;

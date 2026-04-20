@@ -49,6 +49,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal void Apply(Control primary, string text, bool showHint, Control anchorOverride, params Control[] fallbackTargets)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (primary == null)
             {
                 return;
@@ -59,6 +60,7 @@ namespace NcTalkOutlookAddIn.Utilities
             _fallbackTargetsByPrimary[primary] = normalizedFallbackTargets;
             _showHintByPrimary[primary] = showHint;
             Track(primary);
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (anchorOverride != null)
             {
                 Track(anchorOverride);
@@ -76,6 +78,7 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 foreach (Control target in normalizedFallbackTargets)
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (target != null && !ReferenceEquals(target, primary))
                     {
                         _toolTip.SetToolTip(target, text);
@@ -88,6 +91,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private void UpdateHint(Control primary, string text, bool showHint, Control anchorOverride, Control[] fallbackTargets)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (primary == null)
             {
                 return;
@@ -109,6 +113,7 @@ namespace NcTalkOutlookAddIn.Utilities
             Label hint = GetOrCreateHint(primary);
             if (!ReferenceEquals(hint.Parent, anchor.Parent))
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (hint.Parent != null)
                 {
                     hint.Parent.Controls.Remove(hint);
@@ -155,6 +160,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private void Track(Control primary)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (primary == null || _trackedControls.Contains(primary))
             {
                 return;
@@ -171,6 +177,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private void OnTrackedControlChanged(object sender, EventArgs e)
         {
             Control changed = sender as Control;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (changed == null)
             {
                 return;
@@ -208,6 +215,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private void RefreshHint(Control primary)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (primary == null)
             {
                 return;
@@ -236,11 +244,13 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static Control ResolveAnchor(Control primary, Control anchorOverride, Control[] fallbackTargets)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (primary == null)
             {
                 return null;
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (anchorOverride != null && anchorOverride.Visible && anchorOverride.Parent != null)
             {
                 return anchorOverride;
@@ -251,10 +261,12 @@ namespace NcTalkOutlookAddIn.Utilities
                 return primary;
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (fallbackTargets != null)
             {
                 foreach (Control target in fallbackTargets)
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (target == null || !target.Visible)
                     {
                         continue;
@@ -273,6 +285,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private static void PositionHint(Control anchor, Control hint)
         {
             Control parent = anchor.Parent;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (parent == null)
             {
                 return;
@@ -303,6 +316,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static int FindNearestRightNeighborLeft(Control anchor, Control hint, Control parent, int hintTop, int hintHeight)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (anchor == null || parent == null)
             {
                 return 0;
@@ -313,6 +327,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
             foreach (Control sibling in parent.Controls)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (sibling == null || !sibling.Visible || ReferenceEquals(sibling, anchor) || ReferenceEquals(sibling, hint))
                 {
                     continue;

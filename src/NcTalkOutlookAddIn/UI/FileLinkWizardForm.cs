@@ -213,6 +213,7 @@ namespace NcTalkOutlookAddIn.UI
          */
         private string GetSeparatePasswordUnavailableTooltip()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_backendPolicyStatus == null || !_backendPolicyStatus.EndpointAvailable)
             {
                 return Strings.SharingPasswordSeparateBackendRequiredTooltip;
@@ -385,6 +386,7 @@ namespace NcTalkOutlookAddIn.UI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_uploadInProgress && _cancellationSource != null && !_cancellationSource.IsCancellationRequested)
             {
                 _cancellationSource.Cancel();
@@ -529,6 +531,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdateStepHostBounds()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_stepHost == null || IsDisposed || Disposing)
             {
                 return;
@@ -548,6 +551,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LayoutProgressPanel()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_progressPanel == null || _progressPanel.IsDisposed || _progressPanel.Disposing)
             {
                 return;
@@ -574,6 +578,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LayoutCurrentStep()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_stepHost == null || _stepHost.IsDisposed || _stepHost.Disposing)
             {
                 return;
@@ -604,6 +609,7 @@ namespace NcTalkOutlookAddIn.UI
             var buttons = new[] { _backButton, _uploadButton, _nextButton, _finishButton, _cancelButton };
             foreach (Button button in buttons)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (button != null && button.Visible)
                 {
                     topMostButton = Math.Min(topMostButton, button.Top);
@@ -737,6 +743,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LayoutGeneralStep(Size clientSize)
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_generalStepPanel == null || _generalStepPanel.IsDisposed || _generalStepPanel.Disposing)
             {
                 return;
@@ -803,6 +810,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LayoutExpirationStep(Size clientSize)
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_expirationStepPanel == null || _expirationStepPanel.IsDisposed || _expirationStepPanel.Disposing)
             {
                 return;
@@ -839,6 +847,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LayoutNoteStep(Size clientSize)
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_noteStepPanel == null || _noteStepPanel.IsDisposed || _noteStepPanel.Disposing)
             {
                 return;
@@ -992,6 +1001,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyFileStepButtonSize(Button button, int targetWidth)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (button == null)
             {
                 return;
@@ -1063,6 +1073,7 @@ namespace NcTalkOutlookAddIn.UI
                 AutoScroll = true
             };
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_stepHost != null)
             {
                 _stepHost.Controls.Add(panel);
@@ -1244,6 +1255,7 @@ namespace NcTalkOutlookAddIn.UI
 
             protected override void WndProc(ref Message m)
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (m.Msg == WmMouseWheel && HorizontalWheelHandler != null)
                 {
                     long wParam = m.WParam.ToInt64();
@@ -1291,6 +1303,7 @@ namespace NcTalkOutlookAddIn.UI
 
                 ApplyFormData();
 
+                // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
                 if (_allowEmptyUpload && (_uploadContext == null || !_uploadCompleted))
                 {
                     _uploadContext = _service.PrepareUpload(_request, CancellationToken.None);
@@ -1298,6 +1311,7 @@ namespace NcTalkOutlookAddIn.UI
                 }
             }
 
+            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (_uploadContext == null || !_uploadCompleted)
             {
                 MessageBox.Show(
@@ -1357,6 +1371,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 UseWaitCursor = false;
                 Cursor.Current = previousCursor;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_cancellationSource != null)
                 {
                     _cancellationSource.Dispose();
@@ -1488,6 +1503,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void TryCleanupUnfinalizedUploadContext(string reason)
         {
+            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (_shareFinalized || _uploadContext == null)
             {
                 return;
@@ -1502,6 +1518,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void TryCleanupPreparedUploadContext(FileLinkUploadContext context, string reason)
         {
+            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (context == null)
             {
                 return;
@@ -1539,6 +1556,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void LoadInitialSelections()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_launchOptions == null || _launchOptions.InitialSelections == null)
             {
                 return;
@@ -1596,6 +1614,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private string BuildAttachmentModeInfoText()
         {
+            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
             if (_launchOptions == null || string.Equals(_launchOptions.AttachmentTrigger, "always", StringComparison.OrdinalIgnoreCase))
             {
                 return Strings.FileLinkWizardAttachmentModeReasonAlways;
@@ -1653,6 +1672,7 @@ namespace NcTalkOutlookAddIn.UI
             try
             {
                 var state = _attachmentGuardService.ReadLiveState();
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (state == null || !state.LockActive)
                 {
                     return true;
@@ -1720,6 +1740,7 @@ namespace NcTalkOutlookAddIn.UI
                 _passwordSeparateToggleCheckBox.Checked = false;
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_generalStepPanel != null)
             {
                 LayoutGeneralStep(_generalStepPanel.ClientSize);
@@ -1733,6 +1754,7 @@ namespace NcTalkOutlookAddIn.UI
             _expireDatePicker.Enabled = enabled && !lockExpireDays;
             _expireHintLabel.Enabled = enabled;
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_expirationStepPanel != null)
             {
                 LayoutExpirationStep(_expirationStepPanel.ClientSize);
@@ -1742,6 +1764,7 @@ namespace NcTalkOutlookAddIn.UI
         private void UpdateNoteState()
         {
             _noteTextBox.Enabled = _noteToggleCheckBox.Checked;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_noteStepPanel != null)
             {
                 LayoutNoteStep(_noteStepPanel.ClientSize);
@@ -1793,6 +1816,7 @@ namespace NcTalkOutlookAddIn.UI
                 }
 
                 FileLinkSelection selection = item.Tag as FileLinkSelection;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (selection != null)
                 {
                     _items.Remove(selection);
@@ -1817,6 +1841,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void AddSelections(IEnumerable<FileLinkSelection> selections)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (selections == null)
             {
                 return;
@@ -1876,6 +1901,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdateQueueColumnWidths()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_fileListView == null || _fileListView.Columns.Count < 3 || _fileListView.IsDisposed || _fileListView.Disposing)
             {
                 return;
@@ -1944,6 +1970,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdatePathColumnScrollRange()
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing || _fileListView.Columns.Count == 0)
             {
                 _pathColumnHorizontalOffset = 0;
@@ -1989,6 +2016,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void HandleFileListViewDrawColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (e == null)
             {
                 return;
@@ -1999,6 +2027,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void HandleFileListViewDrawItem(object sender, DrawListViewItemEventArgs e)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (e == null)
             {
                 return;
@@ -2012,6 +2041,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void HandleFileListViewDrawSubItem(object sender, DrawListViewSubItemEventArgs e)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (e == null || e.Item == null || e.SubItem == null)
             {
                 return;
@@ -2080,6 +2110,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyQueueRowStyle(SelectionUploadState state, Color backgroundColor, Color textColor)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (state == null || state.Item == null)
             {
                 return;
@@ -2135,6 +2166,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void DisposeStateProgressBar(SelectionUploadState state)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (state == null || state.ProgressBar == null)
             {
                 return;
@@ -2142,6 +2174,7 @@ namespace NcTalkOutlookAddIn.UI
 
             var bar = state.ProgressBar;
             state.ProgressBar = null;
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_fileListView != null && !_fileListView.IsDisposed && !_fileListView.Disposing)
             {
                 _fileListView.Controls.Remove(bar);
@@ -2162,6 +2195,7 @@ namespace NcTalkOutlookAddIn.UI
                 _allowEmptyUpload = false;
             }
 
+            // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
             if (!_shareFinalized && previousContext != null)
             {
                 TryCleanupPreparedUploadContext(previousContext, "upload_invalidated");
@@ -2339,6 +2373,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 foreach (var state in _selectionStates.Values)
                 {
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (state.ProgressBar != null)
                     {
                         state.ProgressBar.Visible = false;
@@ -2358,6 +2393,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void PositionProgressBar(SelectionUploadState state)
         {
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_fileListView == null || _fileListView.Columns.Count < 3)
             {
                 return;
@@ -2370,11 +2406,13 @@ namespace NcTalkOutlookAddIn.UI
 
         private void PositionProgressBar(SelectionUploadState state, int statusLeft, int statusWidth)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (state == null || state.ProgressBar == null)
             {
                 return;
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (state.ProgressBar.IsDisposed || state.ProgressBar.Disposing || state.Item == null)
             {
                 state.ProgressBar.Visible = false;
@@ -2413,6 +2451,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             bounds = Rectangle.Empty;
 
+            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing)
             {
                 return false;
@@ -2580,12 +2619,14 @@ namespace NcTalkOutlookAddIn.UI
                 FlushBufferedUploadProgress();
                 ResetUploadProgressPump();
                 _lastAutoScrolledUploadItem = null;
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_cancellationSource != null)
                 {
                     _cancellationSource.Dispose();
                     _cancellationSource = null;
                 }
 
+                // Kontext kann außerhalb des UI-Threads fehlen; Guard verhindert Folgefehler im Shutdown/Background-Pfad.
                 if (!_uploadCompleted && preparedContext != null)
                 {
                     TryCleanupPreparedUploadContext(preparedContext, "upload_not_completed");
@@ -2709,6 +2750,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void HandleUploadProgress(FileLinkUploadItemProgress progress)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (progress == null || progress.Selection == null)
             {
                 return;
@@ -2804,9 +2846,11 @@ namespace NcTalkOutlookAddIn.UI
             for (int i = snapshot.Count - 1; i >= 0; i--)
             {
                 FileLinkUploadItemProgress queued = snapshot[i];
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (queued != null && queued.Status == FileLinkUploadStatus.Uploading)
                 {
                     SelectionUploadState activeState;
+                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                     if (_selectionStates.TryGetValue(queued.Selection, out activeState) && activeState != null)
                     {
                         activeUploadItem = activeState.Item;
@@ -2815,6 +2859,7 @@ namespace NcTalkOutlookAddIn.UI
                 }
             }
 
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (activeUploadItem != null)
             {
                 EnsureUploadItemVisible(activeUploadItem, true);
@@ -2850,6 +2895,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyUploadProgress(FileLinkUploadItemProgress progress)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (progress == null || progress.Selection == null)
             {
                 return;
@@ -2871,11 +2917,13 @@ namespace NcTalkOutlookAddIn.UI
                 EnsureUploadItemVisible(state.Item, false);
                 int percent = state.TotalBytes > 0 ? (int)Math.Min(100, (state.UploadedBytes * 100L) / state.TotalBytes) : 100;
                 percent = Math.Max(0, Math.Min(100, percent));
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (state.ProgressBar == null)
                 {
                     state.ProgressBar = CreateProgressBar();
                 }
 
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (state.ProgressBar != null)
                 {
                     state.ProgressBar.Visible = true;
@@ -2929,6 +2977,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void EnsureUploadItemVisible(ListViewItem item, bool forceScroll)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (item == null || item.ListView != _fileListView || _fileListView.IsDisposed || _fileListView.Disposing)
             {
                 return;
@@ -3006,6 +3055,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private string HandleDuplicate(FileLinkDuplicateInfo info)
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (info == null)
             {
                 return null;
@@ -3149,6 +3199,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private int GetMinPasswordLength()
         {
+            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
             if (_passwordPolicy != null && _passwordPolicy.MinLength > 0)
             {
                 return _passwordPolicy.MinLength;
@@ -3174,6 +3225,7 @@ namespace NcTalkOutlookAddIn.UI
 
             try
             {
+                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (_configuration != null && _passwordPolicy != null && _passwordPolicy.HasPolicy)
                 {
                     var policyService = new PasswordPolicyService(_configuration);
