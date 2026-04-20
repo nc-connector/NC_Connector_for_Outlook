@@ -202,10 +202,7 @@ namespace NcTalkOutlookAddIn
 
             _ribbonUi = null;
             _uiSynchronizationContext = null;
-            lock (_pendingAppointmentEnsureSyncRoot)
-            {
-                _pendingAppointmentEnsureKeys.Clear();
-            }
+            _deferredAppointmentEnsureState.ClearPendingKeys();
         }
     }
 }

@@ -5,7 +5,6 @@
  */
 
 using System;
-using System.Globalization;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn
@@ -47,32 +46,13 @@ namespace NcTalkOutlookAddIn
 
         private void LogDeferredAppointmentEnsureRestriction(string message)
         {
-            if (string.IsNullOrWhiteSpace(message))
+            string throttledMessage;
+            if (!_deferredAppointmentEnsureState.ShouldLogRestriction(message, DateTime.UtcNow, out throttledMessage))
             {
                 return;
             }
 
-            lock (_pendingAppointmentEnsureSyncRoot)
-            {
-                DateTime nowUtc = DateTime.UtcNow;
-                bool shouldEmit = _lastDeferredAppointmentEnsureRestrictionLogUtc == DateTime.MinValue ||
-                                  (nowUtc - _lastDeferredAppointmentEnsureRestrictionLogUtc).TotalSeconds >= 5;
-                if (shouldEmit)
-                {
-                    if (_deferredAppointmentEnsureRestrictionSuppressedCount > 0)
-                    {
-                        message = message + " (suppressed " + _deferredAppointmentEnsureRestrictionSuppressedCount.ToString(CultureInfo.InvariantCulture) + " similar entries)";
-                    }
-
-                    DiagnosticsLogger.Log(LogCategories.Core, message);
-                    _lastDeferredAppointmentEnsureRestrictionLogUtc = nowUtc;
-                    _deferredAppointmentEnsureRestrictionSuppressedCount = 0;
-                }
-                else
-                {
-                    _deferredAppointmentEnsureRestrictionSuppressedCount++;
-                }
-            }
+            DiagnosticsLogger.Log(LogCategories.Core, throttledMessage);
         }
     }
 }

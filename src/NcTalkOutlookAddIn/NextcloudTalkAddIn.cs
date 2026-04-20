@@ -56,11 +56,7 @@ namespace NcTalkOutlookAddIn
         private readonly FileLinkLaunchController _fileLinkLaunchController;
         private readonly TalkRibbonController _talkRibbonController;
         private readonly MailInteropController _mailInteropController;
-        private readonly HashSet<string> _pendingAppointmentEnsureKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private readonly object _pendingAppointmentEnsureSyncRoot = new object();
-        private DateTime _lastDeferredAppointmentEnsureRestrictionLogUtc = DateTime.MinValue;
-        private DateTime _lastDeferredAppointmentEnsureUnstableIdentityLogUtc = DateTime.MinValue;
-        private int _deferredAppointmentEnsureRestrictionSuppressedCount;
+        private readonly DeferredAppointmentEnsureState _deferredAppointmentEnsureState = new DeferredAppointmentEnsureState();
         private SynchronizationContext _uiSynchronizationContext;
         private IRibbonUI _ribbonUi;
         private const int ComposeAttachmentEvalDebounceMs = 250;

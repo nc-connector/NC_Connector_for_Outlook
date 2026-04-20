@@ -158,6 +158,7 @@
     <Compile Include="Utilities\NcJson.cs" />
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
     <Compile Include="Utilities\HtmlTemplateSanitizer.cs" />
+    <Compile Include="Utilities\DeferredAppointmentEnsureState.cs" />
     <Compile Include="Utilities\PictureConverter.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />
     <Compile Include="Utilities\ComInteropScope.cs" />

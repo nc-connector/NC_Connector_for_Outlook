@@ -165,19 +165,7 @@ namespace NcTalkOutlookAddIn
 
             if (ensureKey.StartsWith("obj:", StringComparison.Ordinal))
             {
-                bool shouldEmitIdentityRestriction;
-                lock (_pendingAppointmentEnsureSyncRoot)
-                {
-                    DateTime nowUtc = DateTime.UtcNow;
-                    shouldEmitIdentityRestriction = _lastDeferredAppointmentEnsureUnstableIdentityLogUtc == DateTime.MinValue ||
-                        (nowUtc - _lastDeferredAppointmentEnsureUnstableIdentityLogUtc).TotalSeconds >= 60;
-                    if (shouldEmitIdentityRestriction)
-                    {
-                        _lastDeferredAppointmentEnsureUnstableIdentityLogUtc = nowUtc;
-                    }
-                }
-
-                if (shouldEmitIdentityRestriction)
+                if (_deferredAppointmentEnsureState.ShouldLogUnstableIdentityRestriction(DateTime.UtcNow))
                 {
                     LogDeferredAppointmentEnsureRestriction(
                         "Deferred appointment subscription ensure suppressed: unstable appointment identity during Outlook event restriction (hresult=0x" +
@@ -187,14 +175,9 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            lock (_pendingAppointmentEnsureSyncRoot)
+            if (!_deferredAppointmentEnsureState.TryQueuePendingKey(ensureKey))
             {
-                if (_pendingAppointmentEnsureKeys.Contains(ensureKey))
-                {
-                    return true;
-                }
-
-                _pendingAppointmentEnsureKeys.Add(ensureKey);
+                return true;
             }
 
             LogDeferredAppointmentEnsureRestriction(
@@ -211,10 +194,7 @@ namespace NcTalkOutlookAddIn
                     }
                     finally
                     {
-                        lock (_pendingAppointmentEnsureSyncRoot)
-                        {
-                            _pendingAppointmentEnsureKeys.Remove(ensureKey);
-                        }
+                        _deferredAppointmentEnsureState.DequeuePendingKey(ensureKey);
                     }
                 },
                 null);
