@@ -1258,6 +1258,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.EventDescriptionLang = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
         }
 
+        // WinForms event handlers must stay async void; keep awaited flow inside this method-level try/catch.
         private async void OnLoginFlowButtonClick(object sender, EventArgs e)
         {
             if (_isBusy)
@@ -1345,6 +1346,7 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
+        // WinForms event handlers must stay async void; keep awaited flow inside this method-level try/catch.
         private async void OnTestButtonClick(object sender, EventArgs e)
         {
             if (_isBusy)
