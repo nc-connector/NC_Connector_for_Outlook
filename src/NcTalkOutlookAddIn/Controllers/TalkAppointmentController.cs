@@ -60,8 +60,9 @@ namespace NcTalkOutlookAddIn.Controllers
             string normalizedDescriptionType = NextcloudTalkAddIn.NormalizeTalkEventDescriptionType(request.DescriptionType);
             if (string.Equals(normalizedDescriptionType, "html", StringComparison.OrdinalIgnoreCase))
             {
+                // AppointmentItem HTML body read is intentionally disabled for compatibility.
                 string updatedHtmlBody = NextcloudTalkAddIn.UpdateHtmlBodyWithTalkBlock(
-                    NextcloudTalkAddIn.ReadAppointmentHtmlBody(appointment),
+                    string.Empty,
                     appointment.Body,
                     result.RoomUrl,
                     request.Password,
@@ -751,15 +752,6 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             string body = appointment.Body ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                string htmlBody = NextcloudTalkAddIn.ReadAppointmentHtmlBody(appointment);
-                if (!string.IsNullOrWhiteSpace(htmlBody))
-                {
-                    body = NextcloudTalkAddIn.ConvertHtmlTemplateToPlainText(htmlBody);
-                }
-            }
-
             return body.Trim();
         }
 

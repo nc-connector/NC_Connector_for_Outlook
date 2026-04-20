@@ -1522,14 +1522,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        internal static string ReadAppointmentHtmlBody(Outlook.AppointmentItem appointment)
-        {
-            // AppointmentItem HTMLBody is intentionally not used.
-            // Outlook builds differ here and may not expose this member reliably.
-            // The appointment HTML insertion path is handled through HTML->RTF bridge.
-            return string.Empty;
-        }
-
         internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
         {
             return TryWriteAppointmentHtmlBodyWithRtfBridge(appointment, html);
