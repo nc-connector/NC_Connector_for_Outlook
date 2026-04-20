@@ -29,9 +29,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         internal BackendPolicyStatus FetchStatus()
-        {
-            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-            if (_configuration == null || !_configuration.IsComplete())
+        {            if (_configuration == null || !_configuration.IsComplete())
             {
                 return BuildLocalStatus(
                     endpointAvailable: false,
@@ -73,17 +71,17 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             IDictionary<string, object> normalized = NormalizePayload(payload);
-            IDictionary<string, object> status = GetDictionary(normalized, "status");
-            IDictionary<string, object> policy = GetDictionary(normalized, "policy");
-            IDictionary<string, object> policyEditable = GetDictionary(normalized, "policy_editable");
-            IDictionary<string, object> sharePolicy = GetDictionary(policy, "share");
-            IDictionary<string, object> talkPolicy = GetDictionary(policy, "talk");
-            IDictionary<string, object> shareEditable = GetDictionary(policyEditable, "share");
-            IDictionary<string, object> talkEditable = GetDictionary(policyEditable, "talk");
+            IDictionary<string, object> status = NcJson.GetDictionary(normalized, "status");
+            IDictionary<string, object> policy = NcJson.GetDictionary(normalized, "policy");
+            IDictionary<string, object> policyEditable = NcJson.GetDictionary(normalized, "policy_editable");
+            IDictionary<string, object> sharePolicy = NcJson.GetDictionary(policy, "share");
+            IDictionary<string, object> talkPolicy = NcJson.GetDictionary(policy, "talk");
+            IDictionary<string, object> shareEditable = NcJson.GetDictionary(policyEditable, "share");
+            IDictionary<string, object> talkEditable = NcJson.GetDictionary(policyEditable, "talk");
 
             bool seatAssigned = GetBool(status, "seat_assigned");
             bool isValid = GetBool(status, "is_valid");
-            string seatState = GetString(status, "seat_state");
+            string seatState = NcJson.GetStringOrEmpty(status, "seat_state");
 
             bool seatUsable = seatAssigned
                               && isValid
@@ -149,9 +147,7 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {
-                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-                if (response.TransportException != null)
+            {                if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", response.TransportException);
                 }
@@ -174,9 +170,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static IDictionary<string, object> NormalizePayload(IDictionary<string, object> payload)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (payload == null)
+        {            if (payload == null)
             {
                 return null;
             }
@@ -218,16 +212,14 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static bool ShouldWarnForSeat(IDictionary<string, object> status)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (status == null)
+        {            if (status == null)
             {
                 return false;
             }
 
             bool seatAssigned = GetBool(status, "seat_assigned");
             bool isValid = GetBool(status, "is_valid");
-            string seatState = GetString(status, "seat_state");
+            string seatState = NcJson.GetStringOrEmpty(status, "seat_state");
 
             if (seatAssigned
                 && (!isValid
@@ -238,28 +230,13 @@ namespace NcTalkOutlookAddIn.Services
 
             return false;
         }
-
-        private static string GetString(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetStringOrEmpty(parent, key);
-        }
-
-        private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetDictionary(parent, key);
-        }
-
         private static bool GetBool(IDictionary<string, object> parent, string key)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (parent == null || string.IsNullOrWhiteSpace(key))
+        {            if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return false;
             }
 
-            object raw;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (!parent.TryGetValue(key, out raw) || raw == null)
+            object raw;            if (!parent.TryGetValue(key, out raw) || raw == null)
             {
                 return false;
             }
@@ -269,3 +246,4 @@ namespace NcTalkOutlookAddIn.Services
         }
     }
 }
+

@@ -55,28 +55,21 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     DiagnosticsLogger.LogApi("Password policy fetch returned HTTP " + (int)statusCode + ".");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
-                }
-
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (root == null)
+                }                if (root == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy fetch returned no parsable JSON payload.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
 
-                var ocs = GetDictionary(root, "ocs");
-                var data = GetDictionary(ocs, "data");
-                var caps = GetDictionary(data, "capabilities");
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (caps == null)
+                var ocs = NcJson.GetDictionary(root, "ocs");
+                var data = NcJson.GetDictionary(ocs, "data");
+                var caps = NcJson.GetDictionary(data, "capabilities");                if (caps == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy capabilities block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
 
-                var policy = GetDictionary(caps, "password_policy") ?? GetDictionary(caps, "passwordPolicy");
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (policy == null)
+                var policy = NcJson.GetDictionary(caps, "password_policy") ?? NcJson.GetDictionary(caps, "passwordPolicy");                if (policy == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
@@ -85,12 +78,12 @@ namespace NcTalkOutlookAddIn.Services
                 int minLength = GetFirstPositiveInt(policy, MinLengthKeys);
                 if (minLength <= 0)
                 {
-                    var policies = GetDictionary(policy, "policies");
-                    var accountPolicy = GetDictionary(policies, "account");
+                    var policies = NcJson.GetDictionary(policy, "policies");
+                    var accountPolicy = NcJson.GetDictionary(policies, "account");
                     minLength = GetFirstPositiveInt(accountPolicy, MinLengthKeys);
                 }
 
-                var api = GetDictionary(policy, "api");
+                var api = NcJson.GetDictionary(policy, "api");
                 string generateRaw = GetFirstString(api, "generate", "generateUrl", "generate_url");
                 if (string.IsNullOrWhiteSpace(generateRaw))
                 {
@@ -106,9 +99,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         internal string GeneratePassword(PasswordPolicyInfo policy)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (policy == null || !policy.HasPolicy || string.IsNullOrEmpty(policy.GenerateUrl) || !_configuration.IsComplete())
+        {            if (policy == null || !policy.HasPolicy || string.IsNullOrEmpty(policy.GenerateUrl) || !_configuration.IsComplete())
             {
                 return null;
             }
@@ -125,16 +116,13 @@ namespace NcTalkOutlookAddIn.Services
                 DiagnosticsLogger.LogApi("GET " + apiUrl);
                 IDictionary<string, object> root;
                 HttpStatusCode statusCode;
-                ExecuteJsonRequest("GET", apiUrl, null, out statusCode, out root);
-
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (statusCode != HttpStatusCode.OK || root == null)
+                ExecuteJsonRequest("GET", apiUrl, null, out statusCode, out root);                if (statusCode != HttpStatusCode.OK || root == null)
                 {
                     return null;
                 }
 
-                var data = GetDictionary(GetDictionary(root, "ocs"), "data");
-                string password = GetString(data, "password");
+                var data = NcJson.GetDictionary(NcJson.GetDictionary(root, "ocs"), "data");
+                string password = NcJson.GetString(data, "password");
                 if (string.IsNullOrWhiteSpace(password))
                 {
                     return null;
@@ -166,9 +154,7 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {
-                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-                if (response.TransportException != null)
+            {                if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Api, "Password policy request failed without HTTP response.", response.TransportException);
                 }
@@ -181,10 +167,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
-            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);
-
-            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-            if (response.JsonParseException != null)
+            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);            if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Password policy response parsing failed.", response.JsonParseException);
                 DiagnosticsLogger.LogApi("Password policy response sample: " + GetResponseSample(response.ResponseText));
@@ -234,73 +217,15 @@ namespace NcTalkOutlookAddIn.Services
             string normalized = responseText.Replace("\r", " ").Replace("\n", " ").Trim();
             return normalized.Length <= 180 ? normalized : normalized.Substring(0, 180) + "...";
         }
-
-        private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetDictionary(parent, key);
-        }
-
-        private static string GetString(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetString(parent, key);
-        }
-
-        private static string GetFirstString(IDictionary<string, object> parent, params string[] keys)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (parent == null || keys == null)
-            {
-                return null;
-            }
-
-            foreach (string key in keys)
-            {
-                string value = GetString(parent, key);
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    return value.Trim();
-                }
-            }
-
-            return null;
-        }
-
-        private static int GetInt(IDictionary<string, object> parent, string key)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (parent == null || string.IsNullOrWhiteSpace(key))
-            {
-                return 0;
-            }
-
-            object rawObject;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (!parent.TryGetValue(key, out rawObject) || rawObject == null)
-            {
-                return 0;
-            }
-
-            string raw = Convert.ToString(rawObject, CultureInfo.InvariantCulture);
-            int value;
-            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
-            {
-                return value;
-            }
-
-            return 0;
-        }
-
         private static int GetFirstPositiveInt(IDictionary<string, object> parent, params string[] keys)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (parent == null || keys == null)
+        {            if (parent == null || keys == null)
             {
                 return 0;
             }
 
             foreach (string key in keys)
             {
-                int value = GetInt(parent, key);
+                int value = NcJson.GetInt(parent, key);
                 if (value > 0)
                 {
                     return value;
@@ -309,5 +234,24 @@ namespace NcTalkOutlookAddIn.Services
 
             return 0;
         }
+
+        private static string GetFirstString(IDictionary<string, object> parent, params string[] keys)
+        {            if (parent == null || keys == null)
+            {
+                return null;
+            }
+
+            foreach (string key in keys)
+            {
+                string value = NcJson.GetTrimmedString(parent, key);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
     }
 }
+

@@ -18,9 +18,7 @@ namespace NcTalkOutlookAddIn.UI
     internal sealed partial class FileLinkWizardForm
     {
         private void AttachFileQueueDropTarget(Control control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null)
+        {            if (control == null)
             {
                 return;
             }
@@ -32,9 +30,7 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDragEnter(object sender, DragEventArgs e)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (e == null)
+        {            if (e == null)
             {
                 return;
             }
@@ -43,9 +39,7 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDragOver(object sender, DragEventArgs e)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (e == null)
+        {            if (e == null)
             {
                 return;
             }
@@ -54,9 +48,7 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDragDrop(object sender, DragEventArgs e)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (e == null)
+        {            if (e == null)
             {
                 return;
             }
@@ -71,9 +63,7 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static DragDropEffects ResolveFileDropEffect(DragEventArgs e)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (e == null || e.Data == null)
+        {            if (e == null || e.Data == null)
             {
                 return DragDropEffects.None;
             }
@@ -85,16 +75,12 @@ namespace NcTalkOutlookAddIn.UI
 
         private static List<FileLinkSelection> BuildSelectionsFromFileDropData(IDataObject dataObject)
         {
-            var selections = new List<FileLinkSelection>();
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (dataObject == null || !dataObject.GetDataPresent(DataFormats.FileDrop))
+            var selections = new List<FileLinkSelection>();            if (dataObject == null || !dataObject.GetDataPresent(DataFormats.FileDrop))
             {
                 return selections;
             }
 
-            var paths = dataObject.GetData(DataFormats.FileDrop) as string[];
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (paths == null || paths.Length == 0)
+            var paths = dataObject.GetData(DataFormats.FileDrop) as string[];            if (paths == null || paths.Length == 0)
             {
                 return selections;
             }
@@ -113,15 +99,10 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private bool TryAddSelection(FileLinkSelection selection, HashSet<string> existingPaths)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
+        {            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
             {
                 return false;
-            }
-
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (!_attachmentMode && existingPaths != null)
+            }            if (!_attachmentMode && existingPaths != null)
             {
                 if (existingPaths.Contains(selection.LocalPath))
                 {
@@ -148,9 +129,7 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static bool SelectionPathExists(FileLinkSelection selection)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
+        {            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
             {
                 return false;
             }
@@ -184,3 +163,4 @@ namespace NcTalkOutlookAddIn.UI
         }
     }
 }
+

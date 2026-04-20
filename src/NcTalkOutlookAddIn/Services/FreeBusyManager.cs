@@ -36,9 +36,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         internal void ApplySettings(AddinSettings settings)
-        {
-            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-            if (_application == null || settings == null)
+        {            if (_application == null || settings == null)
             {
                 return;
             }
@@ -171,7 +169,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string BuildIfbStartFailureMessage(int ifbPort, HttpListenerException ex)
         {
-            // HTTP.sys URLACL fehlt oder wird durch Policy blockiert.
+            // HTTP.sys URLACL is missing or blocked by policy.
             if (ex != null && ex.ErrorCode == 5)
             {
                 return "IFB server could not be started on port "
@@ -179,7 +177,7 @@ namespace NcTalkOutlookAddIn.Services
                        + ": access denied (URL reservation missing).";
             }
 
-            // Prefix ist bereits von einem anderen Prozess belegt.
+            // Prefix is already bound by another process.
             if (ex != null && ex.ErrorCode == 32)
             {
                 return "IFB server could not be started on port "
@@ -245,9 +243,7 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 using (var key = OpenOrCreateSubKey(path))
-                {
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (key == null)
+                {                    if (key == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' (value '" + valueName + "').");
                         if (critical)
@@ -326,9 +322,7 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 using (var key = OpenOrCreateSubKey(path))
-                {
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (key == null)
+                {                    if (key == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' while restoring.");
                         return;
@@ -377,9 +371,7 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(path, false))
-                {
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (key == null)
+                {                    if (key == null)
                     {
                         return false;
                     }
@@ -410,9 +402,7 @@ namespace NcTalkOutlookAddIn.Services
         {
             try
             {
-                var key = Registry.CurrentUser.OpenSubKey(path, true);
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (key != null)
+                var key = Registry.CurrentUser.OpenSubKey(path, true);                if (key != null)
                 {
                     return key;
                 }
@@ -442,3 +432,4 @@ namespace NcTalkOutlookAddIn.Services
         }
     }
 }
+

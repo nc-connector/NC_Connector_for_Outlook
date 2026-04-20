@@ -56,9 +56,7 @@ namespace NcTalkOutlookAddIn
         }
 
         private void EnsureSubscriptionForAppointment(Outlook.AppointmentItem appointment, bool allowDeferredRetry)
-        {
-            // Outlook/COM may return null in lifecycle edge cases; keep fail-soft behavior.
-            if (appointment == null)
+        {            if (appointment == null)
             {
                 return;
             }
@@ -137,9 +135,7 @@ namespace NcTalkOutlookAddIn
         }
 
         private bool QueueDeferredAppointmentSubscriptionEnsure(Outlook.AppointmentItem appointment, COMException triggerException)
-        {
-            // Outlook/COM may return null in lifecycle edge cases; keep fail-soft behavior.
-            if (appointment == null)
+        {            if (appointment == null)
             {
                 return false;
             }

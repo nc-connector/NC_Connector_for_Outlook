@@ -33,9 +33,7 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal async Task OnTalkButtonPressedAsync(IRibbonControl control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (_owner == null)
+        {            if (_owner == null)
             {
                 return;
             }
@@ -59,9 +57,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            Outlook.AppointmentItem appointment = _owner.GetActiveAppointment();
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
+            Outlook.AppointmentItem appointment = _owner.GetActiveAppointment();            if (appointment == null)
             {
                 NextcloudTalkAddIn.LogTalkMessage("Talk link cancelled: no active appointment found.");
                 MessageBox.Show(
@@ -310,3 +306,4 @@ namespace NcTalkOutlookAddIn.Controllers
         }
     }
 }
+

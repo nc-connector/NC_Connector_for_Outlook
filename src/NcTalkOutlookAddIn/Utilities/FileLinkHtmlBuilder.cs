@@ -102,9 +102,7 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.AppendLine("</td>");
             builder.AppendLine("</tr>");
             builder.AppendLine("</table>");
-            builder.AppendLine("<div style=\"padding:18px 18px 12px 18px;\">");
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
+            builder.AppendLine("<div style=\"padding:18px 18px 12px 18px;\">");            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
             {
                 builder.AppendFormat(
                     CultureInfo.InvariantCulture,
@@ -256,9 +254,7 @@ namespace NcTalkOutlookAddIn.Utilities
          * Resolve custom policy template for normal or password-only mode.
          */
         private static string ResolvePolicyTemplate(BackendPolicyStatus policyStatus, bool passwordOnly, string effectiveLanguage)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (policyStatus == null || !policyStatus.PolicyActive)
+        {            if (policyStatus == null || !policyStatus.PolicyActive)
             {
                 return string.Empty;
             }
@@ -284,9 +280,7 @@ namespace NcTalkOutlookAddIn.Utilities
             bool attachmentMode,
             bool separatePassword,
             bool passwordOnly)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (string.IsNullOrWhiteSpace(template) || result == null)
+        {            if (string.IsNullOrWhiteSpace(template) || result == null)
             {
                 return string.Empty;
             }
@@ -307,9 +301,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 passwordValue = passwordSeparateHint;
             }
 
-            string noteValue = string.Empty;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
+            string noteValue = string.Empty;            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
             {
                 noteValue = request.Note.Trim();
             }
@@ -531,9 +523,7 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             const string resource = "NcTalkOutlookAddIn.Resources.header-solid-blue-164x48.png";
             using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource))
-            {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (stream == null)
+            {                if (stream == null)
                 {
                     return string.Empty;
                 }
@@ -547,3 +537,4 @@ namespace NcTalkOutlookAddIn.Utilities
         }
     }
 }
+

@@ -52,9 +52,7 @@ namespace NcTalkOutlookAddIn
                 _isEventConversation = isEventConversation;
                 _lastLobbyTimer = GetIcalStartEpochOrNull(appointment);
                 _entryId = entryId;
-                _events = appointment as Outlook.ItemEvents_10_Event;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_events != null)
+                _events = appointment as Outlook.ItemEvents_10_Event;                if (_events != null)
                 {
                     _events.BeforeDelete += OnBeforeDelete;
                     _events.Write += OnWrite;
@@ -212,10 +210,7 @@ namespace NcTalkOutlookAddIn
                     LogTalk("OnClose without organizer (token=" + _roomToken + ").");
                     Dispose();
                     return;
-                }
-
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (!_roomDeleted && _appointment != null && !_appointment.Saved)
+                }                if (!_roomDeleted && _appointment != null && !_appointment.Saved)
                 {
                     LogTalk("OnClose unsaved state observed (token=" + _roomToken + ", cancel=" + cancel + ").");
                     if (!cancel)
@@ -246,16 +241,12 @@ namespace NcTalkOutlookAddIn
             }
 
             private void ScheduleDeferredWriteLobbyVerification()
-            {
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (_disposed || _roomDeleted || _appointment == null)
+            {                if (_disposed || _roomDeleted || _appointment == null)
                 {
                     return;
                 }
 
-                _deferredWriteLobbyAttempts = 0;
-                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-                if (_deferredWriteLobbyTimer == null)
+                _deferredWriteLobbyAttempts = 0;                if (_deferredWriteLobbyTimer == null)
                 {
                     _deferredWriteLobbyTimer = new System.Windows.Forms.Timer();
                     _deferredWriteLobbyTimer.Interval = 750;
@@ -268,9 +259,7 @@ namespace NcTalkOutlookAddIn
             }
 
             private void OnDeferredWriteLobbyTick(object sender, EventArgs e)
-            {
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (_disposed || _roomDeleted || _appointment == null)
+            {                if (_disposed || _roomDeleted || _appointment == null)
                 {
                     _deferredWriteLobbyAttempts = 0;
                     StopDeferredWriteLobbyTimer();
@@ -357,9 +346,7 @@ namespace NcTalkOutlookAddIn
             }
 
             private void OnUnsavedCloseCleanupTick(object sender, EventArgs e)
-            {
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (_disposed || _roomDeleted || _appointment == null)
+            {                if (_disposed || _roomDeleted || _appointment == null)
                 {
                     _unsavedCloseCleanupPending = false;
                     _unsavedCloseCleanupAttempts = 0;
@@ -415,9 +402,7 @@ namespace NcTalkOutlookAddIn
 
             private static bool TryGetAppointmentSaved(Outlook.AppointmentItem appointment, out bool saved)
             {
-                saved = false;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (appointment == null)
+                saved = false;                if (appointment == null)
                 {
                     return false;
                 }
@@ -434,9 +419,7 @@ namespace NcTalkOutlookAddIn
             }
 
             private void StopUnsavedCloseCleanupTimer()
-            {
-                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-                if (_unsavedCloseCleanupTimer == null)
+            {                if (_unsavedCloseCleanupTimer == null)
                 {
                     return;
                 }
@@ -448,9 +431,7 @@ namespace NcTalkOutlookAddIn
             }
 
             private void StopDeferredWriteLobbyTimer()
-            {
-                // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-                if (_deferredWriteLobbyTimer == null)
+            {                if (_deferredWriteLobbyTimer == null)
                 {
                     return;
                 }
@@ -462,9 +443,7 @@ namespace NcTalkOutlookAddIn
             }
 
             private bool IsAppointmentOpenInAnyInspector(Outlook.AppointmentItem appointment)
-            {
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (appointment == null || _owner == null || _owner._inspectors == null)
+            {                if (appointment == null || _owner == null || _owner._inspectors == null)
                 {
                     return false;
                 }
@@ -495,17 +474,13 @@ namespace NcTalkOutlookAddIn
                     Outlook.AppointmentItem currentAppointment = null;
                     try
                     {
-                        inspector = _owner._inspectors[i];
-                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                        if (inspector == null)
+                        inspector = _owner._inspectors[i];                        if (inspector == null)
                         {
                             continue;
                         }
 
                         currentItem = inspector.CurrentItem;
-                        currentAppointment = currentItem as Outlook.AppointmentItem;
-                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                        if (currentAppointment == null)
+                        currentAppointment = currentItem as Outlook.AppointmentItem;                        if (currentAppointment == null)
                         {
                             continue;
                         }
@@ -537,9 +512,7 @@ namespace NcTalkOutlookAddIn
                     {
                     }
                     finally
-                    {
-                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                        if (currentAppointment != null && !ReferenceEquals(currentAppointment, appointment))
+                    {                        if (currentAppointment != null && !ReferenceEquals(currentAppointment, appointment))
                         {
                             ComInteropScope.TryRelease(
                                 currentAppointment,
@@ -555,10 +528,7 @@ namespace NcTalkOutlookAddIn
                                 currentItem,
                                 LogCategories.Talk,
                                 "Failed to release current item COM object during unsaved-close lookup.");
-                        }
-
-                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                        if (inspector != null)
+                        }                        if (inspector != null)
                         {
                             ComInteropScope.TryRelease(
                                 inspector,
@@ -612,10 +582,7 @@ namespace NcTalkOutlookAddIn
                 {
                     LogTalk("Subscription.Dispose called again (token=" + _roomToken + ").");
                     return;
-                }
-
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_events != null)
+                }                if (_events != null)
                 {
                     _events.BeforeDelete -= OnBeforeDelete;
                     _events.Write -= OnWrite;
@@ -641,9 +608,7 @@ namespace NcTalkOutlookAddIn
             }
 
             internal bool IsFor(Outlook.AppointmentItem appointment)
-            {
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (appointment == null)
+            {                if (appointment == null)
                 {
                     return false;
                 }
@@ -684,3 +649,4 @@ namespace NcTalkOutlookAddIn
 
     }
 }
+

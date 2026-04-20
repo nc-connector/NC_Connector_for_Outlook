@@ -191,9 +191,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void LogException(string category, string context, Exception ex)
-        {
-            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-            if (ex == null)
+        {            if (ex == null)
             {
                 WriteLogLine(category, context);
                 return;
@@ -246,9 +244,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static string ReplaceServerUrls(string value)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (string.IsNullOrEmpty(value) || _serverUrlTokens == null || _serverUrlTokens.Length == 0)
+        {            if (string.IsNullOrEmpty(value) || _serverUrlTokens == null || _serverUrlTokens.Length == 0)
             {
                 return value;
             }
@@ -276,9 +272,7 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             return EmailRegex.Replace(value, match =>
-            {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (match == null || string.IsNullOrEmpty(match.Value))
+            {                if (match == null || string.IsNullOrEmpty(match.Value))
                 {
                     return "<EMAIL>";
                 }
@@ -395,9 +389,7 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             try
             {
-                string[] files = Directory.GetFiles(LogDirectory, DailyLogFilePrefix + "*");
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (files == null || files.Length == 0)
+                string[] files = Directory.GetFiles(LogDirectory, DailyLogFilePrefix + "*");                if (files == null || files.Length == 0)
                 {
                     return;
                 }
@@ -464,3 +456,4 @@ namespace NcTalkOutlookAddIn.Utilities
         }
     }
 }
+

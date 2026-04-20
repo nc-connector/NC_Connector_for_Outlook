@@ -40,10 +40,7 @@ namespace NcTalkOutlookAddIn
             if (!string.IsNullOrWhiteSpace(outlookProfileName))
             {
                 LogCore("Using Outlook profile settings: " + outlookProfileName + ".");
-            }
-
-            // Guard against partially initialized runtime state; fail-soft by design.
-            if (_currentSettings != null)
+            }            if (_currentSettings != null)
             {
                 LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", IfbPort=" + _currentSettings.IfbPort + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
             }
@@ -58,9 +55,7 @@ namespace NcTalkOutlookAddIn
         private void TryApplyOfficeUiLanguage()
         {
             try
-            {
-                // The application field is lazy-initialized and cleared on shutdown.
-                if (_outlookApplication == null)
+            {                if (_outlookApplication == null)
                 {
                     return;
                 }
@@ -84,9 +79,7 @@ namespace NcTalkOutlookAddIn
         }
 
         private string ResolveCurrentOutlookProfileName()
-        {
-            // The application field is lazy-initialized and cleared on shutdown.
-            if (_outlookApplication == null)
+        {            if (_outlookApplication == null)
             {
                 return string.Empty;
             }
@@ -94,9 +87,7 @@ namespace NcTalkOutlookAddIn
             object session = null;
             try
             {
-                session = _outlookApplication.Session;
-                // Outlook/COM can return null in lifecycle edge cases; keep fail-soft behavior.
-                if (session == null)
+                session = _outlookApplication.Session;                if (session == null)
                 {
                     return string.Empty;
                 }
@@ -168,10 +159,7 @@ namespace NcTalkOutlookAddIn
         {
             UnhookApplication();
             UnhookInspector();
-            UnhookMailComposeSubscriptions();
-
-            // Guard against partially initialized runtime state; fail-soft by design.
-            if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
+            UnhookMailComposeSubscriptions();            if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
             {
                 try
                 {
@@ -186,10 +174,7 @@ namespace NcTalkOutlookAddIn
                         "Failed to disable IFB during add-in " + (origin ?? "teardown") + ".",
                         ex);
                 }
-            }
-
-            // Guard against partially initialized runtime state; fail-soft by design.
-            if (_freeBusyManager != null)
+            }            if (_freeBusyManager != null)
             {
                 _freeBusyManager.Dispose();
             }

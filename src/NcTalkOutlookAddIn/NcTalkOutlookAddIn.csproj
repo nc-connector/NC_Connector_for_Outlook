@@ -89,6 +89,8 @@
     <Compile Include="NextcloudTalkAddIn.Lifecycle.cs" />
     <Compile Include="NextcloudTalkAddIn.PolicyTemplates.cs" />
     <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.cs" />
+    <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.AttachmentFlow.cs" />
+    <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.SendCleanup.cs" />
     <Compile Include="NextcloudTalkAddIn.AppointmentSubscription.cs" />
     <Compile Include="NextcloudTalkAddIn.SubscriptionEnsure.cs" />
     <Compile Include="Settings\AddinSettings.cs" />

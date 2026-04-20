@@ -17,9 +17,7 @@ namespace NcTalkOutlookAddIn.Utilities
     internal static class ComInteropScope
     {
         internal static void TryRelease(object comObject, string category, string failureMessage)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (comObject == null || !Marshal.IsComObject(comObject))
+        {            if (comObject == null || !Marshal.IsComObject(comObject))
             {
                 return;
             }
@@ -35,9 +33,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void TryFinalRelease(object comObject, string category, string failureMessage)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (comObject == null || !Marshal.IsComObject(comObject))
+        {            if (comObject == null || !Marshal.IsComObject(comObject))
             {
                 return;
             }
@@ -53,9 +49,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static string ResolveIdentityKey(object comObject, string category, string objectName)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (comObject == null || !Marshal.IsComObject(comObject))
+        {            if (comObject == null || !Marshal.IsComObject(comObject))
             {
                 return string.Empty;
             }
@@ -104,9 +98,7 @@ namespace NcTalkOutlookAddIn.Utilities
             string category,
             string firstName,
             string secondName)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (first == null || second == null)
+        {            if (first == null || second == null)
             {
                 return false;
             }
@@ -133,3 +125,4 @@ namespace NcTalkOutlookAddIn.Utilities
     }
 
 }
+

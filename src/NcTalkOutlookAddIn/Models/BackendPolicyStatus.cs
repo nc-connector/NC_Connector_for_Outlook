@@ -88,9 +88,7 @@ namespace NcTalkOutlookAddIn.Models
                 return null;
             }
 
-            IDictionary<string, object> policy = GetDomainDictionary(domain, true);
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (policy == null)
+            IDictionary<string, object> policy = GetDomainDictionary(domain, true);            if (policy == null)
             {
                 return null;
             }
@@ -115,9 +113,7 @@ namespace NcTalkOutlookAddIn.Models
                 return false;
             }
 
-            IDictionary<string, object> policy = GetDomainDictionary(domain, true);
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (policy == null)
+            IDictionary<string, object> policy = GetDomainDictionary(domain, true);            if (policy == null)
             {
                 return false;
             }
@@ -135,9 +131,7 @@ namespace NcTalkOutlookAddIn.Models
                 return false;
             }
 
-            IDictionary<string, object> editable = GetDomainDictionary(domain, false);
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (editable == null)
+            IDictionary<string, object> editable = GetDomainDictionary(domain, false);            if (editable == null)
             {
                 return false;
             }
@@ -163,9 +157,7 @@ namespace NcTalkOutlookAddIn.Models
         internal bool TryGetPolicyBool(string domain, string key, out bool value)
         {
             value = false;
-            object raw = GetPolicyValue(domain, key);
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (raw == null)
+            object raw = GetPolicyValue(domain, key);            if (raw == null)
             {
                 return false;
             }
@@ -179,9 +171,7 @@ namespace NcTalkOutlookAddIn.Models
         internal bool TryGetPolicyInt(string domain, string key, out int value)
         {
             value = 0;
-            object raw = GetPolicyValue(domain, key);
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (raw == null)
+            object raw = GetPolicyValue(domain, key);            if (raw == null)
             {
                 return false;
             }
@@ -194,9 +184,7 @@ namespace NcTalkOutlookAddIn.Models
          */
         internal string GetPolicyString(string domain, string key)
         {
-            object raw = GetPolicyValue(domain, key);
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (raw == null)
+            object raw = GetPolicyValue(domain, key);            if (raw == null)
             {
                 return string.Empty;
             }
@@ -218,9 +206,7 @@ namespace NcTalkOutlookAddIn.Models
 
         internal static bool TryConvertBool(object raw, out bool value)
         {
-            value = false;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (raw == null)
+            value = false;            if (raw == null)
             {
                 return false;
             }
@@ -289,9 +275,7 @@ namespace NcTalkOutlookAddIn.Models
 
         internal static bool TryConvertInt(object raw, out int value)
         {
-            value = 0;
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (raw == null)
+            value = 0;            if (raw == null)
             {
                 return false;
             }
@@ -331,3 +315,4 @@ namespace NcTalkOutlookAddIn.Models
         }
     }
 }
+

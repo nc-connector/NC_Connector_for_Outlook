@@ -31,9 +31,7 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal void OnFileLinkButtonPressed(IRibbonControl control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (_owner == null)
+        {            if (_owner == null)
             {
                 return;
             }
@@ -49,9 +47,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            Outlook.MailItem mail = _owner.GetActiveMailItem();
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null)
+            Outlook.MailItem mail = _owner.GetActiveMailItem();            if (mail == null)
             {
                 MessageBox.Show(
                     Strings.ErrorNoMailItem,
@@ -67,9 +63,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
-            AddinSettings settings = _owner != null ? _owner.CurrentSettings : null;
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (_owner == null || mail == null || settings == null)
+            AddinSettings settings = _owner != null ? _owner.CurrentSettings : null;            if (_owner == null || mail == null || settings == null)
             {
                 return false;
             }
@@ -91,16 +85,12 @@ namespace NcTalkOutlookAddIn.Controllers
             PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
 
             using (var wizard = new FileLinkWizardForm(settings, configuration, passwordPolicy, policyStatus, basePath, launchOptions))
-            {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
+            {                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
                 {
                     string languageOverride = settings != null ? settings.ShareBlockLang : "default";
                     NextcloudTalkAddIn.LogFileLinkMessage("Share created (folder=\"" + wizard.Result.FolderName + "\").");
 
-                    NextcloudTalkAddIn.MailComposeSubscription composeSubscription = _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (composeSubscription != null)
+                    NextcloudTalkAddIn.MailComposeSubscription composeSubscription = _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());                    if (composeSubscription != null)
                     {
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
@@ -157,3 +147,4 @@ namespace NcTalkOutlookAddIn.Controllers
         }
     }
 }
+

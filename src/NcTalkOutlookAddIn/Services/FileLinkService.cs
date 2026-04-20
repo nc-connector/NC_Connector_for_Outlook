@@ -59,9 +59,7 @@ namespace NcTalkOutlookAddIn.Services
                 uploadContext,
                 request.Items,
                 new Progress<FileLinkUploadItemProgress>(p =>
-                {
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (p != null && p.Status == FileLinkUploadStatus.Uploading && p.DeltaBytes > 0)
+                {                    if (p != null && p.Status == FileLinkUploadStatus.Uploading && p.DeltaBytes > 0)
                     {
                         progressState.AddBytes(p.DeltaBytes, p.Selection != null ? p.Selection.LocalPath : null);
                     }
@@ -303,9 +301,7 @@ namespace NcTalkOutlookAddIn.Services
             FileLinkUploadStatus status,
             string message,
             long deltaBytes)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (progress == null)
+        {            if (progress == null)
             {
                 return;
             }
@@ -320,9 +316,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static long CalculateSelectionSize(FileLinkSelection selection)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (selection == null)
+        {            if (selection == null)
             {
                 return 0;
             }
@@ -504,9 +498,7 @@ namespace NcTalkOutlookAddIn.Services
                 || secondaryKnownSet.Contains(fullPath)
                 || primaryReservedSet.Contains(fullPath)
                 || secondaryReservedSet.Contains(fullPath))
-            {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (duplicateResolver == null)
+            {                if (duplicateResolver == null)
                 {
                     throw new TalkServiceException("Duplicate name in target directory: " + sanitizedName, false, 0, null);
                 }
@@ -566,9 +558,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 current.Add(segment);
-                string path = string.Join("/", current.ToArray());
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (knownFolderPaths != null && knownFolderPaths.Contains(path))
+                string path = string.Join("/", current.ToArray());                if (knownFolderPaths != null && knownFolderPaths.Contains(path))
                 {
                     continue;
                 }
@@ -597,10 +587,7 @@ namespace NcTalkOutlookAddIn.Services
                     && response.StatusCode != HttpStatusCode.Conflict)
                 {
                     throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, response.ResponseText);
-                }
-
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (knownFolderPaths != null)
+                }                if (knownFolderPaths != null)
                 {
                     knownFolderPaths.Add(path);
                 }
@@ -655,9 +642,7 @@ namespace NcTalkOutlookAddIn.Services
          * Update mutable share metadata through the documented OCS update endpoint.
          */
         private void UpdateShareMetadata(string baseUrl, ShareData shareData, FileLinkRequest request, CancellationToken cancellationToken)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (shareData == null || string.IsNullOrWhiteSpace(shareData.Id))
+        {            if (shareData == null || string.IsNullOrWhiteSpace(shareData.Id))
             {
                 return;
             }
@@ -775,9 +760,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static ShareData ParseShareData(IDictionary<string, object> parsedJson, string responseText)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (parsedJson == null)
+        {            if (parsedJson == null)
             {
                 throw new TalkServiceException("Share creation failed: invalid response.", false, 0, responseText);
             }
@@ -973,9 +956,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             internal void AddBytes(long bytes, string item)
-            {
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_totalBytes <= 0 || _progress == null)
+            {                if (_totalBytes <= 0 || _progress == null)
                 {
                     return;
                 }
@@ -996,3 +977,4 @@ namespace NcTalkOutlookAddIn.Services
 
     }
 }
+

@@ -54,10 +54,10 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException("HTTP " + (int)statusCode, statusCode == HttpStatusCode.Unauthorized, statusCode, responseText);
             }
 
-            string loginUrl = GetString(data, "login");
-            IDictionary<string, object> poll = GetDictionary(data, "poll");
-            string pollEndpoint = GetString(poll, "endpoint");
-            string pollToken = GetString(poll, "token");
+            string loginUrl = NcJson.GetString(data, "login");
+            IDictionary<string, object> poll = NcJson.GetDictionary(data, "poll");
+            string pollEndpoint = NcJson.GetString(poll, "endpoint");
+            string pollToken = NcJson.GetString(poll, "token");
 
             if (string.IsNullOrEmpty(loginUrl) || string.IsNullOrEmpty(pollEndpoint) || string.IsNullOrEmpty(pollToken))
             {
@@ -106,8 +106,8 @@ namespace NcTalkOutlookAddIn.Services
                         throw new TalkServiceException("HTTP " + (int)statusCode, statusCode == HttpStatusCode.Unauthorized, statusCode, responseText);
                     }
 
-                    string appPassword = GetString(response, "appPassword") ?? GetString(GetDictionary(response, "ocs"), "token");
-                    string loginName = GetString(response, "loginName");
+                    string appPassword = NcJson.GetString(response, "appPassword") ?? NcJson.GetString(NcJson.GetDictionary(response, "ocs"), "token");
+                    string loginName = NcJson.GetString(response, "loginName");
 
                     if (string.IsNullOrEmpty(appPassword) || string.IsNullOrEmpty(loginName))
                     {
@@ -140,9 +140,7 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {
-                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-                if (response.TransportException != null)
+            {                if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
                     DiagnosticsLogger.LogException(LogCategories.Api, "Login flow request failed without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(response.TransportException, failure) + ").", response.TransportException);
@@ -158,10 +156,7 @@ namespace NcTalkOutlookAddIn.Services
             if (string.IsNullOrWhiteSpace(responseText))
             {
                 return new Dictionary<string, object>();
-            }
-
-            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-            if (response.JsonParseException != null)
+            }            if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Login flow JSON parsing failed.", response.JsonParseException);
                 throw new TalkServiceException("Could not parse JSON: " + response.JsonParseException.Message, false, statusCode, responseText);
@@ -169,17 +164,6 @@ namespace NcTalkOutlookAddIn.Services
 
             return response.ParsedJson ?? new Dictionary<string, object>();
         }
-
-        private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetDictionary(parent, key);
-        }
-
-        private static string GetString(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetString(parent, key);
-        }
-
         private static string BuildUserAgent()
         {
             try
@@ -248,5 +232,6 @@ namespace NcTalkOutlookAddIn.Services
         }
     }
 }
+
 
 

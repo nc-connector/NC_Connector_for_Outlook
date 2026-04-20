@@ -35,10 +35,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             base.OnPaint(e);
 
-            e.Graphics.Clear(BackColor);
-
-            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-            if (_banner == null || ClientSize.Width <= 0 || ClientSize.Height <= 0)
+            e.Graphics.Clear(BackColor);            if (_banner == null || ClientSize.Width <= 0 || ClientSize.Height <= 0)
             {
                 return;
             }
@@ -76,3 +73,4 @@ namespace NcTalkOutlookAddIn.UI
         }
     }
 }
+

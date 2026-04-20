@@ -176,9 +176,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void ApplyToForm(Form form, params ToolTip[] toolTips)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (form == null)
+        {            if (form == null)
             {
                 return;
             }
@@ -211,10 +209,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 return;
             }
 
-            ApplyToControlTree(form, palette);
-
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (toolTips != null)
+            ApplyToControlTree(form, palette);            if (toolTips != null)
             {
                 foreach (var toolTip in toolTips)
                 {
@@ -248,9 +243,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void ApplyToControlTree(Control root, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (root == null || palette == null || !palette.IsDark)
+        {            if (root == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -284,9 +277,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabChromeToControlTree(Control root, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (root == null || palette == null)
+        {            if (root == null || palette == null)
             {
                 return;
             }
@@ -308,9 +299,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyControlColors(Control control, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null || palette == null || !palette.IsDark)
+        {            if (control == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -406,9 +395,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyToToolTip(ToolTip toolTip, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (toolTip == null || palette == null || !palette.IsDark)
+        {            if (toolTip == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -426,9 +413,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyDateTimePicker(DateTimePicker picker, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (picker == null || palette == null || !palette.IsDark)
+        {            if (picker == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -442,9 +427,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyListView(ListView view, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (view == null || palette == null || !palette.IsDark)
+        {            if (view == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -454,9 +437,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyComboBox(ComboBox comboBox, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (comboBox == null || palette == null || !palette.IsDark)
+        {            if (comboBox == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -517,9 +498,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabControl(TabControl control, UiThemePalette palette)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null || palette == null)
+        {            if (control == null || palette == null)
             {
                 return;
             }
@@ -741,9 +720,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void DisableWindowsTheme(Control control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null || control.Handle == IntPtr.Zero)
+        {            if (control == null || control.Handle == IntPtr.Zero)
             {
                 return;
             }
@@ -764,9 +741,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
 
         private static void ApplyTabStretchToControlTree(Control root)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (root == null)
+        {            if (root == null)
             {
                 return;
             }
@@ -783,9 +758,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabStretch(TabControl control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null)
+        {            if (control == null)
             {
                 return;
             }
@@ -848,9 +821,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabSizing(TabControl control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null || control.TabPages == null || control.TabPages.Count == 0)
+        {            if (control == null || control.TabPages == null || control.TabPages.Count == 0)
             {
                 return;
             }
@@ -907,9 +878,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static bool IsAdaptiveTabControl(TabControl control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null)
+        {            if (control == null)
             {
                 return false;
             }
@@ -924,9 +893,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyAdaptiveTabLayout(TabControl control)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (control == null)
+        {            if (control == null)
             {
                 return;
             }
@@ -1058,9 +1025,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
                     foreach (string name in valueNames)
                     {
-                        object value = ReadRegistryValue(Registry.CurrentUser, key, name);
-                        // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                        if (value == null)
+                        object value = ReadRegistryValue(Registry.CurrentUser, key, name);                        if (value == null)
                         {
                             continue;
                         }
@@ -1158,9 +1123,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static OfficeUiTheme? ParseOfficeThemeValue(object rawValue)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (rawValue == null)
+        {            if (rawValue == null)
             {
                 return null;
             }
@@ -1210,9 +1173,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static int? ReadRegistryDword(RegistryKey root, string subKey, string valueName)
         {
-            object value = ReadRegistryValue(root, subKey, valueName);
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (value == null)
+            object value = ReadRegistryValue(root, subKey, valueName);            if (value == null)
             {
                 return null;
             }
@@ -1233,9 +1194,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static object ReadRegistryValue(RegistryKey root, string subKey, string valueName)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (root == null || string.IsNullOrWhiteSpace(subKey) || string.IsNullOrWhiteSpace(valueName))
+        {            if (root == null || string.IsNullOrWhiteSpace(subKey) || string.IsNullOrWhiteSpace(valueName))
             {
                 return null;
             }
@@ -1243,9 +1202,7 @@ namespace NcTalkOutlookAddIn.Utilities
             try
             {
                 using (var key = root.OpenSubKey(subKey))
-                {
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (key == null)
+                {                    if (key == null)
                     {
                         return null;
                     }
@@ -1261,3 +1218,4 @@ namespace NcTalkOutlookAddIn.Utilities
         }
     }
 }
+

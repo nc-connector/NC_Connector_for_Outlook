@@ -5,6 +5,7 @@
  */
 
 using System;
+using NcTalkOutlookAddIn.Controllers;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
 
@@ -16,18 +17,14 @@ namespace NcTalkOutlookAddIn
     public sealed partial class NextcloudTalkAddIn
     {
         private void EnsureInspectorHook()
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (_outlookApplication == null || _inspectors != null)
+        {            if (_outlookApplication == null || _inspectors != null)
             {
                 return;
             }
 
             try
             {
-                _inspectors = _outlookApplication.Inspectors;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (_inspectors != null)
+                _inspectors = _outlookApplication.Inspectors;                if (_inspectors != null)
                 {
                     _inspectors.NewInspector += OnNewInspector;
                 }
@@ -40,18 +37,14 @@ namespace NcTalkOutlookAddIn
         }
 
         private void EnsureApplicationHook()
-        {
-            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-            if (_outlookApplication == null || _applicationEvents != null)
+        {            if (_outlookApplication == null || _applicationEvents != null)
             {
                 return;
             }
 
             try
             {
-                _applicationEvents = _outlookApplication as Outlook.ApplicationEvents_11_Event;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_applicationEvents != null)
+                _applicationEvents = _outlookApplication as Outlook.ApplicationEvents_11_Event;                if (_applicationEvents != null)
                 {
                     _applicationEvents.ItemLoad += OnApplicationItemLoad;
                 }
@@ -64,9 +57,7 @@ namespace NcTalkOutlookAddIn
         }
 
         private void UnhookApplication()
-        {
-            // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
-            if (_applicationEvents == null)
+        {            if (_applicationEvents == null)
             {
                 return;
             }
@@ -86,9 +77,7 @@ namespace NcTalkOutlookAddIn
         }
 
         private void UnhookInspector()
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (_inspectors == null)
+        {            if (_inspectors == null)
             {
                 return;
             }
@@ -109,25 +98,19 @@ namespace NcTalkOutlookAddIn
         }
 
         private void OnNewInspector(Outlook.Inspector inspector)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (inspector == null)
+        {            if (inspector == null)
             {
                 return;
             }
 
             try
             {
-                var appointment = inspector.CurrentItem as Outlook.AppointmentItem;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (appointment != null)
+                var appointment = inspector.CurrentItem as Outlook.AppointmentItem;                if (appointment != null)
                 {
                     EnsureSubscriptionForAppointment(appointment);
                 }
 
-                var mail = inspector.CurrentItem as Outlook.MailItem;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (mail != null)
+                var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null)
                 {
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
                     EnsureMailComposeSubscription(mail, inspectorIdentityKey);
@@ -141,9 +124,7 @@ namespace NcTalkOutlookAddIn
 
         private void OnApplicationItemLoad(object item)
         {
-            var mail = item as Outlook.MailItem;
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (mail == null)
+            var mail = item as Outlook.MailItem;            if (mail == null)
             {
                 return;
             }
@@ -152,7 +133,7 @@ namespace NcTalkOutlookAddIn
             object inlineResponseObject = null;
             try
             {
-                string inspectorIdentityKey = ResolveMailInspectorIdentityKey(mail);
+                string inspectorIdentityKey = MailInteropController.ResolveMailInspectorIdentityKey(mail);
                 if (!string.IsNullOrWhiteSpace(inspectorIdentityKey))
                 {
                     if (DiagnosticsLogger.IsEnabled)
@@ -160,16 +141,10 @@ namespace NcTalkOutlookAddIn
                         LogFileLink("Application.ItemLoad compose subscription skipped (reason=inspector_context).");
                     }
                     return;
-                }
-
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (_outlookApplication != null)
+                }                if (_outlookApplication != null)
                 {
                     explorer = _outlookApplication.ActiveExplorer();
-                }
-
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (explorer == null)
+                }                if (explorer == null)
                 {
                     if (DiagnosticsLogger.IsEnabled)
                     {
@@ -179,9 +154,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 inlineResponseObject = explorer.ActiveInlineResponse;
-                var inlineResponseMail = inlineResponseObject as Outlook.MailItem;
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (inlineResponseMail == null)
+                var inlineResponseMail = inlineResponseObject as Outlook.MailItem;                if (inlineResponseMail == null)
                 {
                     if (DiagnosticsLogger.IsEnabled)
                     {
@@ -215,9 +188,7 @@ namespace NcTalkOutlookAddIn
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to ensure compose subscription on Application.ItemLoad.", ex);
             }
             finally
-            {
-                // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                if (inlineResponseObject != null && !ReferenceEquals(inlineResponseObject, mail))
+            {                if (inlineResponseObject != null && !ReferenceEquals(inlineResponseObject, mail))
                 {
                     ComInteropScope.TryRelease(
                         inlineResponseObject,
@@ -233,3 +204,4 @@ namespace NcTalkOutlookAddIn
         }
     }
 }
+

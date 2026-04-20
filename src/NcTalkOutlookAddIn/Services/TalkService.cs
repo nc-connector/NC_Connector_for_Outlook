@@ -217,12 +217,12 @@ namespace NcTalkOutlookAddIn.Services
                 return false;
             }
 
-            IDictionary<string, object> ocs = GetDictionary(data, "ocs");
-            IDictionary<string, object> meta = GetDictionary(ocs, "meta");
-            IDictionary<string, object> payload = GetDictionary(ocs, "data");
+            IDictionary<string, object> ocs = NcJson.GetDictionary(data, "ocs");
+            IDictionary<string, object> meta = NcJson.GetDictionary(ocs, "meta");
+            IDictionary<string, object> payload = NcJson.GetDictionary(ocs, "data");
 
             string version = ExtractVersion(payload);
-            string status = GetString(meta, "status");
+            string status = NcJson.GetString(meta, "status");
             if (!string.IsNullOrEmpty(version))
             {
                 message = version;
@@ -492,21 +492,15 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             object listObj = null;
-            IDictionary<string, object> ocs = GetDictionary(parsed, "ocs");
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (ocs != null)
+            IDictionary<string, object> ocs = NcJson.GetDictionary(parsed, "ocs");            if (ocs != null)
             {
                 ocs.TryGetValue("data", out listObj);
             }
 
-            object[] list = listObj as object[];
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (list == null)
+            object[] list = listObj as object[];            if (list == null)
             {
                 // Some Talk versions wrap the list under { data: { participants: [...] } }.
-                var dataDict = listObj as IDictionary<string, object>;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (dataDict != null)
+                var dataDict = listObj as IDictionary<string, object>;                if (dataDict != null)
                 {
                     object participantsObj;
                     if (dataDict.TryGetValue("participants", out participantsObj))
@@ -514,26 +508,21 @@ namespace NcTalkOutlookAddIn.Services
                         list = participantsObj as object[];
                     }
                 }
-            }
-
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (list == null)
+            }            if (list == null)
             {
                 return participants;
             }
 
             foreach (object entry in list)
             {
-                var dict = entry as IDictionary<string, object>;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (dict == null)
+                var dict = entry as IDictionary<string, object>;                if (dict == null)
                 {
                     continue;
                 }
 
-                string actorType = GetString(dict, "actorType") ?? string.Empty;
-                string actorId = GetString(dict, "actorId") ?? string.Empty;
-                int attendeeId = GetInt(dict, "attendeeId");
+                string actorType = NcJson.GetString(dict, "actorType") ?? string.Empty;
+                string actorId = NcJson.GetString(dict, "actorId") ?? string.Empty;
+                int attendeeId = NcJson.GetInt(dict, "attendeeId");
                 participants.Add(new TalkParticipant(actorType, actorId, attendeeId));
             }
 
@@ -665,9 +654,9 @@ namespace NcTalkOutlookAddIn.Services
 
                 if (IsSuccessStatus(statusCode))
                 {
-                    IDictionary<string, object> data = GetDictionary(GetDictionary(parsed, "ocs"), "data");
+                    IDictionary<string, object> data = NcJson.GetDictionary(NcJson.GetDictionary(parsed, "ocs"), "data");
                     int lobbyState;
-                    if (TryGetInt(data, "state", out lobbyState))
+                    if (NcJson.TryGetInt(data, "state", out lobbyState))
                     {
                         lobbyEnabled = lobbyState != 0;
                         resolvedAny = true;
@@ -704,9 +693,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (description == null)
+        {            if (description == null)
             {
                 return;
             }
@@ -797,9 +784,7 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {
-                // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-                if (response.TransportException != null)
+            {                if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
                     DiagnosticsLogger.LogException(LogCategories.Api, "HTTP connection error without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(response.TransportException, failure) + ").", response.TransportException);
@@ -810,10 +795,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
-            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);
-
-            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-            if (response.JsonParseException != null)
+            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);            if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Failed to parse JSON response.", response.JsonParseException);
             }
@@ -828,22 +810,18 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static string ExtractRoomToken(IDictionary<string, object> responseData)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (responseData == null)
+        {            if (responseData == null)
             {
                 return null;
             }
 
-            IDictionary<string, object> ocs = GetDictionary(responseData, "ocs");
-            IDictionary<string, object> data = GetDictionary(ocs, "data");
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (data != null)
+            IDictionary<string, object> ocs = NcJson.GetDictionary(responseData, "ocs");
+            IDictionary<string, object> data = NcJson.GetDictionary(ocs, "data");            if (data != null)
             {
-                string token = GetString(data, "token");
+                string token = NcJson.GetString(data, "token");
                 if (string.IsNullOrEmpty(token))
                 {
-                    token = GetString(data, "roomToken");
+                    token = NcJson.GetString(data, "roomToken");
                 }
 
                 if (!string.IsNullOrEmpty(token))
@@ -852,65 +830,40 @@ namespace NcTalkOutlookAddIn.Services
                 }
             }
 
-            return GetString(responseData, "token");
+            return NcJson.GetString(responseData, "token");
         }
-
-        private static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetDictionary(parent, key);
-        }
-
-        private static string GetString(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetString(parent, key);
-        }
-
-        private static int GetInt(IDictionary<string, object> parent, string key)
-        {
-            return NcJson.GetInt(parent, key);
-        }
-
-        private static bool TryGetInt(IDictionary<string, object> parent, string key, out int value)
-        {
-            return NcJson.TryGetInt(parent, key, out value);
-        }
-
         private static string ExtractVersion(IDictionary<string, object> payload)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (payload == null)
+        {            if (payload == null)
             {
                 return null;
             }
 
-            string version = GetString(payload, "versionstring") ?? GetString(payload, "version");
-            string edition = GetString(payload, "edition");
+            string version = NcJson.GetString(payload, "versionstring") ?? NcJson.GetString(payload, "version");
+            string edition = NcJson.GetString(payload, "edition");
             string result = ComposeVersion(version, edition);
             if (!string.IsNullOrEmpty(result))
             {
                 return EnsureProductPrefix(result, payload);
             }
 
-            IDictionary<string, object> versionDict = GetDictionary(payload, "version");
+            IDictionary<string, object> versionDict = NcJson.GetDictionary(payload, "version");
             result = ComposeVersion(
-                GetString(versionDict, "string") ?? BuildVersionFromParts(versionDict),
-                GetString(versionDict, "edition"));
+                NcJson.GetString(versionDict, "string") ?? BuildVersionFromParts(versionDict),
+                NcJson.GetString(versionDict, "edition"));
             if (!string.IsNullOrEmpty(result))
             {
                 return EnsureProductPrefix(result, payload);
             }
 
-            IDictionary<string, object> nextcloud = GetDictionary(payload, "nextcloud");
-            IDictionary<string, object> system = GetDictionary(nextcloud, "system");
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (system != null)
+            IDictionary<string, object> nextcloud = NcJson.GetDictionary(payload, "nextcloud");
+            IDictionary<string, object> system = NcJson.GetDictionary(nextcloud, "system");            if (system != null)
             {
                 result = ComposeVersion(
-                    GetString(system, "versionstring") ?? GetString(system, "version") ?? BuildVersionFromParts(system),
-                    GetString(system, "edition"));
+                    NcJson.GetString(system, "versionstring") ?? NcJson.GetString(system, "version") ?? BuildVersionFromParts(system),
+                    NcJson.GetString(system, "edition"));
                 if (!string.IsNullOrEmpty(result))
                 {
-                    string product = GetString(system, "productname") ?? GetString(nextcloud, "productname");
+                    string product = NcJson.GetString(system, "productname") ?? NcJson.GetString(nextcloud, "productname");
                     if (!string.IsNullOrEmpty(product))
                     {
                         return product + " " + result;
@@ -924,16 +877,14 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static string BuildVersionFromParts(IDictionary<string, object> dictionary)
-        {
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (dictionary == null)
+        {            if (dictionary == null)
             {
                 return null;
             }
 
-            string major = GetString(dictionary, "major");
-            string minor = GetString(dictionary, "minor");
-            string micro = GetString(dictionary, "micro");
+            string major = NcJson.GetString(dictionary, "major");
+            string minor = NcJson.GetString(dictionary, "minor");
+            string micro = NcJson.GetString(dictionary, "micro");
 
             if (string.IsNullOrEmpty(major))
             {
@@ -979,7 +930,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             string prefix = "Nextcloud";
-            string product = GetString(payload, "productname");
+            string product = NcJson.GetString(payload, "productname");
             if (!string.IsNullOrEmpty(product))
             {
                 prefix = product;
@@ -1011,9 +962,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static bool IsEventConversationDescriptionLockError(TalkServiceException ex)
-        {
-            // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
-            if (ex == null || ex.StatusCode != HttpStatusCode.BadRequest)
+        {            if (ex == null || ex.StatusCode != HttpStatusCode.BadRequest)
             {
                 return false;
             }
@@ -1054,6 +1003,7 @@ namespace NcTalkOutlookAddIn.Services
         
     }
 }
+
 
 
 

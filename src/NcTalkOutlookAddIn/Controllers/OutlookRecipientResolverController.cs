@@ -18,9 +18,7 @@ namespace NcTalkOutlookAddIn.Controllers
     {
         internal static List<string> CollectAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)
         {
-            var emails = new List<string>();
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (appointment == null)
+            var emails = new List<string>();            if (appointment == null)
             {
                 return emails;
             }
@@ -34,10 +32,7 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment recipients.", ex);
                 recipients = null;
-            }
-
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (recipients == null)
+            }            if (recipients == null)
             {
                 return emails;
             }
@@ -50,9 +45,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     Outlook.Recipient recipient = null;
                     try
                     {
-                        recipient = recipients[i];
-                        // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-                        if (recipient == null)
+                        recipient = recipients[i];                        if (recipient == null)
                         {
                             continue;
                         }
@@ -105,9 +98,7 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static string TryResolveRecipientSmtpAddress(Outlook.Recipient recipient)
-        {
-            // Outlook/COM kann hier null liefern (Lifecycle/Interop-Randfall); fail-soft behalten.
-            if (recipient == null)
+        {            if (recipient == null)
             {
                 return null;
             }
@@ -137,10 +128,7 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Recipient.AddressEntry.", ex);
                 entry = null;
-            }
-
-            // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-            if (entry != null)
+            }            if (entry != null)
             {
                 try
                 {
@@ -153,10 +141,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve Exchange user from address entry.", ex);
                         exUser = null;
-                    }
-
-                    // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                    if (exUser != null)
+                    }                    if (exUser != null)
                     {
                         try
                         {
@@ -184,9 +169,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                Outlook.PropertyAccessor accessor = recipient.PropertyAccessor;
-                // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
-                if (accessor != null)
+                Outlook.PropertyAccessor accessor = recipient.PropertyAccessor;                if (accessor != null)
                 {
                     try
                     {
@@ -208,3 +191,4 @@ namespace NcTalkOutlookAddIn.Controllers
         }
     }
 }
+
