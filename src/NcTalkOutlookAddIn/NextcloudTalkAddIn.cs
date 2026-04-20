@@ -59,6 +59,7 @@ namespace NcTalkOutlookAddIn
         private DateTime _lastDeferredAppointmentEnsureUnstableIdentityLogUtc = DateTime.MinValue;
         private int _deferredAppointmentEnsureRestrictionSuppressedCount;
         private SynchronizationContext _uiSynchronizationContext;
+        private IRibbonUI _ribbonUi;
         private const int ComposeAttachmentEvalDebounceMs = 250;
         private const int ComposeShareCleanupSendGraceMs = 15000;
 
@@ -286,6 +287,7 @@ namespace NcTalkOutlookAddIn
                 _outlookApplication = null;
             }
 
+            _ribbonUi = null;
             _uiSynchronizationContext = null;
             lock (_pendingAppointmentEnsureSyncRoot)
             {
@@ -386,7 +388,11 @@ namespace NcTalkOutlookAddIn
          */
         public void OnRibbonLoad(IRibbonUI ribbonUI)
         {
-            // Ribbon handle not needed right now; keep as an interface stub.
+            // Keep a stable handle so future dynamic ribbon refreshes can call Invalidate/InvalidateControl.
+            if (!ReferenceEquals(_ribbonUi, ribbonUI))
+            {
+                _ribbonUi = ribbonUI;
+            }
         }
 
         public async void OnTalkButtonPressed(IRibbonControl control)
