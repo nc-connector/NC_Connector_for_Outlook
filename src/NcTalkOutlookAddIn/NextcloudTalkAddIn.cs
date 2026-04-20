@@ -2621,11 +2621,7 @@ namespace NcTalkOutlookAddIn
                 {
                     if (allowDeferredRetry)
                     {
-                        if (QueueDeferredAppointmentSubscriptionEnsure(appointment, ex))
-                        {
-                            return;
-                        }
-
+                        QueueDeferredAppointmentSubscriptionEnsure(appointment, ex);
                         return;
                     }
 
