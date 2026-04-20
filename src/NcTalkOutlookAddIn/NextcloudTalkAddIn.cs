@@ -389,7 +389,7 @@ namespace NcTalkOutlookAddIn
             // Ribbon handle not needed right now; keep as an interface stub.
         }
 
-        public void OnTalkButtonPressed(IRibbonControl control)
+        public async void OnTalkButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
 
@@ -430,17 +430,11 @@ namespace NcTalkOutlookAddIn
             LogTalk("Talk link started (subject='" + subject + "', start=" + start.ToString("o") + ", end=" + end.ToString("o") + ").");
 
             var configuration = new TalkServiceConfiguration(_currentSettings.ServerUrl, _currentSettings.Username, _currentSettings.AppPassword);
-            BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "talk_wizard_open");
-            PasswordPolicyInfo passwordPolicy = null;
-            try
-            {
-                passwordPolicy = new PasswordPolicyService(configuration).FetchPolicy();
-            }
-            catch (Exception ex)
-            {
-                LogTalk("Password policy could not be loaded: " + ex.Message);
-                passwordPolicy = null;
-            }
+            Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => FetchBackendPolicyStatus(configuration, "talk_wizard_open"));
+            Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => FetchPasswordPolicyForTalkWizard(configuration));
+            await Task.WhenAll(policyStatusTask, passwordPolicyTask);
+            BackendPolicyStatus policyStatus = policyStatusTask.Result;
+            PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
 
             var addressbookCache = new IfbAddressBookCache(_settingsStorage != null ? _settingsStorage.DataDirectory : null);
             LogTalk("System address book status check requested (context=talk_click, forceRefresh=True).");
@@ -457,20 +451,10 @@ namespace NcTalkOutlookAddIn
                 LogTalk("System address book unavailable on talk click: " + talkClickAddressbookStatus.Error);
             }
 
-            var talkWizardAddressbookStatus = talkClickAddressbookStatus;
-            LogTalk(
-                "System address book status reused (context=talk_wizard_open, source=talk_click, available=" + talkWizardAddressbookStatus.Available +
-                ", count=" + talkWizardAddressbookStatus.Count +
-                ", hasError=" + (!string.IsNullOrWhiteSpace(talkWizardAddressbookStatus.Error)) + ").");
-            if (!talkWizardAddressbookStatus.Available && !string.IsNullOrWhiteSpace(talkWizardAddressbookStatus.Error))
-            {
-                LogTalk("System address book unavailable on talk wizard open: " + talkWizardAddressbookStatus.Error);
-            }
-
             List<NextcloudUser> userDirectory;
             try
             {
-                userDirectory = talkWizardAddressbookStatus.Available
+                userDirectory = talkClickAddressbookStatus.Available
                     ? addressbookCache.GetUsers(configuration, _currentSettings.IfbCacheHours, false)
                     : new List<NextcloudUser>();
             }
@@ -486,7 +470,7 @@ namespace NcTalkOutlookAddIn
                 passwordPolicy,
                 policyStatus,
                 userDirectory,
-                talkWizardAddressbookStatus,
+                talkClickAddressbookStatus,
                 subject,
                 start,
                 end))
@@ -611,7 +595,7 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        public void OnSettingsButtonPressed(IRibbonControl control)
+        public async void OnSettingsButtonPressed(IRibbonControl control)
         {
             EnsureSettingsLoaded();
             LogSettings("Settings dialog opened.");
@@ -619,7 +603,7 @@ namespace NcTalkOutlookAddIn
                 _currentSettings != null ? _currentSettings.ServerUrl : string.Empty,
                 _currentSettings != null ? _currentSettings.Username : string.Empty,
                 _currentSettings != null ? _currentSettings.AppPassword : string.Empty);
-            BackendPolicyStatus initialPolicyStatus = FetchBackendPolicyStatus(configuration, "settings_open_initial");
+            BackendPolicyStatus initialPolicyStatus = await Task.Run(() => FetchBackendPolicyStatus(configuration, "settings_open_initial"));
             using (var form = new SettingsForm(_currentSettings, _outlookApplication, initialPolicyStatus))
             {
                 if (form.ShowDialog() == DialogResult.OK)
@@ -714,22 +698,17 @@ namespace NcTalkOutlookAddIn
                 _currentSettings.ServerUrl,
                 _currentSettings.Username,
                 _currentSettings.AppPassword);
-            BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "sharing_wizard_open");
+            // Keep this method synchronous for existing callers and prefetch both policies in parallel.
+            Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => FetchBackendPolicyStatus(configuration, "sharing_wizard_open"));
+            Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => FetchPasswordPolicyForFileLinkWizard(configuration));
+            Task.WhenAll(policyStatusTask, passwordPolicyTask).GetAwaiter().GetResult();
+            BackendPolicyStatus policyStatus = policyStatusTask.Result;
 
             string basePath = string.IsNullOrWhiteSpace(_currentSettings.FileLinkBasePath)
                 ? "90 Freigaben - extern"
                 : _currentSettings.FileLinkBasePath;
 
-            PasswordPolicyInfo passwordPolicy = null;
-            try
-            {
-                passwordPolicy = new PasswordPolicyService(configuration).FetchPolicy();
-            }
-            catch (Exception ex)
-            {
-                LogFileLink("Sharing password policy could not be loaded: " + ex.Message);
-                passwordPolicy = null;
-            }
+            PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
 
             using (var wizard = new FileLinkWizardForm(_currentSettings ?? new AddinSettings(), configuration, passwordPolicy, policyStatus, basePath, launchOptions))
             {
@@ -1740,6 +1719,32 @@ namespace NcTalkOutlookAddIn
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Backend policy status fetch failed (trigger=" + (trigger ?? "n/a") + ").", ex);
+                return null;
+            }
+        }
+
+        private PasswordPolicyInfo FetchPasswordPolicyForTalkWizard(TalkServiceConfiguration configuration)
+        {
+            try
+            {
+                return new PasswordPolicyService(configuration).FetchPolicy();
+            }
+            catch (Exception ex)
+            {
+                LogTalk("Password policy could not be loaded: " + ex.Message);
+                return null;
+            }
+        }
+
+        private PasswordPolicyInfo FetchPasswordPolicyForFileLinkWizard(TalkServiceConfiguration configuration)
+        {
+            try
+            {
+                return new PasswordPolicyService(configuration).FetchPolicy();
+            }
+            catch (Exception ex)
+            {
+                LogFileLink("Sharing password policy could not be loaded: " + ex.Message);
                 return null;
             }
         }
