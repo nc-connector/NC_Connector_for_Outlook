@@ -87,6 +87,7 @@
     <Compile Include="NextcloudTalkAddIn.Hooks.cs" />
     <Compile Include="NextcloudTalkAddIn.Logging.cs" />
     <Compile Include="NextcloudTalkAddIn.Lifecycle.cs" />
+    <Compile Include="NextcloudTalkAddIn.PolicyTemplates.cs" />
     <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.cs" />
     <Compile Include="NextcloudTalkAddIn.AppointmentSubscription.cs" />
     <Compile Include="NextcloudTalkAddIn.SubscriptionEnsure.cs" />
