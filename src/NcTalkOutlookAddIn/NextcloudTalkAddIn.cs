@@ -1625,7 +1625,8 @@ namespace NcTalkOutlookAddIn
 
         private void ApplyIfbSettings()
         {
-            ConfigureDiagnosticsLogger(_currentSettings);
+            // Diagnostics logger configuration is intentionally handled by the caller
+            // (startup/settings save) to avoid duplicate reconfiguration on normal settings saves.
 
             // Feld wird lazy initialisiert bzw. beim Shutdown geleert; null ist hier ein erwartbarer Zustand.
             if (_freeBusyManager == null || _currentSettings == null)

@@ -145,6 +145,11 @@ namespace NcTalkOutlookAddIn.Utilities
             WriteLogLine(category, message);
         }
 
+        internal static void LogApi(string message)
+        {
+            Log(LogCategories.Api, message);
+        }
+
         private static void WriteLogLine(string category, string message)
         {
             try

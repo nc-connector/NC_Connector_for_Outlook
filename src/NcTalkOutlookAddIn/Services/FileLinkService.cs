@@ -27,10 +27,6 @@ namespace NcTalkOutlookAddIn.Services
         private const int ShareTypePublicLink = 3;
         private readonly TalkServiceConfiguration _configuration;
         private readonly NcHttpClient _httpClient;
-        private static void LogApi(string message)
-        {
-            DiagnosticsLogger.Log(LogCategories.Api, message);
-        }
         private static void LogFileLink(string message)
         {
             DiagnosticsLogger.Log(LogCategories.FileLink, message);
@@ -140,7 +136,7 @@ namespace NcTalkOutlookAddIn.Services
             string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
             string username = _configuration.Username ?? string.Empty;
             string url = BuildDavUrl(normalizedBaseUrl, username, normalizedPath);
-            LogApi("DELETE " + url);
+            DiagnosticsLogger.LogApi("DELETE " + url);
 
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
@@ -174,7 +170,7 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException("Share folder could not be deleted: " + normalizedPath, authError, response.StatusCode, response.ResponseText);
             }
 
-            LogApi("DELETE " + url + " -> " + response.StatusCode);
+            DiagnosticsLogger.LogApi("DELETE " + url + " -> " + response.StatusCode);
         }
 
         internal void UploadSelections(
@@ -445,7 +441,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             string url = BuildDavUrl(context.NormalizedBaseUrl, context.Username, remotePath);
-            LogApi("PUT " + url);
+            DiagnosticsLogger.LogApi("PUT " + url);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -485,7 +481,7 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException("File could not be uploaded: " + localPath, false, response.StatusCode, response.ResponseText);
             }
 
-            LogApi("PUT " + url + " -> " + response.StatusCode);
+            DiagnosticsLogger.LogApi("PUT " + url + " -> " + response.StatusCode);
         }
 
         private string EnsureUniqueName(
@@ -578,7 +574,7 @@ namespace NcTalkOutlookAddIn.Services
                 }
 
                 string url = BuildDavUrl(baseUrl, username, path);
-                LogApi("MKCOL " + url);
+                DiagnosticsLogger.LogApi("MKCOL " + url);
                 NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
                 {
                     Method = "MKCOL",
@@ -609,7 +605,7 @@ namespace NcTalkOutlookAddIn.Services
                     knownFolderPaths.Add(path);
                 }
 
-                LogApi("MKCOL " + url + " -> " + response.StatusCode);
+                DiagnosticsLogger.LogApi("MKCOL " + url + " -> " + response.StatusCode);
             }
         }
 
@@ -688,7 +684,7 @@ namespace NcTalkOutlookAddIn.Services
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            LogApi("POST " + url);
+            DiagnosticsLogger.LogApi("POST " + url);
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
                 Method = "POST",
@@ -709,7 +705,7 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException("Share creation failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
 
-            LogApi("POST " + url + " -> " + response.StatusCode);
+            DiagnosticsLogger.LogApi("POST " + url + " -> " + response.StatusCode);
             if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
                 string detail = NcJson.ExtractOcsErrorMessage(response.ParsedJson);
@@ -730,7 +726,7 @@ namespace NcTalkOutlookAddIn.Services
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            LogApi("PUT " + url);
+            DiagnosticsLogger.LogApi("PUT " + url);
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
                 Method = "PUT",
@@ -751,7 +747,7 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException("Share metadata update failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
 
-            LogApi("PUT " + url + " -> " + response.StatusCode);
+            DiagnosticsLogger.LogApi("PUT " + url + " -> " + response.StatusCode);
             if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
                 string detail = NcJson.ExtractOcsErrorMessage(response.ParsedJson);

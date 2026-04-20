@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Text;
-using System.Web.Script.Serialization;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
@@ -28,12 +27,7 @@ namespace NcTalkOutlookAddIn.Services
         private const string ActorTypeEmails = "emails";
 
         private readonly TalkServiceConfiguration _configuration;
-        private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
         private readonly NcHttpClient _httpClient;
-        private static void LogApi(string message)
-        {
-            DiagnosticsLogger.Log(LogCategories.Api, message);
-        }
 
         private static void LogTalk(string message)
         {
@@ -784,10 +778,10 @@ namespace NcTalkOutlookAddIn.Services
             }
             else if (payload != null)
             {
-                payloadText = _serializer.Serialize(payload);
+                payloadText = NcJson.Serialize(payload);
             }
 
-            LogApi(method + " " + url);
+            DiagnosticsLogger.LogApi(method + " " + url);
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
                 Method = method,
@@ -815,7 +809,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
-            LogApi(method + " " + url + " -> " + statusCode);
+            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);
 
             // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (response.JsonParseException != null)

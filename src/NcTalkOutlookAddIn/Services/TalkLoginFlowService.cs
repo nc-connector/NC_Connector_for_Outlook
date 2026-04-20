@@ -25,11 +25,6 @@ namespace NcTalkOutlookAddIn.Services
         private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
         private readonly NcHttpClient _httpClient = new NcHttpClient(string.Empty, string.Empty);
 
-        private static void LogApi(string message)
-        {
-            DiagnosticsLogger.Log(LogCategories.Api, message);
-        }
-
         internal TalkLoginFlowService(string baseUrl)
         {
             _baseUrl = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
@@ -45,7 +40,7 @@ namespace NcTalkOutlookAddIn.Services
             using (DiagnosticsLogger.BeginOperation(LogCategories.Api, "LoginFlow.Start"))
             {
                 string url = _baseUrl + "/index.php/login/v2";
-                LogApi("POST " + url);
+                DiagnosticsLogger.LogApi("POST " + url);
 
             var payloadObject = new Dictionary<string, object>();
             payloadObject["name"] = DeviceName;

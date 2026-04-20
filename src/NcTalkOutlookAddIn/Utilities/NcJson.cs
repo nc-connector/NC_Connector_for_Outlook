@@ -56,6 +56,11 @@ namespace NcTalkOutlookAddIn.Utilities
             return Serializer.DeserializeObject(payload) as IDictionary<string, object>;
         }
 
+        internal static string Serialize(object value)
+        {
+            return Serializer.Serialize(value);
+        }
+
         internal static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
         {
             // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.

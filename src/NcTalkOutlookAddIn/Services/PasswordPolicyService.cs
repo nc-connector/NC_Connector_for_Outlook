@@ -23,11 +23,6 @@ namespace NcTalkOutlookAddIn.Services
         private static readonly string[] MinLengthKeys = { "minLength", "min_length", "minimumLength", "minimum_length" };
         private static readonly string[] GenerateUrlKeys = { "api_generate", "apiGenerateUrl", "generateUrl", "generate_url" };
 
-        private static void LogApi(string message)
-        {
-            DiagnosticsLogger.Log(LogCategories.Api, message);
-        }
-
         internal PasswordPolicyService(TalkServiceConfiguration configuration)
         {
             if (configuration == null)
@@ -50,7 +45,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 string baseUrl = _configuration.GetNormalizedBaseUrl();
                 string url = baseUrl + "/ocs/v2.php/cloud/capabilities?format=json";
-                LogApi("GET " + url);
+                DiagnosticsLogger.LogApi("GET " + url);
 
                 IDictionary<string, object> root;
                 HttpStatusCode statusCode;
@@ -58,14 +53,14 @@ namespace NcTalkOutlookAddIn.Services
 
                 if (statusCode != HttpStatusCode.OK)
                 {
-                    LogApi("Password policy fetch returned HTTP " + (int)statusCode + ".");
+                    DiagnosticsLogger.LogApi("Password policy fetch returned HTTP " + (int)statusCode + ".");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
 
                 // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (root == null)
                 {
-                    LogApi("Password policy fetch returned no parsable JSON payload.");
+                    DiagnosticsLogger.LogApi("Password policy fetch returned no parsable JSON payload.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
 
@@ -75,7 +70,7 @@ namespace NcTalkOutlookAddIn.Services
                 // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (caps == null)
                 {
-                    LogApi("Password policy capabilities block missing.");
+                    DiagnosticsLogger.LogApi("Password policy capabilities block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
 
@@ -83,7 +78,7 @@ namespace NcTalkOutlookAddIn.Services
                 // Defensiver Null-Guard: dieser Pfad soll bei unvollständigem Runtime-Zustand kontrolliert abbrechen.
                 if (policy == null)
                 {
-                    LogApi("Password policy block missing.");
+                    DiagnosticsLogger.LogApi("Password policy block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
 
@@ -105,7 +100,7 @@ namespace NcTalkOutlookAddIn.Services
                 string generateUrl = ResolvePolicyUrl(generateRaw, baseUrl);
                 bool hasPolicy = minLength > 0 || !string.IsNullOrWhiteSpace(generateUrl);
 
-                LogApi("Password policy normalized (hasPolicy=" + hasPolicy + ", minLength=" + minLength + ", hasGenerateUrl=" + (!string.IsNullOrWhiteSpace(generateUrl)) + ").");
+                DiagnosticsLogger.LogApi("Password policy normalized (hasPolicy=" + hasPolicy + ", minLength=" + minLength + ", hasGenerateUrl=" + (!string.IsNullOrWhiteSpace(generateUrl)) + ").");
                 return new PasswordPolicyInfo(hasPolicy, minLength, generateUrl ?? string.Empty);
             }
         }
@@ -123,11 +118,11 @@ namespace NcTalkOutlookAddIn.Services
                 string apiUrl = ResolvePolicyUrl(policy.GenerateUrl, _configuration.GetNormalizedBaseUrl());
                 if (string.IsNullOrWhiteSpace(apiUrl))
                 {
-                    LogApi("Password generate skipped: no usable generator URL.");
+                    DiagnosticsLogger.LogApi("Password generate skipped: no usable generator URL.");
                     return null;
                 }
 
-                LogApi("GET " + apiUrl);
+                DiagnosticsLogger.LogApi("GET " + apiUrl);
                 IDictionary<string, object> root;
                 HttpStatusCode statusCode;
                 ExecuteJsonRequest("GET", apiUrl, null, out statusCode, out root);
@@ -186,13 +181,13 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
-            LogApi(method + " " + url + " -> " + statusCode);
+            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);
 
             // Null bedeutet hier "kein passender Fehlerkontext"; Auswertung bleibt absichtlich defensiv.
             if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Password policy response parsing failed.", response.JsonParseException);
-                LogApi("Password policy response sample: " + GetResponseSample(response.ResponseText));
+                DiagnosticsLogger.LogApi("Password policy response sample: " + GetResponseSample(response.ResponseText));
             }
 
             parsed = response.ParsedJson;
