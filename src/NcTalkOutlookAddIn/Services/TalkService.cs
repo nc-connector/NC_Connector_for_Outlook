@@ -242,6 +242,7 @@ namespace NcTalkOutlookAddIn.Services
         private IDictionary<string, object> BuildCreatePayload(TalkRoomRequest request, bool includeEvent)
         {
             Dictionary<string, object> payload = new Dictionary<string, object>();
+            // Keep both fields for backward compatibility across Talk API variants.
             payload["roomType"] = RoomTypePublic;
             payload["type"] = RoomTypePublic;
             payload["roomName"] = string.IsNullOrWhiteSpace(request.Title) ? "Meeting" : request.Title.Trim();
