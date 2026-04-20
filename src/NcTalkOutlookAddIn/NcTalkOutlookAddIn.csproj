@@ -88,6 +88,7 @@
     <Compile Include="NextcloudTalkAddIn.Logging.cs" />
     <Compile Include="NextcloudTalkAddIn.MailComposeSubscription.cs" />
     <Compile Include="NextcloudTalkAddIn.AppointmentSubscription.cs" />
+    <Compile Include="NextcloudTalkAddIn.SubscriptionEnsure.cs" />
     <Compile Include="Settings\AddinSettings.cs" />
     <Compile Include="Settings\AuthenticationMode.cs" />
     <Compile Include="Settings\SettingsStorage.cs" />
