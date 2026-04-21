@@ -68,7 +68,9 @@ namespace NcTalkOutlookAddIn.UI
 
         private bool IsCustomLanguageModeAvailable(string domain)
         {
-            if (!IsBackendEndpointAvailable() || !IsPolicyActive())
+            if (_backendPolicyStatus == null
+                || !_backendPolicyStatus.EndpointAvailable
+                || !PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
             {
                 return false;
             }
@@ -120,7 +122,7 @@ namespace NcTalkOutlookAddIn.UI
 
                 combo.Items.Add(new LanguageOption(code, GetLanguageLabel(code)));
             }
-            if (IsBackendEndpointAvailable())
+            if (_backendPolicyStatus != null && _backendPolicyStatus.EndpointAvailable)
             {
                 combo.Items.Add(new LanguageOption("custom", Strings.LanguageOverrideCustomOption, IsCustomLanguageModeAvailable(domain)));
             }

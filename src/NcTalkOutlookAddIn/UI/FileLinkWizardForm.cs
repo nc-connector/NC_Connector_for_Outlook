@@ -185,52 +185,14 @@ namespace NcTalkOutlookAddIn.UI
             get { return _requestSnapshot; }
         }
 
-        private bool IsPolicyActive()
-        {
-            return _backendPolicyStatus != null && _backendPolicyStatus.PolicyActive;
-        }
-
         private bool IsPolicyLocked(string key)
         {
             return _backendPolicyStatus != null && _backendPolicyStatus.IsLocked("share", key);
         }
 
-        /**
-         * Return true when the current user has an active backend seat.
-         * Separate password delivery is gated by this entitlement.
-         */
-        private bool HasBackendSeatEntitlement()
-        {
-            return _backendPolicyStatus != null
-                   && _backendPolicyStatus.EndpointAvailable
-                   && _backendPolicyStatus.SeatAssigned
-                   && _backendPolicyStatus.IsValid
-                   && string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase);
-        }
-
-        /**
-         * Return the tooltip shown when separate password delivery is unavailable.
-         */
-        private string GetSeparatePasswordUnavailableTooltip()
-        {            if (_backendPolicyStatus == null || !_backendPolicyStatus.EndpointAvailable)
-            {
-                return Strings.SharingPasswordSeparateBackendRequiredTooltip;
-            }
-            if (!_backendPolicyStatus.SeatAssigned)
-            {
-                return Strings.SharingPasswordSeparateNoSeatTooltip;
-            }
-            if (!_backendPolicyStatus.IsValid
-                || !string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase))
-            {
-                return Strings.SharingPasswordSeparatePausedTooltip;
-            }
-            return string.Empty;
-        }
-
         private void ApplyPolicyDefaultsToSettings()
         {
-            if (!IsPolicyActive())
+            if (!PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
             {
                 return;
             }
@@ -269,7 +231,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _defaults.SharingDefaultPasswordSeparateEnabled = policyBool;
             }
-            if (!HasBackendSeatEntitlement())
+            if (!PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus))
             {
                 _defaults.SharingDefaultPasswordSeparateEnabled = false;
             }
@@ -301,8 +263,8 @@ namespace NcTalkOutlookAddIn.UI
             bool lockPassword = IsPolicyLocked("share_set_password");
             bool lockPasswordSeparate = IsPolicyLocked("share_send_password_separately");
             bool lockExpireDays = IsPolicyLocked("share_expire_days");
-            bool separatePasswordAvailable = HasBackendSeatEntitlement();
-            string separatePasswordUnavailableTooltip = GetSeparatePasswordUnavailableTooltip();
+            bool separatePasswordAvailable = PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
+            string separatePasswordUnavailableTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
 
             _shareNameTextBox.ReadOnly = _attachmentMode || lockShareName;
             _permissionCreateCheckBox.Enabled = !_attachmentMode && !lockPermCreate;
@@ -1345,7 +1307,7 @@ namespace NcTalkOutlookAddIn.UI
             _request.Password = _passwordToggleCheckBox.Checked ? _passwordTextBox.Text : null;
             _request.PasswordSeparateEnabled =
                 _passwordToggleCheckBox.Checked
-                && HasBackendSeatEntitlement()
+                && PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus)
                 && _passwordSeparateToggleCheckBox.Checked;
             _request.ExpireEnabled = _expireToggleCheckBox.Checked;
             _request.ExpireDate = _expireToggleCheckBox.Checked ? _expireDatePicker.Value.Date : (DateTime?)null;
@@ -1643,8 +1605,8 @@ namespace NcTalkOutlookAddIn.UI
         {
             bool enabled = _passwordToggleCheckBox.Checked;
             bool lockPasswordSeparate = IsPolicyLocked("share_send_password_separately");
-            bool separatePasswordAvailable = HasBackendSeatEntitlement();
-            string separatePasswordUnavailableTooltip = GetSeparatePasswordUnavailableTooltip();
+            bool separatePasswordAvailable = PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
+            string separatePasswordUnavailableTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
             _passwordTextBox.Enabled = enabled;
             _passwordGenerateButton.Enabled = enabled;
             _passwordSeparateToggleCheckBox.Enabled = enabled && !lockPasswordSeparate && separatePasswordAvailable;
