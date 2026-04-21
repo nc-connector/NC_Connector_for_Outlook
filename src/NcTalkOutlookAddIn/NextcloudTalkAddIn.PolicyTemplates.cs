@@ -74,10 +74,10 @@ namespace NcTalkOutlookAddIn
                 string policyLanguageRaw = policyStatus.GetPolicyString("talk", "language_talk_description");
                 if (!string.IsNullOrWhiteSpace(policyLanguageRaw))
                 {
-                    return NormalizeTalkDescriptionLanguage(policyLanguageRaw);
+                    return TalkDescriptionTemplateController.NormalizeTalkDescriptionLanguage(policyLanguageRaw);
                 }
             }
-            return NormalizeTalkDescriptionLanguage(fallbackLanguageOverride);
+            return TalkDescriptionTemplateController.NormalizeTalkDescriptionLanguage(fallbackLanguageOverride);
         }
 
         internal static string ResolveTalkInvitationTemplate(BackendPolicyStatus policyStatus)
@@ -103,23 +103,6 @@ namespace NcTalkOutlookAddIn
             return "plain_text";
         }
 
-        /**
-         * Normalize Talk description language while preserving the explicit "custom" mode.
-         */
-        private static string NormalizeTalkDescriptionLanguage(string languageOverride)
-        {
-            if (string.IsNullOrWhiteSpace(languageOverride))
-            {
-                return "default";
-            }
-            string trimmed = languageOverride.Trim();
-            if (string.Equals(trimmed, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                return "custom";
-            }
-            return Strings.NormalizeLanguageOverride(trimmed);
-        }
-
         internal static string NormalizeTalkEventDescriptionType(string descriptionType)
         {
             return string.Equals(descriptionType, "html", StringComparison.OrdinalIgnoreCase)
@@ -127,28 +110,5 @@ namespace NcTalkOutlookAddIn
                 : "plain_text";
         }
 
-        internal static string UpdateBodyWithTalkBlock(string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
-        {
-            return TalkDescriptionTemplateController.UpdateBodyWithTalkBlock(existingBody, roomUrl, password, languageOverride, invitationTemplate);
-        }
-
-        internal static string UpdateHtmlBodyWithTalkBlock(string existingHtmlBody, string existingBody, string roomUrl, string password, string languageOverride, string invitationTemplate)
-        {
-            return TalkDescriptionTemplateController.UpdateHtmlBodyWithTalkBlock(existingHtmlBody, existingBody, roomUrl, password, languageOverride, invitationTemplate);
-        }
-
-        internal static string BuildInitialRoomDescription(string password, string languageOverride, string invitationTemplate)
-        {
-            return TalkDescriptionTemplateController.BuildInitialRoomDescription(password, languageOverride, invitationTemplate);
-        }
-
-        /**
-         * Outlook appointment bodies are plain text. Convert backend HTML/text
-         * templates into a stable plain-text block before inserting them.
-         */
-        internal static string ConvertHtmlTemplateToPlainText(string value)
-        {
-            return TalkDescriptionTemplateController.ConvertHtmlTemplateToPlainText(value);
-        }
     }
 }

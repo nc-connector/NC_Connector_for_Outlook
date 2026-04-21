@@ -131,7 +131,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 string initialDescription;
                 try
                 {
-                    initialDescription = NextcloudTalkAddIn.BuildInitialRoomDescription(
+                    initialDescription = TalkDescriptionTemplateController.BuildInitialRoomDescription(
                         dialog.TalkPassword,
                         descriptionLanguage,
                         invitationTemplate);

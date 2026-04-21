@@ -414,7 +414,7 @@ namespace NcTalkOutlookAddIn.Controllers
             return html.ToString();
         }
 
-        private static string NormalizeTalkDescriptionLanguage(string languageOverride)
+        internal static string NormalizeTalkDescriptionLanguage(string languageOverride)
         {
             if (string.IsNullOrWhiteSpace(languageOverride))
             {

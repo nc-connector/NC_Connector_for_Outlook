@@ -61,7 +61,7 @@ namespace NcTalkOutlookAddIn.Controllers
             if (string.Equals(normalizedDescriptionType, "html", StringComparison.OrdinalIgnoreCase))
             {
                 // AppointmentItem HTML body read is intentionally disabled for compatibility.
-                string updatedHtmlBody = NextcloudTalkAddIn.UpdateHtmlBodyWithTalkBlock(
+                string updatedHtmlBody = TalkDescriptionTemplateController.UpdateHtmlBodyWithTalkBlock(
                     string.Empty,
                     appointment.Body,
                     result.RoomUrl,
@@ -71,7 +71,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 if (!NextcloudTalkAddIn.TryWriteAppointmentHtmlBody(appointment, updatedHtmlBody))
                 {
                     NextcloudTalkAddIn.LogTalkMessage("Appointment HTML editor unavailable, falling back to plain-text Talk block insertion.");
-                    appointment.Body = NextcloudTalkAddIn.UpdateBodyWithTalkBlock(
+                    appointment.Body = TalkDescriptionTemplateController.UpdateBodyWithTalkBlock(
                         appointment.Body,
                         result.RoomUrl,
                         request.Password,
@@ -81,7 +81,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             else
             {
-                appointment.Body = NextcloudTalkAddIn.UpdateBodyWithTalkBlock(
+                appointment.Body = TalkDescriptionTemplateController.UpdateBodyWithTalkBlock(
                     appointment.Body,
                     result.RoomUrl,
                     request.Password,
