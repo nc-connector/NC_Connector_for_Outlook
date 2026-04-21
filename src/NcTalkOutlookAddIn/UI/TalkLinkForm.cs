@@ -22,7 +22,7 @@ namespace NcTalkOutlookAddIn.UI
     /// <summary>
     /// Dialog for configuring and creating a Nextcloud Talk room for the active appointment.
     /// </summary>
-    internal sealed partial class TalkLinkForm : Form
+    internal sealed partial class TalkLinkForm : ScaledForm
     {
         private static readonly string DefaultTitle = Strings.TalkDefaultTitle;
         private const int DefaultMinPasswordLength = 5;
@@ -950,11 +950,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _roomTypeComboBox.SelectedIndex = 0;
             }
-        }
-
-        private int ScaleLogical(int value)
-        {
-            return DpiScaling.ScaleLogical(this, value);
         }
 
         private sealed class RoomTypeOption

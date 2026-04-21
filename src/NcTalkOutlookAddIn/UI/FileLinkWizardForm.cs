@@ -20,7 +20,7 @@ namespace NcTalkOutlookAddIn.UI
 {
         // Multi-step wizard for creating a Nextcloud share (permissions, expiration date,
     // file/folder selection, note, and upload progress).
-    internal sealed partial class FileLinkWizardForm : Form
+    internal sealed partial class FileLinkWizardForm : ScaledForm
     {
         private const int DefaultMinPasswordLength = 8;
         private const string AttachmentShareNameBase = "email_attachment";
@@ -2272,11 +2272,6 @@ namespace NcTalkOutlookAddIn.UI
                     ex);
                 return false;
             }
-        }
-
-        private int ScaleLogical(int value)
-        {
-            return DpiScaling.ScaleLogical(this, value);
         }
 
         private void ReflowWizardLayout()

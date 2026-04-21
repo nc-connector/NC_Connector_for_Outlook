@@ -17,7 +17,7 @@ namespace NcTalkOutlookAddIn.UI
 
         // Two-action prompt for threshold-based compose attachment automation.
     // There is intentionally no third cancel action.
-    internal sealed class ComposeAttachmentPromptForm : Form
+    internal sealed class ComposeAttachmentPromptForm : ScaledForm
     {
         private readonly Label _reasonLabel = new Label();
         private readonly Button _shareButton = new Button();
@@ -178,9 +178,5 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
-        private int ScaleLogical(int value)
-        {
-            return DpiScaling.ScaleLogical(this, value);
-        }
     }
 }

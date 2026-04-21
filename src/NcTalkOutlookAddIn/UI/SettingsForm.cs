@@ -23,7 +23,7 @@ namespace NcTalkOutlookAddIn.UI
 {
         // WinForms dialog for all add-in settings (authentication, sharing, IFB, debug, ...).
     // Encapsulates UI logic including starting the login flow, connection tests, and status messages.
-    internal sealed partial class SettingsForm : Form
+    internal sealed partial class SettingsForm : ScaledForm
     {
         private readonly Outlook.Application _outlookApplication;
         private readonly BrandedHeader _headerPanel = new BrandedHeader();
@@ -2301,10 +2301,6 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
-        private int ScaleLogical(int value)
-        {
-            return DpiScaling.ScaleLogical(this, value);
-        }
     }
 }
 

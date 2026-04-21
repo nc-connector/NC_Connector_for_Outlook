@@ -138,6 +138,7 @@
     <Compile Include="UI\SettingsForm.cs" />
     <Compile Include="UI\SettingsForm.Language.cs" />
     <Compile Include="UI\SettingsTabControl.cs" />
+    <Compile Include="UI\ScaledForm.cs" />
     <Compile Include="UI\TalkLinkForm.cs" />
     <Compile Include="UI\TalkLinkForm.Moderator.cs" />
     <Compile Include="UI\ComposeAttachmentPromptForm.cs" />

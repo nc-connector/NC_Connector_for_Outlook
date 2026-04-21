@@ -131,6 +131,7 @@ Key code locations:
   - `Services/NcHttpClient.cs` is the shared request executor for auth headers, OCS headers, timeout/decompression, and optional fresh-connection mode.
   - All runtime HTTP calls (Talk, share/DAV, IFB, login flow, moderator avatar fetch) are routed through `NcHttpClient`.
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
+  - `UI/ScaledForm.cs` is the shared DPI-scaling base for forms that use logical pixel layout helpers.
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
 - `src/NcTalkOutlookAddIn/Utilities/` — logging, theming, i18n, small shared helpers
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` — centralized sanitizer for backend-provided share/talk HTML templates
@@ -159,6 +160,7 @@ Key code locations:
   - `UI/TalkLinkForm.cs` is the Talk wizard.
   - `UI/FileLinkWizardForm.cs` is the sharing wizard.
   - `UI/BrandedHeader.cs` is the shared header banner control.
+  - `UI/ScaledForm.cs` centralizes `ScaleLogical(...)` so form-level DPI wrappers are not duplicated.
 - **Shared utilities**
   - `Utilities/BrowserLauncher.cs` centralizes shell target starts (URLs, files, directories).
   - `Utilities/SizeFormatting.cs` centralizes MB display formatting.
