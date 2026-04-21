@@ -27,6 +27,18 @@ namespace NcTalkOutlookAddIn.UI
             BackColor = BrandingAssets.BrandBlue;
         }
 
+        internal static void AttachToParent(BrandedHeader header, Control.ControlCollection controls, int height)
+        {
+            if (header == null || controls == null)
+            {
+                return;
+            }
+
+            header.Height = height;
+            header.Dock = DockStyle.Top;
+            controls.Add(header);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);

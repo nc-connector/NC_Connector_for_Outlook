@@ -159,7 +159,7 @@ namespace NcTalkOutlookAddIn.UI
             MinimumSize = new Size(ScaleLogical(780), ScaleLogical(680));
             Icon = BrandingAssets.GetAppIcon(32);
 
-            InitializeHeader();
+            BrandedHeader.AttachToParent(_headerPanel, Controls, HeaderHeight);
             InitializeComponents();
             ApplySettings(settings);
             UpdateAboutTab();
@@ -373,14 +373,6 @@ namespace NcTalkOutlookAddIn.UI
             _serverUrlTextBox.Width = width;
             _usernameTextBox.Width = width;
             _appPasswordTextBox.Width = width;
-        }
-
-        private void InitializeHeader()
-        {
-            _headerPanel.Height = HeaderHeight;
-            _headerPanel.Dock = DockStyle.Top;
-
-            Controls.Add(_headerPanel);
         }
 
         protected override void OnShown(EventArgs e)

@@ -174,7 +174,7 @@ UI:
 - `src/NcTalkOutlookAddIn/UI/TalkLinkForm.cs`
 - `src/NcTalkOutlookAddIn/UI/FileLinkWizardForm.cs`
 - `src/NcTalkOutlookAddIn/UI/ComposeAttachmentPromptForm.cs` (2-Aktions-Prompt fuer Schwellwertmodus)
-- `src/NcTalkOutlookAddIn/UI/BrandedHeader.cs` (Header-Banner)
+- `src/NcTalkOutlookAddIn/UI/BrandedHeader.cs` (Header-Banner inkl. `AttachToParent(...)` fuer konsistente Header-Initialisierung in Forms)
 - `src/NcTalkOutlookAddIn/UI/ScaledForm.cs` (zentrale DPI-Skalierung via `ScaleLogical(...)`, damit Form-Wrapper nicht dupliziert werden)
 
 Utilities:

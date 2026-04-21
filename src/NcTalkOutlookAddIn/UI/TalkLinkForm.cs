@@ -174,7 +174,7 @@ namespace NcTalkOutlookAddIn.UI
             MinimumSize = new Size(ScaleLogical(580), ScaleLogical(580));
             Icon = BrandingAssets.GetAppIcon(32);
 
-            InitializeHeader();
+            BrandedHeader.AttachToParent(_headerPanel, Controls, HeaderHeight);
             InitializeComponents();
             ApplyDefaults(defaults, appointmentSubject);
             ApplyDialogLayout(true);
@@ -400,13 +400,6 @@ namespace NcTalkOutlookAddIn.UI
             checkBox.Text = text ?? string.Empty;
             checkBox.AutoSize = true;
             _settingsGroup.Controls.Add(checkBox);
-        }
-
-        private void InitializeHeader()
-        {
-            _headerPanel.Height = HeaderHeight;
-            _headerPanel.Dock = DockStyle.Top;
-            Controls.Add(_headerPanel);
         }
 
         protected override void OnSizeChanged(EventArgs e)

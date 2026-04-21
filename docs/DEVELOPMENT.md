@@ -159,7 +159,7 @@ Key code locations:
   - `UI/SettingsForm.cs` configures base URL, authentication, sharing defaults, IFB, and debug logging.
   - `UI/TalkLinkForm.cs` is the Talk wizard.
   - `UI/FileLinkWizardForm.cs` is the sharing wizard.
-  - `UI/BrandedHeader.cs` is the shared header banner control.
+  - `UI/BrandedHeader.cs` is the shared header banner control and provides `AttachToParent(...)` for consistent form header setup.
   - `UI/ScaledForm.cs` centralizes `ScaleLogical(...)` so form-level DPI wrappers are not duplicated.
 - **Shared utilities**
   - `Utilities/BrowserLauncher.cs` centralizes shell target starts (URLs, files, directories).
