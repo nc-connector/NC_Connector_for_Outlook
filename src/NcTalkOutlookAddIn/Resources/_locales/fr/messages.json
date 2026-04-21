@@ -705,7 +705,7 @@
     "message": "Répertoire de base"
   },
   "options_sharing_base_hint": {
-    "message": "Les fichiers sont stockés sous ce répertoire (p. ex. \"90 Freigaben - extern\")."
+    "message": "Les fichiers sont stockés sous ce répertoire (p. ex. \"NC Connector\")."
   },
   "sharing_wizard_title": {
     "message": "Partage Nextcloud"

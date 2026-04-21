@@ -772,7 +772,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
         // Sharing defaults (settings)
         internal static string FileLinkBaseLabel { get { return Get("options_sharing_base_label", "Base directory"); } }
-        internal static string FileLinkBaseHint { get { return Get("options_sharing_base_hint", "Files are stored beneath this directory (e.g. \"90 Freigaben - extern\")."); } }
+        internal static string FileLinkBaseHint { get { return Get("options_sharing_base_hint", "Files are stored beneath this directory (e.g. \"NC Connector\")."); } }
         internal static string SharingDefaultsHeading { get { return Get("options_sharing_defaults_heading", "Default settings"); } }
         internal static string SharingDefaultShareNameLabel { get { return Get("options_sharing_default_share_name_label", "Share name"); } }
         internal static string SharingDefaultPermissionsLabel { get { return Get("options_sharing_default_permissions_label", "Default permissions"); } }

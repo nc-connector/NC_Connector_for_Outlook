@@ -648,7 +648,7 @@
     "message": "ベースディレクトリ"
   },
   "options_sharing_base_hint": {
-    "message": "ファイルはこのディレクトリ配下に保存されます（例: \"90 Freigaben - extern\"）。"
+    "message": "ファイルはこのディレクトリ配下に保存されます（例: \"NC Connector\"）。"
   },
   "options_sharing_defaults_heading": {
     "message": "既定の設定"

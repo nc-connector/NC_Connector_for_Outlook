@@ -648,7 +648,7 @@
     "message": "基础目录"
   },
   "options_sharing_base_hint": {
-    "message": "文件将存储在此目录下（例如 \"90 Freigaben - extern\"）。"
+    "message": "文件将存储在此目录下（例如 \"NC Connector\"）。"
   },
   "options_sharing_defaults_heading": {
     "message": "默认设置"
