@@ -33,7 +33,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 throw new ArgumentNullException("result");
             }
-
             bool attachmentMode = request != null && request.AttachmentMode;
             bool separatePassword = request != null
                 && request.PasswordSeparateEnabled
@@ -56,7 +55,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 effectiveLanguage = "default";
             }
-
             string intro = Strings.GetInLanguage(
                 effectiveLanguage,
                 "sharing_html_intro",
@@ -129,12 +127,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 AppendRow(builder, passwordLabel, HttpUtility.HtmlEncode(passwordSeparateHint));
             }
-
             if (result.ExpireDate.HasValue)
             {
                 AppendRow(builder, expireLabel, HttpUtility.HtmlEncode(result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
             }
-
             if (!attachmentMode)
             {
                 AppendRow(builder, permissionsLabel, BuildPermissions(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete));
@@ -162,7 +158,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 throw new ArgumentNullException("result");
             }
-
             string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
             string policyTemplate = ResolvePolicyTemplate(policyStatus, true, effectiveLanguage);
             if (!string.IsNullOrWhiteSpace(policyTemplate))
@@ -180,7 +175,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 effectiveLanguage = "default";
             }
-
             string intro = Strings.GetInLanguage(
                 effectiveLanguage,
                 "sharing_html_password_mail_intro",
@@ -241,7 +235,6 @@ namespace NcTalkOutlookAddIn.Utilities
                         : Strings.NormalizeLanguageOverride(policyLang);
                 }
             }
-
             string normalized = Strings.NormalizeLanguageOverride(languageOverride);
             if (string.Equals((languageOverride ?? string.Empty).Trim(), "custom", StringComparison.OrdinalIgnoreCase))
             {
@@ -258,12 +251,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
-
             if (!string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Empty;
             }
-
             string key = passwordOnly ? "share_password_template" : "share_html_block_template";
             string template = policyStatus.GetPolicyString("share", key);
             return template ?? string.Empty;
@@ -284,7 +275,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
-
             string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
             string permissionRead = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read");
             string permissionCreate = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload");
@@ -300,12 +290,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 passwordValue = passwordSeparateHint;
             }
-
             string noteValue = string.Empty;            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
             {
                 noteValue = request.Note.Trim();
             }
-
             string rightsValue = attachmentMode
                 ? string.Empty
                 : BuildPermissions(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete);
@@ -330,7 +318,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 throw new InvalidOperationException("Share HTML template sanitized to empty output.");
             }
-
             return sanitized;
         }
 
@@ -345,21 +332,18 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return template ?? string.Empty;
             }
-
             string output = template ?? string.Empty;
             int tokenIndex = output.IndexOf(token, StringComparison.Ordinal);
             if (tokenIndex < 0)
             {
                 return output;
             }
-
             int rowStart = LastIndexOfIgnoreCase(output, "<tr", tokenIndex);
             int rowEnd = IndexOfIgnoreCase(output, "</tr>", tokenIndex);
             if (rowStart >= 0 && rowEnd >= 0 && rowEnd >= rowStart)
             {
                 output = output.Remove(rowStart, (rowEnd + 5) - rowStart);
             }
-
             return output.Replace(token, string.Empty);
         }
 
@@ -372,13 +356,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return -1;
             }
-
             int maxIndex = Math.Min(startIndexExclusive, value.Length);
             if (maxIndex <= 0)
             {
                 return -1;
             }
-
             return value.LastIndexOf(search, maxIndex - 1, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -391,13 +373,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return -1;
             }
-
             int normalizedStart = Math.Max(0, startIndex);
             if (normalizedStart >= value.Length)
             {
                 return -1;
             }
-
             return value.IndexOf(search, normalizedStart, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -432,7 +412,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
-
             string token = string.IsNullOrWhiteSpace(shareToken) ? string.Empty : shareToken.Trim();
             try
             {
@@ -457,13 +436,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to derive attachment-mode ZIP download URL from share URL.", ex);
             }
-
             if (string.IsNullOrEmpty(token))
             {
                 DiagnosticsLogger.Log(LogCategories.FileLink, "Attachment-mode ZIP download URL fallback used public share URL because no token was available.");
                 return shareUrl;
             }
-
             try
             {
                 var shareUri = new Uri(shareUrl, UriKind.Absolute);

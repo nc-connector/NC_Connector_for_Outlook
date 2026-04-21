@@ -138,7 +138,6 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 return DefaultIfbPort;
             }
-
             return port;
         }
     }

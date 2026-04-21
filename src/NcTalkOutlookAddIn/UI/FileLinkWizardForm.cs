@@ -216,18 +216,15 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return Strings.SharingPasswordSeparateBackendRequiredTooltip;
             }
-
             if (!_backendPolicyStatus.SeatAssigned)
             {
                 return Strings.SharingPasswordSeparateNoSeatTooltip;
             }
-
             if (!_backendPolicyStatus.IsValid
                 || !string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase))
             {
                 return Strings.SharingPasswordSeparatePausedTooltip;
             }
-
             return string.Empty;
         }
 
@@ -237,7 +234,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             bool policyBool;
             int policyInt;
             string policyString;
@@ -253,7 +249,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _defaults.SharingDefaultShareName = policyString;
             }
-
             if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
             {
                 _defaults.SharingDefaultPermCreate = policyBool;
@@ -508,7 +503,6 @@ namespace NcTalkOutlookAddIn.UI
                 _policyWarningPanel.SetBounds(left, top, width, 0);
                 return;
             }
-
             int padding = ScaleLogical(8);
             int textWidth = Math.Max(ScaleLogical(180), width - (padding * 2));
             _policyWarningTitleLabel.Location = new Point(padding, padding);
@@ -530,7 +524,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int top = _policyWarningPanel.Visible
                 ? _policyWarningPanel.Bottom + ScaleLogical(10)
                 : _titleLabel.Bottom + ScaleLogical(16);
@@ -548,7 +541,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int left = _stepHost != null ? _stepHost.Left : ScaleLogical(20);
             int width = _stepHost != null ? _stepHost.Width : Math.Max(ScaleLogical(240), ClientSize.Width - ScaleLogical(40));
             int top = _stepHost != null ? _stepHost.Bottom + ScaleLogical(8) : ScaleLogical(360);
@@ -603,12 +595,10 @@ namespace NcTalkOutlookAddIn.UI
                     topMostButton = Math.Min(topMostButton, button.Top);
                 }
             }
-
             if (topMostButton == int.MaxValue)
             {
                 return fallbackBottom;
             }
-
             int safeBottomFromButtons = topMostButton - 12;
             return Math.Min(fallbackBottom, safeBottomFromButtons);
         }
@@ -687,7 +677,6 @@ namespace NcTalkOutlookAddIn.UI
                 _permissionDeleteCheckBox.Enabled = false;
                 _shareNameTextBox.ReadOnly = true;
             }
-
             if (_passwordToggleCheckBox.Checked)
             {
                 _passwordTextBox.Text = GeneratePasswordValue(GetMinPasswordLength());
@@ -734,7 +723,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int left = ScaleLogical(12);
             int top = ScaleLogical(12);
             int indent = ScaleLogical(6);
@@ -799,7 +787,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int left = ScaleLogical(12);
             int top = ScaleLogical(12);
             int rowGap = ScaleLogical(10);
@@ -820,7 +807,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _expireDatePicker.SetBounds(left + ScaleLogical(16), _expireToggleCheckBox.Bottom + rowGap, pickerWidth, pickerHeight);
             }
-
             int hintTop = Math.Max(_expireToggleCheckBox.Bottom, _expireDatePicker.Bottom) + sectionGap;
             _expireHintLabel.MaximumSize = new Size(contentWidth, 0);
             _expireHintLabel.Location = new Point(left, hintTop);
@@ -834,7 +820,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int left = ScaleLogical(12);
             int top = ScaleLogical(12);
             int rowGap = ScaleLogical(8);
@@ -973,7 +958,6 @@ namespace NcTalkOutlookAddIn.UI
                 ApplyFileStepButtonSize(_addFolderButton, actionColumnWidth);
                 ApplyFileStepButtonSize(_removeItemButton, actionColumnWidth);
             }
-
             int maxInfoWidth = Math.Max(120, clientSize.Width - (FileStepPaddingPixels * 2));
             _attachmentModeInfoLabel.MaximumSize = new Size(maxInfoWidth, 0);
 
@@ -986,7 +970,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int minWidth;
             FooterButtonLayoutHelper.ApplyButtonSize(button, out minWidth);
             int width = Math.Max(minWidth, Math.Max(ScaleLogical(120), targetWidth));
@@ -1056,7 +1039,6 @@ namespace NcTalkOutlookAddIn.UI
                 _stepHost.Controls.Add(panel);
                 panel.BringToFront();
             }
-
             return panel;
         }
 
@@ -1066,7 +1048,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             foreach (Panel panel in _steps)
             {
                 panel.Visible = false;
@@ -1109,12 +1090,10 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             if (direction > 0 && !ValidateCurrentStep())
             {
                 return;
             }
-
             int newIndex = _currentStepIndex + direction;
             ShowStep(newIndex);
         }
@@ -1127,16 +1106,13 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     return true;
                 }
-
                 if (_items.Count == 0)
                 {
                     MessageBox.Show(Strings.FileLinkWizardSelectFileOrFolder, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }
-
                 return true;
             }
-
             if (_currentStepIndex == 0)
             {
                 if (string.IsNullOrWhiteSpace(_shareNameTextBox.Text))
@@ -1145,7 +1121,6 @@ namespace NcTalkOutlookAddIn.UI
                     _shareNameTextBox.Focus();
                     return false;
                 }
-
                 if (_passwordToggleCheckBox.Checked && !IsPasswordValid(_passwordTextBox.Text))
                 {
                     MessageBox.Show(
@@ -1156,7 +1131,6 @@ namespace NcTalkOutlookAddIn.UI
                     _passwordTextBox.Focus();
                     return false;
                 }
-
                 if (!EnsureShareFolderAvailable())
                 {
                     return false;
@@ -1199,7 +1173,6 @@ namespace NcTalkOutlookAddIn.UI
                     return false;
                 }
             }
-
             return true;
         }
 
@@ -1259,7 +1232,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     return;
                 }
-
                 if (!_uploadCompleted)
                 {
                     await StartUploadAsync();
@@ -1281,7 +1253,8 @@ namespace NcTalkOutlookAddIn.UI
                     _uploadContext = _service.PrepareUpload(_request, CancellationToken.None);
                     _uploadCompleted = true;
                 }
-            }            if (_uploadContext == null || !_uploadCompleted)
+            }
+            if (_uploadContext == null || !_uploadCompleted)
             {
                 MessageBox.Show(
                     Strings.FileLinkWizardUploadFirst,
@@ -1422,7 +1395,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 sanitizedShareName = Strings.FileLinkWizardFallbackShareName;
             }
-
             string folderName = BuildShareFolderName(sanitizedShareName);
 
             Cursor previousCursor = Cursor.Current;
@@ -1458,7 +1430,6 @@ namespace NcTalkOutlookAddIn.UI
                 UseWaitCursor = false;
                 Cursor.Current = previousCursor;
             }
-
             return true;
         }
 
@@ -1486,13 +1457,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             string relativeFolderPath = context.RelativeFolderPath ?? string.Empty;
             if (string.IsNullOrWhiteSpace(relativeFolderPath))
             {
                 return;
             }
-
             try
             {
                 _service.DeleteShareFolder(relativeFolderPath, CancellationToken.None);
@@ -1522,7 +1491,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             var validSelections = new List<FileLinkSelection>();
             foreach (var selection in _launchOptions.InitialSelections)
             {
@@ -1578,7 +1546,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return Strings.FileLinkWizardAttachmentModeReasonAlways;
             }
-
             return string.Format(
                 CultureInfo.CurrentCulture,
                 Strings.FileLinkWizardAttachmentModeReasonThreshold,
@@ -1594,7 +1561,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             for (int suffix = 0; suffix < 1000; suffix++)
             {
                 string candidate = suffix == 0
@@ -1627,14 +1593,12 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return true;
             }
-
             try
             {
                 var state = _attachmentGuardService.ReadLiveState();                if (state == null || !state.LockActive)
                 {
                     return true;
                 }
-
                 string message = string.Format(
                     CultureInfo.CurrentCulture,
                     Strings.SharingAttachmentAutomationLockedError,
@@ -1667,7 +1631,6 @@ namespace NcTalkOutlookAddIn.UI
                 BeginInvoke(new Action<FileLinkProgress>(UpdateProgress), progress);
                 return;
             }
-
             if (progress.TotalBytes > 0)
             {
                 double percent = (double)progress.UploadedBytes / progress.TotalBytes;
@@ -1695,7 +1658,8 @@ namespace NcTalkOutlookAddIn.UI
             if (!enabled || !separatePasswordAvailable)
             {
                 _passwordSeparateToggleCheckBox.Checked = false;
-            }            if (_generalStepPanel != null)
+            }
+            if (_generalStepPanel != null)
             {
                 LayoutGeneralStep(_generalStepPanel.ClientSize);
             }
@@ -1756,7 +1720,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             foreach (ListViewItem item in _fileListView.SelectedItems)
             {
                 if (ReferenceEquals(_lastAutoScrolledUploadItem, item))
@@ -1776,7 +1739,6 @@ namespace NcTalkOutlookAddIn.UI
                 }
                 _fileListView.Items.Remove(item);
             }
-
             if (_items.Count == 0)
             {
                 _allowEmptyUpload = false;
@@ -1791,13 +1753,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             var pendingSelections = selections.Where(s => s != null && !string.IsNullOrWhiteSpace(s.LocalPath)).ToList();
             if (pendingSelections.Count == 0)
             {
                 return;
             }
-
             var existingPaths = _attachmentMode
                 ? null
                 : new HashSet<string>(
@@ -1822,7 +1782,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _fileListView.EndUpdate();
             }
-
             if (addedCount == 0)
             {
                 return;
@@ -1849,7 +1808,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int typeWidth = 110;
             int statusWidth = 180;
             int clientWidth = Math.Max(0, _fileListView.ClientSize.Width);
@@ -1882,13 +1840,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return false;
             }
-
             if (_pathColumnMaxHorizontalOffset <= 0)
             {
                 _pathColumnHorizontalOffset = 0;
                 return false;
             }
-
             int steps = Math.Max(1, Math.Abs(delta) / 120);
             int shift = steps * PathColumnWheelStepPixels;
             int nextOffset = _pathColumnHorizontalOffset + (delta < 0 ? shift : -shift);
@@ -1900,7 +1856,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 nextOffset = _pathColumnMaxHorizontalOffset;
             }
-
             if (nextOffset == _pathColumnHorizontalOffset)
             {
                 return true;
@@ -1918,7 +1873,6 @@ namespace NcTalkOutlookAddIn.UI
                 _pathColumnMaxHorizontalOffset = 0;
                 return;
             }
-
             int visibleWidth = Math.Max(0, _fileListView.Columns[0].Width - 8);
             if (_fileListView.Items.Count == 0 || visibleWidth <= 0)
             {
@@ -1926,7 +1880,6 @@ namespace NcTalkOutlookAddIn.UI
                 _pathColumnMaxHorizontalOffset = 0;
                 return;
             }
-
             int widestPath = 0;
             foreach (ListViewItem item in _fileListView.Items)
             {
@@ -1935,7 +1888,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     continue;
                 }
-
                 int width = TextRenderer.MeasureText(
                     path,
                     _fileListView.Font,
@@ -1969,7 +1921,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             if (_fileListView.View != View.Details)
             {
                 e.DrawDefault = true;
@@ -1998,7 +1949,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 e.Graphics.FillRectangle(backBrush, e.Bounds);
             }
-
             string text = e.SubItem.Text ?? string.Empty;
             Rectangle textBounds = new Rectangle(
                 e.Bounds.Left + 4,
@@ -2034,7 +1984,6 @@ namespace NcTalkOutlookAddIn.UI
                     textColor,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
             }
-
             if (e.ColumnIndex == _fileListView.Columns.Count - 1 && selected)
             {
                 Rectangle focusRect = e.Item.Bounds;
@@ -2073,7 +2022,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return template.Replace("$1", name);
             }
-
             try
             {
                 return string.Format(CultureInfo.CurrentCulture, template, name);
@@ -2102,7 +2050,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             var bar = state.ProgressBar;
             state.ProgressBar = null;            if (_fileListView != null && !_fileListView.IsDisposed && !_fileListView.Disposing)
             {
@@ -2122,11 +2069,11 @@ namespace NcTalkOutlookAddIn.UI
             if (_items.Count > 0)
             {
                 _allowEmptyUpload = false;
-            }            if (!_shareFinalized && previousContext != null)
+            }
+            if (!_shareFinalized && previousContext != null)
             {
                 TryCleanupPreparedUploadContext(previousContext, "upload_invalidated");
             }
-
             foreach (var state in _selectionStates.Values)
             {
                 state.TotalBytes = 0;
@@ -2203,7 +2150,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int spacing = 12;
             var buttons = new List<Button>();
 
@@ -2227,12 +2173,10 @@ namespace NcTalkOutlookAddIn.UI
             {
                 buttons.Add(_cancelButton);
             }
-
             if (buttons.Count == 0)
             {
                 return;
             }
-
             int requiredClientWidth = FooterButtonLayoutHelper.LayoutCentered(
                 this,
                 buttons,
@@ -2289,12 +2233,10 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             if (_fileListView.IsDisposed || _fileListView.Disposing || !_fileListView.IsHandleCreated)
             {
                 return;
             }
-
             if (_fileListView.Items.Count == 0)
             {
                 foreach (var state in _selectionStates.Values)
@@ -2305,7 +2247,6 @@ namespace NcTalkOutlookAddIn.UI
                 }
                 return;
             }
-
             int statusLeft = _fileListView.Columns[0].Width + _fileListView.Columns[1].Width;
             int statusWidth = _fileListView.Columns[2].Width;
 
@@ -2320,7 +2261,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int statusLeft = _fileListView.Columns[0].Width + _fileListView.Columns[1].Width;
             int statusWidth = _fileListView.Columns[2].Width;
             PositionProgressBar(state, statusLeft, statusWidth);
@@ -2330,18 +2270,17 @@ namespace NcTalkOutlookAddIn.UI
         {            if (state == null || state.ProgressBar == null)
             {
                 return;
-            }            if (state.ProgressBar.IsDisposed || state.ProgressBar.Disposing || state.Item == null)
+            }
+            if (state.ProgressBar.IsDisposed || state.ProgressBar.Disposing || state.Item == null)
             {
                 state.ProgressBar.Visible = false;
                 return;
             }
-
             if (state.Item.ListView != _fileListView)
             {
                 state.ProgressBar.Visible = false;
                 return;
             }
-
             int itemIndex = state.Item.Index;
             Rectangle bounds;
             if (!TryGetListViewItemBounds(itemIndex, out bounds))
@@ -2349,13 +2288,11 @@ namespace NcTalkOutlookAddIn.UI
                 state.ProgressBar.Visible = false;
                 return;
             }
-
             if (bounds.Height <= 0 || bounds.Width <= 0)
             {
                 state.ProgressBar.Visible = false;
                 return;
             }
-
             int left = statusLeft + 4;
             int width = Math.Max(12, statusWidth - 8);
             int top = bounds.Top + 3;
@@ -2370,12 +2307,10 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return false;
             }
-
             if (index < 0 || index >= _fileListView.Items.Count)
             {
                 return false;
             }
-
             try
             {
                 bounds = _fileListView.GetItemRect(index, ItemBoundsPortion.Entire);
@@ -2428,7 +2363,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             if (_layoutAdjustingClientSize)
             {
                 return;
@@ -2536,7 +2470,8 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     _cancellationSource.Dispose();
                     _cancellationSource = null;
-                }                if (!_uploadCompleted && preparedContext != null)
+                }
+                if (!_uploadCompleted && preparedContext != null)
                 {
                     TryCleanupPreparedUploadContext(preparedContext, "upload_not_completed");
                 }
@@ -2629,7 +2564,6 @@ namespace NcTalkOutlookAddIn.UI
                             FooterButtonLayoutHelper.DefaultSpacing,
                             true);
                     }
-
                     int buttonsTop = Math.Min(continueButton.Top, backButton.Top);
                     int requiredHeight = label.Bottom + verticalGap + continueButton.Height + FooterButtonLayoutHelper.DefaultBottomPadding;
                     if (requiredHeight > dialog.ClientSize.Height)
@@ -2662,7 +2596,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             bool activatePump = false;
             lock (_uploadProgressSync)
             {
@@ -2679,7 +2612,6 @@ namespace NcTalkOutlookAddIn.UI
                     activatePump = true;
                 }
             }
-
             if (!activatePump)
             {
                 return;
@@ -2695,13 +2627,11 @@ namespace NcTalkOutlookAddIn.UI
                 ResetUploadProgressPump();
                 return;
             }
-
             if (InvokeRequired)
             {
                 BeginInvoke(new Action(EnsureUploadProgressPumpRunning));
                 return;
             }
-
             if (!_uploadProgressFlushTimer.Enabled)
             {
                 _uploadProgressFlushTimer.Start();
@@ -2743,7 +2673,6 @@ namespace NcTalkOutlookAddIn.UI
                 _pendingUploadProgress.Clear();
                 _pendingUploadProgressOrder.Clear();
             }
-
             foreach (var progress in snapshot)
             {
                 ApplyUploadProgress(progress);
@@ -2760,7 +2689,8 @@ namespace NcTalkOutlookAddIn.UI
                         break;
                     }
                 }
-            }            if (activeUploadItem != null)
+            }
+            if (activeUploadItem != null)
             {
                 EnsureUploadItemVisible(activeUploadItem, true);
             }
@@ -2786,7 +2716,6 @@ namespace NcTalkOutlookAddIn.UI
                 _pendingUploadProgressOrder.Clear();
                 _uploadProgressPumpRequested = false;
             }
-
             if (_uploadProgressFlushTimer.Enabled)
             {
                 _uploadProgressFlushTimer.Stop();
@@ -2817,7 +2746,8 @@ namespace NcTalkOutlookAddIn.UI
                 percent = Math.Max(0, Math.Min(100, percent));                if (state.ProgressBar == null)
                 {
                     state.ProgressBar = CreateProgressBar();
-                }                if (state.ProgressBar != null)
+                }
+                if (state.ProgressBar != null)
                 {
                     state.ProgressBar.Visible = true;
                     state.ProgressBar.Value = percent;
@@ -2873,18 +2803,15 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int index = item.Index;
             if (index < 0 || index >= _fileListView.Items.Count)
             {
                 return;
             }
-
             if (!forceScroll && ReferenceEquals(_lastAutoScrolledUploadItem, item))
             {
                 return;
             }
-
             if (!forceScroll && IsQueueItemVisible(index))
             {
                 _lastAutoScrolledUploadItem = item;
@@ -2902,7 +2829,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return false;
             }
-
             int top = bounds.Top;
             int bottom = bounds.Bottom;
             int viewTop = 0;
@@ -2949,14 +2875,12 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return null;
             }
-
             if (InvokeRequired)
             {
                 string result = null;
                 Invoke(new MethodInvoker(() => { result = ShowRenameDialog(info); }));
                 return result;
             }
-
             return ShowRenameDialog(info);
         }
 
@@ -3038,7 +2962,6 @@ namespace NcTalkOutlookAddIn.UI
                             FooterButtonLayoutHelper.DefaultSpacing,
                             true);
                     }
-
                     int requiredHeight = textBox.Bottom + verticalGap + okButton.Height + FooterButtonLayoutHelper.DefaultBottomPadding;
                     if (requiredHeight > form.ClientSize.Height)
                     {
@@ -3063,13 +2986,11 @@ namespace NcTalkOutlookAddIn.UI
                     {
                         return null;
                     }
-
                     string sanitized = FileLinkService.SanitizeComponent(input);
                     if (string.IsNullOrEmpty(sanitized))
                     {
                         return null;
                     }
-
                     if (!info.IsDirectory)
                     {
                         SelectionUploadState state;
@@ -3078,21 +2999,15 @@ namespace NcTalkOutlookAddIn.UI
                             state.RenamedTo = sanitized;
                         }
                     }
-
                     return sanitized;
                 }
             }
-
             return null;
         }
 
         private int GetMinPasswordLength()
-        {            if (_passwordPolicy != null && _passwordPolicy.MinLength > 0)
-            {
-                return _passwordPolicy.MinLength;
-            }
-
-            return DefaultMinPasswordLength;
+        {
+            return PasswordGenerationHelper.ResolveMinLength(_passwordPolicy, DefaultMinPasswordLength);
         }
 
         private void GeneratePassword()
@@ -3101,34 +3016,17 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int minLength = GetMinPasswordLength();
             _passwordTextBox.Text = GeneratePasswordValue(minLength);
         }
 
         private string GeneratePasswordValue(int minLength)
         {
-            string generated = null;
-
-            try
-            {                if (_configuration != null && _passwordPolicy != null && _passwordPolicy.HasPolicy)
-                {
-                    var policyService = new PasswordPolicyService(_configuration);
-                    generated = policyService.GeneratePassword(_passwordPolicy);
-                }
-            }
-            catch (Exception ex)
-            {
-                generated = null;
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Password generation via server policy failed; falling back to local generator.", ex);
-            }
-
-            if (string.IsNullOrWhiteSpace(generated) || generated.Trim().Length < minLength)
-            {
-                generated = PasswordGenerator.GenerateLocalPassword(minLength);
-            }
-
-            return generated;
+            return PasswordGenerationHelper.GenerateWithServerPolicyFallback(
+                _configuration,
+                _passwordPolicy,
+                minLength,
+                LogCategories.FileLink);
         }
 
         private bool IsPasswordValid(string password)
@@ -3137,7 +3035,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return false;
             }
-
             string trimmed = password.Trim();
             int minLength = GetMinPasswordLength();
             return trimmed.Length >= minLength;

@@ -98,7 +98,6 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return value;
             }
-
             return null;
         }
 
@@ -117,7 +116,6 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return false;
             }
-
             return policy.ContainsKey(key);
         }
 
@@ -141,13 +139,11 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return false;
             }
-
             bool isEditable;
             if (!TryConvertBool(rawEditable, out isEditable))
             {
                 return false;
             }
-
             return !isEditable;
         }
 
@@ -161,7 +157,6 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return false;
             }
-
             return TryConvertBool(raw, out value);
         }
 
@@ -175,7 +170,6 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return false;
             }
-
             return TryConvertInt(raw, out value);
         }
 
@@ -188,7 +182,6 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return string.Empty;
             }
-
             string text = Convert.ToString(raw, CultureInfo.InvariantCulture);
             return text == null ? string.Empty : text.Trim();
         }
@@ -200,7 +193,6 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return normalized == "talk" ? TalkPolicy : SharePolicy;
             }
-
             return normalized == "talk" ? TalkEditable : ShareEditable;
         }
 
@@ -210,31 +202,26 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return false;
             }
-
             if (raw is bool)
             {
                 value = (bool)raw;
                 return true;
             }
-
             if (raw is int)
             {
                 value = (int)raw != 0;
                 return true;
             }
-
             if (raw is long)
             {
                 value = (long)raw != 0L;
                 return true;
             }
-
             if (raw is double)
             {
                 value = Math.Abs((double)raw) > 0.0001d;
                 return true;
             }
-
             string text = Convert.ToString(raw, CultureInfo.InvariantCulture);
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -262,14 +249,12 @@ namespace NcTalkOutlookAddIn.Models
                 value = false;
                 return true;
             }
-
             bool parsed;
             if (bool.TryParse(text, out parsed))
             {
                 value = parsed;
                 return true;
             }
-
             return false;
         }
 
@@ -279,13 +264,11 @@ namespace NcTalkOutlookAddIn.Models
             {
                 return false;
             }
-
             if (raw is int)
             {
                 value = (int)raw;
                 return true;
             }
-
             if (raw is long)
             {
                 long asLong = (long)raw;
@@ -297,20 +280,17 @@ namespace NcTalkOutlookAddIn.Models
                 value = (int)asLong;
                 return true;
             }
-
             string text = Convert.ToString(raw, CultureInfo.InvariantCulture);
             if (string.IsNullOrWhiteSpace(text))
             {
                 return false;
             }
-
             int parsed;
             if (int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
             {
                 value = parsed;
                 return true;
             }
-
             return false;
         }
     }

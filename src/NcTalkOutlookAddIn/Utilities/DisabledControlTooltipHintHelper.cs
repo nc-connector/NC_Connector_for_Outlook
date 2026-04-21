@@ -210,7 +210,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 fallbackTargets = new Control[0];
             }
-
             bool showHint;
             if (!_showHintByPrimary.TryGetValue(primary, out showHint))
             {
@@ -230,29 +229,28 @@ namespace NcTalkOutlookAddIn.Utilities
         {            if (primary == null)
             {
                 return null;
-            }            if (anchorOverride != null && anchorOverride.Visible && anchorOverride.Parent != null)
+            }
+            if (anchorOverride != null && anchorOverride.Visible && anchorOverride.Parent != null)
             {
                 return anchorOverride;
             }
-
             if (primary is CheckBox || primary is RadioButton || primary is Label || primary is LinkLabel)
             {
                 return primary;
-            }            if (fallbackTargets != null)
+            }
+            if (fallbackTargets != null)
             {
                 foreach (Control target in fallbackTargets)
                 {                    if (target == null || !target.Visible)
                     {
                         continue;
                     }
-
                     if (target is Label || target is LinkLabel || target is CheckBox || target is RadioButton)
                     {
                         return target;
                     }
                 }
             }
-
             return primary;
         }
 
@@ -262,7 +260,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             int x = anchor.Right + HintSpacing;
             int y = anchor.Top + Math.Max(0, (anchor.Height - hint.Height) / 2);
             int maxX = Math.Max(HintSpacing, parent.ClientSize.Width - hint.Width - HintSpacing);
@@ -271,17 +268,14 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 maxX = Math.Min(maxX, rightNeighborLeft - hint.Width - HintSpacing);
             }
-
             if (x > maxX)
             {
                 x = maxX;
             }
-
             if (x < HintSpacing)
             {
                 x = HintSpacing;
             }
-
             int maxY = Math.Max(0, parent.ClientSize.Height - hint.Height - HintSpacing);
             hint.Location = new Point(x, Math.Min(y, maxY));
         }
@@ -291,7 +285,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return 0;
             }
-
             int nearestLeft = int.MaxValue;
             int hintBottom = hintTop + hintHeight;
 
@@ -300,24 +293,20 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     continue;
                 }
-
                 if (sibling.Left <= anchor.Right)
                 {
                     continue;
                 }
-
                 bool overlapsVertically = sibling.Bottom > hintTop && sibling.Top < hintBottom;
                 if (!overlapsVertically)
                 {
                     continue;
                 }
-
                 if (sibling.Left < nearestLeft)
                 {
                     nearestLeft = sibling.Left;
                 }
             }
-
             return nearestLeft == int.MaxValue ? 0 : nearestLeft;
         }
 

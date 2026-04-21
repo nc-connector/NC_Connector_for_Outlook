@@ -28,7 +28,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 errorMessage = "Target is empty.";
                 return false;
             }
-
             try
             {
                 Process.Start(new ProcessStartInfo

@@ -24,24 +24,20 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
-
             string payload = responseText.Trim().TrimStart('\uFEFF');
             if (payload.StartsWith(")]}',", StringComparison.Ordinal))
             {
                 int newlineIndex = payload.IndexOf('\n');
                 payload = newlineIndex >= 0 ? payload.Substring(newlineIndex + 1) : string.Empty;
             }
-
             if (payload.StartsWith("while(1);", StringComparison.Ordinal))
             {
                 payload = payload.Substring("while(1);".Length);
             }
-
             if (payload.StartsWith("for(;;);", StringComparison.Ordinal))
             {
                 payload = payload.Substring("for(;;);".Length);
             }
-
             return payload.Trim();
         }
 
@@ -52,7 +48,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return null;
             }
-
             return Serializer.DeserializeObject(payload) as IDictionary<string, object>;
         }
 
@@ -71,7 +66,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return null;
             }
-
             return value as IDictionary<string, object>;
         }
 
@@ -85,12 +79,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return null;
             }
-
             if (value is IDictionary<string, object>)
             {
                 return null;
             }
-
             return value as string ?? Convert.ToString(value, CultureInfo.InvariantCulture);
         }
 
@@ -117,13 +109,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return false;
             }
-
             if (raw is int)
             {
                 value = (int)raw;
                 return true;
             }
-
             if (raw is long)
             {
                 long longValue = (long)raw;
@@ -135,20 +125,17 @@ namespace NcTalkOutlookAddIn.Utilities
                 value = (int)longValue;
                 return true;
             }
-
             if (raw is bool)
             {
                 value = (bool)raw ? 1 : 0;
                 return true;
             }
-
             int parsed;
             if (int.TryParse(Convert.ToString(raw, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
             {
                 value = parsed;
                 return true;
             }
-
             return false;
         }
 
@@ -179,12 +166,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return detail ?? string.Empty;
             }
-
             if (string.IsNullOrWhiteSpace(detail) || string.Equals(message, detail, StringComparison.OrdinalIgnoreCase))
             {
                 return message;
             }
-
             return message + " / " + detail;
         }
     }

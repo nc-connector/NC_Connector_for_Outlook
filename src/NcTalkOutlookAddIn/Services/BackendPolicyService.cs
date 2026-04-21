@@ -36,7 +36,6 @@ namespace NcTalkOutlookAddIn.Services
                     fetchSucceeded: false,
                     reason: "credentials_incomplete");
             }
-
             string baseUrl = _configuration.GetNormalizedBaseUrl();
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
@@ -45,7 +44,6 @@ namespace NcTalkOutlookAddIn.Services
                     fetchSucceeded: false,
                     reason: "base_url_invalid");
             }
-
             string endpointUrl = baseUrl.TrimEnd('/') + StatusEndpointPath;
 
             IDictionary<string, object> payload;
@@ -155,7 +153,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", null);
                 }
-
                 return false;
             }
 
@@ -186,7 +183,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return Strings.PolicyWarningNoSeat;
             }
-
             if (!isValid)
             {
                 if (!string.IsNullOrWhiteSpace(seatState))
@@ -196,10 +192,8 @@ namespace NcTalkOutlookAddIn.Services
                         Strings.PolicyWarningSeatStateFormat,
                         seatState);
                 }
-
                 return Strings.PolicyWarningLicenseInvalid;
             }
-
             if (!string.IsNullOrWhiteSpace(seatState))
             {
                 return string.Format(
@@ -207,7 +201,6 @@ namespace NcTalkOutlookAddIn.Services
                     Strings.PolicyWarningSeatStateFormat,
                     seatState);
             }
-
             return Strings.PolicyWarningLicenseInvalid;
         }
 
@@ -216,7 +209,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             bool seatAssigned = GetBool(status, "seat_assigned");
             bool isValid = GetBool(status, "is_valid");
             string seatState = NcJson.GetStringOrEmpty(status, "seat_state");
@@ -227,7 +219,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return true;
             }
-
             return false;
         }
         private static bool GetBool(IDictionary<string, object> parent, string key)
@@ -240,7 +231,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             bool value;
             return BackendPolicyStatus.TryConvertBool(raw, out value) && value;
         }

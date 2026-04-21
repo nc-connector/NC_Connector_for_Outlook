@@ -21,7 +21,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             try
             {
                 Marshal.ReleaseComObject(comObject);
@@ -37,7 +36,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             try
             {
                 Marshal.FinalReleaseComObject(comObject);
@@ -62,7 +60,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     return string.Empty;
                 }
-
                 return unchecked((ulong)unk.ToInt64()).ToString("X16", CultureInfo.InvariantCulture);
             }
             catch (Exception ex)
@@ -102,24 +99,20 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return false;
             }
-
             if (!Marshal.IsComObject(first) || !Marshal.IsComObject(second))
             {
                 return ReferenceEquals(first, second);
             }
-
             string firstKey = ResolveIdentityKey(first, category, firstName);
             if (string.IsNullOrWhiteSpace(firstKey))
             {
                 return false;
             }
-
             string secondKey = ResolveIdentityKey(second, category, secondName);
             if (string.IsNullOrWhiteSpace(secondKey))
             {
                 return false;
             }
-
             return string.Equals(firstKey, secondKey, StringComparison.Ordinal);
         }
     }

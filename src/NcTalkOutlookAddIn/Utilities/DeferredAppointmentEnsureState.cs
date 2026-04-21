@@ -39,7 +39,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     _suppressedRestrictionCount++;
                     return false;
                 }
-
                 if (_suppressedRestrictionCount > 0)
                 {
                     message = message + " (suppressed " + _suppressedRestrictionCount.ToString(CultureInfo.InvariantCulture) + " similar entries)";
@@ -62,7 +61,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     _lastUnstableIdentityRestrictionLogUtc = nowUtc;
                 }
-
                 return shouldEmit;
             }
         }

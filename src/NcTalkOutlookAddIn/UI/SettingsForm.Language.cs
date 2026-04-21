@@ -63,7 +63,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return "custom";
             }
-
             return Strings.NormalizeLanguageOverride(value);
         }
 
@@ -73,7 +72,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return false;
             }
-
             string normalizedDomain = string.Equals(domain, "talk", StringComparison.OrdinalIgnoreCase)
                 ? "talk"
                 : "share";
@@ -91,7 +89,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return string.Empty;
             }
-
             try
             {
                 string cultureCode = code.Replace('_', '-');
@@ -151,7 +148,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             string normalized = NormalizeLanguageChoice(value);
             foreach (var item in combo.Items)
             {
@@ -165,7 +161,6 @@ namespace NcTalkOutlookAddIn.UI
                     return;
                 }
             }
-
             if (combo.Items.Count > 0)
             {
                 foreach (var item in combo.Items)
@@ -186,7 +181,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return "default";
             }
-
             var selected = combo.SelectedItem as LanguageOption;
             return selected != null && selected.Enabled ? NormalizeLanguageChoice(selected.Value) : "default";
         }
@@ -213,12 +207,10 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             var selected = combo.SelectedItem as LanguageOption;            if (selected == null)
             {
                 return;
             }
-
             if (!selected.Enabled)
             {
                 SelectLanguageChoice(combo, Convert.ToString(combo.Tag, CultureInfo.InvariantCulture) ?? "default");
@@ -238,7 +230,6 @@ namespace NcTalkOutlookAddIn.UI
                     return;
                 }
             }
-
             if (_talkDefaultRoomTypeCombo.Items.Count > 0)
             {
                 _talkDefaultRoomTypeCombo.SelectedIndex = 0;
@@ -262,7 +253,6 @@ namespace NcTalkOutlookAddIn.UI
                     _talkDefaultRoomTypeLabel);
                 return;
             }
-
             var selected = _talkDefaultRoomTypeCombo.SelectedItem as TalkRoomTypeOption;
             TalkRoomType roomType = selected != null ? selected.Value : TalkRoomType.EventConversation;
             SetTooltipWithFallback(

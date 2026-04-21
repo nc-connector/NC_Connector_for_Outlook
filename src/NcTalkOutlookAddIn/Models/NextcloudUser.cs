@@ -30,7 +30,6 @@ namespace NcTalkOutlookAddIn.Models
                 {
                     return UserId;
                 }
-
                 return UserId + " <" + Email + ">";
             }
         }

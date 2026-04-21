@@ -166,10 +166,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     return new UiThemePalette(UiThemeKind.Dark, officeTheme.Value);
                 }
-
                 return new UiThemePalette(UiThemeKind.Light, officeTheme.Value);
             }
-
             return OutlookThemeDetector.IsDarkThemePreferred()
                 ? new UiThemePalette(UiThemeKind.Dark, OfficeUiTheme.Unknown)
                 : new UiThemePalette(UiThemeKind.Light, OfficeUiTheme.Unknown);
@@ -203,7 +201,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to apply tab chrome to control tree.", ex);
             }
-
             if (!palette.IsDark)
             {
                 return;
@@ -216,7 +213,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     ApplyToToolTip(toolTip, palette);
                 }
             }
-
             if (form.IsHandleCreated)
             {
                 TrySetDarkTitleBar(form.Handle, true);
@@ -254,17 +250,14 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 ApplyListView((ListView)root, palette);
             }
-
             if (root is DateTimePicker)
             {
                 ApplyDateTimePicker((DateTimePicker)root, palette);
             }
-
             if (root is ComboBox)
             {
                 ApplyComboBox((ComboBox)root, palette);
             }
-
             foreach (Control child in root.Controls)
             {
                 if (child is BrandedHeader)
@@ -281,12 +274,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             if (root is TabControl)
             {
                 ApplyTabControl((TabControl)root, palette);
             }
-
             foreach (Control child in root.Controls)
             {
                 if (child is BrandedHeader)
@@ -303,26 +294,22 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             if (control is BrandedHeader)
             {
                 return;
             }
-
             if (control is Form)
             {
                 control.BackColor = palette.WindowBackground;
                 control.ForeColor = palette.Text;
                 return;
             }
-
             if (control is TabPage || control is Panel)
             {
                 control.BackColor = palette.WindowBackground;
                 control.ForeColor = palette.Text;
                 return;
             }
-
             if (control is GroupBox)
             {
                 control.BackColor = palette.WindowBackground;
@@ -331,7 +318,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 control.ForeColor = palette.MutedText;
                 return;
             }
-
             if (control is Label)
             {
                 var label = (Label)control;
@@ -346,7 +332,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 label.BackColor = palette.WindowBackground;
                 return;
             }
-
             if (control is LinkLabel)
             {
                 var link = (LinkLabel)control;
@@ -357,14 +342,12 @@ namespace NcTalkOutlookAddIn.Utilities
                 link.VisitedLinkColor = palette.LinkText;
                 return;
             }
-
             if (control is TextBoxBase || control is ComboBox || control is ListBox || control is NumericUpDown)
             {
                 control.BackColor = palette.InputBackground;
                 control.ForeColor = control.Enabled ? palette.Text : palette.DisabledText;
                 return;
             }
-
             if (control is Button)
             {
                 var button = (Button)control;
@@ -378,14 +361,12 @@ namespace NcTalkOutlookAddIn.Utilities
                 button.FlatAppearance.MouseDownBackColor = palette.SelectionBackground;
                 return;
             }
-
             if (control is CheckBox || control is RadioButton)
             {
                 control.BackColor = palette.WindowBackground;
                 control.ForeColor = palette.Text;
                 return;
             }
-
             if (control is ListView)
             {
                 control.BackColor = palette.InputBackground;
@@ -399,7 +380,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             try
             {
                 toolTip.BackColor = palette.ControlBackground;
@@ -453,7 +433,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 comboBox.ItemHeight = desiredItemHeight;
             }
-
             if (comboBox.DrawMode != DrawMode.OwnerDrawFixed)
             {
                 comboBox.DrawMode = DrawMode.OwnerDrawFixed;
@@ -468,7 +447,6 @@ namespace NcTalkOutlookAddIn.Utilities
                         {
                             return;
                         }
-
                         bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                         Color back = selected ? palette.SelectionBackground : palette.InputBackground;
                         Color text = selected ? palette.SelectionText : palette.Text;
@@ -477,7 +455,6 @@ namespace NcTalkOutlookAddIn.Utilities
                         {
                             e.Graphics.FillRectangle(brush, e.Bounds);
                         }
-
                         string itemText = combo.GetItemText(combo.Items[e.Index]);
                         TextRenderer.DrawText(
                             e.Graphics,
@@ -514,7 +491,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 page.ForeColor = palette.Text;
                 page.UseVisualStyleBackColor = false;
             }
-
             if (IsAdaptiveTabControl(control))
             {
                 ApplyAdaptiveTabLayout(control);
@@ -594,7 +570,6 @@ namespace NcTalkOutlookAddIn.Utilities
                             e.Graphics.DrawLine(borderPen, right, top, right, bottom);
                         }
                     }
-
                     string label = tab.TabPages[e.Index].Text;
                     Rectangle textBounds = e.Bounds;
                     textBounds.Inflate(-6, 0);
@@ -621,7 +596,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     {
                         return;
                     }
-
                     int stripHeight = tab.DisplayRectangle.Top;
                     if (stripHeight <= 0)
                     {
@@ -684,7 +658,6 @@ namespace NcTalkOutlookAddIn.Utilities
                             {
                                 selectedRect = tab.GetTabRect(tab.SelectedIndex);
                             }
-
                             int xRight = tab.ClientSize.Width - 1;
                             if (selectedRect.IsEmpty)
                             {
@@ -698,12 +671,10 @@ namespace NcTalkOutlookAddIn.Utilities
                                 {
                                     breakRight = tab.ClientSize.Width;
                                 }
-
                                 if (breakLeft > 0)
                                 {
                                     e.Graphics.DrawLine(borderPen, 0, y, breakLeft, y);
                                 }
-
                                 if (breakRight < xRight)
                                 {
                                     e.Graphics.DrawLine(borderPen, breakRight, y, xRight, y);
@@ -724,7 +695,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             try
             {
                 // Disable themed painting for this control to prevent bright UI artifacts in dark mode and to
@@ -745,12 +715,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             if (root is TabControl)
             {
                 ApplyTabStretch((TabControl)root);
             }
-
             foreach (Control child in root.Controls)
             {
                 ApplyTabStretchToControlTree(child);
@@ -762,7 +730,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             if (IsAdaptiveTabControl(control))
             {
                 ApplyAdaptiveTabLayout(control);
@@ -825,19 +792,16 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             int tabCount = control.TabPages.Count;
             int availableWidth = control.ClientSize.Width;
             if (availableWidth <= 0)
             {
                 availableWidth = control.Width;
             }
-
             if (availableWidth <= 0 || tabCount <= 0)
             {
                 return;
             }
-
             int dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
             int safetyMargin = (int)Math.Round(16f * (dpi / 96f));
             int textPadding = (int)Math.Round(30f * (dpi / 96f));
@@ -853,7 +817,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     maxTextWidth = textWidth;
                 }
             }
-
             int minReadableWidth = Math.Max(40, maxTextWidth + textPadding);
             int desiredWidth = Math.Max(fillWidth, minReadableWidth);
             if (desiredWidth <= 0)
@@ -870,7 +833,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 control.SizeMode = TabSizeMode.Fixed;
             }
-
             if (control.ItemSize.Width != desiredWidth || control.ItemSize.Height != desiredHeight)
             {
                 control.ItemSize = new Size(desiredWidth, desiredHeight);
@@ -882,13 +844,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return false;
             }
-
             string typeName = control.GetType().Name ?? string.Empty;
             if (string.Equals(typeName, "SettingsTabControl", StringComparison.Ordinal))
             {
                 return true;
             }
-
             return control.TabPages != null && control.TabPages.Count >= 6;
         }
 
@@ -897,7 +857,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             int dpi = control.DeviceDpi > 0 ? control.DeviceDpi : 96;
             int padX = Math.Max(8, (int)Math.Round(12f * (dpi / 96f)));
             int padY = Math.Max(4, (int)Math.Round(7f * (dpi / 96f)));
@@ -906,22 +865,18 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 control.DrawMode = TabDrawMode.Normal;
             }
-
             if (control.SizeMode != TabSizeMode.Normal)
             {
                 control.SizeMode = TabSizeMode.Normal;
             }
-
             if (!control.Multiline)
             {
                 control.Multiline = true;
             }
-
             if (control.Padding.X != padX || control.Padding.Y != padY)
             {
                 control.Padding = new Point(padX, padY);
             }
-
             if (control.ItemSize != Size.Empty)
             {
                 control.ItemSize = Size.Empty;
@@ -934,7 +889,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             try
             {
                 int useDark = enabled ? 1 : 0;
@@ -992,7 +946,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed while detecting dark theme preference.", ex);
             }
-
             return false;
         }
 
@@ -1022,7 +975,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     {
                         return jsonTheme.Value;
                     }
-
                     foreach (string name in valueNames)
                     {
                         object value = ReadRegistryValue(Registry.CurrentUser, key, name);                        if (value == null)
@@ -1038,7 +990,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     }
                 }
             }
-
             return null;
         }
 
@@ -1048,7 +999,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return null;
             }
-
             try
             {
                 object raw = ReadRegistryValue(Registry.CurrentUser, outlookOptionsKey, "MonarchInboxPrimingData");
@@ -1073,7 +1023,6 @@ namespace NcTalkOutlookAddIn.Utilities
                         isReallyDark = parsed;
                     }
                 }
-
                 if (!string.IsNullOrEmpty(themeText))
                 {
                     string normalized = themeText.Trim().ToLowerInvariant();
@@ -1108,7 +1057,6 @@ namespace NcTalkOutlookAddIn.Utilities
                         }
                     }
                 }
-
                 if (isReallyDark.HasValue)
                 {
                     return isReallyDark.Value ? OfficeUiTheme.Black : OfficeUiTheme.White;
@@ -1118,7 +1066,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to parse Outlook theme JSON payload.", ex);
             }
-
             return null;
         }
 
@@ -1127,7 +1074,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return null;
             }
-
             try
             {
                 // Common Office mapping (Office 2016/2019/365):
@@ -1140,7 +1086,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     if (numeric == 2) return OfficeUiTheme.Black;
                     if (numeric == 3) return OfficeUiTheme.White;
                 }
-
                 string text = rawValue as string;
                 if (!string.IsNullOrEmpty(text))
                 {
@@ -1167,7 +1112,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to parse Office UI theme value.", ex);
             }
-
             return null;
         }
 
@@ -1177,7 +1121,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return null;
             }
-
             try
             {
                 if (value is int)
@@ -1189,7 +1132,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read registry DWORD value '" + valueName + "' from '" + subKey + "'.", ex);
             }
-
             return null;
         }
 
@@ -1198,7 +1140,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return null;
             }
-
             try
             {
                 using (var key = root.OpenSubKey(subKey))
@@ -1206,7 +1147,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     {
                         return null;
                     }
-
                     return key.GetValue(valueName);
                 }
             }

@@ -40,7 +40,8 @@ namespace NcTalkOutlookAddIn
             if (!string.IsNullOrWhiteSpace(outlookProfileName))
             {
                 LogCore("Using Outlook profile settings: " + outlookProfileName + ".");
-            }            if (_currentSettings != null)
+            }
+            if (_currentSettings != null)
             {
                 LogSettings("Settings loaded (AuthMode=" + _currentSettings.AuthMode + ", IFB=" + _currentSettings.IfbEnabled + ", IfbPort=" + _currentSettings.IfbPort + ", Debug=" + _currentSettings.DebugLoggingEnabled + ", LogAnonymize=" + _currentSettings.LogAnonymizationEnabled + ").");
             }
@@ -66,7 +67,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 int lcid = languageSettings.LanguageID[MsoAppLanguageID.msoLanguageIDUI];
                 CultureInfo culture = CultureInfo.GetCultureInfo(lcid);
                 Strings.SetPreferredUiLanguage(culture.Name);
@@ -174,7 +174,8 @@ namespace NcTalkOutlookAddIn
                         "Failed to disable IFB during add-in " + (origin ?? "teardown") + ".",
                         ex);
                 }
-            }            if (_freeBusyManager != null)
+            }
+            if (_freeBusyManager != null)
             {
                 _freeBusyManager.Dispose();
             }

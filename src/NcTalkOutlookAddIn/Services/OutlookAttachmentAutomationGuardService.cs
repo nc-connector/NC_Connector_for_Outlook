@@ -66,7 +66,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return new GuardState(envLock, envThreshold, "env");
             }
-
             bool lockActive = false;
             int thresholdMb = DefaultThresholdMb;
             string source = "default";
@@ -87,7 +86,6 @@ namespace NcTalkOutlookAddIn.Services
                             thresholdMb = NormalizeThresholdMb(detectedThreshold);
                             source = "registry:" + root.Name + "\\" + path;
                         }
-
                         if (detectedLock.HasValue)
                         {
                             if (detectedLock.Value)
@@ -109,7 +107,6 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
             }
-
             return new GuardState(lockActive, thresholdMb, source);
         }
 
@@ -123,7 +120,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             bool parsedLock;
             if (!TryParseBoolean(envLock, out parsedLock))
             {
@@ -140,7 +136,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 thresholdMb = NormalizeThresholdMb(parsedThreshold);
             }
-
             return true;
         }
 
@@ -152,14 +147,12 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             foreach (string valueName in valueNames)
             {
                 if (string.IsNullOrWhiteSpace(valueName))
                 {
                     continue;
                 }
-
                 try
                 {
                     object raw = Registry.GetValue(root.Name + "\\" + relativePath, valueName, null);
@@ -177,7 +170,6 @@ namespace NcTalkOutlookAddIn.Services
                         ex);
                 }
             }
-
             return false;
         }
 
@@ -188,27 +180,23 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             foreach (string valueName in valueNames)
             {
                 if (string.IsNullOrWhiteSpace(valueName))
                 {
                     continue;
                 }
-
                 try
                 {
                     object raw = Registry.GetValue(root.Name + "\\" + relativePath, valueName, null);                    if (raw == null)
                     {
                         continue;
                     }
-
                     bool parsed;
                     if (TryParseBoolean(Convert.ToString(raw), out parsed))
                     {
                         return parsed;
                     }
-
                     int intValue;
                     if (int.TryParse(Convert.ToString(raw), out intValue))
                     {
@@ -223,7 +211,6 @@ namespace NcTalkOutlookAddIn.Services
                         ex);
                 }
             }
-
             return null;
         }
 
@@ -234,7 +221,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             string trimmed = value.Trim();
             if (string.Equals(trimmed, "1", StringComparison.OrdinalIgnoreCase))
             {

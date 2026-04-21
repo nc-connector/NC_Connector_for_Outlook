@@ -50,7 +50,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 _owner.OnSettingsButtonPressed(control);
                 return;
             }
-
             if (!EnsureAuthenticationValid(control))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Talk link cancelled: authentication failed.");
@@ -67,7 +66,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     MessageBoxIcon.Warning);
                 return;
             }
-
             var subject = appointment.Subject ?? string.Empty;
             var start = appointment.Start == DateTime.MinValue ? DateTime.Now : appointment.Start;
             var end = appointment.End == DateTime.MinValue ? start.AddHours(1) : appointment.End;
@@ -125,7 +123,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     NextcloudTalkAddIn.LogTalkMessage("Talk link dialog cancelled.");
                     return;
                 }
-
                 string descriptionLanguage = NextcloudTalkAddIn.ResolveTalkDescriptionLanguage(
                     policyStatus,
                     settings.EventDescriptionLang);
@@ -149,7 +146,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         MessageBoxIcon.Error);
                     return;
                 }
-
                 var request = new TalkRoomRequest
                 {
                     Title = dialog.TalkTitle,
@@ -185,7 +181,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         NextcloudTalkAddIn.LogTalkMessage("Replacement declined, operation ended.");
                         return;
                     }
-
                     var existingType = TalkAppointmentController.GetRoomType(appointment);
                     bool existingIsEvent = existingType.HasValue && existingType.Value == TalkRoomType.EventConversation;
                     NextcloudTalkAddIn.LogTalkMessage("Attempting to delete existing room (event=" + existingIsEvent + ").");
@@ -255,7 +250,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         NextcloudTalkAddIn.LogTalkMessage("Credentials verified (response=" + (string.IsNullOrEmpty(response) ? "OK" : response) + ").");
                         return true;
                     }
-
                     string message = string.IsNullOrEmpty(response)
                         ? Strings.ErrorCredentialsNotVerified
                         : string.Format(CultureInfo.CurrentCulture, Strings.ErrorCredentialsNotVerifiedFormat, response);
@@ -301,7 +295,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 _owner.OnSettingsButtonPressed(control);
             }
-
             return false;
         }
     }

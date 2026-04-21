@@ -32,11 +32,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment recipients.", ex);
                 recipients = null;
-            }            if (recipients == null)
+            }
+            if (recipients == null)
             {
                 return emails;
             }
-
             try
             {
                 int count = recipients.Count;
@@ -49,7 +49,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         {
                             continue;
                         }
-
                         int type = 0;
                         try
                         {
@@ -66,7 +65,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         {
                             continue;
                         }
-
                         string email = TryResolveRecipientSmtpAddress(recipient);
                         if (string.IsNullOrWhiteSpace(email))
                         {
@@ -93,7 +91,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 ComInteropScope.TryRelease(recipients, LogCategories.Talk, "Failed to release Recipients COM object.");
             }
-
             return emails;
         }
 
@@ -102,7 +99,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return null;
             }
-
             string address = null;
             try
             {
@@ -113,7 +109,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Recipient.Address.", ex);
                 address = null;
             }
-
             if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
             {
                 return address;
@@ -128,7 +123,8 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Recipient.AddressEntry.", ex);
                 entry = null;
-            }            if (entry != null)
+            }
+            if (entry != null)
             {
                 try
                 {
@@ -141,7 +137,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve Exchange user from address entry.", ex);
                         exUser = null;
-                    }                    if (exUser != null)
+                    }
+                    if (exUser != null)
                     {
                         try
                         {
@@ -161,12 +158,10 @@ namespace NcTalkOutlookAddIn.Controllers
                     ComInteropScope.TryRelease(entry, LogCategories.Talk, "Failed to release AddressEntry COM object.");
                 }
             }
-
             if (!string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0)
             {
                 return address;
             }
-
             try
             {
                 Outlook.PropertyAccessor accessor = recipient.PropertyAccessor;                if (accessor != null)
@@ -186,7 +181,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve SMTP address via PropertyAccessor.", ex);
             }
-
             return !string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0 ? address : null;
         }
     }

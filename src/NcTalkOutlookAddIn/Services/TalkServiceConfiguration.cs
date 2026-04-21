@@ -34,18 +34,15 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return string.Empty;
             }
-
             if (!trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
                 && !trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 trimmed = "https://" + trimmed;
             }
-
             while (trimmed.EndsWith("/", StringComparison.Ordinal))
             {
                 trimmed = trimmed.Substring(0, trimmed.Length - 1);
             }
-
             return trimmed;
         }
 

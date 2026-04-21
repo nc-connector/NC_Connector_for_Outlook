@@ -32,7 +32,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 if (cancel)
                 {
                     LogFileLink("Compose send cancelled before dispatch handling (composeKey=" + _composeKey + ").");
@@ -70,7 +69,6 @@ namespace NcTalkOutlookAddIn
                     double elapsedMs = (DateTime.UtcNow - _sendPendingAtUtc).TotalMilliseconds;
                     delayMs = (int)Math.Max(0, ComposeShareCleanupSendGraceMs - elapsedMs);
                 }
-
                 if (sendState == ComposeSendState.Sent)
                 {
                     ClearShareCleanupEntries("after_send_success");
@@ -78,7 +76,6 @@ namespace NcTalkOutlookAddIn
                     Dispose();
                     return;
                 }
-
                 if (sendState == ComposeSendState.UnavailableAfterSend)
                 {
                     if (hasPendingPostSendWork && delayMs > 0)
@@ -101,7 +98,6 @@ namespace NcTalkOutlookAddIn
                     Dispose();
                     return;
                 }
-
                 if (hasPendingPostSendWork && _sendPending && delayMs > 0)
                 {
                     _awaitingGraceCloseResolution = true;
@@ -116,7 +112,6 @@ namespace NcTalkOutlookAddIn
                         + ", reason=close_send_pending).");
                     return;
                 }
-
                 if (hasPendingPostSendWork && _sendPending)
                 {
                     LogFileLink(
@@ -128,12 +123,10 @@ namespace NcTalkOutlookAddIn
                     Dispose();
                     return;
                 }
-
                 if (_cleanupEntries.Count > 0)
                 {
                     DeleteShareCleanupEntries("close_without_successful_send");
                 }
-
                 if (_passwordDispatchQueue.Count > 0)
                 {
                     ClearSeparatePasswordDispatchQueue("close_without_successful_send");
@@ -226,7 +219,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return "0x00000000";
                 }
-
                 return "0x" + unchecked((uint)ex.HResult).ToString("X8", CultureInfo.InvariantCulture);
             }
 
@@ -236,7 +228,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 for (int i = 0; i < _cleanupEntries.Count; i++)
                 {
                     ComposeShareCleanupEntry entry = _cleanupEntries[i];
@@ -304,7 +295,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 string to;
                 string cc;
                 string bcc;
@@ -315,7 +305,6 @@ namespace NcTalkOutlookAddIn
                     cc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("CC"));
                     bcc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("BCC"));
                 }
-
                 for (int i = 0; i < _passwordDispatchQueue.Count; i++)
                 {
                     _passwordDispatchQueue[i].To = to;
@@ -347,7 +336,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return false;
                 }
-
                 var toRecipients = new List<string>();
                 var ccRecipients = new List<string>();
                 var bccRecipients = new List<string>();
@@ -358,7 +346,6 @@ namespace NcTalkOutlookAddIn
                     {
                         return false;
                     }
-
                     int count = 0;
                     try
                     {
@@ -372,7 +359,6 @@ namespace NcTalkOutlookAddIn
                             ex);
                         count = 0;
                     }
-
                     for (int i = 1; i <= count; i++)
                     {
                         Outlook.Recipient recipient = null;
@@ -382,7 +368,6 @@ namespace NcTalkOutlookAddIn
                             {
                                 continue;
                             }
-
                             string address = TryGetRecipientSmtpAddress(recipient);
                             if (string.IsNullOrWhiteSpace(address))
                             {
@@ -399,12 +384,10 @@ namespace NcTalkOutlookAddIn
                                     address = string.Empty;
                                 }
                             }
-
                             if (string.IsNullOrWhiteSpace(address))
                             {
                                 continue;
                             }
-
                             int recipientType = 1;
                             try
                             {
@@ -418,7 +401,6 @@ namespace NcTalkOutlookAddIn
                                     ex);
                                 recipientType = 1;
                             }
-
                             if (recipientType == (int)Outlook.OlMailRecipientType.olCC)
                             {
                                 ComposeShareLifecycleController.AddUniqueRecipient(ccRecipients, address);
@@ -463,7 +445,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 var queue = new List<SeparatePasswordDispatchEntry>(_passwordDispatchQueue);
                 _passwordDispatchQueue.Clear();
                 LogFileLink(

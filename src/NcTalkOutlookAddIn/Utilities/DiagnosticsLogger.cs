@@ -196,7 +196,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 WriteLogLine(category, context);
                 return;
             }
-
             string message = string.IsNullOrWhiteSpace(context) ? "Exception" : context.Trim();
             WriteLogLine(category, message + ": " + ex);
         }
@@ -219,7 +218,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return message ?? string.Empty;
             }
-
             try
             {
                 string value = message;
@@ -248,7 +246,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return value;
             }
-
             string redacted = value;
             for (int i = 0; i < _serverUrlTokens.Length; i++)
             {
@@ -260,7 +257,6 @@ namespace NcTalkOutlookAddIn.Utilities
 
                 redacted = Regex.Replace(redacted, Regex.Escape(token), "<NC_URL>", RegexOptions.IgnoreCase);
             }
-
             return redacted;
         }
 
@@ -270,13 +266,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return value;
             }
-
             return EmailRegex.Replace(value, match =>
             {                if (match == null || string.IsNullOrEmpty(match.Value))
                 {
                     return "<EMAIL>";
                 }
-
                 string hash = ComputeShortHash(match.Value);
                 return "<EMAIL#" + hash + ">";
             });
@@ -303,14 +297,12 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return new string[0];
             }
-
             var tokens = new List<string>();
             string trimmed = serverUrl.Trim();
             if (trimmed.Length == 0)
             {
                 return new string[0];
             }
-
             string raw = trimmed.TrimEnd('/');
             if (!string.IsNullOrEmpty(raw))
             {
@@ -325,13 +317,11 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     tokens.Add(authority);
                 }
-
                 if (!string.IsNullOrWhiteSpace(uri.Host))
                 {
                     tokens.Add(uri.Host);
                 }
             }
-
             var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string token in tokens)
             {
@@ -340,7 +330,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     unique.Add(token);
                 }
             }
-
             var ordered = new List<string>(unique);
             ordered.Sort(delegate (string left, string right)
             {
@@ -404,7 +393,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     {
                         continue;
                     }
-
                     string datePart = fileName.Substring(DailyLogFilePrefix.Length);
                     DateTime parsedDateLocal;
                     if (DateTime.TryParseExact(
@@ -428,7 +416,6 @@ namespace NcTalkOutlookAddIn.Utilities
                         File.Delete(path);
                     }
                 }
-
                 if (datedFiles.Count == 0)
                 {
                     return;

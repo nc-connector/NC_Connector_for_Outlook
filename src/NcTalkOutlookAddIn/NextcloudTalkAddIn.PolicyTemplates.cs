@@ -77,7 +77,6 @@ namespace NcTalkOutlookAddIn
                     return NormalizeTalkDescriptionLanguage(policyLanguageRaw);
                 }
             }
-
             return NormalizeTalkDescriptionLanguage(fallbackLanguageOverride);
         }
 
@@ -88,7 +87,6 @@ namespace NcTalkOutlookAddIn
             {
                 return string.Empty;
             }
-
             return policyStatus.GetPolicyString("talk", "talk_invitation_template");
         }
 
@@ -102,7 +100,6 @@ namespace NcTalkOutlookAddIn
                     return NormalizeTalkEventDescriptionType(policyTypeRaw);
                 }
             }
-
             return "plain_text";
         }
 
@@ -115,13 +112,11 @@ namespace NcTalkOutlookAddIn
             {
                 return "default";
             }
-
             string trimmed = languageOverride.Trim();
             if (string.Equals(trimmed, "custom", StringComparison.OrdinalIgnoreCase))
             {
                 return "custom";
             }
-
             return Strings.NormalizeLanguageOverride(trimmed);
         }
 

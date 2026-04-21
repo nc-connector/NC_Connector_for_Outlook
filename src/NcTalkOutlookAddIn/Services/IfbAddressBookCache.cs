@@ -80,7 +80,6 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         EnsureCache(configuration, cacheHours);
                     }
-
                     int count = _uidToEmail != null ? _uidToEmail.Count : 0;
                     DiagnosticsLogger.Log(
                         LogCategories.Ifb,
@@ -132,7 +131,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             string candidate = (emailOrLocalPart ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(candidate))
             {
@@ -149,14 +147,12 @@ namespace NcTalkOutlookAddIn.Services
                     resolvedEmail = lowered;
                     return true;
                 }
-
                 string mapped;
                 if (_localPartToEmail.TryGetValue(lowered, out mapped))
                 {
                     resolvedEmail = mapped;
                     return true;
                 }
-
                 foreach (var entry in _emailToUid.Keys)
                 {
                     int at = entry.IndexOf('@');
@@ -171,7 +167,6 @@ namespace NcTalkOutlookAddIn.Services
                         }
                     }
                 }
-
                 return false;
             }
         }
@@ -198,7 +193,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     EnsureCache(configuration, cacheHours);
                 }
-
                 foreach (var pair in _uidToEmail)
                 {
                     if (string.IsNullOrWhiteSpace(pair.Key))
@@ -220,7 +214,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 cacheHours = 1;
             }
-
             if (!LoadFromDisk(cacheHours))
             {
                 RefreshFromServer(configuration);
@@ -233,7 +226,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             try
             {
                 string json = File.ReadAllText(_cacheFilePath);
@@ -241,12 +233,10 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     return false;
                 }
-
                 if (data.GeneratedUtc.AddHours(cacheHours) <= DateTime.UtcNow)
                 {
                     return false;
                 }
-
                 var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var uidMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var localMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -255,19 +245,16 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         continue;
                     }
-
                     var key = entry.Email.Trim().ToLowerInvariant();
                     if (!map.ContainsKey(key))
                     {
                         map[key] = entry.Uid.Trim();
                     }
-
                     var uidKey = entry.Uid.Trim();
                     if (!string.IsNullOrEmpty(uidKey) && !uidMap.ContainsKey(uidKey))
                     {
                         uidMap[uidKey] = key;
                     }
-
                     int at = key.IndexOf('@');
                     if (at > 0)
                     {
@@ -299,7 +286,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new InvalidOperationException("Server URL is not configured.");
             }
-
             string addressBookUrl = string.Format(CultureInfo.InvariantCulture,
                 "{0}/remote.php/dav/addressbooks/users/{1}/z-server-generated--system?export",
                 baseUrl,
@@ -334,12 +320,10 @@ namespace NcTalkOutlookAddIn.Services
                 string status = ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture);
                 throw new InvalidOperationException("Address book could not be loaded: HTTP " + status + ".");
             }
-
             if (string.IsNullOrEmpty(responseText))
             {
                 throw new InvalidOperationException("Address book response was empty.");
             }
-
             var entries = ParseAddressBook(responseText);
             var emailMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var uidMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -350,7 +334,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     continue;
                 }
-
                 string uidKey = entry.Uid.Trim();                if (entry.Emails != null)
                 {
                     foreach (var email in entry.Emails)
@@ -359,18 +342,15 @@ namespace NcTalkOutlookAddIn.Services
                         {
                             continue;
                         }
-
                         string emailKey = email.Trim().ToLowerInvariant();
                         if (!emailMap.ContainsKey(emailKey))
                         {
                             emailMap[emailKey] = uidKey;
                         }
-
                         if (!uidMap.ContainsKey(uidKey))
                         {
                             uidMap[uidKey] = emailKey;
                         }
-
                         int at = emailKey.IndexOf('@');
                         if (at > 0)
                         {
@@ -401,7 +381,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     data.Entries.Add(new CacheEntry { Email = kvp.Key, Uid = kvp.Value });
                 }
-
                 string json = _serializer.Serialize(data);
                 File.WriteAllText(_cacheFilePath, json, Encoding.UTF8);
             }
@@ -420,7 +399,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return result;
             }
-
             string normalized = data
                 .Replace("\r\n ", string.Empty)
                 .Replace("\n ", string.Empty)
@@ -440,7 +418,6 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         continue;
                     }
-
                     if (line.StartsWith("BEGIN:VCARD", StringComparison.OrdinalIgnoreCase))
                     {
                         inside = true;
@@ -448,7 +425,6 @@ namespace NcTalkOutlookAddIn.Services
                         emails.Clear();
                         continue;
                     }
-
                     if (line.StartsWith("END:VCARD", StringComparison.OrdinalIgnoreCase))
                     {
                         if (inside && !string.IsNullOrEmpty(uid))
@@ -461,12 +437,10 @@ namespace NcTalkOutlookAddIn.Services
                         emails.Clear();
                         continue;
                     }
-
                     if (!inside)
                     {
                         continue;
                     }
-
                     if (line.StartsWith("UID", StringComparison.OrdinalIgnoreCase))
                     {
                         int colon = line.IndexOf(':', 3);
@@ -476,7 +450,6 @@ namespace NcTalkOutlookAddIn.Services
                         }
                         continue;
                     }
-
                     if (line.StartsWith("EMAIL", StringComparison.OrdinalIgnoreCase))
                     {
                         int colon = line.IndexOf(':', 5);
@@ -491,7 +464,6 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
             }
-
             return result;
         }
 

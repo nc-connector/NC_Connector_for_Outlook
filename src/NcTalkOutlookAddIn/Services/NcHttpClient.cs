@@ -93,12 +93,10 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new ArgumentNullException("options");
             }
-
             if (string.IsNullOrWhiteSpace(options.Url))
             {
                 throw new ArgumentException("URL is required.", "options");
             }
-
             string method = string.IsNullOrWhiteSpace(options.Method) ? "GET" : options.Method.Trim().ToUpperInvariant();
             var result = new NcHttpResponse();
 
@@ -118,22 +116,20 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     request.UserAgent = options.UserAgent;
                 }
-
                 if (options.EnableAutomaticDecompression)
                 {
                     request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
                 }
-
                 if (options.IncludeAuthHeader)
                 {
                     request.Headers["Authorization"] =
                         HttpAuthUtilities.BuildBasicAuthHeader(_username, _appPassword);
                 }
-
                 if (options.IncludeOcsApiHeader)
                 {
                     request.Headers["OCS-APIRequest"] = "true";
-                }                if (options.Headers != null)
+                }
+                if (options.Headers != null)
                 {
                     foreach (var kvp in options.Headers)
                     {
@@ -143,7 +139,6 @@ namespace NcTalkOutlookAddIn.Services
                         }
                     }
                 }
-
                 if (options.ForceFreshConnection)
                 {
                     connectionGroupName = "nc-http-" + Guid.NewGuid().ToString("N");
@@ -151,7 +146,6 @@ namespace NcTalkOutlookAddIn.Services
                     request.KeepAlive = false;
                     request.Pipelined = false;
                 }
-
                 bool hasBody = !string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase)
                                && !string.Equals(method, "DELETE", StringComparison.OrdinalIgnoreCase);
 
@@ -185,7 +179,6 @@ namespace NcTalkOutlookAddIn.Services
                         }
                     }
                 }
-
                 try
                 {
                     response = (HttpWebResponse)request.GetResponse();
@@ -222,12 +215,12 @@ namespace NcTalkOutlookAddIn.Services
                             result.ResponseText = reader.ReadToEnd();
                         }
                     }
-                }                if (result.ResponseText == null && result.ResponseBytes != null && result.ResponseBytes.Length > 0)
+                }
+                if (result.ResponseText == null && result.ResponseBytes != null && result.ResponseBytes.Length > 0)
                 {
                     Encoding responseEncoding = options.ResponseEncoding ?? Encoding.UTF8;
                     result.ResponseText = responseEncoding.GetString(result.ResponseBytes);
                 }
-
                 if (options.ParseJson && !string.IsNullOrWhiteSpace(result.ResponseText))
                 {
                     try
@@ -246,7 +239,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     response.Close();
                 }
-
                 if (options.ForceFreshConnection &&
                     request != null &&
                     !string.IsNullOrEmpty(connectionGroupName))
@@ -261,7 +253,6 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
             }
-
             return result;
         }
     }

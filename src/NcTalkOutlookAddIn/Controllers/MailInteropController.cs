@@ -78,7 +78,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     return null;
                 }
-
                 int hwnd = ReadInspectorWindowHandle(inspector);
                 return hwnd > 0 ? new NativeWindowOwner(new IntPtr(hwnd)) : null;
             }
@@ -98,7 +97,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return 0;
             }
-
             foreach (string propertyName in new[] { "HWND", "Hwnd" })
             {
                 try
@@ -112,7 +110,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         continue;
                     }
-
                     int hwnd;
                     if (int.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out hwnd) && hwnd > 0)
                     {
@@ -127,7 +124,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         ex);
                 }
             }
-
             return 0;
         }
 
@@ -147,7 +143,8 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook ActiveInspector.", ex);
                 inspector = null;
-            }            if (inspector != null)
+            }
+            if (inspector != null)
             {
                 try
                 {
@@ -168,7 +165,8 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook ActiveExplorer.", ex);
                 explorer = null;
-            }            if (explorer != null)
+            }
+            if (explorer != null)
             {
                 object inlineResponse = null;
                 try
@@ -180,13 +178,11 @@ namespace NcTalkOutlookAddIn.Controllers
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read ActiveInlineResponse from Explorer.", ex);
                     inlineResponse = null;
                 }
-
                 var mailItem = inlineResponse as Outlook.MailItem;                if (mailItem != null)
                 {
                     return mailItem;
                 }
             }
-
             return null;
         }
 
@@ -219,7 +215,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             if (TryInsertHtmlIntoMailBody(mail, html))
             {
                 DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (HTMLBody primary).");
@@ -240,7 +235,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 previousClipboard = null;
                 restoreClipboard = false;
             }
-
             try
             {
                 Clipboard.SetText(html, TextDataFormat.Html);
@@ -300,7 +294,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     mail.HTMLBody = insertHtml + existing;
                 }
-
                 return true;
             }
             catch (Exception ex)
@@ -325,11 +318,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access MailItem.GetInspector for HTML paste.", ex);
                 inspector = null;
-            }            if (inspector == null)
+            }
+            if (inspector == null)
             {
                 return false;
             }
-
             try
             {
                 wordEditor = inspector.WordEditor;
@@ -338,11 +331,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access Inspector.WordEditor for HTML paste.", ex);
                 wordEditor = null;
-            }            if (wordEditor == null)
+            }
+            if (wordEditor == null)
             {
                 return false;
             }
-
             try
             {
                 application = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);                if (application == null)
@@ -403,7 +396,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     return false;
                 }
-
                 string bridgeHtml = HtmlTemplateSanitizer.PrepareTalkAppointmentHtmlForOutlookRtfBridge(html);
                 if (string.IsNullOrWhiteSpace(bridgeHtml))
                 {

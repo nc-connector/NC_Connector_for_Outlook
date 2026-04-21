@@ -81,12 +81,10 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         _setCurrentSettings(nextSettings);
                     }
-
                     if (_configureDiagnostics != null)
                     {
                         _configureDiagnostics(nextSettings);
                     }
-
                     if (_applyTransportSecurityFromSettings != null
                         && !_applyTransportSecurityFromSettings("settings_save", true))
                     {
@@ -94,12 +92,10 @@ namespace NcTalkOutlookAddIn.Controllers
                         {
                             _setCurrentSettings(previousSettings);
                         }
-
                         if (_configureDiagnostics != null)
                         {
                             _configureDiagnostics(previousSettings);
                         }
-
                         if (_applyTransportSecurityFromSettings != null)
                         {
                             _applyTransportSecurityFromSettings("settings_save_revert", false);
@@ -121,7 +117,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         _applyIfbSettings();
                     }
-
                     if (_persistSettings != null)
                     {
                         _persistSettings(nextSettings);

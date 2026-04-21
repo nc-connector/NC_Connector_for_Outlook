@@ -155,12 +155,10 @@ namespace NcTalkOutlookAddIn
                 {
                     return false;
                 }
-
                 if (ReferenceEquals(mail, _mail) || mail == _mail)
                 {
                     return true;
                 }
-
                 if (string.IsNullOrWhiteSpace(_mailIdentityKey))
                 {
                     if (string.IsNullOrWhiteSpace(_inspectorIdentityKey))
@@ -168,13 +166,11 @@ namespace NcTalkOutlookAddIn
                         return false;
                     }
                 }
-
                 if (!string.IsNullOrWhiteSpace(_mailIdentityKey)
                     && string.Equals(_mailIdentityKey, mailIdentityKey ?? string.Empty, StringComparison.Ordinal))
                 {
                     return true;
                 }
-
                 return !string.IsNullOrWhiteSpace(_inspectorIdentityKey)
                     && string.Equals(_inspectorIdentityKey, inspectorIdentityKey ?? string.Empty, StringComparison.Ordinal);
             }
@@ -184,7 +180,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 string relativeFolder = string.IsNullOrWhiteSpace(result.RelativePath)
                     ? string.Empty
                     : result.RelativePath.Trim();
@@ -225,13 +220,11 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 string password = result.Password ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(password))
                 {
                     return;
                 }
-
                 var entry = new SeparatePasswordDispatchEntry
                 {
                     ShareLabel = result.FolderName ?? string.Empty,
@@ -285,17 +278,14 @@ namespace NcTalkOutlookAddIn
                         DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read MailItem.EntryID for compose key.", ex);
                     }
                 }
-
                 if (!string.IsNullOrWhiteSpace(mailIdentityKey))
                 {
                     return mailIdentityKey.Trim();
                 }
-
                 if (!string.IsNullOrWhiteSpace(inspectorIdentityKey))
                 {
                     return inspectorIdentityKey.Trim();
                 }
-
                 return Guid.NewGuid().ToString("N");
             }
 
@@ -304,7 +294,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return string.Empty;
                 }
-
                 try
                 {
                     string fileName = attachment.FileName;
@@ -317,7 +306,6 @@ namespace NcTalkOutlookAddIn
                 {
                     DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.FileName.", ex);
                 }
-
                 try
                 {
                     string displayName = attachment.DisplayName;
@@ -330,7 +318,6 @@ namespace NcTalkOutlookAddIn
                 {
                     DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.DisplayName.", ex);
                 }
-
                 return string.Empty;
             }
 
@@ -339,7 +326,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return 0;
                 }
-
                 try
                 {
                     return Math.Max(0, attachment.Size);
@@ -356,7 +342,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return string.Empty;
                 }
-
                 try
                 {
                     return attachment.PathName ?? string.Empty;
@@ -395,7 +380,6 @@ namespace NcTalkOutlookAddIn
                     CleanupTemporaryFiles(pendingTemporaryFiles);
                     _pendingBeforeAddShareEntries.Clear();
                 }
-
                 try
                 {
                     _attachmentEvalTimer.Tick -= OnAttachmentEvalTimerTick;
@@ -408,7 +392,8 @@ namespace NcTalkOutlookAddIn
                 catch (Exception ex)
                 {
                     DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to dispose compose timers.", ex);
-                }                if (_events != null)
+                }
+                if (_events != null)
                 {
                     try
                     {

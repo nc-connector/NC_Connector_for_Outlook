@@ -49,7 +49,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new ArgumentNullException("request");
             }
-
             var uploadContext = PrepareUpload(request, cancellationToken);
 
             long totalBytes = CalculateTotalSize(request.Items);
@@ -152,13 +151,11 @@ namespace NcTalkOutlookAddIn.Services
                 DiagnosticsLogger.LogException(LogCategories.Api, "Share folder delete failed (" + url + ").", transport);
                 throw new TalkServiceException("Share folder delete failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
-
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 LogFileLink("Share folder delete skipped (already removed): " + normalizedPath);
                 return;
             }
-
             if (response.StatusCode != HttpStatusCode.NoContent
                 && response.StatusCode != HttpStatusCode.OK
                 && response.StatusCode != HttpStatusCode.Accepted)
@@ -186,7 +183,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new ArgumentNullException("selections");
             }
-
             foreach (var selection in selections)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -228,7 +224,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new ArgumentNullException("request");
             }
-
             var shareData = CreateShare(
                 context.NormalizedBaseUrl,
                 context.Username,
@@ -254,7 +249,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             string url = BuildDavUrl(baseUrl, username, relativePath);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -276,19 +270,16 @@ namespace NcTalkOutlookAddIn.Services
                 DiagnosticsLogger.LogException(LogCategories.Api, "DAV folder check failed (" + url + ").", transport);
                 throw new TalkServiceException("Folder check failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
-
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 LogFileLink("DAV folder not found: " + url);
                 return false;
             }
-
             if (response.StatusCode == HttpStatusCode.Unauthorized
                 || response.StatusCode == HttpStatusCode.Forbidden)
             {
                 throw new TalkServiceException("Folder check failed: HTTP " + (int)response.StatusCode, true, response.StatusCode, response.ResponseText);
             }
-
             return response.StatusCode == HttpStatusCode.OK
                    || response.StatusCode == HttpStatusCode.NoContent
                    || (int)response.StatusCode == 207;
@@ -320,7 +311,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return 0;
             }
-
             if (selection.SelectionType == FileLinkSelectionType.File)
             {
                 var info = new FileInfo(selection.LocalPath);
@@ -356,7 +346,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new TalkServiceException("File has no valid name: " + selection.LocalPath, false, 0, null);
             }
-
             string uniqueName = EnsureUniqueName(context, remoteFolder, fileName, duplicateResolver, selection, false, cancellationToken);
             string remotePath = CombineRelativePath(remoteFolder, uniqueName);
 
@@ -375,13 +364,11 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             string relativeRoot = SanitizeComponent(Path.GetFileName(selection.LocalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
             if (string.IsNullOrWhiteSpace(relativeRoot))
             {
                 relativeRoot = "Folder";
             }
-
             string uniqueRoot = EnsureUniqueName(context, context.RelativeFolderPath, relativeRoot, duplicateResolver, selection, true, cancellationToken);
             string remoteRoot = CombineRelativePath(context.RelativeFolderPath, uniqueRoot);
 
@@ -398,7 +385,6 @@ namespace NcTalkOutlookAddIn.Services
                 EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteSub, cancellationToken);
                 context.KnownFolderPaths.Add(remoteSub);
             }
-
             foreach (string file in Directory.EnumerateFiles(selection.LocalPath, "*", SearchOption.AllDirectories))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -433,7 +419,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             string url = BuildDavUrl(context.NormalizedBaseUrl, context.Username, remotePath);
             DiagnosticsLogger.LogApi("PUT " + url);
 
@@ -469,7 +454,6 @@ namespace NcTalkOutlookAddIn.Services
                 Exception transport = response.TransportException;
                 throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : localPath), false, 0, null);
             }
-
             if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.NoContent)
             {
                 throw new TalkServiceException("File could not be uploaded: " + localPath, false, response.StatusCode, response.ResponseText);
@@ -502,7 +486,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     throw new TalkServiceException("Duplicate name in target directory: " + sanitizedName, false, 0, null);
                 }
-
                 string newName = duplicateResolver(new FileLinkDuplicateInfo(selection, remoteFolder, sanitizedName, isDirectory));
                 if (string.IsNullOrWhiteSpace(newName))
                 {
@@ -551,7 +534,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             string[] segments = relativePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             var current = new List<string>();
             foreach (string segment in segments)
@@ -562,7 +544,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     continue;
                 }
-
                 string url = BuildDavUrl(baseUrl, username, path);
                 DiagnosticsLogger.LogApi("MKCOL " + url);
                 NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
@@ -581,13 +562,13 @@ namespace NcTalkOutlookAddIn.Services
                     DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ").", transport);
                     throw new TalkServiceException("Directory could not be created: " + (transport != null ? transport.Message : path), false, 0, null);
                 }
-
                 if (response.StatusCode != HttpStatusCode.Created
                     && response.StatusCode != HttpStatusCode.MethodNotAllowed
                     && response.StatusCode != HttpStatusCode.Conflict)
                 {
                     throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, response.ResponseText);
-                }                if (knownFolderPaths != null)
+                }
+                if (knownFolderPaths != null)
                 {
                     knownFolderPaths.Add(path);
                 }
@@ -634,7 +615,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 builder.Append("&publicUpload=true");
             }
-
             return builder.ToString();
         }
 
@@ -646,7 +626,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             string url = baseUrl.TrimEnd('/') + "/ocs/v2.php/apps/files_sharing/api/v1/shares/" + Uri.EscapeDataString(shareData.Id);
             var payload = new StringBuilder();
             payload.Append("permissions=").Append(Uri.EscapeDataString(CalculatePermissionValue(request.Permissions).ToString(CultureInfo.InvariantCulture)));
@@ -698,12 +677,10 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     detail = "HTTP " + (int)response.StatusCode;
                 }
-
                 bool authError = response.StatusCode == HttpStatusCode.Unauthorized
                                  || response.StatusCode == HttpStatusCode.Forbidden;
                 throw new TalkServiceException("Share creation failed: " + detail, authError, response.StatusCode, response.ResponseText);
             }
-
             return ParseShareData(response.ParsedJson, response.ResponseText);
         }
 
@@ -740,7 +717,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     detail = "HTTP " + (int)response.StatusCode;
                 }
-
                 bool authError = response.StatusCode == HttpStatusCode.Unauthorized
                                  || response.StatusCode == HttpStatusCode.Forbidden;
                 throw new TalkServiceException("Share metadata update failed: " + detail, authError, response.StatusCode, response.ResponseText);
@@ -777,7 +753,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new TalkServiceException("Share creation failed: incomplete response.", false, 0, responseText);
             }
-
             return result;
         }
 
@@ -787,7 +762,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return string.Empty;
             }
-
             return string.Join("/", path.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries).Select(SanitizeComponent));
         }
 
@@ -797,12 +771,10 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return component ?? string.Empty;
             }
-
             if (string.IsNullOrEmpty(component))
             {
                 return basePath;
             }
-
             return basePath.TrimEnd('/') + "/" + component.TrimStart('/');
         }
 
@@ -812,7 +784,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return string.Empty;
             }
-
             var invalid = Path.GetInvalidFileNameChars();
             var builder = new StringBuilder(value.Length);
             foreach (char c in value)
@@ -833,7 +804,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return string.Empty;
             }
-
             return string.Join("/", path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Select(SanitizeComponent));
         }
 
@@ -843,7 +813,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return fullPath;
             }
-
             var rootUri = new Uri(AppendDirectorySeparator(root));
             var fullUri = new Uri(fullPath);
             string relative = Uri.UnescapeDataString(rootUri.MakeRelativeUri(fullUri).ToString());
@@ -856,12 +825,10 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return path;
             }
-
             if (!path.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
             {
                 return path + Path.DirectorySeparatorChar;
             }
-
             return path;
         }
 
@@ -884,7 +851,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 value |= 8;
             }
-
             return value;
         }
 
@@ -913,7 +879,6 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
             }
-
             return total;
         }
 

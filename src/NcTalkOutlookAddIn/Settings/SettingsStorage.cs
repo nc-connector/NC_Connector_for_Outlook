@@ -83,7 +83,6 @@ namespace NcTalkOutlookAddIn.Settings
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to load profile settings XML.", ex);
                 }
             }
-
             string legacyPath = ResolveLegacyIniPath();
             if (!string.IsNullOrEmpty(legacyPath))
             {
@@ -96,7 +95,6 @@ namespace NcTalkOutlookAddIn.Settings
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to load legacy settings INI.", ex);
                 }
             }
-
             return new AddinSettings();
         }
 
@@ -105,7 +103,6 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 settings = new AddinSettings();
             }
-
             try
             {
                 Directory.CreateDirectory(_dataDirectory);
@@ -127,7 +124,6 @@ namespace NcTalkOutlookAddIn.Settings
                 TryDeleteDirectoryIfEmpty(_legacyFolderDirectory);
                 return;
             }
-
             bool migrated = TryMigrateLegacyIniToProfiles(sourcePath);
             if (migrated)
             {
@@ -150,7 +146,6 @@ namespace NcTalkOutlookAddIn.Settings
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to parse legacy INI for profile migration.", ex);
                 return false;
             }
-
             var targetProfiles = ResolveMigrationProfileNames();
             bool allSucceeded = true;
 
@@ -161,7 +156,6 @@ namespace NcTalkOutlookAddIn.Settings
                 {
                     continue;
                 }
-
                 try
                 {
                     SaveToXmlFile(targetFilePath, legacySettings, profile);
@@ -173,12 +167,10 @@ namespace NcTalkOutlookAddIn.Settings
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to migrate legacy settings to profile XML (profile=" + profile + ").", ex);
                 }
             }
-
             if (!allSucceeded)
             {
                 return false;
             }
-
             return true;
         }
 
@@ -197,7 +189,6 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 return;
             }
-
             string targetPath = Path.Combine(_dataDirectory, fileName);
             try
             {
@@ -232,7 +223,6 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 return;
             }
-
             try
             {
                 File.Delete(filePath);
@@ -249,7 +239,6 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 return;
             }
-
             try
             {
                 if (Directory.GetFileSystemEntries(directoryPath).Length == 0)
@@ -273,12 +262,10 @@ namespace NcTalkOutlookAddIn.Settings
                 string normalized = NormalizeProfileName(profile);
                 names.Add(normalized);
             }
-
             if (names.Count == 0)
             {
                 names.Add(DefaultProfileName);
             }
-
             var ordered = new List<string>(names);
             ordered.Sort(StringComparer.OrdinalIgnoreCase);
             return ordered;
@@ -309,7 +296,6 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to enumerate Office registry versions for Outlook profile discovery.", ex);
             }
-
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in paths)
             {
@@ -320,7 +306,6 @@ namespace NcTalkOutlookAddIn.Settings
                     {
                         continue;
                     }
-
                     foreach (string profileName in profileRoot.GetSubKeyNames())
                     {
                         if (string.IsNullOrWhiteSpace(profileName))
@@ -342,7 +327,6 @@ namespace NcTalkOutlookAddIn.Settings
                     }
                 }
             }
-
             return names;
         }
 
@@ -352,12 +336,10 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 return _legacyDataIniPath;
             }
-
             if (File.Exists(_legacyFolderIniPath))
             {
                 return _legacyFolderIniPath;
             }
-
             return null;
         }
 
@@ -367,7 +349,6 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 return DefaultProfileName;
             }
-
             string trimmed = profileName.Trim();
             return trimmed.Length == 0 ? DefaultProfileName : trimmed;
         }
@@ -384,13 +365,11 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 return DefaultProfileName;
             }
-
             var builder = new StringBuilder(value.Trim());
             foreach (char invalid in Path.GetInvalidFileNameChars())
             {
                 builder.Replace(invalid, '_');
             }
-
             string sanitized = builder.ToString().Trim();
             return string.IsNullOrWhiteSpace(sanitized) ? DefaultProfileName : sanitized;
         }
@@ -405,18 +384,15 @@ namespace NcTalkOutlookAddIn.Settings
                 {
                     continue;
                 }
-
                 string[] parts = line.Split(new[] { '=' }, 2);
                 if (parts.Length != 2)
                 {
                     continue;
                 }
-
                 string key = parts[0].Trim();
                 string value = parts[1].Trim();
                 ApplySettingValue(settings, key, value);
             }
-
             return settings;
         }
 
@@ -430,14 +406,12 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 throw new InvalidDataException("Profile settings XML root element is missing.");
             }
-
             foreach (XmlNode child in root.ChildNodes)
             {
                 XmlElement element = child as XmlElement;                if (element == null)
                 {
                     continue;
                 }
-
                 string key = element.Name;
                 string value = element.InnerText ?? string.Empty;
 
@@ -446,7 +420,6 @@ namespace NcTalkOutlookAddIn.Settings
                     settings.AppPassword = UnprotectPassword(value);
                     continue;
                 }
-
                 if (string.Equals(key, "AppPassword", StringComparison.OrdinalIgnoreCase))
                 {
                     settings.AppPassword = value;
@@ -455,7 +428,6 @@ namespace NcTalkOutlookAddIn.Settings
 
                 ApplySettingValue(settings, key, value);
             }
-
             return settings;
         }
 

@@ -53,7 +53,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new TalkServiceException("HTTP " + (int)statusCode, statusCode == HttpStatusCode.Unauthorized, statusCode, responseText);
             }
-
             string loginUrl = NcJson.GetString(data, "login");
             IDictionary<string, object> poll = NcJson.GetDictionary(data, "poll");
             string pollEndpoint = NcJson.GetString(poll, "endpoint");
@@ -63,12 +62,10 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new TalkServiceException("Login flow response is incomplete.", false, HttpStatusCode.InternalServerError, null);
             }
-
             if (!pollEndpoint.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
                 pollEndpoint = _baseUrl + pollEndpoint;
             }
-
             return new LoginFlowStart(loginUrl, pollEndpoint, pollToken);
             }
         }
@@ -105,7 +102,6 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         throw new TalkServiceException("HTTP " + (int)statusCode, statusCode == HttpStatusCode.Unauthorized, statusCode, responseText);
                     }
-
                     string appPassword = NcJson.GetString(response, "appPassword") ?? NcJson.GetString(NcJson.GetDictionary(response, "ocs"), "token");
                     string loginName = NcJson.GetString(response, "loginName");
 
@@ -113,7 +109,6 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         throw new TalkServiceException("Login flow did not return an app password.", false, HttpStatusCode.InternalServerError, null);
                     }
-
                     return new LoginFlowCredentials(loginName, appPassword);
                 }
 
@@ -156,12 +151,12 @@ namespace NcTalkOutlookAddIn.Services
             if (string.IsNullOrWhiteSpace(responseText))
             {
                 return new Dictionary<string, object>();
-            }            if (response.JsonParseException != null)
+            }
+            if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Login flow JSON parsing failed.", response.JsonParseException);
                 throw new TalkServiceException("Could not parse JSON: " + response.JsonParseException.Message, false, statusCode, responseText);
             }
-
             return response.ParsedJson ?? new Dictionary<string, object>();
         }
         private static string BuildUserAgent()

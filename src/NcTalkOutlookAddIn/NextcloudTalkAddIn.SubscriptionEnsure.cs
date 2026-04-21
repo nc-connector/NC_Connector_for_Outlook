@@ -39,7 +39,6 @@ namespace NcTalkOutlookAddIn
             {
                 return null;
             }
-
             try
             {
                 return appointment.GlobalAppointmentID;
@@ -60,7 +59,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 string roomToken = ResolveRoomTokenForAppointment(appointment);
@@ -68,7 +66,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 string entryId = GetEntryId(appointment);
                 if (!string.IsNullOrEmpty(entryId))
                 {
@@ -94,7 +91,6 @@ namespace NcTalkOutlookAddIn
 
                     existingByToken.Dispose();
                 }
-
                 bool lobbyKnown;
                 bool lobbyEnabled;
                 bool isEventConversation;
@@ -150,7 +146,6 @@ namespace NcTalkOutlookAddIn
                     ").");
                 return false;
             }
-
             string entryId = TryGetEntryIdForDeferredKey(appointment);
             string globalAppointmentId = TryGetGlobalAppointmentIdForDeferredKey(appointment);
             string ensureKey = !string.IsNullOrWhiteSpace(entryId)
@@ -170,7 +165,6 @@ namespace NcTalkOutlookAddIn
                 }
                 return false;
             }
-
             if (!_deferredAppointmentEnsureState.TryQueuePendingKey(ensureKey))
             {
                 return true;
@@ -205,7 +199,6 @@ namespace NcTalkOutlookAddIn
             {
                 return false;
             }
-
             return (ex.ErrorCode & 0xFFFF) == 0x0108;
         }
     }

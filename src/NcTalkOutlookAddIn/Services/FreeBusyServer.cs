@@ -80,7 +80,8 @@ namespace NcTalkOutlookAddIn.Services
                         + normalizedPort.ToString(CultureInfo.InvariantCulture)
                         + ").");
                     StopListenerLocked();
-                }                if (_configuration == null || !_configuration.IsComplete())
+                }
+                if (_configuration == null || !_configuration.IsComplete())
                 {
                     throw new InvalidOperationException("IFB cannot be started: credentials are incomplete.");
                 }
@@ -112,7 +113,8 @@ namespace NcTalkOutlookAddIn.Services
                 _cancellation.Cancel();
                 _cancellation.Dispose();
                 _cancellation = null;
-            }            if (_listener != null)
+            }
+            if (_listener != null)
             {
                 try
                 {
@@ -128,7 +130,8 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     _listener = null;
                 }
-            }            if (_listenerTask != null)
+            }
+            if (_listenerTask != null)
             {
                 try
                 {
@@ -158,7 +161,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return DefaultPort;
             }
-
             return port;
         }
 
@@ -188,7 +190,8 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     DiagnosticsLogger.LogException(LogCategory, "IFB listener disposed while accepting request.", ex);
                     return;
-                }                if (context != null)
+                }
+                if (context != null)
                 {
                     Task.Run(() => HandleRequest(context), token);
                 }
@@ -205,7 +208,6 @@ namespace NcTalkOutlookAddIn.Services
                     WriteError(context, HttpStatusCode.MethodNotAllowed, "Only GET is supported.");
                     return;
                 }
-
                 string path = context.Request.Url.AbsolutePath ?? string.Empty;
                 if (!path.StartsWith("/nc-ifb/freebusy/", StringComparison.OrdinalIgnoreCase) ||
                     !path.EndsWith(".vfb", StringComparison.OrdinalIgnoreCase))
@@ -214,7 +216,6 @@ namespace NcTalkOutlookAddIn.Services
                     WriteError(context, HttpStatusCode.NotFound, "Unsupported path.");
                     return;
                 }
-
                 string namePart = path.Substring("/nc-ifb/freebusy/".Length);
                 namePart = namePart.Substring(0, namePart.Length - ".vfb".Length);
                 string email = Uri.UnescapeDataString(namePart ?? string.Empty).Trim().ToLowerInvariant();
@@ -224,7 +225,6 @@ namespace NcTalkOutlookAddIn.Services
                     WriteError(context, HttpStatusCode.BadRequest, "Email address is missing.");
                     return;
                 }
-
                 int days = _defaultDays;
                 string daysParam = context.Request.QueryString["days"];
                 int parsedDays;
@@ -235,7 +235,6 @@ namespace NcTalkOutlookAddIn.Services
                         days = parsedDays;
                     }
                 }
-
                 string resolvedEmail;
                 if (!_addressBookCache.TryResolveEmail(_configuration, _cacheHours, email, out resolvedEmail))
                 {
@@ -254,7 +253,6 @@ namespace NcTalkOutlookAddIn.Services
                     WriteError(context, HttpStatusCode.NotFound, "User not found.");
                     return;
                 }
-
                 string freeBusy = null;
                 bool needsFallback = false;
 
@@ -275,12 +273,10 @@ namespace NcTalkOutlookAddIn.Services
                         return;
                     }
                 }
-
                 if (string.IsNullOrEmpty(freeBusy))
                 {
                     needsFallback = true;
                 }
-
                 if (needsFallback)
                 {
                     DiagnosticsLogger.Log(LogCategory, "Starting fallback via scheduling for " + email + ".");
@@ -292,7 +288,6 @@ namespace NcTalkOutlookAddIn.Services
                         WriteError(context, HttpStatusCode.PreconditionFailed, "Own user account not found in address book.");
                         return;
                     }
-
                     try
                     {
                         freeBusy = RequestFreeBusyViaScheduling(originEmail, email, days);
@@ -304,7 +299,6 @@ namespace NcTalkOutlookAddIn.Services
                         return;
                     }
                 }
-
                 if (string.IsNullOrEmpty(freeBusy))
                 {
                     DiagnosticsLogger.Log(LogCategory, "No free/busy data available for " + email);
@@ -381,7 +375,6 @@ namespace NcTalkOutlookAddIn.Services
 
                 throw new FreeBusyRequestException("Free/busy request failed: no HTTP response.", null, ShouldFallback(null));
             }
-
             string payloadText = response.ResponseText ?? string.Empty;
             if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
@@ -397,18 +390,15 @@ namespace NcTalkOutlookAddIn.Services
                     ShouldFallback(response.StatusCode),
                     payloadText);
             }
-
             if (string.IsNullOrEmpty(payloadText))
             {
                 return null;
             }
-
             if (!string.IsNullOrEmpty(response.ContentType) &&
                 response.ContentType.IndexOf("text/calendar", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return payloadText;
             }
-
             string extracted = ExtractCalendarData(payloadText);
             return string.IsNullOrEmpty(extracted) ? payloadText : extracted;
         }
@@ -461,7 +451,6 @@ namespace NcTalkOutlookAddIn.Services
 
                 throw new FreeBusyRequestException("CalDAV scheduling failed: no HTTP response.", null, false, null);
             }
-
             if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
                 string responseText = response.ResponseText;
@@ -471,7 +460,6 @@ namespace NcTalkOutlookAddIn.Services
                     false,
                     responseText);
             }
-
             return ExtractFreeBusyFromScheduleResponse(response.ResponseText ?? string.Empty, attendeeEmail);
         }
 
@@ -501,7 +489,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             try
             {
                 int index = 0;
@@ -514,12 +501,10 @@ namespace NcTalkOutlookAddIn.Services
                         startTag = responseText.IndexOf("<calendar-data", index, StringComparison.OrdinalIgnoreCase);
                         endToken = "</calendar-data>";
                     }
-
                     if (startTag < 0)
                     {
                         break;
                     }
-
                     int startContent = responseText.IndexOf('>', startTag);
                     if (startContent < 0)
                     {
@@ -532,7 +517,6 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         break;
                     }
-
                     string raw = responseText.Substring(startContent, endTag - startContent);
                     string decoded = WebUtility.HtmlDecode(raw ?? string.Empty).Trim();
 
@@ -550,7 +534,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 DiagnosticsLogger.LogException(LogCategory, "Failed to extract free/busy data from scheduling response.", ex);
             }
-
             return null;
         }
 
@@ -560,7 +543,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return string.Empty;
             }
-
             string[] lines = payload.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
             var builder = new StringBuilder();
             bool methodSet = false;
@@ -578,12 +560,10 @@ namespace NcTalkOutlookAddIn.Services
                     builder.AppendLine(line);
                 }
             }
-
             if (!methodSet)
             {
                 builder.Insert(0, "METHOD:PUBLISH" + Environment.NewLine);
             }
-
             string result = builder.ToString().Trim();
             if (!result.StartsWith("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase))
             {
@@ -593,7 +573,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 result = result + Environment.NewLine + "END:VCALENDAR";
             }
-
             return result;
         }
 
@@ -608,24 +587,20 @@ namespace NcTalkOutlookAddIn.Services
                     startTag = "<calendar-data";
                     start = payload.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
                 }
-
                 if (start < 0)
                 {
                     return null;
                 }
-
                 int closing = payload.IndexOf('>', start);
                 if (closing < 0)
                 {
                     return null;
                 }
-
                 int end = payload.IndexOf("</", closing, StringComparison.OrdinalIgnoreCase);
                 if (end < 0)
                 {
                     return null;
                 }
-
                 string data = payload.Substring(closing + 1, end - closing - 1);
                 return WebUtility.HtmlDecode(data).Trim();
             }
@@ -662,7 +637,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return string.Empty;
             }
-
             return value.Replace("\\", "\\\\").Replace(";", "\\;").Replace(",", "\\,").Replace("\n", "\\n");
         }
 

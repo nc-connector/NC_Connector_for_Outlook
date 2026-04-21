@@ -44,7 +44,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     _subscriptions.Add(created);
                 }
-
                 return created;
             }
         }
@@ -71,7 +70,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 current = _subscriptions.ToArray();
                 _subscriptions.Clear();
             }
-
             for (int i = 0; i < current.Length; i++)
             {
                 try

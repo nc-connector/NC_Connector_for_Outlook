@@ -55,12 +55,12 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     DiagnosticsLogger.LogApi("Password policy fetch returned HTTP " + (int)statusCode + ".");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
-                }                if (root == null)
+                }
+                if (root == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy fetch returned no parsable JSON payload.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
-
                 var ocs = NcJson.GetDictionary(root, "ocs");
                 var data = NcJson.GetDictionary(ocs, "data");
                 var caps = NcJson.GetDictionary(data, "capabilities");                if (caps == null)
@@ -68,13 +68,11 @@ namespace NcTalkOutlookAddIn.Services
                     DiagnosticsLogger.LogApi("Password policy capabilities block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
-
                 var policy = NcJson.GetDictionary(caps, "password_policy") ?? NcJson.GetDictionary(caps, "passwordPolicy");                if (policy == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
-
                 int minLength = GetFirstPositiveInt(policy, MinLengthKeys);
                 if (minLength <= 0)
                 {
@@ -82,14 +80,12 @@ namespace NcTalkOutlookAddIn.Services
                     var accountPolicy = NcJson.GetDictionary(policies, "account");
                     minLength = GetFirstPositiveInt(accountPolicy, MinLengthKeys);
                 }
-
                 var api = NcJson.GetDictionary(policy, "api");
                 string generateRaw = GetFirstString(api, "generate", "generateUrl", "generate_url");
                 if (string.IsNullOrWhiteSpace(generateRaw))
                 {
                     generateRaw = GetFirstString(policy, GenerateUrlKeys);
                 }
-
                 string generateUrl = ResolvePolicyUrl(generateRaw, baseUrl);
                 bool hasPolicy = minLength > 0 || !string.IsNullOrWhiteSpace(generateUrl);
 
@@ -120,14 +116,12 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     return null;
                 }
-
                 var data = NcJson.GetDictionary(NcJson.GetDictionary(root, "ocs"), "data");
                 string password = NcJson.GetString(data, "password");
                 if (string.IsNullOrWhiteSpace(password))
                 {
                     return null;
                 }
-
                 return password.Trim();
             }
         }
@@ -141,7 +135,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             var response = _httpClient.Send(new NcHttpRequestOptions
             {
                 Method = method,
@@ -162,7 +155,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     DiagnosticsLogger.LogException(LogCategories.Api, "Password policy request failed without HTTP response.", null);
                 }
-
                 return;
             }
 
@@ -183,7 +175,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             try
             {
                 Uri absoluteUri;
@@ -203,7 +194,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Password policy URL normalization failed.", ex);
             }
-
             return null;
         }
 
@@ -213,7 +203,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return "<empty>";
             }
-
             string normalized = responseText.Replace("\r", " ").Replace("\n", " ").Trim();
             return normalized.Length <= 180 ? normalized : normalized.Substring(0, 180) + "...";
         }
@@ -222,7 +211,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return 0;
             }
-
             foreach (string key in keys)
             {
                 int value = NcJson.GetInt(parent, key);
@@ -231,7 +219,6 @@ namespace NcTalkOutlookAddIn.Services
                     return value;
                 }
             }
-
             return 0;
         }
 
@@ -240,7 +227,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             foreach (string key in keys)
             {
                 string value = NcJson.GetTrimmedString(parent, key);
@@ -249,7 +235,6 @@ namespace NcTalkOutlookAddIn.Services
                     return value;
                 }
             }
-
             return null;
         }
     }

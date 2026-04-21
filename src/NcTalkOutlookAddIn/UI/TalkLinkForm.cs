@@ -459,7 +459,6 @@ namespace NcTalkOutlookAddIn.UI
                     _eventSupportHintLabel.MaximumSize = new Size(inputWidth, 0);
                     y = _eventSupportHintLabel.Bottom + verticalGap;
                 }
-
                 if (_policyWarningPanel.Visible)
                 {
                     int warningPadding = ScaleLogical(8);
@@ -520,7 +519,6 @@ namespace NcTalkOutlookAddIn.UI
                     _moderatorGroup.Height = moderatorGroupHeight;
                     LayoutModeratorGroupControls();
                 }
-
                 var footerButtons = new List<Button> { _okButton, _cancelButton };
                 int minClientWidth = FooterButtonLayoutHelper.LayoutCentered(
                     this,
@@ -532,7 +530,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     ClientSize = new Size(minClientWidth, ClientSize.Height);
                 }
-
                 int buttonHeight = Math.Max(_okButton.Height, _cancelButton.Height);
                 int minClientHeight = _moderatorGroup.Bottom + ScaleLogical(16) + buttonHeight + FooterButtonLayoutHelper.DefaultBottomPadding;
                 if (ensureClientHeight && minClientHeight > ClientSize.Height)
@@ -604,7 +601,6 @@ namespace NcTalkOutlookAddIn.UI
                 _moderatorAddressbookWarningPanel.SetBounds(innerPadding, contentTop, panelWidth, panelHeight);
                 contentTop = _moderatorAddressbookWarningPanel.Bottom + ScaleLogical(8);
             }
-
             int hintTop = contentTop;
             int hintHeight = Math.Max(ScaleLogical(38), _moderatorGroup.ClientSize.Height - hintTop - innerPadding);
             _moderatorHintLabel.SetBounds(innerPadding, hintTop, Math.Max(ScaleLogical(120), _moderatorGroup.ClientSize.Width - (innerPadding * 2)), hintHeight);
@@ -629,7 +625,6 @@ namespace NcTalkOutlookAddIn.UI
                 versionText = parsed.ToString();
                 return parsed.Major >= 31;
             }
-
             return true;
         }
 
@@ -653,7 +648,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     titleDefault = policyString;
                 }
-
                 if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
                 {
                     passwordDefault = policyBool;
@@ -740,13 +734,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return true;
             }
-
             bool value;
             if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_generate_password", out value))
             {
                 return value;
             }
-
             return true;
         }
 
@@ -874,7 +866,6 @@ namespace NcTalkOutlookAddIn.UI
                 SetTooltipWithFallback(_roomTypeComboBox, Strings.PolicyAdminControlledTooltip, true, _roomTypeLabel);
                 return;
             }
-
             var selected = _roomTypeComboBox.SelectedItem as RoomTypeOption;
             var roomType = selected != null ? selected.Value : TalkRoomType.EventConversation;
             SetTooltipWithFallback(
@@ -945,12 +936,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private int GetMinPasswordLength()
-        {            if (_passwordPolicy != null && _passwordPolicy.MinLength > 0)
-            {
-                return _passwordPolicy.MinLength;
-            }
-
-            return DefaultMinPasswordLength;
+        {
+            return PasswordGenerationHelper.ResolveMinLength(_passwordPolicy, DefaultMinPasswordLength);
         }
 
         private void GeneratePassword()
@@ -959,34 +946,17 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int minLength = GetMinPasswordLength();
             _passwordTextBox.Text = GeneratePasswordValue(minLength);
         }
 
         private string GeneratePasswordValue(int minLength)
         {
-            string generated = null;
-
-            try
-            {                if (_configuration != null && _passwordPolicy != null && _passwordPolicy.HasPolicy)
-                {
-                    var policyService = new PasswordPolicyService(_configuration);
-                    generated = policyService.GeneratePassword(_passwordPolicy);
-                }
-            }
-            catch (Exception ex)
-            {
-                generated = null;
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Password generation via server policy failed; falling back to local generator.", ex);
-            }
-
-            if (string.IsNullOrWhiteSpace(generated) || generated.Trim().Length < minLength)
-            {
-                generated = PasswordGenerator.GenerateLocalPassword(minLength);
-            }
-
-            return generated;
+            return PasswordGenerationHelper.GenerateWithServerPolicyFallback(
+                _configuration,
+                _passwordPolicy,
+                minLength,
+                LogCategories.Talk);
         }
 
         private void SelectRoomType(TalkRoomType type)
@@ -999,7 +969,6 @@ namespace NcTalkOutlookAddIn.UI
                     return;
                 }
             }
-
             if (_roomTypeComboBox.Items.Count > 0)
             {
                 _roomTypeComboBox.SelectedIndex = 0;

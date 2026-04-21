@@ -44,7 +44,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return Summary;
             }
-
             return Summary + Environment.NewLine + Environment.NewLine + Guidance;
         }
     }
@@ -56,7 +55,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return BuildInfo(HttpFailureKind.Generic, string.Empty);
             }
-
             string detail = FlattenMessages(ex);
             HttpFailureKind kind = DetectKind(ex, detail);
             return BuildInfo(kind, detail);
@@ -67,7 +65,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return "kind=unknown";
             }
-
             string status = ex != null ? ex.Status.ToString() : "Unknown";
             string securityProtocol = ServicePointManager.SecurityProtocol.ToString();
             string technical = info.TechnicalDetail ?? string.Empty;
@@ -75,7 +72,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 technical = technical.Substring(0, 400);
             }
-
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "kind={0}, webStatus={1}, securityProtocol={2}, detail={3}",
@@ -143,7 +139,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return HttpFailureKind.CertificateValidation;
             }
-
             if (ex.Status == WebExceptionStatus.NameResolutionFailure ||
                 ex.Status == WebExceptionStatus.ProxyNameResolutionFailure ||
                 ContainsAny(detail,
@@ -154,13 +149,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return HttpFailureKind.DnsResolution;
             }
-
             if (ex.Status == WebExceptionStatus.Timeout ||
                 ContainsAny(detail, "timed out", "timeout"))
             {
                 return HttpFailureKind.Timeout;
             }
-
             if (ex.Status == WebExceptionStatus.SecureChannelFailure ||
                 ContainsAny(detail,
                     "secure channel",
@@ -170,7 +163,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return HttpFailureKind.TlsHandshake;
             }
-
             if (ex.Status == WebExceptionStatus.ConnectFailure ||
                 ex.Status == WebExceptionStatus.SendFailure ||
                 ex.Status == WebExceptionStatus.ReceiveFailure ||
@@ -196,7 +188,6 @@ namespace NcTalkOutlookAddIn.Utilities
                         return HttpFailureKind.ProxyOrConnect;
                 }
             }
-
             return HttpFailureKind.Generic;
         }
 
@@ -211,7 +202,6 @@ namespace NcTalkOutlookAddIn.Utilities
 
                 ex = ex.InnerException;
             }
-
             return null;
         }
 
@@ -227,7 +217,6 @@ namespace NcTalkOutlookAddIn.Utilities
 
                 ex = ex.InnerException;
             }
-
             return string.Join(" | ", parts.ToArray());
         }
 
@@ -236,7 +225,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return false;
             }
-
             foreach (string fragment in fragments)
             {
                 if (!string.IsNullOrEmpty(fragment) &&
@@ -245,7 +233,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     return true;
                 }
             }
-
             return false;
         }
     }
@@ -316,12 +303,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 protocol |= Tls13Protocol;
             }
-
             if (protocol == 0)
             {
                 protocol = SecurityProtocolType.Tls12;
             }
-
             return protocol;
         }
     }

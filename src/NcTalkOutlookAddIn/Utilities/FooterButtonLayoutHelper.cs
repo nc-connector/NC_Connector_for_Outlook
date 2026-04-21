@@ -47,7 +47,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return 0;
             }
-
             var minWidths = new Dictionary<Button, int>();
             int buttonHeight = 0;
             foreach (Button button in buttons)
@@ -57,7 +56,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 minWidths[button] = minWidth;
                 buttonHeight = Math.Max(buttonHeight, button.Height);
             }
-
             if (uniformWidths)
             {
                 int commonWidth = 0;
@@ -68,27 +66,23 @@ namespace NcTalkOutlookAddIn.Utilities
                     {
                         commonWidth = button.Width;
                     }
-
                     int buttonMinWidth;
                     if (minWidths.TryGetValue(button, out buttonMinWidth) && buttonMinWidth > commonMinWidth)
                     {
                         commonMinWidth = buttonMinWidth;
                     }
                 }
-
                 foreach (Button button in buttons)
                 {
                     button.Width = commonWidth;
                     minWidths[button] = commonMinWidth;
                 }
             }
-
             int availableWidth = Math.Max(0, container.ClientSize.Width - (horizontalPadding * 2));
             if (availableWidth <= 0)
             {
                 return 0;
             }
-
             int safeSpacing = Math.Max(0, spacing);
             int totalWidth = CalculateTotalWidth(buttons, safeSpacing);
             while (safeSpacing > 0 && totalWidth > availableWidth)
@@ -96,7 +90,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 safeSpacing--;
                 totalWidth = CalculateTotalWidth(buttons, safeSpacing);
             }
-
             if (totalWidth > availableWidth)
             {
                 int overflow = totalWidth - availableWidth;
@@ -119,7 +112,6 @@ namespace NcTalkOutlookAddIn.Utilities
 
                 totalWidth = CalculateTotalWidth(buttons, safeSpacing);
             }
-
             int top = Math.Max(horizontalPadding, container.ClientSize.Height - buttonHeight - bottomPadding);
             int left = horizontalPadding + Math.Max(0, (availableWidth - totalWidth) / 2);
             for (int i = 0; i < buttons.Count; i++)
@@ -128,7 +120,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 button.Location = new Point(left, top);
                 left += button.Width + safeSpacing;
             }
-
             return totalWidth + (horizontalPadding * 2);
         }
 
@@ -138,17 +129,14 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return total;
             }
-
             for (int i = 0; i < buttons.Count; i++)
             {
                 total += buttons[i].Width;
             }
-
             if (buttons.Count > 1)
             {
                 total += spacing * (buttons.Count - 1);
             }
-
             return total;
         }
     }

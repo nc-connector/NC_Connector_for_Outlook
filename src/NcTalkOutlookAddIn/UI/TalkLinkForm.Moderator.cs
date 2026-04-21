@@ -46,7 +46,6 @@ namespace NcTalkOutlookAddIn.UI
                 UpdateModeratorHint();
                 return;
             }
-
             string term = (_moderatorTextBox.Text ?? string.Empty).Trim();
 
             _moderatorListBox.BeginUpdate();
@@ -57,7 +56,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     continue;
                 }
-
                 if (term.Length == 0 ||
                     user.UserId.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     (!string.IsNullOrEmpty(user.Email) && user.Email.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0))
@@ -112,7 +110,6 @@ namespace NcTalkOutlookAddIn.UI
                 HideModeratorDropdown();
                 return;
             }
-
             if (_moderatorListBox.SelectedIndex < 0)
             {
                 _moderatorListBox.SelectedIndex = 0;
@@ -135,7 +132,6 @@ namespace NcTalkOutlookAddIn.UI
                 HideModeratorDropdown();
                 return;
             }
-
             int width = Math.Max(0, _moderatorGroup.Width - 24);
             int rows = Math.Max(1, Math.Min(ModeratorDropdownMaxRows, _moderatorListBox.Items.Count));
             int desiredHeight = (rows * _moderatorListBox.ItemHeight) + 4;
@@ -149,7 +145,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 y = inputClient.Y + _moderatorTextBox.Height + ModeratorDropdownMargin;
             }
-
             int maxBottom = _okButton != null ? _okButton.Top - ModeratorDropdownMargin : ClientSize.Height;
             if (y + desiredHeight > maxBottom)
             {
@@ -177,7 +172,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
             Color backColor;
             Color foreColor;
@@ -196,7 +190,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 e.Graphics.FillRectangle(back, e.Bounds);
             }
-
             var user = _moderatorListBox.Items[e.Index] as NextcloudUser;
             string label = user != null ? user.DisplayLabel : (_moderatorListBox.Items[e.Index] != null ? _moderatorListBox.Items[e.Index].ToString() : string.Empty);
 
@@ -209,7 +202,8 @@ namespace NcTalkOutlookAddIn.UI
             {
                 EnsureAvatarLoaded(user.UserId);
                 avatar = GetCachedAvatar(user.UserId);
-            }            if (avatar != null)
+            }
+            if (avatar != null)
             {
                 e.Graphics.DrawImage(avatar, avatarBounds);
             }
@@ -217,7 +211,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 DrawAvatarPlaceholder(e.Graphics, avatarBounds, user != null ? user.UserId : null);
             }
-
             int textX = avatarBounds.Right + 8;
             var textBounds = new Rectangle(textX, e.Bounds.Top, e.Bounds.Right - textX - 4, e.Bounds.Height);
             TextRenderer.DrawText(e.Graphics, label, e.Font, textBounds, foreColor, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
@@ -240,7 +233,6 @@ namespace NcTalkOutlookAddIn.UI
                     return cached;
                 }
             }
-
             return null;
         }
 
@@ -288,7 +280,6 @@ namespace NcTalkOutlookAddIn.UI
                         }
                     }
                 }
-
                 try
                 {
                     BeginInvoke((Action)(() =>
@@ -313,7 +304,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return null;
             }
-
             string url = baseUrl + "/index.php/avatar/" + Uri.EscapeDataString(userId) + "/64";
             var httpClient = new Services.NcHttpClient(_configuration);
             Services.NcHttpResponse response = httpClient.Send(new Services.NcHttpRequestOptions
@@ -333,9 +323,9 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     DiagnosticsLogger.LogException(LogCategories.Talk, "Avatar request failed for user '" + userId + "'.", response.TransportException);
                 }
-
                 return null;
-            }            if (response.ResponseBytes == null || response.ResponseBytes.Length == 0)
+            }
+            if (response.ResponseBytes == null || response.ResponseBytes.Length == 0)
             {
                 return null;
             }
@@ -359,7 +349,6 @@ namespace NcTalkOutlookAddIn.UI
                 graphics.FillEllipse(fill, bounds);
                 graphics.DrawEllipse(border, bounds);
             }
-
             string initial = string.IsNullOrEmpty(userId) ? "?" : userId.Trim().Substring(0, 1).ToUpperInvariant();
             using (var textBrush = new SolidBrush(_themePalette.AvatarPlaceholderText))
             using (var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })

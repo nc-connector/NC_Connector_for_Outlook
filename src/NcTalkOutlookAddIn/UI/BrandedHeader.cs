@@ -56,7 +56,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return Rectangle.Empty;
             }
-
             int availableWidth = Math.Max(0, canvas.Width - (HorizontalPadding * 2));
             int targetHeight = canvas.Height;
 

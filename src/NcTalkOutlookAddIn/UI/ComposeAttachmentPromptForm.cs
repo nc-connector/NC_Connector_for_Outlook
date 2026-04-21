@@ -113,7 +113,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             int outerPadding = ScaleLogical(16);
             int verticalGap = ScaleLogical(14);
             int bottomPadding = ScaleLogical(12);
@@ -151,7 +150,6 @@ namespace NcTalkOutlookAddIn.UI
                     FooterButtonLayoutHelper.DefaultSpacing,
                     true);
             }
-
             int buttonsTop = Math.Min(_removeButton.Top, _shareButton.Top);
             int requiredHeight = _reasonLabel.Bottom + verticalGap + _removeButton.Height + bottomPadding;
             if (ensureClientSize && requiredHeight > ClientSize.Height)
@@ -175,7 +173,6 @@ namespace NcTalkOutlookAddIn.UI
                     true);
                 buttonsTop = Math.Min(_removeButton.Top, _shareButton.Top);
             }
-
             int maxReasonBottom = buttonsTop - verticalGap;
             if (_reasonLabel.Bottom > maxReasonBottom)
             {

@@ -40,7 +40,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             bool credentialsComplete = !string.IsNullOrWhiteSpace(settings.ServerUrl)
                                        && !string.IsNullOrWhiteSpace(settings.Username)
                                        && !string.IsNullOrEmpty(settings.AppPassword);
@@ -51,7 +50,6 @@ namespace NcTalkOutlookAddIn.Services
                 RestoreFreeBusyPath(settings);
                 return;
             }
-
             var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
             if (!configuration.IsComplete())
             {
@@ -147,7 +145,6 @@ namespace NcTalkOutlookAddIn.Services
                 DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to read Outlook version. Falling back to default version segment.", ex);
                 version = "16.0";
             }
-
             return version;
         }
 
@@ -184,7 +181,6 @@ namespace NcTalkOutlookAddIn.Services
                        + ifbPort.ToString()
                        + ": port/prefix is already in use.";
             }
-
             return "IFB server could not be started: " + (ex != null ? ex.Message : "Unknown listener error.");
         }
 
@@ -198,7 +194,6 @@ namespace NcTalkOutlookAddIn.Services
                     return parts[1].Trim();
                 }
             }
-
             try
             {
                 var uri = new Uri(settings.ServerUrl);
@@ -223,7 +218,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             string current;
             bool hasCurrent = TryReadValue(path, valueName, out current);
             if (hasCurrent && string.IsNullOrEmpty(settings.IfbPreviousFreeBusyPath) && !string.IsNullOrEmpty(current))
@@ -234,12 +228,10 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return true;
             }
-
             if (!hasCurrent && !critical)
             {
                 return true;
             }
-
             try
             {
                 using (var key = OpenOrCreateSubKey(path))
@@ -252,18 +244,15 @@ namespace NcTalkOutlookAddIn.Services
                         }
                         return false;
                     }
-
                     string writableCurrent = key.GetValue(valueName, string.Empty) as string ?? string.Empty;
                     if (string.IsNullOrEmpty(settings.IfbPreviousFreeBusyPath) && !string.IsNullOrEmpty(writableCurrent))
                     {
                         settings.IfbPreviousFreeBusyPath = writableCurrent;
                     }
-
                     if (!string.Equals(writableCurrent, desired, StringComparison.OrdinalIgnoreCase))
                     {
                         key.SetValue(valueName, desired, RegistryValueKind.String);
                     }
-
                     return true;
                 }
             }
@@ -302,7 +291,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             string existing;
             if (TryReadValue(path, valueName, out existing))
             {
@@ -318,7 +306,6 @@ namespace NcTalkOutlookAddIn.Services
                     return;
                 }
             }
-
             try
             {
                 using (var key = OpenOrCreateSubKey(path))
@@ -327,7 +314,6 @@ namespace NcTalkOutlookAddIn.Services
                         DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' while restoring.");
                         return;
                     }
-
                     if (!string.IsNullOrEmpty(previous))
                     {
                         key.SetValue(valueName, previous, RegistryValueKind.String);
@@ -367,7 +353,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             try
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(path, false))
@@ -406,7 +391,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     return key;
                 }
-
                 return Registry.CurrentUser.CreateSubKey(path);
             }
             catch (UnauthorizedAccessException ex)

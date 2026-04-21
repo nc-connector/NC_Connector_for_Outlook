@@ -233,7 +233,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return null;
             }
-
             return parsed;
         }
 
@@ -263,7 +262,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     resolvedEventConversation = roomType.Value == TalkRoomType.EventConversation;
                 }
-
                 if (!resolvedEventConversation.HasValue && TryIsEventConversationFromObjectId(appointment))
                 {
                     resolvedEventConversation = true;
@@ -288,7 +286,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             try
             {
                 SetUserProperty(appointment, NextcloudTalkAddIn.IcalLobby, Outlook.OlUserPropertyType.olText, lobbyEnabled ? "TRUE" : "FALSE");
@@ -311,13 +308,11 @@ namespace NcTalkOutlookAddIn.Controllers
                 delegateId = string.Empty;
                 return false;
             }
-
             string currentUser = _owner.CurrentSettings != null ? (_owner.CurrentSettings.Username ?? string.Empty) : string.Empty;
             if (string.IsNullOrWhiteSpace(currentUser))
             {
                 return true;
             }
-
             return !string.Equals(delegateId.Trim(), currentUser.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
@@ -331,7 +326,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 delegateId = string.Empty;
                 return false;
             }
-
             return !string.IsNullOrWhiteSpace(delegateId);
         }
 
@@ -340,14 +334,12 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             string delegateId;
             if (IsDelegatedToOtherUser(appointment, out delegateId))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Participant sync skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
                 return true;
             }
-
             bool addParticipantsLegacy = GetUserPropertyBool(appointment, NextcloudTalkAddIn.IcalAddParticipants);
             bool hasAddUsers = HasUserProperty(appointment, NextcloudTalkAddIn.IcalAddUsers) || HasUserProperty(appointment, NextcloudTalkAddIn.PropertyAddUsers);
             bool hasAddGuests = HasUserProperty(appointment, NextcloudTalkAddIn.IcalAddGuests) || HasUserProperty(appointment, NextcloudTalkAddIn.PropertyAddGuests);
@@ -358,7 +350,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return true;
             }
-
             var configuration = new TalkServiceConfiguration(_owner.CurrentSettings.ServerUrl, _owner.CurrentSettings.Username, _owner.CurrentSettings.AppPassword);
             if (!configuration.IsComplete())
             {
@@ -371,7 +362,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return true;
             }
-
             var cache = new IfbAddressBookCache(_owner.SettingsStorage != null ? _owner.SettingsStorage.DataDirectory : null);
             string selfEmail;
             cache.TryGetPrimaryEmailForUid(configuration, _owner.CurrentSettings.IfbCacheHours, _owner.CurrentSettings.Username, out selfEmail);
@@ -391,14 +381,12 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         continue;
                     }
-
                     if (!string.IsNullOrWhiteSpace(selfEmail)
                         && string.Equals(email, selfEmail, StringComparison.OrdinalIgnoreCase))
                     {
                         skipped++;
                         continue;
                     }
-
                     string uid;
                     if (cache.TryGetUid(configuration, _owner.CurrentSettings.IfbCacheHours, email, out uid)
                         && !string.IsNullOrWhiteSpace(uid))
@@ -408,7 +396,6 @@ namespace NcTalkOutlookAddIn.Controllers
                             skipped++;
                             continue;
                         }
-
                         if (service.AddUserParticipant(roomToken, uid))
                         {
                             userAdds++;
@@ -421,13 +408,11 @@ namespace NcTalkOutlookAddIn.Controllers
 
                         continue;
                     }
-
                     if (!addGuests)
                     {
                         skipped++;
                         continue;
                     }
-
                     if (service.AddGuestParticipant(roomToken, email))
                     {
                         guestAdds++;
@@ -459,13 +444,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             string delegateId;
             if (!IsDelegationPending(appointment, out delegateId))
             {
                 return;
             }
-
             string currentUser = _owner.CurrentSettings.Username ?? string.Empty;
             if (!string.IsNullOrEmpty(currentUser)
                 && string.Equals(delegateId, currentUser, StringComparison.OrdinalIgnoreCase))
@@ -479,7 +462,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 RemoveUserProperty(appointment, NextcloudTalkAddIn.IcalDelegateReady);
                 return;
             }
-
             try
             {
                 var service = _owner.CreateTalkService();
@@ -495,7 +477,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         continue;
                     }
-
                     if (string.Equals(participant.ActorType, "users", StringComparison.OrdinalIgnoreCase)
                         && string.Equals(participant.ActorId, delegateId, StringComparison.OrdinalIgnoreCase))
                     {
@@ -503,13 +484,11 @@ namespace NcTalkOutlookAddIn.Controllers
                         break;
                     }
                 }
-
                 if (attendeeId <= 0)
                 {
                     NextcloudTalkAddIn.LogTalkMessage("Delegation failed: attendeeId not found (delegate=" + delegateId + ").");
                     return;
                 }
-
                 string promoteError;
                 if (!service.PromoteModerator(roomToken, attendeeId, out promoteError))
                 {
@@ -520,7 +499,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     NextcloudTalkAddIn.ShowWarningDialog(warning);
                     return;
                 }
-
                 bool left = service.LeaveRoom(roomToken);
                 NextcloudTalkAddIn.LogTalkMessage("Delegation completed (token=" + roomToken + ", delegate=" + delegateId + ", leftSelf=" + left + ").");
 
@@ -551,14 +529,12 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             string delegateId;
             if (IsDelegatedToOtherUser(appointment, out delegateId))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Lobby update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
                 return true;
             }
-
             try
             {
                 var service = _owner.CreateTalkService();
@@ -589,7 +565,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read Appointment.End during lobby update (token=" + roomToken + ").", ex);
                     return false;
                 }
-
                 if (end == DateTime.MinValue)
                 {
                     end = startUtc;
@@ -616,7 +591,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 NextcloudTalkAddIn.LogTalkMessage("Unexpected error while updating lobby: " + ex.Message);
                 NextcloudTalkAddIn.ShowWarningDialog(string.Format(Strings.WarningLobbyUpdateFailed, ex.Message));
             }
-
             return false;
         }
 
@@ -625,21 +599,18 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             string delegateId;
             if (IsDelegatedToOtherUser(appointment, out delegateId))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Room name update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
                 return true;
             }
-
             string roomName = GetNormalizedRoomName(appointment);
             if (string.IsNullOrWhiteSpace(roomName))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Room name update skipped (empty subject, token=" + roomToken + ").");
                 return true;
             }
-
             try
             {
                 var service = _owner.CreateTalkService();
@@ -656,7 +627,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     PersistEventConversationTraits(appointment, roomToken);
                     return true;
                 }
-
                 if (IsMissingOrForbiddenRoomMutationError(ex))
                 {
                     NextcloudTalkAddIn.LogTalkMessage("Room name update skipped after access loss (token=" + roomToken + ", status=" + (int)ex.StatusCode + ").");
@@ -669,7 +639,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 NextcloudTalkAddIn.LogTalkMessage("Unexpected error while updating room name: " + ex.Message);
             }
-
             return false;
         }
 
@@ -679,19 +648,16 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             string delegateId;
             if (IsDelegatedToOtherUser(appointment, out delegateId))
             {
                 NextcloudTalkAddIn.LogTalkMessage("Description update skipped (delegation=" + delegateId + ", token=" + roomToken + ").");
                 return true;
             }
-
             string description = BuildDescriptionPayload(appointment);            if (description == null)
             {
                 description = string.Empty;
             }
-
             try
             {
                 var service = _owner.CreateTalkService();
@@ -708,7 +674,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     PersistEventConversationTraits(appointment, roomToken);
                     return true;
                 }
-
                 if (IsMissingOrForbiddenRoomMutationError(ex))
                 {
                     NextcloudTalkAddIn.LogTalkMessage("Room description update skipped after access loss (token=" + roomToken + ", status=" + (int)ex.StatusCode + ").");
@@ -723,7 +688,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 NextcloudTalkAddIn.LogTalkMessage("Unexpected error while updating room description: " + ex.Message);
                 NextcloudTalkAddIn.ShowWarningDialog(string.Format(Strings.WarningDescriptionUpdateFailed, ex.Message));
             }
-
             return false;
         }
 
@@ -734,7 +698,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return null;
             }
-
             string body = appointment.Body ?? string.Empty;
             return body.Trim();
         }
@@ -749,13 +712,11 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     return TalkRoomType.EventConversation;
                 }
-
                 if (string.Equals(normalized, "standard", StringComparison.OrdinalIgnoreCase))
                 {
                     return TalkRoomType.StandardRoom;
                 }
             }
-
             string value = GetUserPropertyText(appointment, NextcloudTalkAddIn.PropertyRoomType);
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -767,7 +728,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return parsed;
             }
-
             return null;
         }
 
@@ -789,7 +749,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             try
             {
                 SetUserProperty(appointment, NextcloudTalkAddIn.IcalEvent, Outlook.OlUserPropertyType.olText, "event");
@@ -811,14 +770,12 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             bool needLobby = !lobbyEnabled.HasValue;
             bool needEvent = !isEventConversation.HasValue;
             if (!needLobby && !needEvent)
             {
                 return;
             }
-
             try
             {
                 bool? resolvedLobby;
@@ -828,7 +785,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     return;
                 }
-
                 if (needLobby && resolvedLobby.HasValue)
                 {
                     lobbyEnabled = resolvedLobby.Value;
@@ -844,7 +800,6 @@ namespace NcTalkOutlookAddIn.Controllers
 
                     NextcloudTalkAddIn.LogTalkMessage("Lobby flag bootstrapped from server (token=" + roomToken + ", lobby=" + resolvedLobby.Value + ").");
                 }
-
                 if (needEvent && resolvedEvent.HasValue)
                 {
                     isEventConversation = resolvedEvent.Value;
@@ -904,14 +859,12 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             try
             {
                 var properties = appointment.UserProperties;                if (properties == null)
                 {
                     return;
                 }
-
                 var property = properties[name] ?? properties.Add(name, type, Type.Missing, Type.Missing);                if (property == null)
                 {
                     return;
@@ -930,7 +883,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return null;
             }
-
             try
             {
                 var property = appointment.UserProperties[name];
@@ -948,7 +900,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             try
             {
                 return appointment.UserProperties[name] != null;
@@ -967,7 +918,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return primaryValue;
             }
-
             return GetUserPropertyText(appointment, legacyName);
         }
 
@@ -977,7 +927,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return GetUserPropertyBool(appointment, primaryName);
             }
-
             return GetUserPropertyBool(appointment, legacyName);
         }
 
@@ -986,7 +935,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             try
             {
                 var property = appointment.UserProperties[name];                if (property == null)
@@ -998,17 +946,14 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     return false;
                 }
-
                 if (value is bool)
                 {
                     return (bool)value;
                 }
-
                 if (value is int)
                 {
                     return (int)value != 0;
                 }
-
                 string text = value as string;
                 if (!string.IsNullOrEmpty(text))
                 {
@@ -1017,14 +962,12 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         return boolParsed;
                     }
-
                     int numericParsed;
                     if (int.TryParse(text, out numericParsed))
                     {
                         return numericParsed != 0;
                     }
                 }
-
                 return false;
             }
             catch (Exception ex)
@@ -1039,7 +982,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             try
             {
                 var property = appointment.UserProperties[name];                if (property != null)
@@ -1058,7 +1000,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             string normalized = ex.Message.Trim();
             return string.Equals(normalized, "event", StringComparison.OrdinalIgnoreCase)
                    || normalized.IndexOf("event conversation", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -1069,7 +1010,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             return ex.StatusCode == HttpStatusCode.NotFound || ex.StatusCode == HttpStatusCode.Forbidden;
         }
 
@@ -1080,7 +1020,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             try
             {
                 string subject = appointment.Subject;

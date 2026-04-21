@@ -21,7 +21,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 _inspectors = _outlookApplication.Inspectors;                if (_inspectors != null)
@@ -41,7 +40,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 _applicationEvents = _outlookApplication as Outlook.ApplicationEvents_11_Event;                if (_applicationEvents != null)
@@ -61,7 +59,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 _applicationEvents.ItemLoad -= OnApplicationItemLoad;
@@ -81,7 +78,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 _inspectors.NewInspector -= OnNewInspector;
@@ -102,14 +98,12 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 var appointment = inspector.CurrentItem as Outlook.AppointmentItem;                if (appointment != null)
                 {
                     EnsureSubscriptionForAppointment(appointment);
                 }
-
                 var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null)
                 {
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
@@ -141,10 +135,12 @@ namespace NcTalkOutlookAddIn
                         LogFileLink("Application.ItemLoad compose subscription skipped (reason=inspector_context).");
                     }
                     return;
-                }                if (_outlookApplication != null)
+                }
+                if (_outlookApplication != null)
                 {
                     explorer = _outlookApplication.ActiveExplorer();
-                }                if (explorer == null)
+                }
+                if (explorer == null)
                 {
                     if (DiagnosticsLogger.IsEnabled)
                     {
@@ -162,7 +158,6 @@ namespace NcTalkOutlookAddIn
                     }
                     return;
                 }
-
                 if (!ComInteropScope.AreSameObject(
                     mail,
                     inlineResponseMail,

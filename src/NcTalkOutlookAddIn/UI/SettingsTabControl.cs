@@ -40,7 +40,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     return;
                 }
-
                 try
                 {
                     var rect = (Rect)Marshal.PtrToStructure(m.LParam, typeof(Rect));
@@ -61,7 +60,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     DiagnosticsLogger.LogException(LogCategories.Core, "SettingsTabControl failed while adjusting tab page bounds.", ex);
                 }
-
                 return;
             }
 

@@ -32,7 +32,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     chars[i] = Alphabet[index];
                 }
             }
-
             return new string(chars);
         }
     }

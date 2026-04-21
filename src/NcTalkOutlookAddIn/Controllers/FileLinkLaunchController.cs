@@ -35,7 +35,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             if (!_owner.SettingsAreComplete())
             {
                 MessageBox.Show(
@@ -67,7 +66,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return false;
             }
-
             var configuration = new TalkServiceConfiguration(
                 settings.ServerUrl,
                 settings.Username,
@@ -94,7 +92,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
-
                     string html;
                     try
                     {
@@ -110,7 +107,6 @@ namespace NcTalkOutlookAddIn.Controllers
                             MessageBoxIcon.Error);
                         return false;
                     }
-
                     if (composeSubscription != null
                         && wizard.RequestSnapshot != null
                         && wizard.RequestSnapshot.PasswordSeparateEnabled
@@ -142,7 +138,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     return true;
                 }
             }
-
             return false;
         }
     }

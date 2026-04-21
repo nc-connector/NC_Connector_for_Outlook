@@ -44,7 +44,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     + (reason ?? string.Empty));
                 return false;
             }
-
             var configuration = new TalkServiceConfiguration(
                 _owner.CurrentSettings.ServerUrl,
                 _owner.CurrentSettings.Username,
@@ -88,7 +87,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             int attemptedDispatches = 0;
             int successfulDispatches = 0;
             int autoSendFailures = 0;
@@ -162,7 +160,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         "Failed to release password MailItem COM object.");
                 }
             }
-
             int recipientCount = sentRecipients.Count;
             if (attemptedDispatches > 0 && successfulDispatches == attemptedDispatches && autoSendFailures == 0 && recipientCount > 0)
             {
@@ -209,7 +206,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             for (int i = 0; i < addresses.Count; i++)
             {
                 string normalized = NormalizeRecipientAddress(addresses[i]);
@@ -225,13 +221,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             string normalized = NormalizeRecipientAddress(address);
             if (string.IsNullOrWhiteSpace(normalized))
             {
                 return;
             }
-
             for (int i = 0; i < recipients.Count; i++)
             {
                 if (string.Equals(recipients[i], normalized, StringComparison.OrdinalIgnoreCase))
@@ -250,13 +244,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return list;
             }
-
             string[] parts = csv.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < parts.Length; i++)
             {
                 AddUniqueRecipient(list, parts[i]);
             }
-
             return list;
         }
 
@@ -277,13 +269,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             string value = raw.Trim();
             if (string.IsNullOrWhiteSpace(value))
             {
                 return string.Empty;
             }
-
             int lt = value.LastIndexOf('<');
             int gt = value.LastIndexOf('>');
             if (lt >= 0 && gt > lt)
@@ -308,7 +298,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     return false;
                 }
-
                 string toRecipients = BuildNormalizedRecipientCsv(dispatch.To);
                 string ccRecipients = BuildNormalizedRecipientCsv(dispatch.Cc);
                 string bccRecipients = BuildNormalizedRecipientCsv(dispatch.Bcc);
@@ -369,7 +358,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 throw new InvalidOperationException("Separate password mail has no valid recipients.");
             }
-
             var resolvedRecipients = new List<string>();
             Outlook.Recipients recipients = null;
             try
@@ -388,12 +376,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     throw new InvalidOperationException("Separate password mail recipients could not be resolved.");
                 }
-
                 if (resolvedRecipients.Count <= 0)
                 {
                     throw new InvalidOperationException("Separate password mail has no resolvable recipients.");
                 }
-
                 return resolvedRecipients;
             }
             finally
@@ -415,7 +401,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             for (int i = 0; i < addresses.Count; i++)
             {
                 string address = addresses[i] ?? string.Empty;
@@ -461,7 +446,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return baseSubject;
             }
-
             return string.Format(CultureInfo.CurrentCulture, Strings.SharingPasswordMailSubjectWithLabel, shareLabel);
         }
 
@@ -471,7 +455,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-
             try
             {
                 MessageBox.Show(

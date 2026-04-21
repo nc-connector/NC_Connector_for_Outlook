@@ -54,7 +54,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 try
                 {
                     OutlookAttachmentAutomationGuardService.GuardState guardState;
@@ -112,20 +111,17 @@ namespace NcTalkOutlookAddIn
                             + ").");
                         return;
                     }
-
                     if (settings.AlwaysConnector)
                     {
                         cancel = true;
                         QueueBeforeAddAttachmentShareFlow("always_preadd", candidate, candidatePath, settings.ThresholdMb, candidatePathIsTemporary);
                         return;
                     }
-
                     if (_attachmentPromptOpen)
                     {
                         LogFileLink("Compose before-attachment-add prompt skipped (composeKey=" + _composeKey + ", reason=prompt_already_open).");
                         return;
                     }
-
                     string reasonText = string.Format(
                         CultureInfo.CurrentCulture,
                         Strings.AttachmentPromptReason,
@@ -146,7 +142,6 @@ namespace NcTalkOutlookAddIn
                     {
                         _attachmentPromptOpen = false;
                     }
-
                     if (decision == ComposeAttachmentPromptDecision.Share)
                     {
                         cancel = true;
@@ -159,7 +154,6 @@ namespace NcTalkOutlookAddIn
                         StartBeforeAddAttachmentShareFlow("threshold_preadd", candidate, candidatePath, settings.ThresholdMb, candidatePathIsTemporary);
                         return;
                     }
-
                     if (decision == ComposeAttachmentPromptDecision.RemoveLast)
                     {
                         cancel = true;
@@ -195,7 +189,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 string propertyName = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim();
                 if (propertyName.IndexOf("Attach", StringComparison.OrdinalIgnoreCase) < 0
                     && !string.Equals(propertyName, "HasAttachment", StringComparison.OrdinalIgnoreCase))
@@ -218,7 +211,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 try
                 {
                     _attachmentEvalTimer.Stop();
@@ -322,12 +314,10 @@ namespace NcTalkOutlookAddIn
                     StartComposeAttachmentShareFlow("always", totalBytes, settings.ThresholdMb, lastAdded);
                     return;
                 }
-
                 if (!settings.OfferAboveEnabled || totalBytes <= settings.ThresholdBytes)
                 {
                     return;
                 }
-
                 string reasonText = string.Format(
                     CultureInfo.CurrentCulture,
                     Strings.AttachmentPromptReason,
@@ -353,12 +343,10 @@ namespace NcTalkOutlookAddIn
                 {
                     _attachmentPromptOpen = false;
                 }
-
                 if (_owner.TryGetAttachmentAutomationGuardState("prompt_action", _composeKey, out guardState))
                 {
                     return;
                 }
-
                 if (decision == ComposeAttachmentPromptDecision.Share)
                 {
                     LogFileLink(
@@ -405,7 +393,6 @@ namespace NcTalkOutlookAddIn
                         {
                             alwaysConnector = policyBool;
                         }
-
                         if (policyStatus.IsLocked("share", "attachments_min_size_mb"))
                         {
                             if (policyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
@@ -420,7 +407,6 @@ namespace NcTalkOutlookAddIn
                         }
                     }
                 }
-
                 return new AttachmentAutomationSettings
                 {
                     AlwaysConnector = alwaysConnector,
@@ -441,7 +427,6 @@ namespace NcTalkOutlookAddIn
                     {
                         return snapshots;
                     }
-
                     int count = attachments.Count;
                     for (int index = 1; index <= count; index++)
                     {
@@ -494,7 +479,6 @@ namespace NcTalkOutlookAddIn
                         LogCategories.FileLink,
                         "Failed to release COM object (compose attachments collection snapshot).");
                 }
-
                 return snapshots;
             }
 
@@ -504,12 +488,10 @@ namespace NcTalkOutlookAddIn
                 {
                     return 0;
                 }
-
                 for (int i = 0; i < snapshots.Count; i++)
                 {
                     total += Math.Max(0, snapshots[i].SizeBytes);
                 }
-
                 return total;
             }
 
@@ -522,7 +504,6 @@ namespace NcTalkOutlookAddIn
                     {
                         total += Math.Max(0, _pendingAddedBatch[i].SizeBytes);
                     }
-
                     var info = new AttachmentBatchInfo
                     {
                         Count = _pendingAddedBatch.Count,
@@ -531,7 +512,8 @@ namespace NcTalkOutlookAddIn
                     };
                     _pendingAddedBatch.Clear();
                     return info;
-                }                if (snapshots == null || snapshots.Count == 0)
+                }
+                if (snapshots == null || snapshots.Count == 0)
                 {
                     return new AttachmentBatchInfo
                     {
@@ -557,7 +539,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 var selections = new List<FileLinkSelection>();
                 var removeIndices = new List<int>();
                 var tempFiles = new List<string>();
@@ -585,7 +566,6 @@ namespace NcTalkOutlookAddIn
                 {
                     launchOptions.InitialSelections.Add(new FileLinkSelection(selections[i].SelectionType, selections[i].LocalPath));
                 }
-
                 try
                 {
                     bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
@@ -681,7 +661,6 @@ namespace NcTalkOutlookAddIn
                         "Failed to read file size from before-attachment-add path (composeKey=" + _composeKey + ").",
                         ex);
                 }
-
                 if (measuredPathSize > 0)
                 {
                     if (attachmentSize > 0
@@ -705,7 +684,6 @@ namespace NcTalkOutlookAddIn
                 {
                     entry.SizeBytes = attachmentSize;
                 }
-
                 return true;
             }
 
@@ -715,13 +693,11 @@ namespace NcTalkOutlookAddIn
                 {
                     return false;
                 }
-
                 string safeName = FileLinkService.SanitizeComponent(attachmentName);
                 if (string.IsNullOrWhiteSpace(safeName))
                 {
                     safeName = "attachment.bin";
                 }
-
                 string tempRoot = Path.Combine(Path.GetTempPath(), "NCConnectorOutlook", "BeforeAdd", _composeKey);
                 try
                 {
@@ -755,7 +731,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return string.Empty;
                 }
-
                 string fileName = string.Empty;
                 string displayName = string.Empty;
 
@@ -770,7 +745,6 @@ namespace NcTalkOutlookAddIn
                         "Failed to read before-attachment-add Attachment.FileName (composeKey=" + _composeKey + ").",
                         ex);
                 }
-
                 try
                 {
                     displayName = attachment.DisplayName ?? string.Empty;
@@ -782,7 +756,6 @@ namespace NcTalkOutlookAddIn
                         "Failed to read before-attachment-add Attachment.DisplayName (composeKey=" + _composeKey + ").",
                         ex);
                 }
-
                 string[] candidates = { fileName, displayName };
                 for (int i = 0; i < candidates.Length; i++)
                 {
@@ -791,13 +764,11 @@ namespace NcTalkOutlookAddIn
                     {
                         continue;
                     }
-
                     string normalized = raw.Trim().Trim('"');
                     if (string.IsNullOrWhiteSpace(normalized))
                     {
                         continue;
                     }
-
                     try
                     {
                         if (Path.IsPathRooted(normalized) && File.Exists(normalized))
@@ -823,7 +794,6 @@ namespace NcTalkOutlookAddIn
                             ex);
                     }
                 }
-
                 if (DiagnosticsLogger.IsEnabled)
                 {
                     LogFileLink(
@@ -835,7 +805,6 @@ namespace NcTalkOutlookAddIn
                         + (displayName ?? string.Empty)
                         + ").");
                 }
-
                 return string.Empty;
             }
 
@@ -851,7 +820,6 @@ namespace NcTalkOutlookAddIn
                     LogFileLink("Compose before-attachment-add share flow skipped (composeKey=" + _composeKey + ", reason=missing_local_path).");
                     return;
                 }
-
                 var launchOptions = new FileLinkWizardLaunchOptions
                 {
                     AttachmentMode = true,
@@ -925,7 +893,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 try
                 {
                     _beforeAddShareTimer.Stop();
@@ -981,7 +948,6 @@ namespace NcTalkOutlookAddIn
                             temporaryFiles.Add(entry.LocalPath);
                         }
                     }
-
                     if (launchOptions.InitialSelections.Count == 0)
                     {
                         LogFileLink("Compose before-attachment-add queued share flow skipped (composeKey=" + _composeKey + ", reason=no_collectible_files).");
@@ -1026,7 +992,6 @@ namespace NcTalkOutlookAddIn
                     {
                         return;
                     }
-
                     int count = attachments.Count;
                     for (int index = 1; index <= count; index++)
                     {
@@ -1037,7 +1002,6 @@ namespace NcTalkOutlookAddIn
                             {
                                 continue;
                             }
-
                             string attachmentName = ReadAttachmentName(attachment);
                             string localPath;
                             if (!TryResolveAttachmentLocalPath(attachment, attachmentName, temporaryFiles, out localPath))
@@ -1090,20 +1054,17 @@ namespace NcTalkOutlookAddIn
                 {
                     return false;
                 }
-
                 string pathName = ReadAttachmentPathName(attachment);
                 if (!string.IsNullOrWhiteSpace(pathName) && File.Exists(pathName))
                 {
                     localPath = pathName;
                     return true;
                 }
-
                 string safeName = FileLinkService.SanitizeComponent(attachmentName);
                 if (string.IsNullOrWhiteSpace(safeName))
                 {
                     safeName = "attachment.bin";
                 }
-
                 string tempRoot = Path.Combine(Path.GetTempPath(), "NCConnectorOutlook", "Attachments", _composeKey);
                 try
                 {
@@ -1142,7 +1103,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return candidate;
                 }
-
                 for (int suffix = 1; suffix < 1000; suffix++)
                 {
                     string slotDirectory = Path.Combine(
@@ -1155,7 +1115,6 @@ namespace NcTalkOutlookAddIn
                         return candidate;
                     }
                 }
-
                 string fallbackDirectory = Path.Combine(directory, Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(fallbackDirectory);
                 return Path.Combine(fallbackDirectory, fileName);
@@ -1180,7 +1139,6 @@ namespace NcTalkOutlookAddIn
                     {
                         return;
                     }
-
                     for (int index = indices.Count - 1; index >= 0; index--)
                     {
                         int attachmentIndex = indices[index];
@@ -1240,7 +1198,6 @@ namespace NcTalkOutlookAddIn
                     {
                         return;
                     }
-
                     int totalCount = attachments.Count;
                     int effectiveCount = Math.Min(totalCount, removeCount);
                     for (int i = 0; i < effectiveCount; i++)
@@ -1280,7 +1237,6 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
-
                 for (int i = 0; i < temporaryFiles.Count; i++)
                 {
                     string path = temporaryFiles[i];
@@ -1288,7 +1244,6 @@ namespace NcTalkOutlookAddIn
                     {
                         continue;
                     }
-
                     try
                     {
                         if (File.Exists(path))

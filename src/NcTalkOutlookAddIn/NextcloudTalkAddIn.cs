@@ -141,7 +141,6 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonTalkButtonScreenTip),
                     EscapeXml(Strings.RibbonTalkButtonSuperTip));
             }
-
             if (string.Equals(ribbonID, "Microsoft.Outlook.Explorer", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Format(
@@ -169,7 +168,6 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonSettingsScreenTip),
                     EscapeXml(Strings.RibbonSettingsSuperTip));
             }
-
             if (string.Equals(ribbonID, "Microsoft.Outlook.Mail.Compose", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Format(
@@ -196,7 +194,6 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
                     EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
             }
-
             return null;
         }
 
@@ -277,7 +274,6 @@ namespace NcTalkOutlookAddIn
             {
                 return null;
             }
-
             string mailIdentityKey = ComInteropScope.ResolveIdentityKey(mail, LogCategories.FileLink, "MailItem");
             string inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityOverride)
                 ? MailInteropController.ResolveMailInspectorIdentityKey(mail)
@@ -311,7 +307,8 @@ namespace NcTalkOutlookAddIn
             {
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read live attachment automation guard state.", ex);
                 return false;
-            }            if (state == null || !state.LockActive)
+            }
+            if (state == null || !state.LockActive)
             {
                 return false;
             }
@@ -341,7 +338,6 @@ namespace NcTalkOutlookAddIn
                 LogFileLink("Separate password notification skipped (UI context unavailable, recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
                 return;
             }
-
             try
             {
                 notificationUiContext.Post(
@@ -360,7 +356,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 var notifyIcon = new NotifyIcon();
@@ -386,7 +381,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             int effectiveDelayMs = Math.Max(0, delayMs);
             Task.Delay(effectiveDelayMs).ContinueWith(
                 _ => DisposeNotifyIconOnUiContext(notifyIcon, notificationUiContext),
@@ -399,12 +393,12 @@ namespace NcTalkOutlookAddIn
         {            if (notifyIcon == null)
             {
                 return;
-            }            if (notificationUiContext == null)
+            }
+            if (notificationUiContext == null)
             {
                 DisposeNotifyIcon(notifyIcon);
                 return;
             }
-
             try
             {
                 notificationUiContext.Post(_ => DisposeNotifyIcon(notifyIcon), null);
@@ -421,7 +415,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 notifyIcon.Visible = false;
@@ -468,11 +461,11 @@ namespace NcTalkOutlookAddIn
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook ActiveInspector for appointment.", ex);
                 inspector = null;
-            }            if (inspector != null)
+            }
+            if (inspector != null)
             {
                 return inspector.CurrentItem as Outlook.AppointmentItem;
             }
-
             return null;
         }
 
@@ -492,7 +485,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             try
             {
                 LogCore("Applying IFB (Enabled=" + _currentSettings.IfbEnabled + ", Days=" + _currentSettings.IfbDays + ", Port=" + _currentSettings.IfbPort + ", CacheHours=" + _currentSettings.IfbCacheHours + ").");
@@ -557,7 +549,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             string versionText = parsed.ToString();
             if (string.Equals(_currentSettings.LastKnownServerVersion, versionText, StringComparison.OrdinalIgnoreCase))
             {
@@ -590,7 +581,6 @@ namespace NcTalkOutlookAddIn
             {
                 return null;
             }
-
             string token = match.Groups["token"] != null ? match.Groups["token"].Value : null;
             return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
         }
@@ -602,7 +592,6 @@ namespace NcTalkOutlookAddIn
             {
                 return roomToken.Trim();
             }
-
             string location = null;
             try
             {
@@ -612,13 +601,11 @@ namespace NcTalkOutlookAddIn
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read appointment location while resolving Talk token.", ex);
             }
-
             string extracted = ExtractTokenFromTalkUrlText(location);
             if (string.IsNullOrWhiteSpace(extracted))
             {
                 return null;
             }
-
             try
             {
                 TalkAppointmentController.SetUserProperty(appointment, IcalToken, Outlook.OlUserPropertyType.olText, extracted);
@@ -629,7 +616,6 @@ namespace NcTalkOutlookAddIn
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to persist bootstrapped room token.", ex);
             }
-
             return extracted;
         }
 
@@ -638,7 +624,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             string oldEntryId = subscription.EntryId;
             string newEntryId = GetEntryId(subscription.Appointment);
 
@@ -646,7 +631,6 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
-
             if (!string.IsNullOrEmpty(oldEntryId))
             {
                 AppointmentSubscription current;
@@ -728,7 +712,6 @@ namespace NcTalkOutlookAddIn
 
                 existingByToken.Dispose();
             }
-
             var key = Guid.NewGuid().ToString("N");
             var subscription = new AppointmentSubscription(this, appointment, key, roomToken, lobbyEnabled, isEventConversation, entryId);
             _activeSubscriptions[key] = subscription;
@@ -747,12 +730,10 @@ namespace NcTalkOutlookAddIn
             {
                 _activeSubscriptions.Remove(key);
             }
-
             if (!string.IsNullOrEmpty(roomToken))
             {
                 _subscriptionByToken.Remove(roomToken);
             }
-
             if (!string.IsNullOrEmpty(entryId))
             {
                 _subscriptionByEntryId.Remove(entryId);
@@ -775,7 +756,6 @@ namespace NcTalkOutlookAddIn
             {
                 return true;
             }
-
             try
             {
                 LogTalk("Deleting room (token=" + roomToken + ", event=" + isEventConversation + ").");
@@ -794,7 +774,6 @@ namespace NcTalkOutlookAddIn
                 LogTalk("Unexpected error while deleting room: " + ex.Message);
                 ShowWarning(string.Format(Strings.WarningRoomDeleteFailed, ex.Message));
             }
-
             return false;
         }
 
@@ -804,7 +783,6 @@ namespace NcTalkOutlookAddIn
             {
                 return string.Empty;
             }
-
             return value
                 .Replace("&", "&amp;")
                 .Replace("<", "&lt;")
@@ -832,7 +810,8 @@ namespace NcTalkOutlookAddIn
             {                if (_settingsStorage != null)
                 {
                     _currentSettings = _settingsStorage.Load();
-                }                if (_currentSettings == null)
+                }
+                if (_currentSettings == null)
                 {
                     _currentSettings = new AddinSettings();
                 }
@@ -872,7 +851,6 @@ namespace NcTalkOutlookAddIn
                         Strings.TransportTlsApplyFailed,
                         ex.Message));
                 }
-
                 return false;
             }
         }

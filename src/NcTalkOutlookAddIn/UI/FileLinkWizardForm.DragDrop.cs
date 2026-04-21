@@ -52,7 +52,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             var selections = BuildSelectionsFromFileDropData(e.Data);
             if (selections.Count == 0)
             {
@@ -67,7 +66,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return DragDropEffects.None;
             }
-
             return e.Data.GetDataPresent(DataFormats.FileDrop)
                 ? DragDropEffects.Copy
                 : DragDropEffects.None;
@@ -79,12 +77,10 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return selections;
             }
-
             var paths = dataObject.GetData(DataFormats.FileDrop) as string[];            if (paths == null || paths.Length == 0)
             {
                 return selections;
             }
-
             for (int i = 0; i < paths.Length; i++)
             {
                 string path = paths[i];
@@ -94,7 +90,6 @@ namespace NcTalkOutlookAddIn.UI
                     selections.Add(selection);
                 }
             }
-
             return selections;
         }
 
@@ -102,7 +97,8 @@ namespace NcTalkOutlookAddIn.UI
         {            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
             {
                 return false;
-            }            if (!_attachmentMode && existingPaths != null)
+            }
+            if (!_attachmentMode && existingPaths != null)
             {
                 if (existingPaths.Contains(selection.LocalPath))
                 {
@@ -133,7 +129,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return false;
             }
-
             return selection.SelectionType == FileLinkSelectionType.Directory
                 ? Directory.Exists(selection.LocalPath)
                 : File.Exists(selection.LocalPath);
@@ -146,19 +141,16 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return false;
             }
-
             if (File.Exists(path))
             {
                 selection = new FileLinkSelection(FileLinkSelectionType.File, path);
                 return true;
             }
-
             if (Directory.Exists(path))
             {
                 selection = new FileLinkSelection(FileLinkSelectionType.Directory, path);
                 return true;
             }
-
             return false;
         }
     }

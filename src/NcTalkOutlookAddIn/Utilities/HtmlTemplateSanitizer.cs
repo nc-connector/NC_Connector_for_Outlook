@@ -167,7 +167,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             try
             {
                 var parser = new HtmlParser();
@@ -176,7 +175,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 {
                     return html;
                 }
-
                 bool changed = false;
                 int fontColorWrappers = 0;
                 int bgColorAttrs = 0;
@@ -194,7 +192,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                     {
                         continue;
                     }
-
                     string color = NormalizeLegacyColorValue(ExtractCssProperty(style, "color"));
                     string backgroundColor = NormalizeLegacyColorValue(ExtractCssProperty(style, "background-color"));
                     string textAlign = NormalizeAlignValue(ExtractCssProperty(style, "text-align"));
@@ -208,7 +205,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                         normalizedStyle = StripUnsupportedOutlookStyleDeclarations(normalizedStyle, out strippedStyleDeclarations);
                         strippedCssDeclarations += strippedStyleDeclarations;
                     }
-
                     if (!string.Equals(style, normalizedStyle, StringComparison.Ordinal))
                     {
                         if (string.IsNullOrWhiteSpace(normalizedStyle))
@@ -221,7 +217,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                         }
                         changed = true;
                     }
-
                     if (!string.IsNullOrWhiteSpace(color))
                     {
                         string tagName = (element.TagName ?? string.Empty).ToLowerInvariant();
@@ -252,7 +247,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                             }
                         }
                     }
-
                     if (!string.IsNullOrWhiteSpace(backgroundColor) && SupportsBgColorAttribute((element.TagName ?? string.Empty).ToLowerInvariant()))
                     {
                         if (!string.Equals(element.GetAttribute("bgcolor") ?? string.Empty, backgroundColor, StringComparison.OrdinalIgnoreCase))
@@ -262,7 +256,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                             bgColorAttrs++;
                         }
                     }
-
                     if (!string.IsNullOrWhiteSpace(textAlign) && SupportsAlignAttribute((element.TagName ?? string.Empty).ToLowerInvariant()))
                     {
                         if (!string.Equals(element.GetAttribute("align") ?? string.Empty, textAlign, StringComparison.OrdinalIgnoreCase))
@@ -272,7 +265,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                             alignAttrs++;
                         }
                     }
-
                     if (!string.IsNullOrWhiteSpace(verticalAlign) && SupportsVAlignAttribute((element.TagName ?? string.Empty).ToLowerInvariant()))
                     {
                         if (!string.Equals(element.GetAttribute("valign") ?? string.Empty, verticalAlign, StringComparison.OrdinalIgnoreCase))
@@ -282,7 +274,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                             valignAttrs++;
                         }
                     }
-                }                if (appointmentCompatMode && body.QuerySelector("table") == null)
+                }
+                if (appointmentCompatMode && body.QuerySelector("table") == null)
                 {
                     var wrapperTable = document.CreateElement("table");
                     wrapperTable.SetAttribute("role", "presentation");
@@ -311,7 +304,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                     changed = true;
                     tableWrapped = true;
                 }
-
                 string output = changed ? body.InnerHtml : html;
                 DiagnosticsLogger.Log(
                     LogCategories.Core,
@@ -378,20 +370,17 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return null;
             }
-
             string requestedName = requestedAssembly == null ? string.Empty : requestedAssembly.Name;
             if (!SanitizerDependencyNames.Contains(requestedName))
             {
                 return null;
             }
-
             string assemblyDirectory = Path.GetDirectoryName(typeof(HtmlTemplateSanitizer).Assembly.Location) ?? string.Empty;
             string dependencyPath = Path.Combine(assemblyDirectory, requestedName + ".dll");
             if (!File.Exists(dependencyPath))
             {
                 return null;
             }
-
             try
             {
                 return Assembly.LoadFrom(dependencyPath);
@@ -409,7 +398,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return;
             }
-
             try
             {
                 AssemblyName targetAssembly = AssemblyName.GetAssemblyName(path);
@@ -441,32 +429,26 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 sanitizer.AllowedTags.Add(tag);
             }
-
             foreach (string attribute in DomPurifyHtmlProfileAttributes)
             {
                 sanitizer.AllowedAttributes.Add(attribute);
             }
-
             foreach (string scheme in DomPurifyAllowedSchemes)
             {
                 sanitizer.AllowedSchemes.Add(scheme);
             }
-
             foreach (string tag in ForbiddenTags)
             {
                 sanitizer.AllowedTags.Remove(tag);
             }
-
             foreach (string tag in AdditionalTags)
             {
                 sanitizer.AllowedTags.Add(tag);
             }
-
             foreach (string attribute in AdditionalAttributes)
             {
                 sanitizer.AllowedAttributes.Add(attribute);
             }
-
             return sanitizer;
         }
 
@@ -476,7 +458,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return Array.Empty<string>();
             }
-
             return Regex
                 .Split(text, @"[\s,]+")
                 .Where(token => !string.IsNullOrWhiteSpace(token))
@@ -490,7 +471,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             try
             {
                 HtmlStructureStats inputStats = AnalyzeHtmlStructure(html);
@@ -547,11 +527,11 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
         {            if (inputStats == null)
             {
                 inputStats = new HtmlStructureStats();
-            }            if (outputStats == null)
+            }
+            if (outputStats == null)
             {
                 outputStats = new HtmlStructureStats();
             }
-
             string removedTags = FormatRemovedEntries(inputStats.TagCounts, outputStats.TagCounts, 8);
             string removedAttributes = FormatRemovedEntries(inputStats.AttributeCounts, outputStats.AttributeCounts, 8);
 
@@ -584,7 +564,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return "none";
             }
-
             var removed = new List<KeyValuePair<string, int>>();
             foreach (var input in inputCounts)
             {
@@ -593,19 +572,16 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 {
                     outputValue = 0;
                 }
-
                 int delta = input.Value - outputValue;
                 if (delta > 0)
                 {
                     removed.Add(new KeyValuePair<string, int>(input.Key, delta));
                 }
             }
-
             if (removed.Count == 0)
             {
                 return "none";
             }
-
             return string.Join(
                 ";",
                 removed
@@ -622,7 +598,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return stats;
             }
-
             try
             {
                 var parser = new HtmlParser();
@@ -631,7 +606,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 {
                     return stats;
                 }
-
                 foreach (IElement element in body.QuerySelectorAll("*"))
                 {
                     stats.ElementCount++;
@@ -643,7 +617,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                         stats.TagCounts.TryGetValue(tagName, out currentTagCount);
                         stats.TagCounts[tagName] = currentTagCount + 1;
                     }
-
                     foreach (IAttr attribute in element.Attributes)
                     {
                         stats.AttributeCount++;
@@ -652,7 +625,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                         {
                             continue;
                         }
-
                         int currentAttrCount;
                         stats.AttributeCounts.TryGetValue(attrName, out currentAttrCount);
                         stats.AttributeCounts[attrName] = currentAttrCount + 1;
@@ -663,7 +635,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to analyze HTML structure for sanitizer summary.", ex);
             }
-
             return stats;
         }
 
@@ -674,14 +645,12 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             var parser = new HtmlParser();
             var document = parser.ParseDocument(html);
             var body = document != null ? document.Body : null;            if (body == null)
             {
                 return html;
             }
-
             bool changed = false;
             foreach (IElement element in body.QuerySelectorAll("[style]"))
             {
@@ -690,7 +659,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 {
                     continue;
                 }
-
                 int styleConversions;
                 string normalizedStyle = NormalizeOutlookStyleColors(style, out styleConversions);
                 if (!string.Equals(style, normalizedStyle, StringComparison.Ordinal))
@@ -701,7 +669,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
 
                 report.RgbaStyleConversions += styleConversions;
             }
-
             foreach (IElement anchor in body.QuerySelectorAll("a[target]"))
             {
                 string target = anchor.GetAttribute("target");
@@ -709,7 +676,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 {
                     continue;
                 }
-
                 var relTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 string rel = anchor.GetAttribute("rel") ?? string.Empty;
                 string[] split = rel.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -717,7 +683,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 {
                     relTokens.Add(token);
                 }
-
                 bool hadNoOpener = relTokens.Contains("noopener");
                 bool hadNoReferrer = relTokens.Contains("noreferrer");
                 if (!hadNoOpener || !hadNoReferrer)
@@ -729,7 +694,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                     report.AnchorRelAdjustments++;
                 }
             }
-
             return changed ? body.InnerHtml : html;
         }
 
@@ -740,7 +704,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             int conversionCount = 0;
             string normalized = RgbaColorRegex.Replace(
                 style,
@@ -778,7 +741,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             string[] declarations = style.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
             var kept = new List<string>(declarations.Length);
             foreach (string rawDeclaration in declarations)
@@ -788,14 +750,12 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                 {
                     continue;
                 }
-
                 int separatorIndex = declaration.IndexOf(':');
                 if (separatorIndex <= 0 || separatorIndex >= declaration.Length - 1)
                 {
                     kept.Add(declaration);
                     continue;
                 }
-
                 string property = declaration.Substring(0, separatorIndex).Trim().ToLowerInvariant();
                 string value = declaration.Substring(separatorIndex + 1).Trim();
                 if (ShouldStripOutlookStyleDeclaration(property, value))
@@ -806,7 +766,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
 
                 kept.Add(property + ": " + value);
             }
-
             return kept.Count == 0 ? string.Empty : string.Join("; ", kept) + ";";
         }
 
@@ -816,7 +775,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return false;
             }
-
             if (property.StartsWith("flex", StringComparison.OrdinalIgnoreCase)
                 || property.StartsWith("grid", StringComparison.OrdinalIgnoreCase)
                 || property.Contains("radius")
@@ -830,7 +788,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return true;
             }
-
             if (string.Equals(property, "display", StringComparison.OrdinalIgnoreCase))
             {
                 string normalizedValue = (value ?? string.Empty).Trim().ToLowerInvariant();
@@ -839,7 +796,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                     return true;
                 }
             }
-
             return false;
         }
 
@@ -858,7 +814,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             string value = match.Groups["value"].Value ?? string.Empty;
             value = Regex.Replace(value, @"\s*!important\s*$", string.Empty, RegexOptions.IgnoreCase).Trim();
             return value;
@@ -883,7 +838,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return false;
             }
-
             var currentSingleChild = targetElement.Children.Length == 1 ? targetElement.Children[0] : null;
             if (currentSingleChild != null
                 && string.Equals(currentSingleChild.TagName, "FONT", StringComparison.OrdinalIgnoreCase)
@@ -891,13 +845,11 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return false;
             }
-
             if (string.Equals(targetElement.TagName, "A", StringComparison.OrdinalIgnoreCase)
                 && string.IsNullOrWhiteSpace(targetElement.TextContent))
             {
                 return false;
             }
-
             var fontElement = document.CreateElement("font");
             fontElement.SetAttribute("color", color);
             while (targetElement.FirstChild != null)
@@ -947,13 +899,11 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             string normalized = value.Trim().ToLowerInvariant();
             if (normalized == "left" || normalized == "right" || normalized == "center" || normalized == "justify")
             {
                 return normalized;
             }
-
             return string.Empty;
         }
 
@@ -963,13 +913,11 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             string normalized = value.Trim().ToLowerInvariant();
             if (normalized == "top" || normalized == "middle" || normalized == "bottom" || normalized == "baseline")
             {
                 return normalized;
             }
-
             return string.Empty;
         }
 
@@ -979,13 +927,11 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return string.Empty;
             }
-
             string normalized = value.Trim();
             if (normalized.Length == 0)
             {
                 return string.Empty;
             }
-
             if (normalized.StartsWith("#", StringComparison.Ordinal))
             {
                 if (normalized.Length == 4)
@@ -995,7 +941,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
                     char b = normalized[3];
                     return "#" + r + r + g + g + b + b;
                 }
-
                 if (normalized.Length == 7)
                 {
                     return normalized;
@@ -1016,7 +961,6 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return normalized;
             }
-
             return string.Empty;
         }
 
@@ -1027,17 +971,14 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return 0;
             }
-
             if (parsed < 0)
             {
                 return 0;
             }
-
             if (parsed > 255)
             {
                 return 255;
             }
-
             return parsed;
         }
 
@@ -1048,17 +989,14 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 return 1d;
             }
-
             if (parsed < 0d)
             {
                 return 0d;
             }
-
             if (parsed > 1d)
             {
                 return 1d;
             }
-
             return parsed;
         }
     }

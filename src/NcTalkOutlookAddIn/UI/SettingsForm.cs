@@ -232,7 +232,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             for (int i = 0; i < controls.Length; i++)
             {
                 Control control = controls[i];                if (control == null)
@@ -447,7 +446,6 @@ namespace NcTalkOutlookAddIn.UI
                     _statusLabel.Visible = false;
                     _statusLabel.SetBounds(outerPadding, statusTop, 0, 0);
                 }
-
                 int tabTop = HeaderHeight + outerPadding;
                 if (_policyWarningPanel.Visible)
                 {
@@ -473,7 +471,6 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     _policyWarningPanel.SetBounds(outerPadding, tabTop, Math.Max(ScaleLogical(420), ClientSize.Width - (outerPadding * 2)), 0);
                 }
-
                 int tabBottom = hasStatus
                     ? Math.Max(tabTop + ScaleLogical(220), statusTop - ScaleLogical(4))
                     : Math.Max(tabTop + ScaleLogical(220), buttonTop - ScaleLogical(4));
@@ -1049,7 +1046,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read assembly version.", ex);
             }
-
             try
             {
                 var info = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location);
@@ -1062,7 +1058,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read file version info.", ex);
             }
-
             return null;
         }
 
@@ -1111,14 +1106,12 @@ namespace NcTalkOutlookAddIn.UI
                         return candidate;
                     }
                 }
-
                 string appBase = AppDomain.CurrentDomain.BaseDirectory ?? string.Empty;
                 candidate = Path.Combine(appBase, "License.txt");
                 if (!string.IsNullOrEmpty(candidate))
                 {
                     return candidate;
                 }
-
                 return "License.txt";
             }
             catch (Exception ex)
@@ -1259,14 +1252,12 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             string baseUrl = _serverUrlTextBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
                 SetStatus(Strings.StatusServerUrlRequired, true);
                 return;
             }
-
             var normalizedUrl = new TalkServiceConfiguration(baseUrl, string.Empty, string.Empty).GetNormalizedBaseUrl();
             if (string.IsNullOrWhiteSpace(normalizedUrl))
             {
@@ -1347,7 +1338,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             string baseUrl = _serverUrlTextBox.Text.Trim();
             string user = _usernameTextBox.Text.Trim();
             string appPassword = _appPasswordTextBox.Text;
@@ -1471,13 +1461,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return Strings.StatusTestFailureUnknown;
             }
-
             string[] lines = message.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
             if (lines.Length == 0)
             {
                 return Strings.StatusTestFailureUnknown;
             }
-
             return lines[0].Trim();
         }
 
@@ -1521,7 +1509,6 @@ namespace NcTalkOutlookAddIn.UI
                 UpdateSharingAttachmentOptionsState();
                 return;
             }
-
             if (_tabControl.SelectedTab == _talkTab)
             {
                 RefreshTalkSystemAddressbookState(true, "settings_tab_talk");
@@ -1567,18 +1554,15 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return Strings.SharingPasswordSeparateBackendRequiredTooltip;
             }
-
             if (!_backendPolicyStatus.SeatAssigned)
             {
                 return Strings.SharingPasswordSeparateNoSeatTooltip;
             }
-
             if (!_backendPolicyStatus.IsValid
                 || !string.Equals(_backendPolicyStatus.SeatState, "active", StringComparison.OrdinalIgnoreCase))
             {
                 return Strings.SharingPasswordSeparatePausedTooltip;
             }
-
             return string.Empty;
         }
 
@@ -1638,7 +1622,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             bool policyBool;
             int policyInt;
             string policyString;
@@ -1654,7 +1637,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _sharingDefaultShareNameTextBox.Text = policyString;
             }
-
             if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
             {
                 _sharingDefaultPermCreateCheckBox.Checked = policyBool;
@@ -1708,7 +1690,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 SelectLanguageChoice(_shareBlockLangCombo, policyString);
             }
-
             if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
             {
                 _talkDefaultPasswordCheckBox.Checked = policyBool;
@@ -1944,7 +1925,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             string text = value.ToString();
             if (combo.Items.Contains(text))
             {
@@ -1965,19 +1945,16 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return fallback;
             }
-
             string selected = combo.SelectedItem as string;
             int parsed;            if (selected != null && int.TryParse(selected, out parsed))
             {
                 return parsed;
             }
-
             int parsedText;
             if (int.TryParse(combo.Text, out parsedText))
             {
                 return parsedText;
             }
-
             return fallback;
         }
 
@@ -2000,7 +1977,6 @@ namespace NcTalkOutlookAddIn.UI
                 }
                 return;
             }
-
             string directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
             {
@@ -2047,7 +2023,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             if (!_tlsUseSystemDefaultCheckBox.Checked
                 && !_tlsEnable12CheckBox.Checked
                 && !_tlsEnable13CheckBox.Checked)
@@ -2055,7 +2030,6 @@ namespace NcTalkOutlookAddIn.UI
                 SetStatus(Strings.TransportTlsSelectionRequired, true);
                 return;
             }
-
             try
             {
                 TransportSecurityConfigurator.Apply(
@@ -2081,7 +2055,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
             try
             {
                 ServicePointManager.SecurityProtocol = _runtimeSecurityProtocolAtOpen;
@@ -2119,7 +2092,6 @@ namespace NcTalkOutlookAddIn.UI
                 _ifbEnabledCheckBox.Checked = true;
                 _ifbDefaultApplied = true;
             }
-
             if (!credentialsAvailable && _ifbEnabledCheckBox.Checked)
             {
                 _ifbEnabledCheckBox.Checked = false;

@@ -33,12 +33,10 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return body.TrimEnd('\r', '\n');
             }
-
             if (string.IsNullOrWhiteSpace(body))
             {
                 return block;
             }
-
             return body.TrimEnd('\r', '\n') + "\r\n\r\n" + block;
         }
 
@@ -52,12 +50,10 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.IsNullOrWhiteSpace(html) ? string.Empty : html.Trim();
             }
-
             if (string.IsNullOrWhiteSpace(html))
             {
                 return block;
             }
-
             return html.TrimEnd() + Environment.NewLine + block;
         }
 
@@ -69,17 +65,14 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return RenderTalkInvitationTemplate(invitationTemplate, string.Empty, password);
             }
-
             if (string.IsNullOrWhiteSpace(password))
             {
                 return string.Empty;
             }
-
             if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
             {
                 normalizedLanguage = "default";
             }
-
             string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
             return string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim());
         }
@@ -94,7 +87,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             string text = value.Replace("\r\n", "\n").Replace('\r', '\n');
             text = Regex.Replace(text, @"<\s*br\s*/?\s*>", "\n", RegexOptions.IgnoreCase);
             text = Regex.Replace(text, @"<\s*/\s*(p|div|li|tr|table|h[1-6])\s*>", "\n", RegexOptions.IgnoreCase);
@@ -121,7 +113,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 lines.Add(line);
                 lastBlank = false;
             }
-
             return string.Join("\r\n", lines).Trim();
         }
 
@@ -131,7 +122,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return body;
             }
-
             var lines = new List<string>();
             using (var reader = new StringReader(body))
             {
@@ -141,7 +131,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     lines.Add(line);
                 }
             }
-
             bool removed = false;
             int index = 0;
 
@@ -152,20 +141,17 @@ namespace NcTalkOutlookAddIn.Controllers
                     index++;
                     continue;
                 }
-
                 int blockEnd = FindTalkBlockEnd(lines, index);
                 if (blockEnd < 0)
                 {
                     index++;
                     continue;
                 }
-
                 int blockStart = index;
                 while (blockStart > 0 && string.IsNullOrWhiteSpace(lines[blockStart - 1]))
                 {
                     blockStart--;
                 }
-
                 int removeEnd = blockEnd;
                 while (removeEnd + 1 < lines.Count && string.IsNullOrWhiteSpace(lines[removeEnd + 1]))
                 {
@@ -176,12 +162,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 removed = true;
                 index = blockStart;
             }
-
             if (!removed)
             {
                 return body;
             }
-
             return string.Join("\r\n", lines).Trim('\r', '\n');
         }
 
@@ -191,7 +175,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             string updated = html;
             int startIndex = updated.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase);
             while (startIndex >= 0)
@@ -206,7 +189,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 updated = updated.Remove(startIndex, endIndex - startIndex);
                 startIndex = updated.IndexOf(HtmlTalkBlockStartMarker, StringComparison.OrdinalIgnoreCase);
             }
-
             return updated.Trim();
         }
 
@@ -218,14 +200,12 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return html;
             }
-
             string cleanedBody = RemoveExistingTalkBlock(body);
             bool bodyHadLegacyBlock = !string.Equals(cleanedBody, body, StringComparison.Ordinal);
             if (bodyHadLegacyBlock || string.IsNullOrWhiteSpace(html))
             {
                 return ConvertPlainTextToHtml(cleanedBody);
             }
-
             return html;
         }
 
@@ -237,12 +217,10 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return RenderTalkInvitationTemplate(invitationTemplate, roomUrl, password);
             }
-
             if (string.Equals(normalizedLanguage, "custom", StringComparison.OrdinalIgnoreCase))
             {
                 normalizedLanguage = "default";
             }
-
             string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
             string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
             string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
@@ -288,7 +266,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     normalizedLanguage = "default";
                 }
-
                 string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
                 string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
                 string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
@@ -329,12 +306,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 html.Append("</table>");
                 innerHtml = html.ToString();
             }
-
             if (string.IsNullOrWhiteSpace(innerHtml))
             {
                 return string.Empty;
             }
-
             return HtmlTalkBlockStartMarker
                 + "<table data-nc4ol-talk-block=\"true\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:16px;border-collapse:collapse;\">"
                 + "<tbody><tr><td valign=\"top\" align=\"left\">"
@@ -362,7 +337,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     return i;
                 }
             }
-
             return -1;
         }
 
@@ -372,7 +346,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             string rendered = template
                 .Replace("{MEETING_URL}", HttpUtility.HtmlEncode(meetingUrl ?? string.Empty))
                 .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty));
@@ -381,7 +354,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 throw new InvalidOperationException("Talk invitation template sanitized to empty output.");
             }
-
             return ConvertHtmlTemplateToPlainText(sanitized);
         }
 
@@ -391,7 +363,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             string rendered = template
                 .Replace("{MEETING_URL}", HttpUtility.HtmlEncode(meetingUrl ?? string.Empty))
                 .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty));
@@ -400,7 +371,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 throw new InvalidOperationException("Talk invitation HTML template sanitized to empty output.");
             }
-
             return sanitized.Trim();
         }
 
@@ -410,7 +380,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             string normalized = Regex.Replace(line, "<[^>]+>", string.Empty);
             normalized = HttpUtility.HtmlDecode(normalized) ?? string.Empty;
             normalized = normalized.Replace('\u00A0', ' ');
@@ -424,7 +393,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return string.Empty;
             }
-
             string[] paragraphs = Regex.Split(normalized, @"\n{2,}");
             var html = new StringBuilder();
             for (int i = 0; i < paragraphs.Length; i++)
@@ -434,7 +402,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     continue;
                 }
-
                 if (html.Length > 0)
                 {
                     html.Append(Environment.NewLine);
@@ -444,7 +411,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     .Append(HttpUtility.HtmlEncode(paragraph).Replace("\n", "<br>"))
                     .Append("</p>");
             }
-
             return html.ToString();
         }
 
@@ -454,13 +420,11 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return "default";
             }
-
             string trimmed = languageOverride.Trim();
             if (string.Equals(trimmed, "custom", StringComparison.OrdinalIgnoreCase))
             {
                 return "custom";
             }
-
             return Strings.NormalizeLanguageOverride(trimmed);
         }
     }

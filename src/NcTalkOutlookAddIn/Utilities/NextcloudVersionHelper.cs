@@ -21,7 +21,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return false;
             }
-
             string candidate = value.Trim();
 
             int spaceIndex = candidate.IndexOf(' ');
@@ -29,7 +28,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 candidate = candidate.Substring(0, spaceIndex);
             }
-
             int dashIndex = candidate.IndexOf('-');
             if (dashIndex > 0)
             {
@@ -44,7 +42,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 version = parsed;
                 return true;
             }
-
             return false;
         }
     }

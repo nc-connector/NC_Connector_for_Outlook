@@ -77,7 +77,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     values.Add(code);
                 }
             }
-
             return values.ToArray();
         }
 
@@ -94,7 +93,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     values.Add(code);
                 }
             }
-
             return values.ToArray();
         }
 
@@ -168,7 +166,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     _preferredUiLanguageCode = normalized;
                     _initialized = false;
                 }
-
                 if (DiagnosticsLogger.IsEnabled && !string.IsNullOrEmpty(normalized))
                 {
                     DiagnosticsLogger.Log(LogCategories.Core, "Preferred UI language: " + normalized);
@@ -188,7 +185,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     return;
                 }
-
                 string normalized = NormalizeLanguageCode(culture.Name);
                 AddLanguageCandidate(list, normalized);
             }
@@ -204,12 +200,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return;
             }
-
             if (!SupportedLanguageSet.Contains(code))
             {
                 return;
             }
-
             if (!list.Contains(code))
             {
                 list.Add(code);
@@ -222,14 +216,12 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
-
             string normalized = languageCode.Trim().Replace('-', '_');
             string[] parts = normalized.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0)
             {
                 return string.Empty;
             }
-
             string language = parts[0].ToLowerInvariant();
 
             if (string.Equals(language, "pt", StringComparison.OrdinalIgnoreCase))
@@ -240,10 +232,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     return "pt_BR";
                 }
-
                 return "pt_PT";
             }
-
             if (string.Equals(language, "zh", StringComparison.OrdinalIgnoreCase))
             {
                 string second = parts.Length > 1 ? parts[1] : string.Empty;
@@ -255,7 +245,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     second = third;
                 }
-
                 if (string.Equals(second, "Hans", StringComparison.OrdinalIgnoreCase))
                 {
                     second = "CN";
@@ -264,23 +253,19 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     second = "TW";
                 }
-
                 if (string.Equals(second, "TW", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(second, "HK", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(second, "MO", StringComparison.OrdinalIgnoreCase))
                 {
                     return "zh_TW";
                 }
-
                 if (string.Equals(second, "CN", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(second, "SG", StringComparison.OrdinalIgnoreCase))
                 {
                     return "zh_CN";
                 }
-
                 return "zh_CN";
             }
-
             return language;
         }
 
@@ -290,7 +275,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return "default";
             }
-
             string trimmed = languageOverride.Trim();
             string alias = trimmed
                 .Replace("_", " ")
@@ -306,13 +290,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return "default";
             }
-
             string normalized = NormalizeLanguageCode(trimmed);
             if (string.IsNullOrEmpty(normalized) || !SupportedLanguageSet.Contains(normalized))
             {
                 return "default";
             }
-
             return normalized;
         }
 
@@ -368,7 +350,6 @@ namespace NcTalkOutlookAddIn.Utilities
                                 dictionary[item.Key] = ConvertPlaceholders(item.Value.message);
                             }
                         }
-
                         return dictionary;
                     }
                 }
@@ -400,7 +381,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     "$" + i.ToString(CultureInfo.InvariantCulture),
                     "{" + (i - 1).ToString(CultureInfo.InvariantCulture) + "}");
             }
-
             return message;
         }
 
@@ -416,7 +396,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     {
                         continue;
                     }
-
                     string value;
                     if (dictionary.TryGetValue(key, out value) && !string.IsNullOrEmpty(value))
                     {
@@ -428,7 +407,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Strings.Get failed for key '" + (key ?? string.Empty) + "'.", ex);
             }
-
             return defaultValue;
         }
 
@@ -443,14 +421,12 @@ namespace NcTalkOutlookAddIn.Utilities
                 {
                     return Get(key, defaultValue);
                 }
-
                 foreach (string code in new[] { normalized, EnglishLanguageCode, DefaultLanguageCode })
                 {
                     Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);                    if (dictionary == null)
                     {
                         continue;
                     }
-
                     string value;
                     if (dictionary.TryGetValue(key, out value) && !string.IsNullOrEmpty(value))
                     {
@@ -462,7 +438,6 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Strings.GetInLanguage failed for key '" + (key ?? string.Empty) + "'.", ex);
             }
-
             return defaultValue;
         }
 
@@ -472,7 +447,8 @@ namespace NcTalkOutlookAddIn.Utilities
             if (!string.IsNullOrWhiteSpace(title))
             {
                 parts.Add(title.Trim());
-            }            if (lines != null)
+            }
+            if (lines != null)
             {
                 foreach (string line in lines)
                 {
@@ -482,7 +458,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     }
                 }
             }
-
             return string.Join("\n\n", parts.ToArray());
         }
 

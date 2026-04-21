@@ -78,13 +78,11 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     ThrowServiceError(statusCode, responseText, responseData);
                 }
-
                 string token = ExtractRoomToken(responseData);
                 if (string.IsNullOrEmpty(token))
                 {
                     throw new TalkServiceException("Response did not contain a room token.", false, statusCode, responseText);
                 }
-
                 string roomUrl = baseUrl + "/call/" + token;
 
                 if (request.LobbyEnabled)
@@ -93,12 +91,10 @@ namespace NcTalkOutlookAddIn.Services
                     // Outlook will retry on appointment save (Write event) when the tracking subscription runs.
                     TryUpdateLobbyInternal(token, request.AppointmentStart, baseUrl, true);
                 }
-
                 if (!includeEvent)
                 {
                     TryUpdateListable(token, request.SearchVisible, baseUrl);
                 }
-
                 try
                 {
                     TryUpdateDescription(token, request.Description, includeEvent, baseUrl);
@@ -116,7 +112,6 @@ namespace NcTalkOutlookAddIn.Services
                         throw;
                     }
                 }
-
                 return new TalkRoomCreationResult(token, roomUrl, includeEvent, request.LobbyEnabled, request.SearchVisible);
             }
             catch (TalkServiceException ex)
@@ -142,7 +137,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             string baseUrl = _configuration.GetNormalizedBaseUrl();
             if (isEventConversation)
             {
@@ -176,14 +170,12 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-
             string baseUrl = _configuration.GetNormalizedBaseUrl();
             TryClearActiveParticipants(roomToken, baseUrl);
             if (isEventConversation)
             {
                 TryDetachEventBinding(roomToken, baseUrl);
             }
-
             string url = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(roomToken.Trim());
 
             HttpStatusCode statusCode;
@@ -235,7 +227,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 message = "OK";
             }
-
             return true;
         }
 
@@ -253,12 +244,10 @@ namespace NcTalkOutlookAddIn.Services
             {
                 payload["password"] = request.Password;
             }
-
             if (!string.IsNullOrWhiteSpace(request.Description))
             {
                 payload["description"] = request.Description.Trim();
             }
-
             if (includeEvent)
             {
                 string objectId = BuildEventObjectId(request);
@@ -268,7 +257,6 @@ namespace NcTalkOutlookAddIn.Services
                     payload["objectId"] = objectId;
                 }
             }
-
             return payload;
         }
 
@@ -295,7 +283,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 payload["timer"] = unixStart.Value;
             }
-
             string lobbyUrl = baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + "/webinar/lobby";
 
             try
@@ -307,7 +294,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     throw new TalkServiceException("Lobby time could not be set (status " + (int)statusCode + ").", false, statusCode, null);
                 }
-
                 return IsSuccessStatus(statusCode);
             }
             catch (TalkServiceException ex)
@@ -318,7 +304,6 @@ namespace NcTalkOutlookAddIn.Services
                     throw;
                 }
             }
-
             return false;
         }
 
@@ -508,24 +493,22 @@ namespace NcTalkOutlookAddIn.Services
                         list = participantsObj as object[];
                     }
                 }
-            }            if (list == null)
+            }
+            if (list == null)
             {
                 return participants;
             }
-
             foreach (object entry in list)
             {
                 var dict = entry as IDictionary<string, object>;                if (dict == null)
                 {
                     continue;
                 }
-
                 string actorType = NcJson.GetString(dict, "actorType") ?? string.Empty;
                 string actorId = NcJson.GetString(dict, "actorId") ?? string.Empty;
                 int attendeeId = NcJson.GetInt(dict, "attendeeId");
                 participants.Add(new TalkParticipant(actorType, actorId, attendeeId));
             }
-
             return participants;
         }
 
@@ -552,7 +535,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return true;
             }
-
             string message = ExtractOcsMessage(parsed);
             if (string.IsNullOrWhiteSpace(message))
             {
@@ -641,7 +623,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe event conversation flag.", ex);
             }
-
             try
             {
                 HttpStatusCode statusCode;
@@ -688,7 +669,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe lobby flag.", ex);
             }
-
             return resolvedAny;
         }
 
@@ -823,13 +803,11 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     token = NcJson.GetString(data, "roomToken");
                 }
-
                 if (!string.IsNullOrEmpty(token))
                 {
                     return token;
                 }
             }
-
             return NcJson.GetString(responseData, "token");
         }
         private static string ExtractVersion(IDictionary<string, object> payload)
@@ -837,7 +815,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             string version = NcJson.GetString(payload, "versionstring") ?? NcJson.GetString(payload, "version");
             string edition = NcJson.GetString(payload, "edition");
             string result = ComposeVersion(version, edition);
@@ -868,11 +845,9 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         return product + " " + result;
                     }
-
                     return EnsureProductPrefix(result, payload);
                 }
             }
-
             return null;
         }
 
@@ -881,7 +856,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             string major = NcJson.GetString(dictionary, "major");
             string minor = NcJson.GetString(dictionary, "minor");
             string micro = NcJson.GetString(dictionary, "micro");
@@ -890,7 +864,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             var builder = new StringBuilder();
             builder.Append(major);
             if (!string.IsNullOrEmpty(minor))
@@ -901,7 +874,6 @@ namespace NcTalkOutlookAddIn.Services
                     builder.Append(".").Append(micro);
                 }
             }
-
             return builder.ToString();
         }
 
@@ -911,14 +883,12 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             if (!string.IsNullOrEmpty(edition))
             {
                 return edition.Equals(version, StringComparison.OrdinalIgnoreCase)
                     ? version
                     : version + " (" + edition + ")";
             }
-
             return version;
         }
 
@@ -928,19 +898,16 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             string prefix = "Nextcloud";
             string product = NcJson.GetString(payload, "productname");
             if (!string.IsNullOrEmpty(product))
             {
                 prefix = product;
             }
-
             if (version.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
                 return version;
             }
-
             return prefix + " " + version;
         }
 
@@ -956,7 +923,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 builder.Append("HTTP ").Append((int)statusCode);
             }
-
             bool authError = statusCode == HttpStatusCode.Unauthorized || statusCode == HttpStatusCode.Forbidden;
             throw new TalkServiceException(builder.ToString(), authError, statusCode, responseText);
         }
@@ -966,12 +932,10 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return false;
             }
-
             if (string.IsNullOrWhiteSpace(ex.Message))
             {
                 return false;
             }
-
             string normalized = ex.Message.ToLowerInvariant();
             return normalized.IndexOf("event", StringComparison.Ordinal) >= 0;
         }
@@ -983,7 +947,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             return BuildEventObjectId(request.AppointmentStart, request.AppointmentEnd);
         }
 
@@ -996,7 +959,6 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return null;
             }
-
             return startEpoch.Value + "#" + endEpoch.Value;
         }
 
