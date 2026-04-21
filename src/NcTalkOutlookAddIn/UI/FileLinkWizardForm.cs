@@ -2282,8 +2282,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private int ScaleLogical(int value)
         {
-            int dpi = DeviceDpi > 0 ? DeviceDpi : 96;
-            return (int)Math.Round(value * (dpi / 96f));
+            return DpiScaling.ScaleLogical(this, value);
         }
 
         private void ReflowWizardLayout()
