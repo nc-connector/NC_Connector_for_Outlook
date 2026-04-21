@@ -165,6 +165,7 @@ Key code locations:
   - `Utilities/BrowserLauncher.cs` centralizes shell target starts (URLs, files, directories).
   - `Utilities/SizeFormatting.cs` centralizes MB display formatting.
   - `Utilities/ComInteropScope.cs` centralizes COM release/final-release patterns.
+  - `Utilities/PasswordGenerationHelper.cs` centralizes password-policy min-length resolution, server-policy generation fallback, and shared minimum-length validation for Talk/FileLink forms.
   - `Utilities/HtmlTemplateSanitizer.cs` applies a Thunderbird-aligned HTML policy for backend templates and fails closed if sanitization cannot be applied.
 
 ### End-to-end flows

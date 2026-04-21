@@ -627,7 +627,11 @@ namespace NcTalkOutlookAddIn.UI
             }
             if (_passwordToggleCheckBox.Checked)
             {
-                _passwordTextBox.Text = GeneratePasswordValue(GetMinPasswordLength());
+                _passwordTextBox.Text = PasswordGenerationHelper.GenerateWithPolicyDefaults(
+                    _configuration,
+                    _passwordPolicy,
+                    DefaultMinPasswordLength,
+                    LogCategories.FileLink);
             }
 
             UpdatePasswordState();
@@ -1072,7 +1076,10 @@ namespace NcTalkOutlookAddIn.UI
                 if (_passwordToggleCheckBox.Checked && !IsPasswordValid(_passwordTextBox.Text))
                 {
                     MessageBox.Show(
-                        string.Format(CultureInfo.CurrentCulture, Strings.TalkPasswordTooShort, GetMinPasswordLength()),
+                        string.Format(
+                            CultureInfo.CurrentCulture,
+                            Strings.TalkPasswordTooShort,
+                            PasswordGenerationHelper.ResolveMinLength(_passwordPolicy, DefaultMinPasswordLength)),
                         Strings.DialogTitle,
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
@@ -2943,39 +2950,22 @@ namespace NcTalkOutlookAddIn.UI
             return null;
         }
 
-        private int GetMinPasswordLength()
-        {
-            return PasswordGenerationHelper.ResolveMinLength(_passwordPolicy, DefaultMinPasswordLength);
-        }
-
         private void GeneratePassword()
         {
             if (!_passwordToggleCheckBox.Checked)
             {
                 return;
             }
-            int minLength = GetMinPasswordLength();
-            _passwordTextBox.Text = GeneratePasswordValue(minLength);
-        }
-
-        private string GeneratePasswordValue(int minLength)
-        {
-            return PasswordGenerationHelper.GenerateWithServerPolicyFallback(
+            _passwordTextBox.Text = PasswordGenerationHelper.GenerateWithPolicyDefaults(
                 _configuration,
                 _passwordPolicy,
-                minLength,
+                DefaultMinPasswordLength,
                 LogCategories.FileLink);
         }
 
         private bool IsPasswordValid(string password)
         {
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                return false;
-            }
-            string trimmed = password.Trim();
-            int minLength = GetMinPasswordLength();
-            return trimmed.Length >= minLength;
+            return PasswordGenerationHelper.MeetsMinimumLength(password, _passwordPolicy, DefaultMinPasswordLength);
         }
     }
 }

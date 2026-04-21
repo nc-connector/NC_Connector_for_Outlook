@@ -51,5 +51,29 @@ namespace NcTalkOutlookAddIn.Utilities
 
             return generated;
         }
+
+        internal static string GenerateWithPolicyDefaults(
+            TalkServiceConfiguration configuration,
+            PasswordPolicyInfo passwordPolicy,
+            int defaultMinLength,
+            string logCategory)
+        {
+            int minLength = ResolveMinLength(passwordPolicy, defaultMinLength);
+            return GenerateWithServerPolicyFallback(configuration, passwordPolicy, minLength, logCategory);
+        }
+
+        internal static bool MeetsMinimumLength(
+            string password,
+            PasswordPolicyInfo passwordPolicy,
+            int defaultMinLength)
+        {
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                return false;
+            }
+
+            int minLength = ResolveMinLength(passwordPolicy, defaultMinLength);
+            return password.Trim().Length >= minLength;
+        }
     }
 }

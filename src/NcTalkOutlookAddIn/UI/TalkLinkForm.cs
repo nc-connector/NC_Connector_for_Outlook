@@ -675,13 +675,16 @@ namespace NcTalkOutlookAddIn.UI
             TalkTitle = titleDefault;
             _titleTextBox.Text = TalkTitle;
 
-            int minLength = GetMinPasswordLength();
             _passwordToggleCheckBox.Checked = passwordDefault;
             TalkPassword = string.Empty;
             _passwordTextBox.Text = string.Empty;
             if (_passwordToggleCheckBox.Checked)
             {
-                TalkPassword = GeneratePasswordValue(minLength);
+                TalkPassword = PasswordGenerationHelper.GenerateWithPolicyDefaults(
+                    _configuration,
+                    _passwordPolicy,
+                    DefaultMinPasswordLength,
+                    LogCategories.Talk);
                 _passwordTextBox.Text = TalkPassword;
             }
 
@@ -871,7 +874,7 @@ namespace NcTalkOutlookAddIn.UI
 
             bool passwordEnabled = _passwordToggleCheckBox.Checked;
             TalkPassword = passwordEnabled ? _passwordTextBox.Text.Trim() : string.Empty;
-            int minLength = GetMinPasswordLength();
+            int minLength = PasswordGenerationHelper.ResolveMinLength(_passwordPolicy, DefaultMinPasswordLength);
             if (passwordEnabled && TalkPassword.Length > 0 && TalkPassword.Length < minLength)
             {
                 MessageBox.Show(
@@ -912,27 +915,16 @@ namespace NcTalkOutlookAddIn.UI
                 _passwordLabel);
         }
 
-        private int GetMinPasswordLength()
-        {
-            return PasswordGenerationHelper.ResolveMinLength(_passwordPolicy, DefaultMinPasswordLength);
-        }
-
         private void GeneratePassword()
         {
             if (!_passwordToggleCheckBox.Checked)
             {
                 return;
             }
-            int minLength = GetMinPasswordLength();
-            _passwordTextBox.Text = GeneratePasswordValue(minLength);
-        }
-
-        private string GeneratePasswordValue(int minLength)
-        {
-            return PasswordGenerationHelper.GenerateWithServerPolicyFallback(
+            _passwordTextBox.Text = PasswordGenerationHelper.GenerateWithPolicyDefaults(
                 _configuration,
                 _passwordPolicy,
-                minLength,
+                DefaultMinPasswordLength,
                 LogCategories.Talk);
         }
 
