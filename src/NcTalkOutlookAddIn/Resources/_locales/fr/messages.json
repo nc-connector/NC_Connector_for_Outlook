@@ -729,7 +729,7 @@
     "message": "Répertoire de base"
   },
   "sharing_base_path_hint": {
-    "message": "Les fichiers sont stockés sous ce répertoire."
+    "message": "Les fichiers sont stockés sous ce répertoire (p. ex. \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "Les destinataires peuvent téléverser leurs propres fichiers"
@@ -1391,5 +1391,6 @@
     "message": "Lorsque la stratégie TLS par défaut du système d'exploitation est désactivée, activez au moins une version TLS (1.2 ou 1.3)."
   }
 }
+
 
 

@@ -729,7 +729,7 @@
     "message": "基础目录"
   },
   "sharing_base_path_hint": {
-    "message": "文件将存储在此目录下。"
+    "message": "文件将存储在此目录下（例如 \"NC Connector\"）。"
   },
   "sharing_allow_upload_label": {
     "message": "收件人可以上传自己的文件"
@@ -1391,5 +1391,6 @@
     "message": "当禁用操作系统默认 TLS 策略时，请至少启用一个 TLS 版本（1.2 或 1.3）。"
   }
 }
+
 
 

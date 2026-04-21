@@ -729,7 +729,7 @@
     "message": "基礎目錄"
   },
   "sharing_base_path_hint": {
-    "message": "檔案會儲存在此目錄下。"
+    "message": "檔案會儲存在此目錄下（例如 \"NC Connector\"）。"
   },
   "sharing_allow_upload_label": {
     "message": "收件者可上傳自己的檔案"
@@ -1391,5 +1391,6 @@
     "message": "當作業系統預設 TLS 原則停用時，請至少啟用一個 TLS 版本（1.2 或 1.3）。"
   }
 }
+
 
 

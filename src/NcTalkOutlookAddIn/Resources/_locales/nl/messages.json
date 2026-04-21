@@ -729,7 +729,7 @@
     "message": "Basismap"
   },
   "sharing_base_path_hint": {
-    "message": "Bestanden worden onder deze map opgeslagen."
+    "message": "Bestanden worden onder deze map opgeslagen (bijv. \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "Ontvangers mogen hun eigen bestanden uploaden"
@@ -1391,5 +1391,6 @@
     "message": "Wanneer het standaard TLS-beleid van het besturingssysteem is uitgeschakeld, schakel dan minimaal een TLS-versie in (1.2 of 1.3)."
   }
 }
+
 
 

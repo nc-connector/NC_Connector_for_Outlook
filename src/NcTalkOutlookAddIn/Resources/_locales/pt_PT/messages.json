@@ -729,7 +729,7 @@
     "message": "Diretório base"
   },
   "sharing_base_path_hint": {
-    "message": "Os ficheiros são armazenados sob este diretório."
+    "message": "Os ficheiros são armazenados sob este diretório (ex.: \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "Os destinatários podem carregar os seus próprios ficheiros"
@@ -1391,5 +1391,6 @@
     "message": "Quando a política TLS predefinida do sistema operativo estiver desativada, ative pelo menos uma versão TLS (1.2 ou 1.3)."
   }
 }
+
 
 

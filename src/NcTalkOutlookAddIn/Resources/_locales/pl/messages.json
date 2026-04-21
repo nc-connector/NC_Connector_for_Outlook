@@ -729,7 +729,7 @@
     "message": "Katalog bazowy"
   },
   "sharing_base_path_hint": {
-    "message": "Pliki są przechowywane w tym katalogu."
+    "message": "Pliki są przechowywane w tym katalogu (np. \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "Odbiorcy mogą przesyłać własne pliki"
@@ -1391,5 +1391,6 @@
     "message": "Gdy domyślna polityka TLS systemu operacyjnego jest wyłączona, włącz co najmniej jedną wersję TLS (1.2 lub 1.3)."
   }
 }
+
 
 
