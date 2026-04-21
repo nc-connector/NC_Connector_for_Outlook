@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -11,10 +9,8 @@ using System.Windows.Forms;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Mirrors lock/explanation tooltips from unavailable controls onto a small active
-     * hint glyph so policy/admin/backend hints remain reachable in WinForms.
-     */
+        // Mirrors lock/explanation tooltips from unavailable controls onto a small active
+    // hint glyph so policy/admin/backend hints remain reachable in WinForms.
     internal sealed class DisabledControlTooltipHintHelper
     {
         private const int HintSize = 16;

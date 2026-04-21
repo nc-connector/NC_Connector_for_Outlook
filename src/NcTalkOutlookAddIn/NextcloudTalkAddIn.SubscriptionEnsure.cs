@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Globalization;
@@ -14,10 +12,8 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn
 {
-    /**
-     * Deferred appointment subscription ensure flow.
-     * Isolated from the add-in root file to keep event-restriction handling maintainable.
-     */
+        // Deferred appointment subscription ensure flow.
+    // Isolated from the add-in root file to keep event-restriction handling maintainable.
     public sealed partial class NextcloudTalkAddIn
     {
         private static string TryGetEntryIdForDeferredKey(Outlook.AppointmentItem appointment)

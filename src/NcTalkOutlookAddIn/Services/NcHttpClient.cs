@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -62,9 +60,7 @@ namespace NcTalkOutlookAddIn.Services
         internal Exception JsonParseException { get; set; }
     }
 
-    /**
-     * Internal HTTP client wrapper that keeps auth/header/timeout behavior consistent.
-     */
+        // Internal HTTP client wrapper that keeps auth/header/timeout behavior consistent.
     internal sealed class NcHttpClient
     {
         private readonly string _username;

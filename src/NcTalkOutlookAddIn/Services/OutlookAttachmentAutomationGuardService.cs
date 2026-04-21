@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2026 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2026 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using Microsoft.Win32;
@@ -10,10 +8,8 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Live probe for host-side large attachment upload options.
-     * Reads environment overrides and registry values on every call.
-     */
+        // Live probe for host-side large attachment upload options.
+    // Reads environment overrides and registry values on every call.
     internal sealed class OutlookAttachmentAutomationGuardService
     {
         internal sealed class GuardState

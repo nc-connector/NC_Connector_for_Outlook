@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -10,10 +8,8 @@ using System.Globalization;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Encapsulates runtime state for deferred appointment subscription ensure.
-     * Keeps pending-key tracking and log throttling in one cohesive location.
-     */
+        // Encapsulates runtime state for deferred appointment subscription ensure.
+    // Keeps pending-key tracking and log throttling in one cohesive location.
     internal sealed class DeferredAppointmentEnsureState
     {
         private readonly object _syncRoot = new object();

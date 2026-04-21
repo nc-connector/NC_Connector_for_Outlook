@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -13,9 +11,7 @@ using System.Runtime.InteropServices;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Central access to embedded branding assets (header banner, app icon).
-     */
+        // Central access to embedded branding assets (header banner, app icon).
     internal static class BrandingAssets
     {
         internal const string BrandBlueHex = "#0082C9";

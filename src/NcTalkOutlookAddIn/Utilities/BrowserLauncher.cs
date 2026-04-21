@@ -1,17 +1,13 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Diagnostics;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Central utility for opening shell targets (URLs, files, folders).
-     */
+        // Central utility for opening shell targets (URLs, files, folders).
     internal static class BrowserLauncher
     {
         internal static bool OpenTarget(string target, string logCategory, string failureContext)

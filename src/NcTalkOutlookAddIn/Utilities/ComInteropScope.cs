@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Globalization;
@@ -10,10 +8,8 @@ using System.Runtime.InteropServices;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Centralizes COM release/final-release behavior and exception-safe logging.
-     * This keeps cleanup paths consistent and reduces duplicated Marshal handling.
-     */
+        // Centralizes COM release/final-release behavior and exception-safe logging.
+    // This keeps cleanup paths consistent and reduces duplicated Marshal handling.
     internal static class ComInteropScope
     {
         internal static void TryRelease(object comObject, string category, string failureMessage)

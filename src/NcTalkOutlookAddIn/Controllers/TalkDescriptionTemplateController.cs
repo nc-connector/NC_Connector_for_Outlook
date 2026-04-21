@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -15,9 +13,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Encapsulates rendering/removal of NC Talk description blocks in plain-text and HTML bodies.
-     */
+        // Encapsulates rendering/removal of NC Talk description blocks in plain-text and HTML bodies.
     internal static class TalkDescriptionTemplateController
     {
         private const string BodySectionHeader = "Nextcloud Talk";
@@ -77,10 +73,8 @@ namespace NcTalkOutlookAddIn.Controllers
             return string.Format(CultureInfo.InvariantCulture, passwordLineFormat, password.Trim());
         }
 
-        /**
-         * Outlook appointment bodies are plain text. Convert backend HTML/text
-         * templates into a stable plain-text block before inserting them.
-         */
+                // Outlook appointment bodies are plain text. Convert backend HTML/text
+        // templates into a stable plain-text block before inserting them.
         internal static string ConvertHtmlTemplateToPlainText(string value)
         {
             if (string.IsNullOrWhiteSpace(value))

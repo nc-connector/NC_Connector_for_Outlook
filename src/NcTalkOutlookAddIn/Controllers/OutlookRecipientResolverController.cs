@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -11,9 +9,7 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Centralized Outlook recipient resolution for attendee extraction and SMTP mapping.
-     */
+        // Centralized Outlook recipient resolution for attendee extraction and SMTP mapping.
     internal static class OutlookRecipientResolverController
     {
         internal static List<string> CollectAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)

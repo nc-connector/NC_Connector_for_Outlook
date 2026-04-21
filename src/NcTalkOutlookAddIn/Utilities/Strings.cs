@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -14,15 +12,13 @@ using System.Web.Script.Serialization;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Localization helper for UI-visible strings.
-     *
-     * Translations are stored as embedded JSON resources under:
-     * - Resources/_locales/<language>/messages.json
-     *
-     * Supported language codes:
-     * - de (default), en, fr, cs, es, hu, it, ja, nl, pl, pt_BR, pt_PT, ru, zh_CN, zh_TW
-     */
+        // Localization helper for UI-visible strings.
+    //
+    // Translations are stored as embedded JSON resources under:
+    // - Resources/_locales/<language>/messages.json
+    //
+    // Supported language codes:
+    // - de (default), en, fr, cs, es, hu, it, ja, nl, pl, pt_BR, pt_PT, ru, zh_CN, zh_TW
     internal static class Strings
     {
         private const string DefaultLanguageCode = "de";

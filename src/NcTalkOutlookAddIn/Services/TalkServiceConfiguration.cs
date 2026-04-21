@@ -1,16 +1,12 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Encapsulates connection details required for Nextcloud Talk REST calls.
-     */
+        // Encapsulates connection details required for Nextcloud Talk REST calls.
     internal sealed class TalkServiceConfiguration
     {
         internal string BaseUrl { get; private set; }
@@ -24,9 +20,7 @@ namespace NcTalkOutlookAddIn.Services
             AppPassword = appPassword ?? string.Empty;
         }
 
-        /**
-         * Removes redundant slashes and returns a canonical base URL.
-         */
+                // Removes redundant slashes and returns a canonical base URL.
         public string GetNormalizedBaseUrl()
         {
             var trimmed = (BaseUrl ?? string.Empty).Trim();

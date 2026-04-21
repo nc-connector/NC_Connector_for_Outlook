@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Drawing;
@@ -13,9 +11,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
 {
-    /**
-     * Language override and talk room type option handling for Settings UI.
-     */
+        // Language override and talk room type option handling for Settings UI.
     internal sealed partial class SettingsForm
     {
         private sealed class LanguageOption
@@ -132,11 +128,9 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
-        /**
-         * Rebuild language override combos so the `custom` option only exists
-         * when the backend endpoint is available and only becomes selectable
-         * once the corresponding backend policy actually uses a custom template.
-         */
+                // Rebuild language override combos so the `custom` option only exists
+        // when the backend endpoint is available and only becomes selectable
+        // once the corresponding backend policy actually uses a custom template.
         private void RefreshLanguageOverrideCombos(string shareValue, string talkValue)
         {
             PopulateLanguageOverrideCombo(_shareBlockLangCombo, "share");

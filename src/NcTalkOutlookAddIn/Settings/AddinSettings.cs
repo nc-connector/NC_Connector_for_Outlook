@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -11,9 +9,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Settings
 {
-    /**
-     * Persistent add-in settings (credentials, sharing/IFB options, etc.).
-     */
+        // Persistent add-in settings (credentials, sharing/IFB options, etc.).
     internal class AddinSettings
     {
         internal const int DefaultIfbPort = 7777;

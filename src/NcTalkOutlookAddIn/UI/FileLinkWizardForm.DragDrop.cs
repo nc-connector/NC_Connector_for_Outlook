@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System.Collections.Generic;
 using System.IO;
@@ -12,9 +10,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
 {
-    /**
-     * Drag/drop and queue-append behavior for the file selection step.
-     */
+        // Drag/drop and queue-append behavior for the file selection step.
     internal sealed partial class FileLinkWizardForm
     {
         private void AttachFileQueueDropTarget(Control control)

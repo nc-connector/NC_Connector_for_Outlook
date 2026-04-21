@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -20,10 +18,8 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
 {
-    /**
-     * Multi-step wizard for creating a Nextcloud share (permissions, expiration date,
-     * file/folder selection, note, and upload progress).
-     */
+        // Multi-step wizard for creating a Nextcloud share (permissions, expiration date,
+    // file/folder selection, note, and upload progress).
     internal sealed partial class FileLinkWizardForm : Form
     {
         private const int DefaultMinPasswordLength = 8;
@@ -2175,10 +2171,8 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
-        /**
-         * Positions or hides the per-item progress bars next to each list entry.
-         * If items are missing, existing bars are hidden to avoid exceptions.
-         */
+                // Positions or hides the per-item progress bars next to each list entry.
+        // If items are missing, existing bars are hidden to avoid exceptions.
         private void PositionProgressBars()
         {
             if (_selectionStates.Count == 0 || _fileListView.Columns.Count < 3)
@@ -2442,9 +2436,7 @@ namespace NcTalkOutlookAddIn.UI
             _cancelButton.Enabled = !uploading;
         }
 
-        /**
-         * Asks whether to continue without prepared uploads.
-         */
+                // Asks whether to continue without prepared uploads.
         private bool ConfirmEmptyUploadProceed()
         {
             using (var dialog = new Form())

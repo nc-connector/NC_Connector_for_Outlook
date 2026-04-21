@@ -1,16 +1,12 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Helper functions for parsing Nextcloud version strings.
-     */
+        // Helper functions for parsing Nextcloud version strings.
     internal static class NextcloudVersionHelper
     {
         internal static bool TryParse(string value, out Version version)

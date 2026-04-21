@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Threading.Tasks;
@@ -15,10 +13,8 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Encapsulates the full settings dialog workflow (open, apply, revert on TLS failures, persist).
-     * Keeps the add-in host focused on orchestration and COM lifecycle code.
-     */
+        // Encapsulates the full settings dialog workflow (open, apply, revert on TLS failures, persist).
+    // Keeps the add-in host focused on orchestration and COM lifecycle code.
     internal sealed class SettingsWorkflowController
     {
         private readonly Outlook.Application _outlookApplication;

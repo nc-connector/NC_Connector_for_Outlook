@@ -1,17 +1,13 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.IO;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Centralized local app-data paths used by NC4OL runtime components.
-     */
+        // Centralized local app-data paths used by NC4OL runtime components.
     internal static class AppDataPaths
     {
         private const string Nc4olFolderName = "NC4OL";

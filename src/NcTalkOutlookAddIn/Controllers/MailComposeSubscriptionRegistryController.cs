@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -11,10 +9,8 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Thread-safe registry for compose subscriptions.
-     * Keeps creation/removal/disposal policy in one place.
-     */
+        // Thread-safe registry for compose subscriptions.
+    // Keeps creation/removal/disposal policy in one place.
     internal sealed class MailComposeSubscriptionRegistryController
     {
         private readonly object _syncRoot = new object();

@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -184,9 +182,7 @@ namespace NcTalkOutlookAddIn.UI
             UiThemeManager.ApplyToForm(this, _toolTip);
         }
 
-        /**
-         * Builds all dialog controls (title, password, options, buttons).
-         */
+                // Builds all dialog controls (title, password, options, buttons).
         private void InitializeComponents()
         {
             _titleLabel.Text = Strings.TalkTitleLabel;
@@ -607,9 +603,7 @@ namespace NcTalkOutlookAddIn.UI
             return _moderatorHintLabel.Bottom + innerPadding;
         }
 
-        /**
-         * Determines whether event conversations are supported (Nextcloud >= 31).
-         */
+                // Determines whether event conversations are supported (Nextcloud >= 31).
         private static bool DetermineEventConversationSupport(AddinSettings defaults, out string versionText)
         {
             versionText = string.Empty;            if (defaults == null)
@@ -870,9 +864,7 @@ namespace NcTalkOutlookAddIn.UI
                 _roomTypeLabel);
         }
 
-        /**
-         * Collects user input, validates the password, and exposes the selection to the caller.
-         */
+                // Collects user input, validates the password, and exposes the selection to the caller.
         private void OnOkButtonClick(object sender, EventArgs e)
         {
             TalkTitle = _titleTextBox.Text.Trim();

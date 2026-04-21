@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2026 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2026 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -19,10 +17,8 @@ using Ganss.Xss;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Central HTML sanitizer for backend-provided template HTML.
-     * Uses a Thunderbird-aligned allowlist/forbidlist policy and fails closed.
-     */
+        // Central HTML sanitizer for backend-provided template HTML.
+    // Uses a Thunderbird-aligned allowlist/forbidlist policy and fails closed.
     internal static class HtmlTemplateSanitizer
     {
         private static readonly HashSet<string> SanitizerDependencyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -146,11 +142,9 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             return SanitizeTemplateHtml(html, "talk");
         }
 
-        /**
-         * Appointment-specific compatibility transform for Talk HTML before the
-         * HTML->RTF bridge. Keeps this behavior explicit and isolated from other
-         * template rendering paths.
-         */
+                // Appointment-specific compatibility transform for Talk HTML before the
+        // HTML->RTF bridge. Keeps this behavior explicit and isolated from other
+        // template rendering paths.
         internal static string PrepareTalkAppointmentHtmlForOutlookRtfBridge(string html)
         {
             return NormalizeForOutlookRtfBridge(html, "talk", true);

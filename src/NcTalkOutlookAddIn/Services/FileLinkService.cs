@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -18,10 +16,8 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Creates Nextcloud shares including uploading local files.
-     * Encapsulates the full workflow (create folder, upload, create share, return result).
-     */
+        // Creates Nextcloud shares including uploading local files.
+    // Encapsulates the full workflow (create folder, upload, create share, return result).
     internal sealed class FileLinkService
     {
         private const int ShareTypePublicLink = 3;
@@ -577,9 +573,7 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        /**
-         * Create the public share through the documented OCS create endpoint and then update mutable metadata.
-         */
+                // Create the public share through the documented OCS create endpoint and then update mutable metadata.
         private ShareData CreateShare(string baseUrl, string username, string relativeFolderPath, string shareName, FileLinkRequest request, CancellationToken cancellationToken)
         {
             string url = baseUrl.TrimEnd('/') + "/ocs/v2.php/apps/files_sharing/api/v1/shares";
@@ -589,9 +583,7 @@ namespace NcTalkOutlookAddIn.Services
             return shareData;
         }
 
-        /**
-         * Build the documented form-encoded create payload for OCS public-link shares.
-         */
+                // Build the documented form-encoded create payload for OCS public-link shares.
         private string BuildShareCreatePayload(string relativeFolderPath, string shareName, FileLinkRequest request)
         {
             var builder = new StringBuilder();
@@ -618,9 +610,7 @@ namespace NcTalkOutlookAddIn.Services
             return builder.ToString();
         }
 
-        /**
-         * Update mutable share metadata through the documented OCS update endpoint.
-         */
+                // Update mutable share metadata through the documented OCS update endpoint.
         private void UpdateShareMetadata(string baseUrl, ShareData shareData, FileLinkRequest request, CancellationToken cancellationToken)
         {            if (shareData == null || string.IsNullOrWhiteSpace(shareData.Id))
             {

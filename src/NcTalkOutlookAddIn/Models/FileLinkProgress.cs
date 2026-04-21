@@ -1,14 +1,10 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 namespace NcTalkOutlookAddIn.Models
 {
-    /**
-     * Describes the overall upload progress across all files (for aggregated UI display).
-     */
+        // Describes the overall upload progress across all files (for aggregated UI display).
     internal sealed class FileLinkProgress
     {
         internal FileLinkProgress(long totalBytes, long uploadedBytes, string currentItem)

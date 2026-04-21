@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -15,9 +13,7 @@ using System.Text.RegularExpressions;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Writes internal diagnostics to a log file under %LOCALAPPDATA%.
-     */
+        // Writes internal diagnostics to a log file under %LOCALAPPDATA%.
     internal static class DiagnosticsLogger
     {
         private static readonly object SyncRoot = new object();

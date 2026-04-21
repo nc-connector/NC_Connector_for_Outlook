@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -10,12 +8,10 @@ using System.Globalization;
 
 namespace NcTalkOutlookAddIn.Models
 {
-    /**
-     * Normalized backend policy runtime snapshot.
-     *
-     * The status is loaded from NC Connector backend endpoint:
-     * /apps/ncc_backend_4mc/api/v1/status
-     */
+        // Normalized backend policy runtime snapshot.
+    //
+    // The status is loaded from NC Connector backend endpoint:
+    // /apps/ncc_backend_4mc/api/v1/status
     internal sealed class BackendPolicyStatus
     {
         internal BackendPolicyStatus(
@@ -78,9 +74,7 @@ namespace NcTalkOutlookAddIn.Models
 
         internal IDictionary<string, object> TalkEditable { get; private set; }
 
-        /**
-         * Read one policy value for a domain/key pair.
-         */
+                // Read one policy value for a domain/key pair.
         internal object GetPolicyValue(string domain, string key)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -101,10 +95,8 @@ namespace NcTalkOutlookAddIn.Models
             return null;
         }
 
-        /**
-         * Return true when the policy payload explicitly contains the key,
-         * even if the value is `null`.
-         */
+                // Return true when the policy payload explicitly contains the key,
+        // even if the value is `null`.
         internal bool HasPolicyKey(string domain, string key)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -119,9 +111,7 @@ namespace NcTalkOutlookAddIn.Models
             return policy.ContainsKey(key);
         }
 
-        /**
-         * Return true when a setting is backend-locked (policy_editable == false).
-         */
+                // Return true when a setting is backend-locked (policy_editable == false).
         internal bool IsLocked(string domain, string key)
         {
             if (!PolicyActive || string.IsNullOrWhiteSpace(key))
@@ -147,9 +137,7 @@ namespace NcTalkOutlookAddIn.Models
             return !isEditable;
         }
 
-        /**
-         * Read one boolean policy value.
-         */
+                // Read one boolean policy value.
         internal bool TryGetPolicyBool(string domain, string key, out bool value)
         {
             value = false;
@@ -160,9 +148,7 @@ namespace NcTalkOutlookAddIn.Models
             return TryConvertBool(raw, out value);
         }
 
-        /**
-         * Read one integer policy value.
-         */
+                // Read one integer policy value.
         internal bool TryGetPolicyInt(string domain, string key, out int value)
         {
             value = 0;
@@ -173,9 +159,7 @@ namespace NcTalkOutlookAddIn.Models
             return TryConvertInt(raw, out value);
         }
 
-        /**
-         * Read one string policy value.
-         */
+                // Read one string policy value.
         internal string GetPolicyString(string domain, string key)
         {
             object raw = GetPolicyValue(domain, key);            if (raw == null)

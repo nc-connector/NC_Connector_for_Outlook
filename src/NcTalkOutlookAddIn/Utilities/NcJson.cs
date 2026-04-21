@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -11,9 +9,7 @@ using System.Web.Script.Serialization;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Shared JSON helpers for OCS payload normalization and dictionary access.
-     */
+        // Shared JSON helpers for OCS payload normalization and dictionary access.
     internal static class NcJson
     {
         private static readonly JavaScriptSerializer Serializer = new JavaScriptSerializer();

@@ -1,15 +1,11 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 namespace NcTalkOutlookAddIn.Models
 {
-    /**
-     * Simple representation of a Nextcloud user from the system address book.
-     * Contains the UID (actorId) and a primary email address.
-     */
+        // Simple representation of a Nextcloud user from the system address book.
+    // Contains the UID (actorId) and a primary email address.
     internal sealed class NextcloudUser
     {
         internal NextcloudUser(string userId, string email)

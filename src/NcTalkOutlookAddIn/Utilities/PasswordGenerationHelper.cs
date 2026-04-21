@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using NcTalkOutlookAddIn.Models;
@@ -11,9 +9,7 @@ using NcTalkOutlookAddIn.Settings;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Shared password-policy generation helper used by Talk and Filelink dialogs.
-     */
+        // Shared password-policy generation helper used by Talk and Filelink dialogs.
     internal static class PasswordGenerationHelper
     {
         internal static int ResolveMinLength(PasswordPolicyInfo passwordPolicy, int defaultMinLength)

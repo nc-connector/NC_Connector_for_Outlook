@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Drawing;
@@ -11,9 +9,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
 {
-    /**
-     * Lightweight header control that draws the centered branding logo on a solid blue strip.
-     */
+        // Lightweight header control that draws the centered branding logo on a solid blue strip.
     internal sealed class BrandedHeader : Control
     {
         private readonly Image _banner;

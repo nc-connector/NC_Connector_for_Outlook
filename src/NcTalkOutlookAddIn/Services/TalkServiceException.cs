@@ -1,17 +1,13 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Net;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Specialized exception for errors returned by the Nextcloud Talk REST API.
-     */
+        // Specialized exception for errors returned by the Nextcloud Talk REST API.
     internal sealed class TalkServiceException : Exception
     {
         internal bool IsAuthenticationError { get; private set; }

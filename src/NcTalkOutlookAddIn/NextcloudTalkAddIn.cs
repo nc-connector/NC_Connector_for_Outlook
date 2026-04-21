@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -30,11 +28,9 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn
 {
-    /**
-     * Entry point and ribbon implementation for NC Connector for Outlook.
-     * Registers as a classic COM add-in via IDTExtensibility2 and provides the
-     * ribbon XML for appointment windows.
-     */
+        // Entry point and ribbon implementation for NC Connector for Outlook.
+    // Registers as a classic COM add-in via IDTExtensibility2 and provides the
+    // ribbon XML for appointment windows.
     [ComVisible(true)]
     [Guid("A8CC9257-A153-4A01-AB35-D66CB3D44AAA")]
     [ProgId("NcTalkOutlook.AddIn")]
@@ -197,10 +193,8 @@ namespace NcTalkOutlookAddIn
             return null;
         }
 
-        /**
-         * Outlook passes the ribbon handle right after loading.
-         * Stores the instance for later refresh operations.
-         */
+                // Outlook passes the ribbon handle right after loading.
+        // Stores the instance for later refresh operations.
         public void OnRibbonLoad(IRibbonUI ribbonUI)
         {
             // Keep a stable handle so future dynamic ribbon refreshes can call Invalidate/InvalidateControl.

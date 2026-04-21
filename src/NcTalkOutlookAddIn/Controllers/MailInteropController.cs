@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Globalization;
@@ -13,10 +11,8 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Encapsulates Outlook Mail/Inspector interop and HTML body insertion bridges.
-     * Keeps COM/editor-specific behavior out of the add-in orchestration root.
-     */
+        // Encapsulates Outlook Mail/Inspector interop and HTML body insertion bridges.
+    // Keeps COM/editor-specific behavior out of the add-in orchestration root.
     internal sealed class MailInteropController
     {
         private readonly NextcloudTalkAddIn _owner;

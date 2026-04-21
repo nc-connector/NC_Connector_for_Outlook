@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2026 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2026 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Drawing;
@@ -17,10 +15,8 @@ namespace NcTalkOutlookAddIn.UI
         RemoveLast
     }
 
-    /**
-     * Two-action prompt for threshold-based compose attachment automation.
-     * There is intentionally no third cancel action.
-     */
+        // Two-action prompt for threshold-based compose attachment automation.
+    // There is intentionally no third cancel action.
     internal sealed class ComposeAttachmentPromptForm : Form
     {
         private readonly Label _reasonLabel = new Label();

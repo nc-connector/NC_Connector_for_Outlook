@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -23,10 +21,8 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.UI
 {
-    /**
-     * WinForms dialog for all add-in settings (authentication, sharing, IFB, debug, ...).
-     * Encapsulates UI logic including starting the login flow, connection tests, and status messages.
-     */
+        // WinForms dialog for all add-in settings (authentication, sharing, IFB, debug, ...).
+    // Encapsulates UI logic including starting the login flow, connection tests, and status messages.
     internal sealed partial class SettingsForm : Form
     {
         private readonly Outlook.Application _outlookApplication;

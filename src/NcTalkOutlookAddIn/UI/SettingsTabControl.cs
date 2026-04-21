@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Runtime.InteropServices;
@@ -11,12 +9,10 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
 {
-    /**
-     * TabControl used by the settings dialog.
-     *
-     * WinForms TabControl has a fairly large default content inset below the tab strip. This control reduces
-     * that gap so the first row of settings appears closer to the tabs (closer to Office UI spacing).
-     */
+        // TabControl used by the settings dialog.
+    //
+    // WinForms TabControl has a fairly large default content inset below the tab strip. This control reduces
+    // that gap so the first row of settings appears closer to the tabs (closer to Office UI spacing).
     internal sealed class SettingsTabControl : TabControl
     {
         private const int TcmAdjustRect = 0x1328;

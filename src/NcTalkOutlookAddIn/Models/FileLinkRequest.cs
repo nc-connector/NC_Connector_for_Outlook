@@ -1,18 +1,14 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
 
 namespace NcTalkOutlookAddIn.Models
 {
-    /**
-     * Aggregates all inputs from the sharing wizard (base path, permissions, expiration,
-     * optional note, and the selected files). Used as a parameter object for the service layer.
-     */
+        // Aggregates all inputs from the sharing wizard (base path, permissions, expiration,
+    // optional note, and the selected files). Used as a parameter object for the service layer.
     internal sealed class FileLinkRequest
     {
         internal FileLinkRequest()

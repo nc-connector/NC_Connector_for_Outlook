@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Text;
@@ -14,9 +12,7 @@ using System.Net;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Coordinates the local IFB server and Outlook-specific registry settings.
-     */
+        // Coordinates the local IFB server and Outlook-specific registry settings.
     internal sealed class FreeBusyManager : IDisposable
     {
         private readonly IfbAddressBookCache _addressBookCache;

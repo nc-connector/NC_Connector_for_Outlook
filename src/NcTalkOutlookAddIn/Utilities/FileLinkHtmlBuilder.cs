@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -15,18 +13,14 @@ using NcTalkOutlookAddIn.Models;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Builds the HTML block inserted into mail compose windows (download link, password, expiration, permissions).
-     * The layout is intentionally kept static to remain stable when embedded in Outlook.
-     */
+        // Builds the HTML block inserted into mail compose windows (download link, password, expiration, permissions).
+    // The layout is intentionally kept static to remain stable when embedded in Outlook.
     internal static class FileLinkHtmlBuilder
     {
         private const string HomepageUrl = "https://nc-connector.de";
         private static readonly Lazy<string> HeaderBase64 = new Lazy<string>(LoadHeaderBase64);
 
-        /**
-         * Creates the HTML block including branding and share information.
-         */
+                // Creates the HTML block including branding and share information.
         internal static string Build(FileLinkResult result, FileLinkRequest request, string languageOverride, BackendPolicyStatus policyStatus = null)
         {
             if (result == null)
@@ -149,9 +143,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return builder.ToString();
         }
 
-        /**
-         * Creates the password-only follow-up HTML block.
-         */
+                // Creates the password-only follow-up HTML block.
         internal static string BuildPasswordOnly(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null)
         {
             if (result == null)
@@ -218,9 +210,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return builder.ToString();
         }
 
-        /**
-         * Resolve effective HTML block language with policy override support.
-         */
+                // Resolve effective HTML block language with policy override support.
         private static string ResolveEffectiveLanguage(string languageOverride, BackendPolicyStatus policyStatus)
         {
             if (policyStatus != null
@@ -243,9 +233,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return normalized;
         }
 
-        /**
-         * Resolve custom policy template for normal or password-only mode.
-         */
+                // Resolve custom policy template for normal or password-only mode.
         private static string ResolvePolicyTemplate(BackendPolicyStatus policyStatus, bool passwordOnly, string effectiveLanguage)
         {            if (policyStatus == null || !policyStatus.PolicyActive)
             {
@@ -260,9 +248,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return template ?? string.Empty;
         }
 
-        /**
-         * Render one backend-provided custom HTML template.
-         */
+                // Render one backend-provided custom HTML template.
         private static string RenderPolicyTemplate(
             string template,
             FileLinkResult result,
@@ -321,10 +307,8 @@ namespace NcTalkOutlookAddIn.Utilities
             return sanitized;
         }
 
-        /**
-         * Remove one placeholder row from backend-provided HTML templates.
-         * This is used to reduce the custom share block for attachment mode.
-         */
+                // Remove one placeholder row from backend-provided HTML templates.
+        // This is used to reduce the custom share block for attachment mode.
         private static string StripTemplateRow(string template, string placeholder)
         {
             string token = "{" + (placeholder ?? string.Empty).Trim() + "}";
@@ -347,9 +331,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return output.Replace(token, string.Empty);
         }
 
-        /**
-         * Case-insensitive search for the last occurrence before one absolute index.
-         */
+                // Case-insensitive search for the last occurrence before one absolute index.
         private static int LastIndexOfIgnoreCase(string value, string search, int startIndexExclusive)
         {
             if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(search))
@@ -364,9 +346,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return value.LastIndexOf(search, maxIndex - 1, StringComparison.OrdinalIgnoreCase);
         }
 
-        /**
-         * Case-insensitive forward search.
-         */
+                // Case-insensitive forward search.
         private static int IndexOfIgnoreCase(string value, string search, int startIndex)
         {
             if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(search))
@@ -381,9 +361,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return value.IndexOf(search, normalizedStart, StringComparison.OrdinalIgnoreCase);
         }
 
-        /**
-         * Adds a table row with label and content.
-         */
+                // Adds a table row with label and content.
         private static void AppendRow(StringBuilder builder, string label, string valueHtml)
         {
             builder.AppendLine("<tr>");
@@ -456,9 +434,7 @@ namespace NcTalkOutlookAddIn.Utilities
             }
         }
 
-        /**
-         * Renders the permissions badges (checkmarks / red crosses).
-         */
+                // Renders the permissions badges (checkmarks / red crosses).
         private static string BuildPermissions(FileLinkPermissionFlags permissions, string readLabel, string createLabel, string writeLabel, string deleteLabel)
         {
             var builder = new StringBuilder();
@@ -473,9 +449,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return builder.ToString();
         }
 
-        /**
-         * Builds the cell for a single permission.
-         */
+                // Builds the cell for a single permission.
         private static void AppendPermissionCell(StringBuilder builder, string label, bool enabled)
         {
             builder.Append("<td style=\"padding:0 18px 6px 0;\">");
@@ -493,9 +467,7 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.Append("</td>");
         }
 
-        /**
-         * Loads the embedded header banner as a Base64 string.
-         */
+                // Loads the embedded header banner as a Base64 string.
         private static string LoadHeaderBase64()
         {
             const string resource = "NcTalkOutlookAddIn.Resources.header-solid-blue-164x48.png";

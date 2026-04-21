@@ -1,18 +1,14 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Security.Cryptography;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
-    /**
-     * Shared local password generator fallback used when backend password generation
-     * is unavailable or policy responses are missing.
-     */
+        // Shared local password generator fallback used when backend password generation
+    // is unavailable or policy responses are missing.
     internal static class PasswordGenerator
     {
         private const string Alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";

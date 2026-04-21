@@ -1,18 +1,14 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Carries precomputed paths/metadata from the upload setup into the actual upload process.
-     * Avoids duplicate directory creation and keeps user/path parameters centralized.
-     */
+        // Carries precomputed paths/metadata from the upload setup into the actual upload process.
+    // Avoids duplicate directory creation and keeps user/path parameters centralized.
     internal sealed class FileLinkUploadContext
     {
         internal FileLinkUploadContext(

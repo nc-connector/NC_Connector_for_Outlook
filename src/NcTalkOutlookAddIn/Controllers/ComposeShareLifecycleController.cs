@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -16,9 +14,7 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Encapsulates compose share cleanup and separate password mail dispatch.
-     */
+        // Encapsulates compose share cleanup and separate password mail dispatch.
     internal sealed class ComposeShareLifecycleController
     {
         private readonly NextcloudTalkAddIn _owner;

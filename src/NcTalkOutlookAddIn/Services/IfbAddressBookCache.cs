@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -16,10 +14,8 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Loads the Nextcloud system address book (z-server-generated--system) and caches mappings
-     * from email addresses to calendar UIDs (.vcf).
-     */
+        // Loads the Nextcloud system address book (z-server-generated--system) and caches mappings
+    // from email addresses to calendar UIDs (.vcf).
     internal sealed class IfbAddressBookCache
     {
         private readonly object _syncRoot = new object();

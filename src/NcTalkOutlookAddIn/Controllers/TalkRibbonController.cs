@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -19,10 +17,8 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Handles Talk ribbon interactions including authentication gate, wizard orchestration,
-     * room replacement flow, and appointment persistence.
-     */
+        // Handles Talk ribbon interactions including authentication gate, wizard orchestration,
+    // room replacement flow, and appointment persistence.
     internal sealed class TalkRibbonController
     {
         private readonly NextcloudTalkAddIn _owner;

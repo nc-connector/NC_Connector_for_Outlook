@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Globalization;
@@ -18,9 +16,7 @@ using Microsoft.Office.Core;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-    /**
-     * Handles ribbon-driven FileLink launch and wizard execution for mail compose windows.
-     */
+        // Handles ribbon-driven FileLink launch and wizard execution for mail compose windows.
     internal sealed class FileLinkLaunchController
     {
         private readonly NextcloudTalkAddIn _owner;

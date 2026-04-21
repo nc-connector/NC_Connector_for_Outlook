@@ -1,17 +1,13 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn
 {
-    /**
-     * Logging helpers and throttled log guards used across the add-in runtime.
-     */
+        // Logging helpers and throttled log guards used across the add-in runtime.
     public sealed partial class NextcloudTalkAddIn
     {
         private static void LogCore(string message)

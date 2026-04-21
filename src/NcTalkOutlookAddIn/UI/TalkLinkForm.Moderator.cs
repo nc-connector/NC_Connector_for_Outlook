@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Drawing;
@@ -15,9 +13,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
 {
-    /**
-     * Moderator search dropdown and avatar lifecycle handling.
-     */
+        // Moderator search dropdown and avatar lifecycle handling.
     internal sealed partial class TalkLinkForm
     {
         private void UpdateModeratorResults()

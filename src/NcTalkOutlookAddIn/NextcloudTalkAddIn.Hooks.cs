@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using NcTalkOutlookAddIn.Controllers;
@@ -11,9 +9,7 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn
 {
-    /**
-     * Outlook hook lifecycle for inspector/application events and compose-tracking entry points.
-     */
+        // Outlook hook lifecycle for inspector/application events and compose-tracking entry points.
     public sealed partial class NextcloudTalkAddIn
     {
         private void EnsureInspectorHook()

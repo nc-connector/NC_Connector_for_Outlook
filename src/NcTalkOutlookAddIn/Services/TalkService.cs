@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -14,9 +12,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Performs HTTP calls against the Nextcloud Talk REST API.
-     */
+        // Performs HTTP calls against the Nextcloud Talk REST API.
     internal sealed class TalkService
     {
         private const int RoomTypePublic = 3;
@@ -45,9 +41,7 @@ namespace NcTalkOutlookAddIn.Services
             _httpClient = new NcHttpClient(configuration);
         }
 
-        /**
-         * Creates a Talk room based on user input and returns token + URL.
-         */
+                // Creates a Talk room based on user input and returns token + URL.
         internal TalkRoomCreationResult CreateRoom(TalkRoomRequest request)
         {
             if (request == null)
@@ -126,9 +120,7 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        /**
-         * Updates the lobby time of an existing Talk room.
-         */
+                // Updates the lobby time of an existing Talk room.
         internal void UpdateLobby(string roomToken, DateTime start, DateTime end, bool isEventConversation)
         {
             EnsureConfiguration();
@@ -159,9 +151,7 @@ namespace NcTalkOutlookAddIn.Services
             TryUpdateLobbyInternal(roomToken, start, baseUrl, false);
         }
 
-        /**
-         * Deletes the Talk room (removes the current participant) and ignores 404.
-         */
+                // Deletes the Talk room (removes the current participant) and ignores 404.
         internal void DeleteRoom(string roomToken, bool isEventConversation)
         {
             EnsureConfiguration();
@@ -563,10 +553,8 @@ namespace NcTalkOutlookAddIn.Services
             return IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.NotFound;
         }
 
-        /**
-         * Reads server-side room traits for cross-client interoperability when local
-         * appointment flags are not available yet (for example TB-created events in Outlook).
-         */
+                // Reads server-side room traits for cross-client interoperability when local
+        // appointment flags are not available yet (for example TB-created events in Outlook).
         internal bool TryReadRoomTraits(string token, out bool? lobbyEnabled, out bool? isEventConversation)
         {
             lobbyEnabled = null;

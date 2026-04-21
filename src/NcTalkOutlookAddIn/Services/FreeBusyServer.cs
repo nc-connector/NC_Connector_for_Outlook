@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using System.Collections.Generic;
@@ -16,9 +14,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
-    /**
-     * Local HTTP endpoint for Outlook that proxies free/busy data to Nextcloud.
-     */
+        // Local HTTP endpoint for Outlook that proxies free/busy data to Nextcloud.
     internal sealed class FreeBusyServer : IDisposable
     {
         private const int DefaultPort = 7777;

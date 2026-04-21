@@ -1,8 +1,6 @@
-/**
- * Copyright (c) 2025 Bastian Kleinschmidt
- * Licensed under the GNU Affero General Public License v3.0.
- * See LICENSE.txt for details.
- */
+// Copyright (c) 2025 Bastian Kleinschmidt
+// Licensed under the GNU Affero General Public License v3.0.
+// See LICENSE.txt for details.
 
 using System;
 using NcTalkOutlookAddIn.Controllers;
@@ -12,9 +10,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn
 {
-    /**
-     * Backend policy retrieval and Talk template/language normalization helpers.
-     */
+        // Backend policy retrieval and Talk template/language normalization helpers.
     public sealed partial class NextcloudTalkAddIn
     {
         internal BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
