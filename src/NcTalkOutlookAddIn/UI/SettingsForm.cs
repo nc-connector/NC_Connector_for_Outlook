@@ -2117,28 +2117,28 @@ namespace NcTalkOutlookAddIn.UI
             _talkDefaultAddUsersCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkUsers && !_isBusy;
             _talkDefaultAddGuestsCheckBox.Enabled = !_talkAddressbookLockActive && !lockTalkGuests && !_isBusy;
 
-            SetTooltipWithFallback(_fileLinkBaseTextBox, lockShareBase ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareBase, _fileLinkBaseHintLabel);
-            SetTooltipWithFallback(_sharingDefaultShareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _sharingDefaultShareNameLabel);
-            SetTooltipWithFallback(_sharingDefaultPermCreateCheckBox, lockSharePermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermCreate, _sharingDefaultPermissionsLabel);
-            SetTooltipWithFallback(_sharingDefaultPermWriteCheckBox, lockSharePermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermWrite, _sharingDefaultPermissionsLabel);
-            SetTooltipWithFallback(_sharingDefaultPermDeleteCheckBox, lockSharePermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermDelete, _sharingDefaultPermissionsLabel);
-            SetTooltipWithFallback(_sharingDefaultPasswordCheckBox, lockSharePassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePassword);
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(_fileLinkBaseTextBox, lockShareBase ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareBase, _fileLinkBaseHintLabel);
+            _disabledTooltipHints.Apply(_sharingDefaultShareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _sharingDefaultShareNameLabel);
+            _disabledTooltipHints.Apply(_sharingDefaultPermCreateCheckBox, lockSharePermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermCreate, _sharingDefaultPermissionsLabel);
+            _disabledTooltipHints.Apply(_sharingDefaultPermWriteCheckBox, lockSharePermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermWrite, _sharingDefaultPermissionsLabel);
+            _disabledTooltipHints.Apply(_sharingDefaultPermDeleteCheckBox, lockSharePermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermDelete, _sharingDefaultPermissionsLabel);
+            _disabledTooltipHints.Apply(_sharingDefaultPasswordCheckBox, lockSharePassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePassword);
+            _disabledTooltipHints.Apply(
                 _sharingDefaultPasswordSeparateCheckBox,
                 !separatePasswordAvailable
                     ? separatePasswordUnavailableTooltip
                     : (lockSharePasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
                 !separatePasswordAvailable || lockSharePasswordSeparate);
-            SetTooltipWithFallback(_sharingDefaultExpireDaysUpDown, lockShareExpire ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareExpire, _sharingDefaultExpireDaysLabel);
-            SetTooltipWithFallback(_shareBlockLangCombo, lockShareLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareLang, _shareBlockLangLabel);
-            SetTooltipWithFallback(_talkDefaultPasswordCheckBox, lockTalkPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkPassword);
-            SetTooltipWithFallback(_talkDefaultLobbyCheckBox, lockTalkLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockTalkLobby);
-            SetTooltipWithFallback(_talkDefaultSearchCheckBox, lockTalkSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockTalkSearch);
+            _disabledTooltipHints.Apply(_sharingDefaultExpireDaysUpDown, lockShareExpire ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareExpire, _sharingDefaultExpireDaysLabel);
+            _disabledTooltipHints.Apply(_shareBlockLangCombo, lockShareLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareLang, _shareBlockLangLabel);
+            _disabledTooltipHints.Apply(_talkDefaultPasswordCheckBox, lockTalkPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkPassword);
+            _disabledTooltipHints.Apply(_talkDefaultLobbyCheckBox, lockTalkLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockTalkLobby);
+            _disabledTooltipHints.Apply(_talkDefaultSearchCheckBox, lockTalkSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockTalkSearch);
             TalkRoomTypeOption selectedTalkRoomTypeOption = _talkDefaultRoomTypeCombo.SelectedItem as TalkRoomTypeOption;
             bool standardTalkRoomTypeSelected =
                 selectedTalkRoomTypeOption != null &&
                 selectedTalkRoomTypeOption.Value == TalkRoomType.StandardRoom;
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(
                 _talkDefaultRoomTypeCombo,
                 lockTalkRoomType
                     ? Strings.PolicyAdminControlledTooltip
@@ -2147,19 +2147,9 @@ namespace NcTalkOutlookAddIn.UI
                         : Strings.TooltipRoomTypeEvent),
                 lockTalkRoomType,
                 _talkDefaultRoomTypeLabel);
-            SetTooltipWithFallback(_eventDescriptionLangCombo, lockTalkLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkLang, _eventDescriptionLangLabel);
+            _disabledTooltipHints.Apply(_eventDescriptionLangCombo, lockTalkLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkLang, _eventDescriptionLangLabel);
             UpdateSharingAttachmentOptionsState();
             UpdateTlsOptionsState();
-        }
-
-        private void SetTooltipWithFallback(Control primary, string text, params Control[] fallbackTargets)
-        {
-            _disabledTooltipHints.Apply(primary, text, fallbackTargets);
-        }
-
-        private void SetTooltipWithFallback(Control primary, string text, bool showHint, params Control[] fallbackTargets)
-        {
-            _disabledTooltipHints.Apply(primary, text, showHint, fallbackTargets);
         }
 
         private void SetBusy(bool busy)

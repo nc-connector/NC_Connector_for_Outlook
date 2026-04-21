@@ -248,7 +248,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             if (IsPolicyLocked("talk", "talk_room_type"))
             {
-                SetTooltipWithFallback(
+                _disabledTooltipHints.Apply(
                     _talkDefaultRoomTypeCombo,
                     Strings.PolicyAdminControlledTooltip,
                     true,
@@ -257,7 +257,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             var selected = _talkDefaultRoomTypeCombo.SelectedItem as TalkRoomTypeOption;
             TalkRoomType roomType = selected != null ? selected.Value : TalkRoomType.EventConversation;
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(
                 _talkDefaultRoomTypeCombo,
                 roomType == TalkRoomType.EventConversation ? Strings.TooltipRoomTypeEvent : Strings.TooltipRoomTypeStandard,
                 false,

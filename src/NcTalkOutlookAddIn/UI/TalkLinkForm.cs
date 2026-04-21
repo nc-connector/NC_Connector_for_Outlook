@@ -772,8 +772,8 @@ namespace NcTalkOutlookAddIn.UI
                 _addGuestsCheckBox.Enabled = true;
             }
 
-            SetTooltipWithFallback(_titleTextBox, lockTitle ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTitle, _titleLabel);
-            SetTooltipWithFallback(_roomTypeComboBox, lockRoomType ? Strings.PolicyAdminControlledTooltip : _toolTip.GetToolTip(_roomTypeComboBox), lockRoomType, _roomTypeLabel);
+            _disabledTooltipHints.Apply(_titleTextBox, lockTitle ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTitle, _titleLabel);
+            _disabledTooltipHints.Apply(_roomTypeComboBox, lockRoomType ? Strings.PolicyAdminControlledTooltip : _toolTip.GetToolTip(_roomTypeComboBox), lockRoomType, _roomTypeLabel);
             _disabledTooltipHints.Apply(
                 _passwordToggleCheckBox,
                 lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty,
@@ -782,16 +782,16 @@ namespace NcTalkOutlookAddIn.UI
                 _passwordLabel,
                 _passwordTextBox,
                 _passwordGenerateButton);
-            SetTooltipWithFallback(_lobbyCheckBox, lockLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockLobby);
-            SetTooltipWithFallback(_searchCheckBox, lockSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockSearch);
+            _disabledTooltipHints.Apply(_lobbyCheckBox, lockLobby ? Strings.PolicyAdminControlledTooltip : Strings.TooltipLobby, lockLobby);
+            _disabledTooltipHints.Apply(_searchCheckBox, lockSearch ? Strings.PolicyAdminControlledTooltip : Strings.TooltipSearchVisible, lockSearch);
 
             if (lockUsers)
             {
-                SetTooltipWithFallback(_addUsersCheckBox, Strings.PolicyAdminControlledTooltip, true);
+                _disabledTooltipHints.Apply(_addUsersCheckBox, Strings.PolicyAdminControlledTooltip, true);
             }
             if (lockGuests)
             {
-                SetTooltipWithFallback(_addGuestsCheckBox, Strings.PolicyAdminControlledTooltip, true);
+                _disabledTooltipHints.Apply(_addGuestsCheckBox, Strings.PolicyAdminControlledTooltip, true);
             }
         }
 
@@ -826,16 +826,16 @@ namespace NcTalkOutlookAddIn.UI
                 ? Strings.TalkSystemAddressbookRequiredMessage
                 : string.Empty;
 
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(
                 _addUsersCheckBox,
                 lockActive ? Strings.TooltipAddUsersLocked : (usersPolicyLocked ? Strings.PolicyAdminControlledTooltip : Strings.TooltipAddUsers),
                 lockActive || usersPolicyLocked);
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(
                 _addGuestsCheckBox,
                 lockActive ? Strings.TooltipAddGuestsLocked : (guestsPolicyLocked ? Strings.PolicyAdminControlledTooltip : Strings.TooltipAddGuests),
                 lockActive || guestsPolicyLocked);
-            SetTooltipWithFallback(_moderatorTextBox, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
-            SetTooltipWithFallback(_moderatorClearButton, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
+            _disabledTooltipHints.Apply(_moderatorTextBox, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
+            _disabledTooltipHints.Apply(_moderatorClearButton, lockActive ? Strings.TooltipModeratorLocked : Strings.TooltipModerator, lockActive, _moderatorHintLabel);
 
             DiagnosticsLogger.Log(
                 LogCategories.Talk,
@@ -858,26 +858,16 @@ namespace NcTalkOutlookAddIn.UI
         {
             if (IsPolicyLocked("talk_room_type"))
             {
-                SetTooltipWithFallback(_roomTypeComboBox, Strings.PolicyAdminControlledTooltip, true, _roomTypeLabel);
+                _disabledTooltipHints.Apply(_roomTypeComboBox, Strings.PolicyAdminControlledTooltip, true, _roomTypeLabel);
                 return;
             }
             var selected = _roomTypeComboBox.SelectedItem as RoomTypeOption;
             var roomType = selected != null ? selected.Value : TalkRoomType.EventConversation;
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(
                 _roomTypeComboBox,
                 roomType == TalkRoomType.EventConversation ? Strings.TooltipRoomTypeEvent : Strings.TooltipRoomTypeStandard,
                 false,
                 _roomTypeLabel);
-        }
-
-        private void SetTooltipWithFallback(Control primary, string text, params Control[] fallbackTargets)
-        {
-            _disabledTooltipHints.Apply(primary, text, fallbackTargets);
-        }
-
-        private void SetTooltipWithFallback(Control primary, string text, bool showHint, params Control[] fallbackTargets)
-        {
-            _disabledTooltipHints.Apply(primary, text, showHint, fallbackTargets);
         }
 
         /**

@@ -273,10 +273,10 @@ namespace NcTalkOutlookAddIn.UI
             _passwordToggleCheckBox.Enabled = !lockPassword;
             _expireToggleCheckBox.Enabled = !lockExpireDays;
 
-            SetTooltipWithFallback(_shareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _shareNameLabel, _titleLabel);
-            SetTooltipWithFallback(_permissionCreateCheckBox, lockPermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermCreate, _permissionsLabel);
-            SetTooltipWithFallback(_permissionWriteCheckBox, lockPermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermWrite, _permissionsLabel);
-            SetTooltipWithFallback(_permissionDeleteCheckBox, lockPermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermDelete, _permissionsLabel);
+            _disabledTooltipHints.Apply(_shareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _shareNameLabel, _titleLabel);
+            _disabledTooltipHints.Apply(_permissionCreateCheckBox, lockPermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermCreate, _permissionsLabel);
+            _disabledTooltipHints.Apply(_permissionWriteCheckBox, lockPermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermWrite, _permissionsLabel);
+            _disabledTooltipHints.Apply(_permissionDeleteCheckBox, lockPermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermDelete, _permissionsLabel);
             _disabledTooltipHints.Apply(
                 _passwordToggleCheckBox,
                 lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty,
@@ -284,28 +284,18 @@ namespace NcTalkOutlookAddIn.UI
                 _passwordGenerateButton,
                 _passwordGenerateButton,
                 _passwordTextBox);
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(
                 _passwordSeparateToggleCheckBox,
                 !separatePasswordAvailable
                     ? separatePasswordUnavailableTooltip
                     : (lockPasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
                 !separatePasswordAvailable || lockPasswordSeparate,
                 _passwordTextBox);
-            SetTooltipWithFallback(_expireToggleCheckBox, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, lockExpireDays, _expireHintLabel);
-            SetTooltipWithFallback(_expireDatePicker, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, false, _expireHintLabel);
+            _disabledTooltipHints.Apply(_expireToggleCheckBox, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, lockExpireDays, _expireHintLabel);
+            _disabledTooltipHints.Apply(_expireDatePicker, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, false, _expireHintLabel);
 
             UpdatePasswordState();
             UpdateExpireState();
-        }
-
-        private void SetTooltipWithFallback(Control primary, string text, params Control[] fallbackTargets)
-        {
-            _disabledTooltipHints.Apply(primary, text, fallbackTargets);
-        }
-
-        private void SetTooltipWithFallback(Control primary, string text, bool showHint, params Control[] fallbackTargets)
-        {
-            _disabledTooltipHints.Apply(primary, text, showHint, fallbackTargets);
         }
 
         private static void OpenPolicyAdminGuide()
@@ -1610,7 +1600,7 @@ namespace NcTalkOutlookAddIn.UI
             _passwordTextBox.Enabled = enabled;
             _passwordGenerateButton.Enabled = enabled;
             _passwordSeparateToggleCheckBox.Enabled = enabled && !lockPasswordSeparate && separatePasswordAvailable;
-            SetTooltipWithFallback(
+            _disabledTooltipHints.Apply(
                 _passwordSeparateToggleCheckBox,
                 !separatePasswordAvailable
                     ? separatePasswordUnavailableTooltip
