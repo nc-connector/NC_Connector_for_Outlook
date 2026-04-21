@@ -648,7 +648,7 @@
     "message": "Alapkönyvtár"
   },
   "options_sharing_base_hint": {
-    "message": "A fájlok e könyvtár alatt tárolódnak (pl. „90 Freigaben - extern”)."
+    "message": "A fájlok e könyvtár alatt tárolódnak (pl. „NC Connector”)."
   },
   "options_sharing_defaults_heading": {
     "message": "Alapértelmezett beállítások"
@@ -729,7 +729,7 @@
     "message": "Alapkönyvtár"
   },
   "sharing_base_path_hint": {
-    "message": "A fájlok e könyvtár alatt lesznek tárolva."
+    "message": "A fájlok e könyvtár alatt tárolódnak (pl. „NC Connector”)."
   },
   "sharing_allow_upload_label": {
     "message": "A címzettek feltölthetik saját fájljaikat"
@@ -1391,5 +1391,6 @@
     "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."
   }
 }
+
 
 

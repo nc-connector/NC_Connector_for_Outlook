@@ -15,6 +15,7 @@ namespace NcTalkOutlookAddIn.Settings
         internal const int DefaultIfbPort = 7777;
         internal const int MinIfbPort = 1024;
         internal const int MaxIfbPort = 49151;
+        internal const string DefaultFileLinkBasePath = "NC Connector";
 
         public AddinSettings()
         {
@@ -33,7 +34,7 @@ namespace NcTalkOutlookAddIn.Settings
             TransportTlsEnable12 = true;
             TransportTlsEnable13 = false;
             LastKnownServerVersion = string.Empty;
-            FileLinkBasePath = "90 Freigaben - extern";
+            FileLinkBasePath = DefaultFileLinkBasePath;
             SharingDefaultShareName = Strings.SharingDefaultShareNameLabel;
             SharingDefaultPermCreate = false;
             SharingDefaultPermWrite = false;

@@ -648,7 +648,7 @@
     "message": "Diretório base"
   },
   "options_sharing_base_hint": {
-    "message": "Os arquivos são armazenados sob este diretório (ex.: \"90 Freigaben - extern\")."
+    "message": "Os arquivos são armazenados sob este diretório (ex.: \"NC Connector\")."
   },
   "options_sharing_defaults_heading": {
     "message": "Configurações padrão"
@@ -729,7 +729,7 @@
     "message": "Diretório base"
   },
   "sharing_base_path_hint": {
-    "message": "Os arquivos são armazenados sob este diretório."
+    "message": "Os arquivos são armazenados sob este diretório (ex.: \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "Destinatários podem enviar seus próprios arquivos"
@@ -1391,5 +1391,6 @@
     "message": "Quando a política TLS padrão do sistema operacional estiver desativada, ative pelo menos uma versão TLS (1.2 ou 1.3)."
   }
 }
+
 
 

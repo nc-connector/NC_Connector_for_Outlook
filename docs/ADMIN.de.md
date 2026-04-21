@@ -101,7 +101,7 @@ Beispiel (Auszug):
   <IfbCacheHours>24</IfbCacheHours>
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
-  <FileLinkBasePath>90 Freigaben - extern</FileLinkBasePath>
+  <FileLinkBasePath>NC Connector</FileLinkBasePath>
 </Settings>
 ```
 

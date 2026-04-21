@@ -73,7 +73,7 @@ namespace NcTalkOutlookAddIn.Controllers
             BackendPolicyStatus policyStatus = policyStatusTask.Result;
 
             string basePath = string.IsNullOrWhiteSpace(settings.FileLinkBasePath)
-                ? "90 Freigaben - extern"
+                ? AddinSettings.DefaultFileLinkBasePath
                 : settings.FileLinkBasePath;
 
             PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;

@@ -648,7 +648,7 @@
     "message": "Directory base"
   },
   "options_sharing_base_hint": {
-    "message": "I file sono archiviati sotto questa directory (es. \"90 Freigaben - extern\")."
+    "message": "I file sono archiviati sotto questa directory (es. \"NC Connector\")."
   },
   "options_sharing_defaults_heading": {
     "message": "Impostazioni predefinite"
@@ -729,7 +729,7 @@
     "message": "Directory base"
   },
   "sharing_base_path_hint": {
-    "message": "I file sono archiviati sotto questa directory."
+    "message": "I file sono archiviati sotto questa directory (es. \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "I destinatari possono caricare i propri file"
@@ -1391,5 +1391,6 @@
     "message": "Quando il criterio TLS predefinito del sistema operativo è disattivato, abilita almeno una versione TLS (1.2 o 1.3)."
   }
 }
+
 
 

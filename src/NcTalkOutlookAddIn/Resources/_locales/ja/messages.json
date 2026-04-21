@@ -648,7 +648,7 @@
     "message": "ベースディレクトリ"
   },
   "options_sharing_base_hint": {
-    "message": "ファイルはこのディレクトリ配下に保存されます（例: \"90 Freigaben - extern\"）。"
+    "message": "ファイルはこのディレクトリ配下に保存されます（例: \"NC Connector\"）。"
   },
   "options_sharing_defaults_heading": {
     "message": "既定の設定"
@@ -729,7 +729,7 @@
     "message": "ベースディレクトリ"
   },
   "sharing_base_path_hint": {
-    "message": "ファイルはこのディレクトリ配下に保存されます。"
+    "message": "ファイルはこのディレクトリ配下に保存されます（例: \"NC Connector\"）。"
   },
   "sharing_allow_upload_label": {
     "message": "受信者は自分のファイルをアップロードできます"
@@ -1391,5 +1391,6 @@
     "message": "OS 既定の TLS ポリシーを無効にする場合は、少なくとも 1 つの TLS バージョン（1.2 または 1.3）を有効にしてください。"
   }
 }
+
 
 

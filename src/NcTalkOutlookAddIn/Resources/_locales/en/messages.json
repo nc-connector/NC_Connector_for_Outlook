@@ -669,7 +669,7 @@
     "message": "Base directory"
   },
   "options_sharing_base_hint": {
-    "message": "Files are stored beneath this directory (e.g. \"90 Freigaben - extern\")."
+    "message": "Files are stored beneath this directory (e.g. \"NC Connector\")."
   },
   "options_sharing_defaults_heading": {
     "message": "Default settings"
@@ -750,7 +750,7 @@
     "message": "Base directory"
   },
   "sharing_base_path_hint": {
-    "message": "Files are stored beneath this directory."
+    "message": "Files are stored beneath this directory (e.g. \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "Recipients may upload their own files"
@@ -1391,6 +1391,7 @@
     "message": "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator."
   }
 }
+
 
 
 

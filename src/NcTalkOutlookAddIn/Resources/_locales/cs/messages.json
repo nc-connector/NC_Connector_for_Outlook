@@ -648,7 +648,7 @@
     "message": "Základní adresář"
   },
   "options_sharing_base_hint": {
-    "message": "Soubory jsou ukládány pod tento adresář (např. \"90 Freigaben - extern\")."
+    "message": "Soubory jsou ukládány pod tento adresář (např. \"NC Connector\")."
   },
   "options_sharing_defaults_heading": {
     "message": "Výchozí nastavení"
@@ -729,7 +729,7 @@
     "message": "Základní adresář"
   },
   "sharing_base_path_hint": {
-    "message": "Soubory jsou ukládány pod tento adresář."
+    "message": "Soubory jsou ukládány pod tento adresář (např. \"NC Connector\")."
   },
   "sharing_allow_upload_label": {
     "message": "Příjemci mohou nahrát své vlastní soubory"
@@ -1391,5 +1391,6 @@
     "message": "Když jsou výchozí zásady TLS operačního systému vypnuté, povolte alespoň jednu verzi TLS (1.2 nebo 1.3)."
   }
 }
+
 
 
