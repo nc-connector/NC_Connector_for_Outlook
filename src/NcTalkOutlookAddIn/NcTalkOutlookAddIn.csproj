@@ -154,7 +154,9 @@
     <Compile Include="Utilities\SizeFormatting.cs" />
     <Compile Include="Utilities\PasswordGenerator.cs" />
     <Compile Include="Utilities\PasswordGenerationHelper.cs" />
+    <Compile Include="Utilities\PolicyUiHelper.cs" />
     <Compile Include="Utilities\TimeUtilities.cs" />
+    <Compile Include="Utilities\DpiScaling.cs" />
     <Compile Include="Utilities\UiThemeManager.cs" />
     <Compile Include="Utilities\DisabledControlTooltipHintHelper.cs" />
     <Compile Include="Utilities\HttpFailureDiagnostics.cs" />
