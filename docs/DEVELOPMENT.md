@@ -109,6 +109,8 @@ Key code locations:
 
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.cs` — entry point, ribbon XML, Outlook event wiring, orchestration
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.Lifecycle.cs` — add-in bootstrap/teardown lifecycle (`OnConnection`, shutdown/disconnect)
+- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.Hooks.cs` — dedicated Outlook event hook/unhook wiring helpers
+- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.Logging.cs` — category-specific runtime logging helpers
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.PolicyTemplates.cs` — backend policy + Talk template/language resolver helpers
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.SubscriptionEnsure.cs` — deferred appointment-subscription ensure and Outlook event-restriction handling
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.cs` — compose subscription core state + lifecycle entry points (`Dispose`, identity, shared helpers)
@@ -145,6 +147,7 @@ Key code locations:
 - **Workflow controllers**
   - `SettingsWorkflowController`, `FileLinkLaunchController`, and `TalkRibbonController` own ribbon-triggered UI/runtime workflows.
   - `NextcloudTalkAddIn.cs` remains the COM/ribbon/event composition root and delegates feature flows to controllers.
+  - `TalkRibbonController` and `FileLinkLaunchController` prefetch backend policy + password policy in parallel before opening wizards, while still fetching fresh runtime policy data on every entry.
   - Lifecycle, policy/template resolution, and deferred subscription ensure are split into dedicated partial files to keep the root orchestration class maintainable.
 - **Service layer**
   - `Services/TalkService.cs` calls the Talk OCS API.
@@ -168,15 +171,16 @@ Key code locations:
 
 1. User clicks **Insert Talk link** in an appointment.
 2. `UI/TalkLinkForm.cs` collects: title, password, lobby, listable flag, room type, participant sync options, optional delegation target.
-3. `Services/TalkService.cs` creates the room via OCS.
-4. `Controllers/TalkAppointmentController.ApplyRoomToAppointment(...)` (invoked by `NextcloudTalkAddIn`) updates the appointment:
+3. `Controllers/TalkRibbonController.cs` prefetches backend policy status and password policy in parallel (`Task.WhenAll`) before opening the wizard.
+4. `Services/TalkService.cs` creates the room via OCS.
+5. `Controllers/TalkAppointmentController.ApplyRoomToAppointment(...)` (invoked by `NextcloudTalkAddIn`) updates the appointment:
    - `Location` (Talk URL)
    - a localized plain-text body block (incl. password and help URL)
    - persisted metadata as Outlook `UserProperties` (including `X-NCTALK-*` keys)
    - backend-provided custom Talk templates are sanitized before rendering (no raw HTML fallback)
    - talk appointment HTML is passed through an explicit compatibility transform (`HtmlTemplateSanitizer.PrepareTalkAppointmentHtmlForOutlookRtfBridge(...)`) before insert
    - appointment HTML insert uses the HTML->RTF bridge (`MailItem.HTMLBody` -> `AppointmentItem.RTFBody`), not `AppointmentItem.HTMLBody` and not `HTMLEditor.body.innerHTML`
-5. A runtime subscription is registered for the appointment (`AppointmentSubscription` in `NextcloudTalkAddIn.AppointmentSubscription.cs`):
+6. A runtime subscription is registered for the appointment (`AppointmentSubscription` in `NextcloudTalkAddIn.AppointmentSubscription.cs`):
    - **Write** (save): updates lobby timer on time changes, updates room description, syncs participants, applies delegation
    - If Outlook exposes the final changed start time only shortly after `Write`, a short deferred post-write verification retries the lobby update on the same opened appointment instead of broad calendar scanning.
    - **Close** (discard without saving): deletes the room to avoid orphans (best-effort)
@@ -201,10 +205,11 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
 
 1. User clicks **Insert Nextcloud share** while composing an email.
 2. `UI/FileLinkWizardForm.cs` collects sharing settings and the file/folder selection.
-3. `Services/FileLinkService.cs` performs WebDAV upload, creates the public share via OCS (`label` on create), then updates mutable metadata like `note` via the documented OCS update arguments.
-4. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
+3. `Controllers/FileLinkLaunchController.cs` prefetches backend policy status and password policy in parallel (`Task.WhenAll`) before opening the wizard.
+4. `Services/FileLinkService.cs` performs WebDAV upload, creates the public share via OCS (`label` on create), then updates mutable metadata like `note` via the documented OCS update arguments.
+5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
-5. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` inserts the HTML into the message body (delegated to `Controllers/MailInteropController.cs`).
+6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` inserts the HTML into the message body (delegated to `Controllers/MailInteropController.cs`).
 
 Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) with lifecycle logic delegated to `Controllers/ComposeShareLifecycleController`:
 
@@ -219,7 +224,7 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
 - Runtime host guard checks (live large-attachment setting) at:
   - pre-evaluation
   - pre-prompt-action handling
-  - wizard finalize (enforced in `UI/FileLinkWizardForm.cs`).
+  - wizard finalize (enforced in `UI/FileLinkWizardForm.cs` via `Services/OutlookAttachmentAutomationGuardService.cs`).
 - Attachment-mode wizard launch:
   - removes selected compose attachments
   - queues files as initial wizard selections
