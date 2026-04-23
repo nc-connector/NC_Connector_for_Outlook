@@ -228,10 +228,10 @@
     "message": "會議"
   },
   "ui_description_heading": {
-    "message": "Nextcloud Talk"
+    "message": "此會議在 Nextcloud Talk 中進行"
   },
   "ui_description_join_label": {
-    "message": "立即加入會議："
+    "message": "會議連結："
   },
   "ui_description_password_line": {
     "message": "密碼：$1"
@@ -849,7 +849,7 @@
     "message": "無法將分享插入郵件。"
   },
   "sharing_html_intro": {
-    "message": "我想安全地分享檔案並保護您的隱私。請點擊下方連結下載您的檔案。"
+    "message": "這些檔案已透過 Nextcloud 以安全且符合隱私規範的方式提供。可透過下方連結下載。"
   },
   "sharing_html_password_label": {
     "message": "密碼"
@@ -963,7 +963,7 @@
     "message": "由於未提供替代名稱，上傳已取消。"
   },
   "sharing_html_intro_line": {
-    "message": "我想安全地分享檔案並保護您的隱私。請點擊下方連結下載您的檔案。"
+    "message": "這些檔案已透過 Nextcloud 以安全且符合隱私規範的方式提供。可透過下方連結下載。"
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud 是安全電子郵件與資料交換的解決方案。"

@@ -16,7 +16,9 @@ namespace NcTalkOutlookAddIn.Controllers
         // Encapsulates rendering/removal of NC Talk description blocks in plain-text and HTML bodies.
     internal static class TalkDescriptionTemplateController
     {
-        private const string BodySectionHeader = "Nextcloud Talk";
+        private const string BodySectionHeaderDefault = "This meeting takes place in Nextcloud Talk";
+        private const string LegacyBodySectionHeader = "Nextcloud Talk";
+        private static readonly HashSet<string> TalkBlockHeaderLines = BuildTalkBlockHeaderLines();
         private static readonly string[] TalkHelpUrlMarkers =
         {
             "/talk/join_a_call_or_chat_as_guest.html",
@@ -219,7 +221,8 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 normalizedLanguage = "default";
             }
-            string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
+            string heading = Strings.GetInLanguage(normalizedLanguage, "ui_description_heading", BodySectionHeaderDefault);
+            string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Meeting link:");
             string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
             string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
             string helpUrl = Strings.GetInLanguage(
@@ -229,7 +232,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
             var lines = new List<string>
             {
-                BodySectionHeader,
+                heading,
                 string.Empty,
                 joinLabel,
                 roomUrl ?? string.Empty,
@@ -264,7 +267,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     normalizedLanguage = "default";
                 }
-                string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Join the meeting now:");
+                string heading = Strings.GetInLanguage(normalizedLanguage, "ui_description_heading", BodySectionHeaderDefault);
+                string joinLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_join_label", "Meeting link:");
                 string passwordLineFormat = Strings.GetInLanguage(normalizedLanguage, "ui_description_password_line", "Password: {0}");
                 string helpLabel = Strings.GetInLanguage(normalizedLanguage, "ui_description_help_label", "Need help?");
                 string helpUrl = Strings.GetInLanguage(
@@ -276,7 +280,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 html.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
                 html.Append("<tbody>");
                 html.Append("<tr><td valign=\"top\" align=\"left\"><strong>")
-                    .Append(HttpUtility.HtmlEncode(BodySectionHeader))
+                    .Append(HttpUtility.HtmlEncode(heading))
                     .Append("</strong></td></tr>");
                 html.Append("<tr><td valign=\"top\" align=\"left\">")
                     .Append(HttpUtility.HtmlEncode(joinLabel))
@@ -319,7 +323,7 @@ namespace NcTalkOutlookAddIn.Controllers
         private static bool IsTalkBlockHeaderLine(string line)
         {
             string normalized = NormalizeTalkBlockLine(line);
-            return string.Equals(normalized, BodySectionHeader, StringComparison.OrdinalIgnoreCase);
+            return TalkBlockHeaderLines.Contains(normalized);
         }
 
         private static int FindTalkBlockEnd(List<string> lines, int headerIndex)
@@ -354,6 +358,27 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             return false;
+        }
+
+        private static HashSet<string> BuildTalkBlockHeaderLines()
+        {
+            var headers = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                LegacyBodySectionHeader,
+                BodySectionHeaderDefault
+            };
+
+            IReadOnlyList<string> supportedCodes = Strings.SupportedLanguageCodes;
+            for (int i = 0; i < supportedCodes.Count; i++)
+            {
+                string heading = Strings.GetInLanguage(supportedCodes[i], "ui_description_heading", BodySectionHeaderDefault);
+                if (!string.IsNullOrWhiteSpace(heading))
+                {
+                    headers.Add(heading.Trim());
+                }
+            }
+
+            return headers;
         }
 
         private static string RenderTalkInvitationTemplate(string template, string meetingUrl, string password)
