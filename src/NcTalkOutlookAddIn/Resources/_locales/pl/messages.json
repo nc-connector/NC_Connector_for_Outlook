@@ -228,10 +228,10 @@
     "message": "Spotkanie"
   },
   "ui_description_heading": {
-    "message": "Nextcloud Talk"
+    "message": "To spotkanie odbywa się w Nextcloud Talk"
   },
   "ui_description_join_label": {
-    "message": "Dołącz do spotkania teraz:"
+    "message": "Link do spotkania:"
   },
   "ui_description_password_line": {
     "message": "Hasło: $1"
@@ -849,7 +849,7 @@
     "message": "Nie można wstawić udostępnienia do wiadomości."
   },
   "sharing_html_intro": {
-    "message": "Chcę udostępnić pliki w bezpieczny sposób i chronić Twoją prywatność. Kliknij poniższy link, aby pobrać pliki."
+    "message": "Pliki zostały udostępnione przez Nextcloud w sposób bezpieczny i zgodny z zasadami ochrony prywatności. Pobieranie jest możliwe za pomocą poniższego linku."
   },
   "sharing_html_password_label": {
     "message": "Hasło"
@@ -963,7 +963,7 @@
     "message": "Przesyłanie anulowane, ponieważ nie podano nazwy zastępczej."
   },
   "sharing_html_intro_line": {
-    "message": "Chcę udostępnić pliki w bezpieczny sposób i chronić Twoją prywatność. Kliknij poniższy link, aby pobrać pliki."
+    "message": "Pliki zostały udostępnione przez Nextcloud w sposób bezpieczny i zgodny z zasadami ochrony prywatności. Pobieranie jest możliwe za pomocą poniższego linku."
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud to rozwiązanie do bezpiecznej poczty e-mail i wymiany danych."

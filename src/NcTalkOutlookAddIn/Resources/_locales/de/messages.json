@@ -228,10 +228,10 @@
     "message": "Besprechung"
   },
   "ui_description_heading": {
-    "message": "Nextcloud Talk"
+    "message": "Dieses Meeting findet in Nextcloud Talk statt"
   },
   "ui_description_join_label": {
-    "message": "Jetzt an der Besprechung teilnehmen :"
+    "message": "Meeting-Link:"
   },
   "ui_description_password_line": {
     "message": "Passwort: $1"
@@ -870,7 +870,7 @@
     "message": "Freigabe konnte nicht in die Nachricht eingefügt werden."
   },
   "sharing_html_intro": {
-    "message": "Ich möchte Dateien sicher und unter Wahrung Ihrer Privatsphäre mit Ihnen teilen. Klicken Sie auf den untenstehenden Link, um Ihre Dateien herunterzuladen."
+    "message": "Die Dateien wurden sicher und datenschutzkonform über Nextcloud bereitgestellt. Der Download ist über den untenstehenden Link möglich."
   },
   "sharing_html_password_label": {
     "message": "Passwort"
@@ -984,7 +984,7 @@
     "message": "Upload abgebrochen, da kein Ersatzname angegeben wurde."
   },
   "sharing_html_intro_line": {
-    "message": "Ich möchte Dateien sicher und unter Wahrung Ihrer Privatsphäre mit Ihnen teilen. Klicken Sie auf den untenstehenden Link, um Ihre Dateien herunterzuladen."
+    "message": "Die Dateien wurden sicher und datenschutzkonform über Nextcloud bereitgestellt. Der Download ist über den untenstehenden Link möglich."
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud ist eine Lösung für sicheren E-Mail- und Datenaustausch."

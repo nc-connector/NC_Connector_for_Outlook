@@ -228,10 +228,10 @@
     "message": "Megbeszélés"
   },
   "ui_description_heading": {
-    "message": "Nextcloud Talk"
+    "message": "Ez a megbeszélés a Nextcloud Talkban zajlik"
   },
   "ui_description_join_label": {
-    "message": "Csatlakozzon a megbeszéléshez most:"
+    "message": "Értekezlet hivatkozása:"
   },
   "ui_description_password_line": {
     "message": "Jelszó: $1"
@@ -849,7 +849,7 @@
     "message": "Nem sikerült beszúrni a megosztást az üzenetbe."
   },
   "sharing_html_intro": {
-    "message": "Szeretnék fájlokat biztonságosan megosztani, és megóvni az Ön magánszféráját. Kattintson az alábbi hivatkozásra a fájlok letöltéséhez."
+    "message": "A fájlok biztonságosan és az adatvédelmi előírásoknak megfelelően kerültek megosztásra a Nextclouddal. A letöltés az alábbi linken érhető el."
   },
   "sharing_html_password_label": {
     "message": "Jelszó"
@@ -963,7 +963,7 @@
     "message": "A feltöltés megszakadt, mert nem adott meg új nevet."
   },
   "sharing_html_intro_line": {
-    "message": "Szeretnék fájlokat biztonságosan megosztani, és megóvni az Ön magánszféráját. Kattintson az alábbi hivatkozásra a fájlok letöltéséhez."
+    "message": "A fájlok biztonságosan és az adatvédelmi előírásoknak megfelelően kerültek megosztásra a Nextclouddal. A letöltés az alábbi linken érhető el."
   },
   "sharing_html_footer_line": {
     "message": "A Nextcloud megoldás a biztonságos e-mail és adatcsere számára."

@@ -228,10 +228,10 @@
     "message": "Réunion"
   },
   "ui_description_heading": {
-    "message": "Nextcloud Talk"
+    "message": "Cette réunion a lieu dans Nextcloud Talk"
   },
   "ui_description_join_label": {
-    "message": "Rejoindre la réunion :"
+    "message": "Lien de la réunion :"
   },
   "ui_description_password_line": {
     "message": "Mot de passe : $1"
@@ -849,7 +849,7 @@
     "message": "Impossible d’insérer le partage dans le message."
   },
   "sharing_html_intro": {
-    "message": "Je souhaite partager des fichiers de manière sûre et confidentielle. Cliquez sur le lien ci-dessous pour télécharger vos fichiers."
+    "message": "Les fichiers ont été fournis de manière sécurisée et conforme à la protection des données via Nextcloud. Le téléchargement est possible via le lien ci-dessous."
   },
   "sharing_html_password_label": {
     "message": "Mot de passe"
@@ -963,7 +963,7 @@
     "message": "Téléversement annulé car aucun nouveau nom n’a été fourni."
   },
   "sharing_html_intro_line": {
-    "message": "Je souhaite partager des fichiers de manière sûre et confidentielle. Cliquez sur le lien ci-dessous pour télécharger vos fichiers."
+    "message": "Les fichiers ont été fournis de manière sécurisée et conforme à la protection des données via Nextcloud. Le téléchargement est possible via le lien ci-dessous."
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud est une solution pour des échanges d'e-mails et de données sécurisés."

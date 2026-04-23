@@ -228,10 +228,10 @@
     "message": "Schůzka"
   },
   "ui_description_heading": {
-    "message": "Nextcloud Talk"
+    "message": "Tato schůzka probíhá v Nextcloud Talk"
   },
   "ui_description_join_label": {
-    "message": "Připojte se ke schůzce nyní:"
+    "message": "Odkaz na schůzku:"
   },
   "ui_description_password_line": {
     "message": "Heslo: $1"
@@ -849,7 +849,7 @@
     "message": "Nepodařilo se vložit sdílení do zprávy."
   },
   "sharing_html_intro": {
-    "message": "Chci sdílet soubory bezpečně a chránit vaše soukromí. Klikněte na odkaz níže pro stažení souborů."
+    "message": "Soubory byly bezpečně a v souladu s ochranou soukromí poskytnuty prostřednictvím Nextcloudu. Stahování je možné pomocí níže uvedeného odkazu."
   },
   "sharing_html_password_label": {
     "message": "Heslo"
@@ -963,7 +963,7 @@
     "message": "Nahrávání bylo zrušeno, protože nebyl zadán náhradní název."
   },
   "sharing_html_intro_line": {
-    "message": "Chci sdílet soubory bezpečně a chránit vaše soukromí. Klikněte na odkaz níže pro stažení souborů."
+    "message": "Soubory byly bezpečně a v souladu s ochranou soukromí poskytnuty prostřednictvím Nextcloudu. Stahování je možné pomocí níže uvedeného odkazu."
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud je řešení pro bezpečný e-mail a výměnu dat."

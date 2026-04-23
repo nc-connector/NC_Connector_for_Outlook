@@ -228,10 +228,10 @@
     "message": "ミーティング"
   },
   "ui_description_heading": {
-    "message": "Nextcloud Talk"
+    "message": "この会議は Nextcloud Talk で実施されます"
   },
   "ui_description_join_label": {
-    "message": "今すぐミーティングに参加:"
+    "message": "会議リンク:"
   },
   "ui_description_password_line": {
     "message": "パスワード: $1"
@@ -849,7 +849,7 @@
     "message": "メッセージに共有を挿入できませんでした。"
   },
   "sharing_html_intro": {
-    "message": "ファイルを安全に共有し、あなたのプライバシーを保護したいと思います。以下のリンクをクリックしてファイルをダウンロードしてください。"
+    "message": "ファイルは Nextcloud を通じて安全かつプライバシーに配慮して提供されています。ダウンロードは以下のリンクから可能です。"
   },
   "sharing_html_password_label": {
     "message": "パスワード"
@@ -963,7 +963,7 @@
     "message": "置換名が指定されなかったため、アップロードはキャンセルされました。"
   },
   "sharing_html_intro_line": {
-    "message": "ファイルを安全に共有し、あなたのプライバシーを保護したいと思います。以下のリンクをクリックしてファイルをダウンロードしてください。"
+    "message": "ファイルは Nextcloud を通じて安全かつプライバシーに配慮して提供されています。ダウンロードは以下のリンクから可能です。"
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud は安全なメールとデータ交換のソリューションです。"
