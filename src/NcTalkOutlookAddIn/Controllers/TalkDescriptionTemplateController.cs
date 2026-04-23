@@ -17,7 +17,11 @@ namespace NcTalkOutlookAddIn.Controllers
     internal static class TalkDescriptionTemplateController
     {
         private const string BodySectionHeader = "Nextcloud Talk";
-        private const string TalkHelpUrlMarker = "join_a_call_or_chat_as_guest.html";
+        private static readonly string[] TalkHelpUrlMarkers =
+        {
+            "/talk/join_a_call_or_chat_as_guest.html",
+            "/talk/guest.html"
+        };
         private const string HtmlTalkBlockStartMarker = "<!-- NC4OL_TALK_BLOCK_START -->";
         private const string HtmlTalkBlockEndMarker = "<!-- NC4OL_TALK_BLOCK_END -->";
 
@@ -221,7 +225,7 @@ namespace NcTalkOutlookAddIn.Controllers
             string helpUrl = Strings.GetInLanguage(
                 normalizedLanguage,
                 "ui_description_help_url",
-                "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
+                "https://docs.nextcloud.com/server/latest/user_manual/en/talk/guest.html");
 
             var lines = new List<string>
             {
@@ -266,7 +270,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 string helpUrl = Strings.GetInLanguage(
                     normalizedLanguage,
                     "ui_description_help_url",
-                    "https://docs.nextcloud.com/server/latest/user_manual/en/talk/join_a_call_or_chat_as_guest.html");
+                    "https://docs.nextcloud.com/server/latest/user_manual/en/talk/guest.html");
 
                 var html = new StringBuilder();
                 html.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">");
@@ -325,13 +329,31 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 string rawLine = lines[i] ?? string.Empty;
                 string normalized = NormalizeTalkBlockLine(rawLine);
-                if (rawLine.IndexOf(TalkHelpUrlMarker, StringComparison.OrdinalIgnoreCase) >= 0
-                    || normalized.IndexOf(TalkHelpUrlMarker, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (ContainsTalkHelpUrlMarker(rawLine)
+                    || ContainsTalkHelpUrlMarker(normalized))
                 {
                     return i;
                 }
             }
             return -1;
+        }
+
+        private static bool ContainsTalkHelpUrlMarker(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < TalkHelpUrlMarkers.Length; i++)
+            {
+                if (value.IndexOf(TalkHelpUrlMarkers[i], StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string RenderTalkInvitationTemplate(string template, string meetingUrl, string password)
