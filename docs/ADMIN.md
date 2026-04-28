@@ -7,7 +7,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 - [Updates / upgrade behavior](#updates--upgrade-behavior)
 - [Files & registry](#files--registry)
 - [Settings (profile XML)](#settings-profile-xml)
-- [Compose sharing lifecycle (3.0.3)](#compose-sharing-lifecycle-303)
+- [Compose sharing lifecycle (3.0.4)](#compose-sharing-lifecycle-304)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
 - [Logging / support](#logging--support)
@@ -20,7 +20,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 Silent install example:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.3.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.0.4.msi" /qn /norestart
 ```
 
 Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).
@@ -133,7 +133,7 @@ If backend policy/template delivery is enabled for Talk appointment descriptions
 - Keep links explicit with full `https://` URLs.
 - NC Connector adds legacy fallbacks automatically during appointment insert (`font color`, `bgcolor`, `align`, `valign`) and hardens anchor color rendering.
 
-## Compose sharing lifecycle (3.0.3)
+## Compose sharing lifecycle (3.0.4)
 
 ### Attachment automation and cleanup contract
 - In compose attachment mode, created server artifacts are tracked immediately after share creation.

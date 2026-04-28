@@ -20,23 +20,15 @@ Das Add-in integriert:
 - **Nextcloud Filelink** im E-Mail-Composer (Wizard, Upload, HTML-Block)
 - **IFB (Internet Free/Busy)** als lokaler HTTP-Proxy zu Nextcloud
 
-## Release 3.0.3 Delta-Ueberblick
+## Release 3.0.4 Delta-Ueberblick
 
-In 3.0.3 gelten die paritaetskritischen Verhaltensregeln weiterhin und muessen bei Folgeaenderungen stabil bleiben:
+Diese Release-Linie fuehrt eine funktionale Laufzeiterweiterung ein und fokussiert sich ansonsten auf Konsolidierung plus einige gezielte Fixes:
 
-- Compose-Anhangsautomatisierung mit deterministischen Modi (`always` vs. Schwellwert-Prompt).
-- Compose-Anhangsautomatisierung prueft zusaetzlich pre-add (`BeforeAttachmentAdd`) und kann Host-Adds best effort vor der normalen Outlook-Post-Add-Verarbeitung abbrechen, wenn ein lokaler Pfad aufloesbar ist.
-- Schwellwert-Prompt strikt mit zwei Aktionen (`Share with NC Connector` / `Remove last selected attachments`) und Batch-Entfernungssemantik.
-- Spezialisierter Attachment-Share-Output (`email_attachment`-Namensvertrag, read-only Empfaengerrechte, ZIP-Link `/s/<token>/download`, keine Permissions-Zeile).
-- Compose-Share-Cleanup mit Lifecycle-Vertrag (armed nach Share-Erstellung, cleared nur nach bestaetigtem Versand, delayed delete bei unsent-close-Race).
-- Separater Passwort-Follow-up-Versand nur post-send inklusive Auto-Send und manuellem Fallback-Entwurf.
-- Talk-Defaults und Talk-Wizard mit zentralem Systemadressbuch-Verfuegbarkeitsvertrag und deterministischem Lock-Zustand.
-- Public-Link-Share-Erstellung folgt dem dokumentierten Nextcloud-OCS-Vertrag: `label` beim Create, veränderliche Metadaten wie `note` danach über den OCS-Update-Endpunkt.
-- Runtime-Settings und Caches unter `%LOCALAPPDATA%\\NC4OL` mit profilbasierter XML-Migration.
-- TLS-Transporteinstellungen sind in `SettingsForm` runtime-live schaltbar (`OS-Default` / `TLS 1.2` / `TLS 1.3` / kombiniert) und werden beim Anwenden bewusst validiert.
-- Nicht unterstuetzte manuelle `TLS 1.3`-Anwendung faellt nicht mehr still auf TLS 1.2 zurueck, sondern bricht explizit mit Fehler ab.
-- Verbindungspruefung und Login-Flow erzwingen frische HTTP/TLS-Handshakes (kein Keep-Alive-Reuse), damit TLS-Moduswechsel deterministisch getestet werden.
-- Die TLS-Fehlerhilfe in der Verbindungsdiagnose ist modusneutral und behauptet nicht mehr pauschal `OS-Default`.
+- Der lokale IFB-Listener-Port ist jetzt in Settings und Runtime konfigurierbar; Diagnosen und manuelle Admin-Pruefungen muessen daher den tatsaechlich gesetzten Port verwenden statt pauschal `7777`.
+- Runtime-API-Logging sowie JSON-/Request-Serialisierung laufen jetzt ueber gemeinsame Helper; neuer HTTP-/OCS-Code soll diese zentralen Pfade nutzen statt ad-hoc Payload- oder Request-Handling einzufuehren.
+- Das Talk-Termin-Handling fuehrt keinen toten HTML-Read-Fallback mehr mit; der aktive Render-/Update-Pfad soll eindeutig und explizit bleiben.
+- Das Password-Notification-Cleanup bleibt an UI-Context-Marshaling gebunden; Folgeaenderungen sollen dieses captured-context-Dispose-Verhalten erhalten.
+- Talk-/Sharing-Wording wurde ueber alle unterstuetzten Locales aktualisiert, und Talk-Hilfe-URL sowie Block-Marker-Handling wurden gestrafft.
 
 ## Voraussetzungen
 
@@ -188,7 +180,7 @@ Utilities:
 - `src/NcTalkOutlookAddIn/Utilities/DeferredAppointmentEnsureState.cs` (gekapselter Laufzeitzustand fuer Pending-Keys und Restriction-Log-Throttling)
 - `src/NcTalkOutlookAddIn/Utilities/PictureConverter.cs` (gemeinsamer Image->IPictureDisp-Helfer fuer Ribbon-Icons)
 
-Compose-Filelink-Paritaet (3.0.3):
+Compose-Filelink-Paritaet (3.0.4):
 
 - `MailComposeSubscription` in `NextcloudTalkAddIn.cs` steuert den Compose-Lifecycle fuer:
   - debouncte Anhangsauswertung (`ComposeAttachmentEvalDebounceMs`)

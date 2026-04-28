@@ -8,7 +8,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 - [Updates / Upgrade-Verhalten](#updates--upgrade-verhalten)
 - [Dateien & Registry](#dateien--registry)
 - [Einstellungen (Profil-XML)](#einstellungen-profil-xml)
-- [Compose-Freigabe-Lifecycle (3.0.3)](#compose-freigabe-lifecycle-303)
+- [Compose-Freigabe-Lifecycle (3.0.4)](#compose-freigabe-lifecycle-304)
 - [Talk-Termin-Templates (HTML) — Outlook-sicheres Subset](#talk-termin-templates-html--outlook-sicheres-subset)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [Systemadressbuch erforderlich fuer Benutzersuche und Moderator-Auswahl](#systemadressbuch-erforderlich-fuer-benutzersuche-und-moderator-auswahl)
@@ -23,7 +23,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 Beispiel (silent):
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.0.3.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-3.0.4.msi" /qn /norestart
 ```
 
 Danach Outlook starten. Im Ribbon erscheint der Tab **NC Connector** (Kalender/Termin + E-Mail).
@@ -117,7 +117,7 @@ Empfehlung:
 - Nur Base-URL und Defaults pre-seeden.
 - Credentials entweder ueber Login Flow v2 oder per Benutzer setzen lassen (empfohlen fuer DPAPI-Kompatibilitaet).
 
-## Compose-Freigabe-Lifecycle (3.0.3)
+## Compose-Freigabe-Lifecycle (3.0.4)
 
 ### Attachment-Automatisierung und Cleanup-Vertrag
 - Im Compose-Attachment-Modus werden serverseitige Artefakte direkt nach Share-Erstellung fuer Cleanup-Tracking registriert.

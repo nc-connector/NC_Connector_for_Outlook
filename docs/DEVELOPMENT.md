@@ -25,32 +25,15 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 - **Nextcloud sharing** from the mail compose window (upload + link share + HTML block insertion)
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
-## Release 3.0.3 delta summary
+## Release 3.0.4 delta summary
 
-This release added parity-critical behavior that developers should preserve in future changes:
+This release adds one functional runtime feature and otherwise focuses on consolidation plus a few targeted fixes:
 
-- Compose attachment automation now has deterministic two-mode handling (`always` vs. threshold prompt).
-- Compose attachment automation now also evaluates pre-add (`BeforeAttachmentAdd`) and can best-effort cancel host add before Outlook post-add handling when a local path is resolvable.
-- Compose threshold prompt is a strict two-action decision (`Share with NC Connector` / `Remove last selected attachments`) with batch removal semantics.
-- Attachment-mode share output is specialized (`email_attachment` naming contract, read-only recipients, ZIP download link `/s/<token>/download`, no permissions row).
-- Compose share cleanup is lifecycle-driven (armed after share creation, cleared only after confirmed send, delayed delete on unsent close race).
-- Separate password follow-up dispatch is post-send only and includes automatic send plus manual fallback draft behavior.
-- Talk defaults and Talk wizard use a centralized system-addressbook availability contract and deterministic lock state.
-- Optional NC Connector backend policy mode is evaluated on wizard/settings entrypoints and can override/lock Talk + Sharing defaults, including central text/template payloads.
-- Backend custom templates are only activated when the effective language override is `custom`; otherwise runtime stays on local UI-default text blocks.
-- The `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for the respective domain is actually `custom` and provides a template.
-- Separate password follow-up dispatch is seat-gated and only available with backend endpoint + active assigned seat.
-- Backend attachment-threshold policy uses `attachments_min_size_mb` as both value and enable-state: a positive integer enables threshold mode, `null` disables it.
-- Locked backend attachment-automation policy is also enforced in compose runtime through the live backend status, not only in Settings UI.
-- If the backend is unreachable, the runtime falls back to local add-in settings immediately.
-- If the backend is reachable but the license/seat state is no longer usable or the backend grace window has expired, the runtime also falls back to local add-in settings.
-- Talk event-description templates may arrive as `html` or `plain_text`; when `html` is active, Outlook writes the Talk block into the open appointment editor HTML with stable markers so the rendered event description stays HTML while `Body` continues to provide the synchronized plain-text view.
-- Share creation now follows the documented Nextcloud OCS contract more closely: create via `POST /shares` with `label`, then update mutable metadata like `note` via form-encoded `PUT /shares/{id}` arguments.
-- Runtime settings and caches use `%LOCALAPPDATA%\\NC4OL` with profile-scoped XML settings migration.
-- Transport security settings are runtime-live in `SettingsForm` (`OS default` / `TLS 1.2` / `TLS 1.3` / combined) and are intentionally validated on apply.
-- Unsupported manual `TLS 1.3` runtime apply now fails closed (no implicit downgrade to TLS 1.2).
-- Settings connectivity operations (connection test, login flow) enforce fresh HTTP/TLS handshakes (no pooled keep-alive reuse), so TLS mode toggles are tested deterministically.
-- TLS transport diagnostics guidance text is mode-neutral and no longer assumes OS-default mode.
+- The local IFB listener port is now configurable in settings and runtime, so diagnostics and manual admin checks must use the effective configured port instead of assuming `7777`.
+- Runtime API logging and JSON/request serialization now run through shared helpers; new HTTP/OCS code should stay on those centralized paths instead of adding ad-hoc request or payload handling.
+- Talk appointment handling no longer keeps the dead HTML read fallback path; the active render/update path should remain single-source and explicit.
+- Password notification cleanup continues to require UI-context marshaling; follow-up changes should preserve that captured-context disposal behavior.
+- Talk/Sharing wording was refreshed across all supported locales, and the Talk help URL / block-marker handling was tightened.
 
 ## Quick start
 

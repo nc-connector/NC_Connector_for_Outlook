@@ -4,6 +4,21 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.0.4] - 2026-04-28
+
+### Added
+- Configurable local IFB listener port in settings and runtime.
+
+### Changed
+- Runtime API logging and JSON serialization helpers were centralized.
+- Cleanup and guard-related consolidation was streamlined across the active runtime paths.
+- Talk and Sharing wording was updated across all supported locales.
+
+### Fixed
+- Removed the dead Talk appointment HTML read fallback path.
+- Password notification icon cleanup is now marshaled onto the captured UI context.
+- Talk help URL and block-marker detection were hardened.
+
 ## [3.0.3] - 2026-04-17
 
 ### Added

@@ -19,6 +19,6 @@ using System.Runtime.InteropServices;
 // The following GUID is used as the ID of the type library when this project is made COM-visible.
 [assembly: Guid("f7812432-4b4f-45a6-8f16-22a3d28b1fe4")]
 
-[assembly: AssemblyVersion("3.0.3.0")]
-[assembly: AssemblyFileVersion("3.0.3.0")]
+[assembly: AssemblyVersion("3.0.4.0")]
+[assembly: AssemblyFileVersion("3.0.4.0")]
 
