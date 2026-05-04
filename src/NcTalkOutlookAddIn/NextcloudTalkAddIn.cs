@@ -57,17 +57,6 @@ namespace NcTalkOutlookAddIn
         private const int ComposeAttachmentEvalDebounceMs = 250;
         private const int ComposeShareCleanupSendGraceMs = 15000;
 
-        internal const string PropertyToken = "NcTalkRoomToken";
-        internal const string PropertyRoomType = "NcTalkRoomType";
-        internal const string PropertyLobby = "NcTalkLobbyEnabled";
-        internal const string PropertySearchVisible = "NcTalkSearchVisible";
-        internal const string PropertyPasswordSet = "NcTalkPasswordSet";
-        internal const string PropertyStartEpoch = "NcTalkStartEpoch";
-        internal const string PropertyDataVersion = "NcTalkDataVersion";
-        internal const string PropertyAddUsers = "NcTalkAddUsers";
-        internal const string PropertyAddGuests = "NcTalkAddGuests";
-        internal const string PropertyDelegateId = "NcTalkDelegateId";
-        internal const string PropertyDelegated = "NcTalkDelegated";
         internal const string IcalToken = "X-NCTALK-TOKEN";
         internal const string IcalUrl = "X-NCTALK-URL";
         internal const string IcalLobby = "X-NCTALK-LOBBY";
@@ -76,12 +65,10 @@ namespace NcTalkOutlookAddIn
         internal const string IcalObjectId = "X-NCTALK-OBJECTID";
         internal const string IcalAddUsers = "X-NCTALK-ADD-USERS";
         internal const string IcalAddGuests = "X-NCTALK-ADD-GUESTS";
-        internal const string IcalAddParticipants = "X-NCTALK-ADD-PARTICIPANTS";
         internal const string IcalDelegate = "X-NCTALK-DELEGATE";
         internal const string IcalDelegateName = "X-NCTALK-DELEGATE-NAME";
         internal const string IcalDelegated = "X-NCTALK-DELEGATED";
         internal const string IcalDelegateReady = "X-NCTALK-DELEGATE-READY";
-        internal const int PropertyVersionValue = 1;
 
         public NextcloudTalkAddIn()
         {
@@ -502,11 +489,6 @@ namespace NcTalkOutlookAddIn
             _talkAppointmentController.ApplyRoomToAppointment(appointment, request, result);
         }
 
-        private bool TryStampIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
-        {
-            return _talkAppointmentController.TryStampIcalStartEpoch(appointment, roomToken, out startEpoch);
-        }
-
         private bool TryReadRequiredIcalStartEpoch(Outlook.AppointmentItem appointment, string roomToken, out long startEpoch)
         {
             return _talkAppointmentController.TryReadRequiredIcalStartEpoch(appointment, roomToken, out startEpoch);
@@ -569,11 +551,6 @@ namespace NcTalkOutlookAddIn
                 return roomToken.Trim();
             }
 
-            string legacyRoomToken = TalkAppointmentController.GetUserPropertyText(appointment, PropertyToken);
-            if (!string.IsNullOrWhiteSpace(legacyRoomToken))
-            {
-                LogTalk("Stored legacy Talk token ignored because X-NCTALK-TOKEN is missing.");
-            }
             return null;
         }
 
@@ -658,20 +635,30 @@ namespace NcTalkOutlookAddIn
         }
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, TalkRoomCreationResult result)
-        {            if (result == null)
+        {
+            if (result == null)
             {
                 return;
             }
 
-            RegisterSubscription(appointment, result.RoomToken, result.LobbyEnabled, result.CreatedAsEventConversation);
+            RegisterSubscription(appointment, result.RoomToken, result.RoomUrl, result.LobbyEnabled, result.CreatedAsEventConversation);
         }
 
         internal void RegisterSubscription(Outlook.AppointmentItem appointment, string roomToken, bool lobbyEnabled, bool isEventConversation)
-        {            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
+        {
+            string roomUrl = TalkAppointmentController.GetUserPropertyText(appointment, IcalUrl);
+            RegisterSubscription(appointment, roomToken, roomUrl, lobbyEnabled, isEventConversation);
+        }
+
+        internal void RegisterSubscription(Outlook.AppointmentItem appointment, string roomToken, string roomUrl, bool lobbyEnabled, bool isEventConversation)
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(roomToken))
             {
                 return;
             }
-            LogTalk("Registering appointment subscription (token=" + roomToken + ", lobby=" + lobbyEnabled + ", event=" + isEventConversation + ").");
+            string normalizedRoomToken = roomToken.Trim();
+            string normalizedRoomUrl = !string.IsNullOrWhiteSpace(roomUrl) ? roomUrl.Trim() : string.Empty;
+            LogTalk("Registering appointment subscription (token=" + normalizedRoomToken + ", lobby=" + lobbyEnabled + ", event=" + isEventConversation + ", urlSet=" + !string.IsNullOrWhiteSpace(normalizedRoomUrl) + ").");
 
             string entryId = GetEntryId(appointment);
             if (!string.IsNullOrEmpty(entryId))
@@ -689,7 +676,7 @@ namespace NcTalkOutlookAddIn
             }
 
             AppointmentSubscription existingByToken;
-            if (_subscriptionByToken.TryGetValue(roomToken, out existingByToken))
+            if (_subscriptionByToken.TryGetValue(normalizedRoomToken, out existingByToken))
             {
                 if (existingByToken.IsFor(appointment))
                 {
@@ -699,9 +686,9 @@ namespace NcTalkOutlookAddIn
                 existingByToken.Dispose();
             }
             var key = Guid.NewGuid().ToString("N");
-            var subscription = new AppointmentSubscription(this, appointment, key, roomToken, lobbyEnabled, isEventConversation, entryId);
+            var subscription = new AppointmentSubscription(this, appointment, key, normalizedRoomToken, normalizedRoomUrl, lobbyEnabled, isEventConversation, entryId);
             _activeSubscriptions[key] = subscription;
-            _subscriptionByToken[roomToken] = subscription;
+            _subscriptionByToken[normalizedRoomToken] = subscription;
 
             if (!string.IsNullOrEmpty(entryId))
             {
@@ -843,7 +830,5 @@ namespace NcTalkOutlookAddIn
 
     }
 }
-
-
 
 

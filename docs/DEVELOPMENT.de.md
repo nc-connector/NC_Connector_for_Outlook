@@ -22,13 +22,12 @@ Das Add-in integriert:
 
 ## Release 3.0.4 Delta-Ueberblick
 
-Diese Release-Linie fuehrt eine funktionale Laufzeiterweiterung ein und fokussiert sich ansonsten auf Konsolidierung plus einige gezielte Fixes:
+Diese Release-Linie ist ein gezieltes Sicherheitsupdate fuer den Talk-Termin-Cleanup:
 
-- Der lokale IFB-Listener-Port ist jetzt in Settings und Runtime konfigurierbar; Diagnosen und manuelle Admin-Pruefungen muessen daher den tatsaechlich gesetzten Port verwenden statt pauschal `7777`.
-- Runtime-API-Logging sowie JSON-/Request-Serialisierung laufen jetzt ueber gemeinsame Helper; neuer HTTP-/OCS-Code soll diese zentralen Pfade nutzen statt ad-hoc Payload- oder Request-Handling einzufuehren.
-- Das Talk-Termin-Handling fuehrt keinen toten HTML-Read-Fallback mehr mit; der aktive Render-/Update-Pfad soll eindeutig und explizit bleiben.
-- Das Password-Notification-Cleanup bleibt an UI-Context-Marshaling gebunden; Folgeaenderungen sollen dieses captured-context-Dispose-Verhalten erhalten.
-- Talk-/Sharing-Wording wurde ueber alle unterstuetzten Locales aktualisiert, und Talk-Hilfe-URL sowie Block-Marker-Handling wurden gestrafft.
+- Das Loeschen gespeicherter Termine entfernt entfernte Talk-Raeume nur noch, wenn `TalkDeleteRoomOnEventDelete` oder die gesperrte Backend-Policy `talk_delete_room_on_event_delete` es explizit aktiviert.
+- Die Runtime-Subscription-Erkennung benoetigt `X-NCTALK-TOKEN`; generische Talk-URLs in `Location` oder URL-Feldern werden nicht als Loeschquelle verwendet.
+- Der Cleanup fuer neu erzeugte Termine, die vor dem Speichern verworfen werden, bleibt aktiv und ist vom Opt-in fuer gespeicherte Termine getrennt.
+- Talk-Metadaten werden lokal in Outlook als `X-NCTALK-*` UserProperties/MAPI-Felder persistiert. Serverseitige Kalender-`.ics`-Objekte werden nicht gepatcht.
 
 ## Voraussetzungen
 
@@ -194,6 +193,7 @@ Compose-Filelink-Paritaet (3.0.4):
   - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand.
 - `ComposeShareLifecycleController` kapselt die eigentliche Share-Cleanup-/Passwort-Dispatch-Logik; `MailComposeSubscription` haelt nur Queue- und Eventzustand.
 - `TalkAppointmentController` kapselt Appointment-Schreib-/Sync-Pfade; `NextcloudTalkAddIn` delegiert diese Aufrufe statt die komplette Fachlogik im Root zu halten.
+- Nach Appointment-Write werden die lokalen Outlook-`X-NCTALK-*`-Metadaten aktualisiert; serverseitige CalDAV-VEVENTs werden dafuer nicht gepatcht.
 - Gespeicherte Talk-Termine loeschen den entfernten Raum nur mit Opt-in (`TalkDeleteRoomOnEventDelete` bzw. Backend-Policy `talk_delete_room_on_event_delete`) und vorhandenen `X-NCTALK-TOKEN`-Metadaten; generische Talk-URLs in `Location`/URL-Feldern werden nicht als Loeschquelle ausgewertet.
 - Der Cleanup fuer verworfene, noch nicht gespeicherte neue Termine bleibt davon getrennt aktiv.
 - Ribbon-getriggerte Flows werden im Controller-Slice gehalten (`SettingsWorkflowController`, `FileLinkLaunchController`, `TalkRibbonController`); `NextcloudTalkAddIn.cs` bleibt schlanke Delegate-/Composition-Root-Schicht.
@@ -255,5 +255,4 @@ Wichtig für Updates:
 4) MSI installieren/upgrade testen (alte Version → neue Version)
 5) Talk + Filelink + IFB Smoke-Test
 6) MSI ggf. signieren (falls in der Umgebung erforderlich)
-
 

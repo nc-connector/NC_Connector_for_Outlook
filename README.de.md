@@ -11,17 +11,17 @@ Dies ist ein Community-Projekt und kein offizielles Produkt der Nextcloud GmbH.
 
 ## Highlights
 
-- **Ein Klick zu Nextcloud Talk** 
+- **Ein Klick zu Nextcloud Talk**
 Termin öffnen, Nextcloud Talk wählen, Raum konfigurieren, Moderator definieren. Optional können eingeladene Teilnehmer direkt in den Raum übernommen werden (getrennt nach internen Nextcloud-Benutzern und externen E-Mail-Gästen). Der Wizard schreibt Titel/Ort/Beschreibung inklusive Hilfe-Link automatisch in den Termin.
-- **Sharing deluxe** 
+- **Sharing deluxe**
 Compose-Button Nextcloud Freigabe hinzufügen startet den Freigabe-Assistenten mit Upload-Queue, Passwortgenerator, Ablaufdatum, Notizfeld, Anhangs-Automatisierung und optionalem separatem Passwort-Follow-up. Die fertige Freigabe landet als formatiertes HTML direkt in der E-Mail.
-- **Enterprise-Sicherheit** 
+- **Enterprise-Sicherheit**
 Lobby bis Startzeit, Moderator-Delegation, automatisches Aufräumen nicht gespeicherter Termine, Pflicht-Passwörter und Ablauffristen schützen sensible Meetings und Dateien.
 - **Zentrale Backend-Policies (optional)**
 Ist das optionale NC-Connector-Backend installiert, koennen Talk- und Sharing-Defaults zentral gesteuert werden. Beim Oeffnen von Wizard und Settings prueft das Add-in den Backend-Status, uebernimmt bei gueltigem Seat die Policy-Werte und sperrt admin-kontrollierte Optionen sichtbar im UI.
-- **Internet Free/Busy Gateway (IFB)**  
+- **Internet Free/Busy Gateway (IFB)**
 Lokaler HTTP-Listener beantwortet Outlook-Free/Busy-Anfragen direkt aus Nextcloud. Registry-Werte fuer Suchpfad und Read-URL werden gesetzt. Bei HTTP 404 faellt das Add-in auf Scheduling-POST zurueck, sodass Verfuegbarkeiten bereitstehen.
-- **Debug-Logging auf Knopfdruck**  
+- **Debug-Logging auf Knopfdruck**
 Im Debug-Tab aktivierbar. Schreibt strukturierte Logs (Authentifizierung, Termin- und Filelink-Flows, IFB) nach `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. Laufzeit-Exceptions werden dort auch dann geschrieben, wenn der Debug-Schalter aus ist. Der Speicherort wird im UI angezeigt. Mit `Logs anonymisieren` (standardmaessig aktiv) werden NC-URL, Token/Secrets, E-Mails und lokale Benutzerpfadsegmente maskiert.
 
 ## Changelog
@@ -38,6 +38,7 @@ Gebuendelte Drittanbieter-Abhaengigkeiten (Sanitizer/Laufzeit) und deren Lizenze
 - Talk-Popup mit Lobby, Passwort, Listbarkeit, Raumtyp und Moderatorensuche.
 - Automatische Einträge von Titel, Ort, Beschreibung (inkl. Hilfe-Link und Passwort) in das Terminfenster.
 - Room-Tracking, Lobby-Updates, Delegations-Workflow und Cleanup, falls der Termin verworfen oder verschoben wird.
+- Das Loeschen gespeicherter Termine entfernt den entfernten Talk-Raum nur nach explizitem Opt-in und NC-Connector-Metadatenpruefung.
 - Kalender-Aenderungen (Drag-and-drop oder Dialog-Edit) halten Lobby/Startzeit des Talk-Raums synchron.
 - Wenn Sie einen Termin mit Moderator-Delegation speichern, aktualisiert NC Connector zuerst Raumname, Lobbyzeit, Beschreibung und Teilnehmer und uebergibt danach die Moderation.
 - Live-Verfuegbarkeitschecks fuer das Systemadressbuch (bei Talk-Klick, Settings Open/Save und Wizard-Open) mit deterministischem Lock-Verhalten:
@@ -100,17 +101,17 @@ Option `Benutzerdefiniert` wird nur angezeigt, wenn der NC-Connector-Backend-End
 
 ## Systemanforderungen
 
-- Windows 10 oder Windows 11 (64 Bit)  
-- Microsoft Outlook classic >=2019  
-- .NET Framework 4.7.2 Runtime  
+- Windows 10 oder Windows 11 (64 Bit)
+- Microsoft Outlook classic >=2019
+- .NET Framework 4.7.2 Runtime
 - Nextcloud Server mit Talk- und Filesharing-App
 
 ## Installation und Updates
 
-1. Outlook schliessen.  
-2. Aktuelle MSI (z.B. `NCConnectorForOutlook-3.0.4.msi`) ausfuehren und den UAC-Prompt bestaetigen (Administratorrechte sind erforderlich). Das Setup richtet URLACL sowie alle benoetigten Registry-Schluessel fuer IFB ein.  
-3. Outlook starten und im Ribbon **NC Connector** auf **Einstellungen** klicken.  
-4. Login-Modus waehlen, Verbindungstest ausfuehren, Einstellungen speichern. Bei erfolgreichem Test bleibt IFB automatisch aktiv.  
+1. Outlook schliessen.
+2. Aktuelle MSI (z.B. `NCConnectorForOutlook-3.0.4.msi`) ausfuehren und den UAC-Prompt bestaetigen (Administratorrechte sind erforderlich). Das Setup richtet URLACL sowie alle benoetigten Registry-Schluessel fuer IFB ein.
+3. Outlook starten und im Ribbon **NC Connector** auf **Einstellungen** klicken.
+4. Login-Modus waehlen, Verbindungstest ausfuehren, Einstellungen speichern. Bei erfolgreichem Test bleibt IFB automatisch aktiv.
 5. Filelink-Basisverzeichnis pruefen und Debug-Logging bei Bedarf aktivieren.
 6. Optional: unter `Einstellungen -> IFB` einen eigenen lokalen IFB-Port setzen (Standard `7777`).
 
@@ -125,17 +126,18 @@ Updates erfolgen durch Installation eines MSI-Pakets ueber die bestehende Instal
 - Der lokale IFB-Listener-Port ist jetzt unter `Einstellungen -> IFB` konfigurierbar; Diagnosen und manuelle URLACL-Pruefungen muessen daher den tatsaechlich gesetzten Port verwenden und nicht pauschal `7777` annehmen.
 - Legacy-INI-Settings aus aelteren Builds werden beim ersten Start migriert und nach erfolgreicher Migration entfernt.
 - Der TLS-Modus kann live in den Einstellungen umgeschaltet werden (`OS-Default`, `TLS 1.2`, `TLS 1.3` oder `TLS 1.2 + 1.3`) und wird sofort auf Runtime-Netzwerkaufrufe angewendet.
-- Verbindungspruefung und Login-Flow erzwingen in 3.0.4 jeweils einen frischen HTTP/TLS-Handshake, damit TLS-Tests nicht durch Keep-Alive-Verbindungs-Reuse verfälscht werden.
+- Verbindungspruefung und Login-Flow erzwingen jeweils einen frischen HTTP/TLS-Handshake, damit TLS-Tests nicht durch Keep-Alive-Verbindungs-Reuse verfälscht werden.
 - Im Compose-Attachment-Modus wird das serverseitige Cleanup direkt nach Share-Erstellung armed und nur nach bestaetigtem erfolgreichem Mailversand wieder cleared.
 - Wenn separates Passwort-Senden aktiv ist, blendet die Hauptmail das Inline-Passwort aus und der Passwort-Follow-up-Versand wird erst nach bestaetigtem erfolgreichem Hauptversand gestartet. Dieses Feature ist nur mit Backend-Endpunkt + aktiv zugewiesenem Seat verfuegbar.
+- Das Loeschen gespeicherter Talk-Termine ist Opt-in: generische Talk-URLs in Termin-Feldern werden ignoriert, der Cleanup verworfener ungespeicherter Termine bleibt aktiv.
 
 ## Troubleshooting
 
-- **Debug-Log**: Tab *Debug* für ausführliche Traces aktivieren. Log-Dateiformat: `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. Bei aktiviertem Debug-Logging sind auch Attachment-Pre-Add-Entscheidungen/Fallback-Gruende enthalten. Laufzeit-Exceptions werden dort auch bei deaktiviertem Debug-Logging geschrieben. Der Schalter `Logs anonymisieren` ist standardmaessig aktiv.  
-- **Add-in nicht sichtbar**: Installation muss mit Adminrechten erfolgen. Pruefe `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` und ggf. Repair in einer Admin-Konsole: `msiexec /i "NCConnectorForOutlook-3.0.4.msi" ADDLOCAL=ALL`.  
-- **IFB testen**: mit dem in `Einstellungen -> IFB` konfigurierten Port (Standard `7777`): `powershell -Command "Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. Bei Abweichungen Registry unter `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar` pruefen.  
-- **TLS/Proxy pruefen**: `powershell -Command "Test-NetConnection <Ihre-Domain> -Port 443"`. Bei SSL-Warnungen Zertifikate/Proxy kontrollieren. Der TLS-Modus kann zur Laufzeit unter `Einstellungen -> Erweitert -> Transportsicherheit (TLS)` umgeschaltet werden (`OS-Default` oder erzwungene TLS-Versionen wie 1.2/1.3). Verbindungspruefung und Login-Flow verwenden in 3.0.4 frische Handshakes, damit Moduswechsel direkt wirksam getestet werden. Wenn Secure-Channel-Fehler trotzdem auftreten, pruefen Sie Zertifikatsvertrauen, TLS-pruefende Proxys, DNS und die TLS-/Schannel-Richtlinien des Systems, bevor maschinenweite Registry-/GPO-Overrides erwogen werden.  
-- **Anhangsautomatisierung greift nicht bei grossen Dateien**: In Microsoft-365-/Exchange-Umgebungen kann Outlook Anhaenge vor den Add-in-Events blockieren (z. B. bei serverseitigen Groessenlimits). In diesen Faellen den Button **`Nextcloud Freigabe hinzufuegen`** verwenden.  
+- **Debug-Log**: Tab *Debug* für ausführliche Traces aktivieren. Log-Dateiformat: `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. Bei aktiviertem Debug-Logging sind auch Attachment-Pre-Add-Entscheidungen/Fallback-Gruende enthalten. Laufzeit-Exceptions werden dort auch bei deaktiviertem Debug-Logging geschrieben. Der Schalter `Logs anonymisieren` ist standardmaessig aktiv.
+- **Add-in nicht sichtbar**: Installation muss mit Adminrechten erfolgen. Pruefe `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` und ggf. Repair in einer Admin-Konsole: `msiexec /i "NCConnectorForOutlook-3.0.4.msi" ADDLOCAL=ALL`.
+- **IFB testen**: mit dem in `Einstellungen -> IFB` konfigurierten Port (Standard `7777`): `powershell -Command "Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. Bei Abweichungen Registry unter `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar` pruefen.
+- **TLS/Proxy pruefen**: `powershell -Command "Test-NetConnection <Ihre-Domain> -Port 443"`. Bei SSL-Warnungen Zertifikate/Proxy kontrollieren. Der TLS-Modus kann zur Laufzeit unter `Einstellungen -> Erweitert -> Transportsicherheit (TLS)` umgeschaltet werden (`OS-Default` oder erzwungene TLS-Versionen wie 1.2/1.3). Verbindungspruefung und Login-Flow verwenden frische Handshakes, damit Moduswechsel direkt wirksam getestet werden. Wenn Secure-Channel-Fehler trotzdem auftreten, pruefen Sie Zertifikatsvertrauen, TLS-pruefende Proxys, DNS und die TLS-/Schannel-Richtlinien des Systems, bevor maschinenweite Registry-/GPO-Overrides erwogen werden.
+- **Anhangsautomatisierung greift nicht bei grossen Dateien**: In Microsoft-365-/Exchange-Umgebungen kann Outlook Anhaenge vor den Add-in-Events blockieren (z. B. bei serverseitigen Groessenlimits). In diesen Faellen den Button **`Nextcloud Freigabe hinzufuegen`** verwenden.
 - **Filelink-Fehler**: Debug-Log liefert HTTP-Statuscodes und Exception-Meldungen. Pflichtfelder im Wizard sind validiert.
 
 ## Screenshots

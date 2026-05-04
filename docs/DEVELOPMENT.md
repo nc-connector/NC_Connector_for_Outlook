@@ -27,13 +27,12 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 
 ## Release 3.0.4 delta summary
 
-This release adds one functional runtime feature and otherwise focuses on consolidation plus a few targeted fixes:
+This release is a targeted safety update for Talk appointment cleanup:
 
-- The local IFB listener port is now configurable in settings and runtime, so diagnostics and manual admin checks must use the effective configured port instead of assuming `7777`.
-- Runtime API logging and JSON/request serialization now run through shared helpers; new HTTP/OCS code should stay on those centralized paths instead of adding ad-hoc request or payload handling.
-- Talk appointment handling no longer keeps the dead HTML read fallback path; the active render/update path should remain single-source and explicit.
-- Password notification cleanup continues to require UI-context marshaling; follow-up changes should preserve that captured-context disposal behavior.
-- Talk/Sharing wording was refreshed across all supported locales, and the Talk help URL / block-marker handling was tightened.
+- Saved appointment deletion no longer deletes remote Talk rooms unless `TalkDeleteRoomOnEventDelete` or locked backend policy `talk_delete_room_on_event_delete` explicitly enables it.
+- Runtime subscription detection now requires `X-NCTALK-TOKEN`; generic Talk URLs in `Location` or URL fields are not used as a deletion source.
+- Cleanup for newly created appointments that are discarded before saving remains active and separate from the saved-event opt-in.
+- Talk metadata is persisted locally as Outlook `X-NCTALK-*` UserProperties/MAPI fields. The add-in does not patch server-side calendar `.ics` objects.
 
 ## Quick start
 
@@ -380,14 +379,15 @@ Note: there is currently no automated test suite in this repository. Use the smo
 
 1. Enable debug logging in Settings.
 2. Calendar: create a new appointment, insert a Talk link, save the appointment, then change start time and save again (lobby update).
-3. Calendar: add attendees, save again (participant sync).
-4. Mail: run the sharing wizard, upload 1–2 small files, insert the HTML block, and send to yourself.
-5. IFB: enable IFB, then verify the local endpoint responds:
+3. Calendar: restart Outlook, open the same appointment, change start time and save again (persistent metadata + lobby update).
+4. Calendar: add attendees, save again (participant sync).
+5. Mail: run the sharing wizard, upload 1–2 small files, insert the HTML block, and send to yourself.
+6. IFB: enable IFB, then verify the local endpoint responds:
    - `Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/ -UseBasicParsing`
 
 ## X-NCTALK-* property reference
 
-The add-in persists appointment metadata as Outlook `UserProperties`. A subset of those properties uses `X-NCTALK-*` names to enable interoperability and stable re-sync behavior.
+The add-in persists Talk appointment metadata as Outlook `UserProperties` using `X-NCTALK-*` names only. The old NC Connector-specific Outlook property names are no longer written or read.
 
 Unless stated otherwise:
 
@@ -397,25 +397,25 @@ Unless stated otherwise:
 
 Primary write location:
 
-- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.cs` → `ApplyRoomToAppointment(...)`
+- `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` -> `ApplyRoomToAppointment(...)`
+- local Outlook metadata refresh: `src/NcTalkOutlookAddIn/Controllers/TalkAppointmentController.cs` -> `PersistCoreIcalProperties(...)`
 
 ### Properties
 
 | Property | Purpose | Type / format | Example | Written | Read / used | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | `X-NCTALK-TOKEN` | Talk room token | `string` | `a1b2c3d4` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Required for saved-event room deletion and runtime subscription; generic Talk URLs in `Location`/URL fields are ignored. |
-| `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
+| `X-NCTALK-URL` | Talk room URL | `string` | `https://cloud.example.com/call/a1b2c3d4` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored as local Outlook metadata. |
 | `X-NCTALK-LOBBY` | Lobby enabled flag | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `EnsureSubscriptionForAppointment(...)` | Used to decide whether lobby updates run on save. |
 | `X-NCTALK-START` | Appointment start time (epoch seconds) | `int64` as string | `1739750400` | `ApplyRoomToAppointment(...)`, `AppointmentSubscription.OnWrite(...)` | `TryReadRequiredIcalStartEpoch(...)`, `TryUpdateLobby(...)` | Authoritative lobby timer source on appointment save; updated when lobby is enabled and the start time changes. |
-| `X-NCTALK-EVENT` | Room creation mode marker | `event` \| `standard` | `event` | `ApplyRoomToAppointment(...)` | `GetRoomType(...)` | Fallback exists via `NcTalkRoomType` user property. |
-| `X-NCTALK-OBJECTID` | Time-window identifier | `"<start>#<end>"` | `1739750400#1739754000` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
-| `X-NCTALK-ADD-USERS` | Participant sync: internal users | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Preferred over legacy `X-NCTALK-ADD-PARTICIPANTS`. |
-| `X-NCTALK-ADD-GUESTS` | Participant sync: external emails | `TRUE` / `FALSE` | `FALSE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Preferred over legacy `X-NCTALK-ADD-PARTICIPANTS`. |
-| `X-NCTALK-ADD-PARTICIPANTS` | Participant sync: legacy combined toggle | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Used as fallback when the split toggles are missing (older items). |
-| `X-NCTALK-DELEGATE` | Delegation target user ID | `string` | `alice` | `ApplyRoomToAppointment(...)` | `IsDelegatedToOtherUser(...)`, `IsDelegationPending(...)`, `TryApplyDelegation(...)` | Stored in parallel to the `NcTalkDelegateId` user property for backward compatibility. |
-| `X-NCTALK-DELEGATE-NAME` | Delegation target display name | `string` | `Alice Example` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored for interoperability. |
+| `X-NCTALK-EVENT` | Room creation mode marker | `event` \| `standard` | `event` | `ApplyRoomToAppointment(...)` | `GetRoomType(...)` | No legacy Outlook property fallback. |
+| `X-NCTALK-OBJECTID` | Time-window identifier | `"<start>#<end>"` | `1739750400#1739754000` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored as local Outlook metadata. |
+| `X-NCTALK-ADD-USERS` | Participant sync: internal users | `TRUE` / `FALSE` | `TRUE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Split participant sync flag for Nextcloud users. |
+| `X-NCTALK-ADD-GUESTS` | Participant sync: external emails | `TRUE` / `FALSE` | `FALSE` | `ApplyRoomToAppointment(...)` | `TrySyncRoomParticipants(...)` | Split participant sync flag for guests. |
+| `X-NCTALK-DELEGATE` | Delegation target user ID | `string` | `alice` | `ApplyRoomToAppointment(...)` | `IsDelegatedToOtherUser(...)`, `IsDelegationPending(...)`, `TryApplyDelegation(...)` | No legacy Outlook property fallback. |
+| `X-NCTALK-DELEGATE-NAME` | Delegation target display name | `string` | `Alice Example` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Stored as local Outlook metadata. |
 | `X-NCTALK-DELEGATED` | Delegation state marker | `TRUE` / `FALSE` | `FALSE` | `ApplyRoomToAppointment(...)`, `TryApplyDelegation(...)` | `IsDelegatedToOtherUser(...)`, `IsDelegationPending(...)` | Controls whether delegation is still pending. |
-| `X-NCTALK-DELEGATE-READY` | Delegation “ready” marker | `TRUE` | `TRUE` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Reserved for interoperability; the add-in currently uses `X-NCTALK-DELEGATED` + delegate ID to detect pending delegation. |
+| `X-NCTALK-DELEGATE-READY` | Delegation “ready” marker | `TRUE` | `TRUE` | `ApplyRoomToAppointment(...)` | (not read by add-in) | Local marker retained for the Outlook delegation contract; the add-in currently uses `X-NCTALK-DELEGATED` + delegate ID to detect pending delegation. |
 
 ## Extension points
 
@@ -442,6 +442,3 @@ Primary write location:
 1. Add a property to `src/NcTalkOutlookAddIn/Utilities/Strings.cs`.
 2. Add the key to all locale files under `src/NcTalkOutlookAddIn/Resources/_locales/`.
 3. Rebuild and verify the UI.
-
-
-

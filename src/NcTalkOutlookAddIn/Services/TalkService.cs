@@ -89,21 +89,28 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     TryUpdateListable(token, request.SearchVisible, baseUrl);
                 }
-                try
+                if (includeEvent)
                 {
-                    TryUpdateDescription(token, request.Description, includeEvent, baseUrl);
+                    LogTalk("CreateRoom description update skipped for event conversation before request.");
                 }
-                catch (TalkServiceException ex)
+                else
                 {
-                    if (includeEvent && IsEventConversationDescriptionLockError(ex))
+                    try
                     {
-                        // Event conversations may reject direct room description updates with a generic
-                        // "event" BadRequest. Keep the event conversation and continue without room-type fallback.
-                        LogTalk("CreateRoom description update skipped for event conversation: " + ex.Message);
+                        TryUpdateDescription(token, request.Description, includeEvent, baseUrl);
                     }
-                    else
+                    catch (TalkServiceException ex)
                     {
-                        throw;
+                        if (includeEvent && IsEventConversationDescriptionLockError(ex))
+                        {
+                            // Event conversations may reject direct room description updates with a generic
+                            // "event" BadRequest. Keep the event conversation and continue without room-type fallback.
+                            LogTalk("CreateRoom description update skipped for event conversation: " + ex.Message);
+                        }
+                        else
+                        {
+                            throw;
+                        }
                     }
                 }
                 return new TalkRoomCreationResult(token, roomUrl, includeEvent, request.LobbyEnabled, request.SearchVisible);
@@ -144,7 +151,7 @@ namespace NcTalkOutlookAddIn.Services
                         throw;
                     }
 
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "UpdateLobby event binding not supported/recoverable (status=" + (int)ex.StatusCode + ").", ex);
+                    LogTalk("UpdateLobby event binding skipped; endpoint not supported/recoverable (status=" + (int)ex.StatusCode + ").");
                 }
             }
 
@@ -551,113 +558,6 @@ namespace NcTalkOutlookAddIn.Services
             ExecuteJsonRequest("DELETE", url, (string)null, out statusCode, out parsed);
 
             return IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.NotFound;
-        }
-
-                // Reads server-side room traits for cross-client interoperability when local
-        // appointment flags are not available yet (for example TB-created events in Outlook).
-        internal bool TryReadRoomTraits(string token, out bool? lobbyEnabled, out bool? isEventConversation)
-        {
-            lobbyEnabled = null;
-            isEventConversation = null;
-
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                return false;
-            }
-
-            EnsureConfiguration();
-            string normalizedToken = token.Trim();
-            string baseUrl = _configuration.GetNormalizedBaseUrl();
-            bool resolvedAny = false;
-
-            try
-            {
-                HttpStatusCode statusCode;
-                IDictionary<string, object> parsed;
-                ExecuteJsonRequest("GET",
-                                   baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(normalizedToken) + "/object",
-                                   (string)null,
-                                   out statusCode,
-                                   out parsed);
-
-                if (IsSuccessStatus(statusCode))
-                {
-                    isEventConversation = true;
-                    resolvedAny = true;
-                }
-                else if (statusCode == HttpStatusCode.NotFound ||
-                         statusCode == HttpStatusCode.Conflict ||
-                         IsRecoverableEventBindingStatus(statusCode))
-                {
-                    isEventConversation = false;
-                    resolvedAny = true;
-                }
-            }
-            catch (TalkServiceException ex)
-            {
-                if (ex.StatusCode == HttpStatusCode.NotFound ||
-                    ex.StatusCode == HttpStatusCode.Conflict ||
-                    IsRecoverableEventBindingStatus(ex.StatusCode))
-                {
-                    isEventConversation = false;
-                    resolvedAny = true;
-                }
-                else
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe event conversation flag.", ex);
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe event conversation flag.", ex);
-            }
-            try
-            {
-                HttpStatusCode statusCode;
-                IDictionary<string, object> parsed;
-                ExecuteJsonRequest("GET",
-                                   baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(normalizedToken) + "/webinar/lobby",
-                                   (string)null,
-                                   out statusCode,
-                                   out parsed);
-
-                if (IsSuccessStatus(statusCode))
-                {
-                    IDictionary<string, object> data = NcJson.GetDictionary(NcJson.GetDictionary(parsed, "ocs"), "data");
-                    int lobbyState;
-                    if (NcJson.TryGetInt(data, "state", out lobbyState))
-                    {
-                        lobbyEnabled = lobbyState != 0;
-                        resolvedAny = true;
-                    }
-                }
-                else if (statusCode == HttpStatusCode.NotFound ||
-                         statusCode == HttpStatusCode.MethodNotAllowed ||
-                         statusCode == HttpStatusCode.NotImplemented)
-                {
-                    lobbyEnabled = false;
-                    resolvedAny = true;
-                }
-            }
-            catch (TalkServiceException ex)
-            {
-                if (ex.StatusCode == HttpStatusCode.NotFound ||
-                    ex.StatusCode == HttpStatusCode.MethodNotAllowed ||
-                    ex.StatusCode == HttpStatusCode.NotImplemented)
-                {
-                    lobbyEnabled = false;
-                    resolvedAny = true;
-                }
-                else
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe lobby flag.", ex);
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to probe lobby flag.", ex);
-            }
-            return resolvedAny;
         }
 
         private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
