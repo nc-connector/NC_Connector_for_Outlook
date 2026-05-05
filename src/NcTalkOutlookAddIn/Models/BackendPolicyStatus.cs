@@ -27,8 +27,10 @@ namespace NcTalkOutlookAddIn.Models
             string seatState,
             IDictionary<string, object> sharePolicy,
             IDictionary<string, object> talkPolicy,
+            IDictionary<string, object> emailSignaturePolicy,
             IDictionary<string, object> shareEditable,
-            IDictionary<string, object> talkEditable)
+            IDictionary<string, object> talkEditable,
+            IDictionary<string, object> emailSignatureEditable)
         {
             EndpointAvailable = endpointAvailable;
             FetchSucceeded = fetchSucceeded;
@@ -42,8 +44,10 @@ namespace NcTalkOutlookAddIn.Models
             SeatState = seatState ?? string.Empty;
             SharePolicy = sharePolicy;
             TalkPolicy = talkPolicy;
+            EmailSignaturePolicy = emailSignaturePolicy;
             ShareEditable = shareEditable;
             TalkEditable = talkEditable;
+            EmailSignatureEditable = emailSignatureEditable;
         }
 
         internal bool EndpointAvailable { get; private set; }
@@ -70,9 +74,24 @@ namespace NcTalkOutlookAddIn.Models
 
         internal IDictionary<string, object> TalkPolicy { get; private set; }
 
+        internal IDictionary<string, object> EmailSignaturePolicy { get; private set; }
+
         internal IDictionary<string, object> ShareEditable { get; private set; }
 
         internal IDictionary<string, object> TalkEditable { get; private set; }
+
+        internal IDictionary<string, object> EmailSignatureEditable { get; private set; }
+
+        internal bool IsDomainAvailable(string domain)
+        {
+            return GetDomainDictionary(domain, true) != null
+                   && GetDomainDictionary(domain, false) != null;
+        }
+
+        internal bool IsDomainActive(string domain)
+        {
+            return PolicyActive && IsDomainAvailable(domain);
+        }
 
                 // Read one policy value for a domain/key pair.
         internal object GetPolicyValue(string domain, string key)
@@ -114,7 +133,7 @@ namespace NcTalkOutlookAddIn.Models
                 // Return true when a setting is backend-locked (policy_editable == false).
         internal bool IsLocked(string domain, string key)
         {
-            if (!PolicyActive || string.IsNullOrWhiteSpace(key))
+            if (!IsDomainActive(domain) || string.IsNullOrWhiteSpace(key))
             {
                 return false;
             }
@@ -172,12 +191,32 @@ namespace NcTalkOutlookAddIn.Models
 
         private IDictionary<string, object> GetDomainDictionary(string domain, bool readPolicy)
         {
-            string normalized = string.Equals(domain, "talk", StringComparison.OrdinalIgnoreCase) ? "talk" : "share";
+            string normalized;
+            if (string.Equals(domain, "talk", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "talk";
+            }
+            else if (string.Equals(domain, "email_signature", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "email_signature";
+            }
+            else
+            {
+                normalized = "share";
+            }
             if (readPolicy)
             {
-                return normalized == "talk" ? TalkPolicy : SharePolicy;
+                if (normalized == "talk")
+                {
+                    return TalkPolicy;
+                }
+                return normalized == "email_signature" ? EmailSignaturePolicy : SharePolicy;
             }
-            return normalized == "talk" ? TalkEditable : ShareEditable;
+            if (normalized == "talk")
+            {
+                return TalkEditable;
+            }
+            return normalized == "email_signature" ? EmailSignatureEditable : ShareEditable;
         }
 
         internal static bool TryConvertBool(object raw, out bool value)

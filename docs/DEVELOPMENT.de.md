@@ -18,6 +18,7 @@ Das Add-in integriert:
 
 - **Nextcloud Talk** direkt aus dem Termin (Raum erstellen, Lobby, Moderator-Delegation, Teilnehmer-Automation)
 - **Nextcloud Filelink** im E-Mail-Composer (Wizard, Upload, HTML-Block)
+- **Zentrale Backend-E-Mail-Signaturen** fuer passende Outlook-Absenderkonten
 - **IFB (Internet Free/Busy)** als lokaler HTTP-Proxy zu Nextcloud
 
 ## Release 3.0.4 Delta-Ueberblick
@@ -128,6 +129,8 @@ Root:
   Runtime-Subscription-Core fuer Compose-Lifecycle-Zustand (`Dispose`, Identity, gemeinsame Helper).
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.AttachmentFlow.cs`
   Compose-Attachment-Interception/Evaluation/Share-Launch-Flow.
+- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.Signature.cs`
+  Backend-E-Mail-Signatur-Policy fuer das passende Outlook-Absenderkonto.
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.SendCleanup.cs`
   Send/Close-Cleanup-Lifecycle inkl. separatem Passwort-Dispatch.
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.AppointmentSubscription.cs`
@@ -158,6 +161,7 @@ Services:
 - `src/NcTalkOutlookAddIn/Services/PasswordPolicyService.cs` (Nextcloud Password Policy + Fallback)
 - `src/NcTalkOutlookAddIn/Services/NcHttpClient.cs` (zentraler Request-Executor fuer Auth-Header, OCS-Header, Timeout/Decompression und optionalen Fresh-Connection-Mode)
   - Alle Runtime-HTTP-Aufrufe (Talk, Share/DAV, IFB, Login-Flow, Moderator-Avatar-Fetch) laufen zentral ueber `NcHttpClient`.
+- `src/NcTalkOutlookAddIn/Services/EmailSignaturePolicyService.cs` (loest Backend-E-Mail-Signatur-Policy gegen lokale Settings und Lock-State auf)
 
 UI:
 
@@ -178,6 +182,21 @@ Utilities:
 - `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` (zentrale JSON-Normalisierung inkl. `PrepareJsonPayload`, Dictionary-/String-/Int-Helfer und OCS-Fehlerextraktion)
 - `src/NcTalkOutlookAddIn/Utilities/DeferredAppointmentEnsureState.cs` (gekapselter Laufzeitzustand fuer Pending-Keys und Restriction-Log-Throttling)
 - `src/NcTalkOutlookAddIn/Utilities/PictureConverter.cs` (gemeinsamer Image->IPictureDisp-Helfer fuer Ribbon-Icons)
+
+### Zentrale E-Mail-Signatur im Compose-Fenster
+
+Die Compose-Subscription prueft die Backend-Policy fuer die zentrale E-Mail-Signatur nach dem Oeffnen eines Compose-Fensters und wenn Outlook senderbezogene Eigenschaften aendert.
+
+Runtime-Vertrag:
+
+- Backend-Signatur-Einfuegung benoetigt eine aktive Backend-Policy fuer die Domain `email_signature`, einen aktiven zugewiesenen Seat, ein nicht leeres `policy.email_signature.email_signature_template` und `policy.email_signature.user_email`.
+- Fehlende `policy.email_signature`-Unterstuetzung deaktiviert nur zentrale Signaturen und zeigt einen Backend-Update-Hinweis; Freigabe-/Talk-Policy-Domains bleiben unabhaengig.
+- Das aktuelle Outlook-Absenderkonto muss zu `policy.email_signature.user_email` passen; andere Identitaeten bleiben unberuehrt.
+- Die lokalen Einstellungen `EmailSignatureOnCompose`, `EmailSignatureOnReply` und `EmailSignatureOnForward` koennen die Einfuegung fuer den jeweiligen Compose-Typ deaktivieren, solange das Backend den Wert nicht sperrt.
+- Fuer das passende Absenderkonto besitzt eine aktive Compose-Signatur-Policy auch bei Antworten und Weiterleitungen den initialen Signaturplatz: Wenn Reply-/Forward-Einfuegung deaktiviert ist, werden beim Compose-Start erkannte Outlook-native oder Drittanbieter-Signaturen entfernt, aber keine Backend-Signatur eingefuegt.
+- Wenn die Compose-Signatur-Policy inaktiv ist oder der Absender nicht passt, entfernt NC Connector nur den eigenen markierten Signaturblock aus dem aktuellen Compose-Body. Outlook-native oder Drittanbieter-Signaturen werden nicht entfernt.
+- Backend-Signatur-HTML laeuft durch `HtmlTemplateSanitizer` mit derselben fail-closed Policy wie Freigabe- und Talk-Templates.
+- Die verwaltete Signatur wird als markierter HTML-Block geschrieben, damit spaetere Policy-/Sender-Aenderungen gezielt nur NC-Connector-eigene Inhalte aktualisieren oder entfernen.
 
 Compose-Filelink-Paritaet (3.0.4):
 

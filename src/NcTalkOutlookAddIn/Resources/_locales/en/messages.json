@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Sharing"
   },
+  "options_tab_signature": {
+    "message": "Signature"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Email signature"
+  },
+  "options_signature_identity_hint": {
+    "message": "The central signature is only applied when the Outlook sender account matches the Nextcloud user email address."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Add signature when composing"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Add signature when replying"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Add signature when forwarding"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Central signature policy is inactive or incomplete."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Please update the NC Connector backend. This backend version does not support central email signatures yet."
+  },
   "options_tab_talklink": {
     "message": "Talk Link"
   },
@@ -1006,7 +1030,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Local IFB port:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Address book cache (hours):"
   },
   "outlook_debug_file_label": {
@@ -1397,7 +1422,3 @@
     "message": "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator."
   }
 }
-
-
-
-

@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Compartilhamento"
   },
+  "options_tab_signature": {
+    "message": "Assinatura"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Assinatura de e-mail"
+  },
+  "options_signature_identity_hint": {
+    "message": "A assinatura central só é aplicada quando a conta de remetente do Outlook corresponde ao endereço de e-mail do usuário do Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Adicionar assinatura ao escrever"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Adicionar assinatura ao responder"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Adicionar assinatura ao encaminhar"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "A política central de assinatura está inativa ou incompleta."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Atualize o backend do NC Connector. Esta versão do backend ainda não oferece suporte a assinaturas de e-mail centrais."
+  },
   "options_tab_talklink": {
     "message": "Link do Talk"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Porta IFB local:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Cache do catálogo de endereços (horas):"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "Quando a política TLS padrão do sistema operacional estiver desativada, ative pelo menos uma versão TLS (1.2 ou 1.3)."
   }
 }
-
-
-

@@ -18,7 +18,7 @@ Compose-Button Nextcloud Freigabe hinzufügen startet den Freigabe-Assistenten m
 - **Enterprise-Sicherheit**
 Lobby bis Startzeit, Moderator-Delegation, automatisches Aufräumen nicht gespeicherter Termine, Pflicht-Passwörter und Ablauffristen schützen sensible Meetings und Dateien.
 - **Zentrale Backend-Policies (optional)**
-Ist das optionale NC-Connector-Backend installiert, koennen Talk- und Sharing-Defaults zentral gesteuert werden. Beim Oeffnen von Wizard und Settings prueft das Add-in den Backend-Status, uebernimmt bei gueltigem Seat die Policy-Werte und sperrt admin-kontrollierte Optionen sichtbar im UI.
+Ist das optionale NC-Connector-Backend installiert, koennen Talk-, Sharing- und zentrale E-Mail-Signatur-Defaults gesteuert werden. Beim Oeffnen von Wizard und Settings prueft das Add-in den Backend-Status, uebernimmt bei gueltigem Seat die Policy-Werte und sperrt admin-kontrollierte Optionen sichtbar im UI.
 - **Internet Free/Busy Gateway (IFB)**
 Lokaler HTTP-Listener beantwortet Outlook-Free/Busy-Anfragen direkt aus Nextcloud. Registry-Werte fuer Suchpfad und Read-URL werden gesetzt. Bei HTTP 404 faellt das Add-in auf Scheduling-POST zurueck, sodass Verfuegbarkeiten bereitstehen.
 - **Debug-Logging auf Knopfdruck**
@@ -78,6 +78,8 @@ Gebuendelte Drittanbieter-Abhaengigkeiten (Sanitizer/Laufzeit) und deren Lizenze
   - gueltiger aktiver Seat aktiviert Backend-Policy-Werte und Admin-Locks
 - fehlendes Backend / kein Seat / ungueltiger Seat / abgelaufene Grace-Zeit faellt auf lokale Outlook-Settings zurueck
   - ungueltige Seat-Zustaende werden sichtbar im UI angezeigt, damit sich Benutzer an den Administrator wenden koennen
+- zentrale Backend-E-Mail-Signaturen werden nur fuer das Outlook-Absenderkonto eingefuegt, das zur Nextcloud-Benutzer-E-Mail passt; andere Outlook-Signaturen bleiben unberuehrt
+- wenn ein aelteres Backend bereits Freigabe-/Talk-Policy liefert, aber noch keine `policy.email_signature`-Domain kennt, bleiben nur zentrale Signaturen deaktiviert und die Settings zeigen einen Backend-Update-Hinweis
 - Backend-Templates fuer Freigabe- und Talk-Texte werden nur aktiv, wenn in den Sprach-Overrides `Benutzerdefiniert` gewaehlt ist
 - `Benutzerdefiniert` wird nur angezeigt, wenn der NC-Connector-Backend-Endpunkt existiert, und bleibt deaktiviert, solange die effektive Backend-Policy fuer diesen Bereich nicht wirklich `custom` ist oder keine Vorlage liefert
 - ist `Benutzerdefiniert` aktiv, aber die Backend-Vorlage leer oder nicht verfuegbar, faellt Outlook auf den lokalen UI-Default-Text zurueck

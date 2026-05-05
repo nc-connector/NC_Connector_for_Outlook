@@ -466,8 +466,16 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TabDebug { get { return Get("options_tab_debug", "Debug"); } }
         internal static string TabAbout { get { return Get("options_tab_about", "About"); } }
         internal static string TabFileLink { get { return Get("options_tab_sharing", "Sharing"); } }
+        internal static string TabSignature { get { return Get("options_tab_signature", "Signature"); } }
 
         internal static string SettingsTalkDefaultsGroup { get { return Get("options_talk_defaults_heading", "Default settings"); } }
+        internal static string SignatureDefaultsHeading { get { return Get("options_signature_defaults_heading", "Email signature"); } }
+        internal static string SignatureIdentityHint { get { return Get("options_signature_identity_hint", "The central signature is only applied when the Outlook sender account matches the Nextcloud user email address."); } }
+        internal static string SignatureOnComposeLabel { get { return Get("options_signature_on_compose_label", "Add signature when composing"); } }
+        internal static string SignatureOnReplyLabel { get { return Get("options_signature_on_reply_label", "Add signature when replying"); } }
+        internal static string SignatureOnForwardLabel { get { return Get("options_signature_on_forward_label", "Add signature when forwarding"); } }
+        internal static string SignatureBackendInactiveTooltip { get { return Get("options_signature_backend_inactive_tooltip", "Central signature policy is inactive or incomplete."); } }
+        internal static string SignatureBackendUpdateRequiredTooltip { get { return Get("options_signature_backend_update_required_tooltip", "Please update the NC Connector backend. This backend version does not support central email signatures yet."); } }
         internal static string LabelServerUrl { get { return Get("options_base_url_label", "Nextcloud URL"); } }
         internal static string LabelUsername { get { return Get("options_user_label", "Username"); } }
         internal static string LabelAppPassword { get { return Get("options_app_pass_label", "App password"); } }
@@ -930,4 +938,3 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string DialogTitle { get { return Get("extName", "NC Connector for Outlook"); } }
     }
 }
-

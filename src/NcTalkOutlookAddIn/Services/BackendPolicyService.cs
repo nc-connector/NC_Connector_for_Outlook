@@ -70,8 +70,10 @@ namespace NcTalkOutlookAddIn.Services
             IDictionary<string, object> policyEditable = NcJson.GetDictionary(normalized, "policy_editable");
             IDictionary<string, object> sharePolicy = NcJson.GetDictionary(policy, "share");
             IDictionary<string, object> talkPolicy = NcJson.GetDictionary(policy, "talk");
+            IDictionary<string, object> emailSignaturePolicy = NcJson.GetDictionary(policy, "email_signature");
             IDictionary<string, object> shareEditable = NcJson.GetDictionary(policyEditable, "share");
             IDictionary<string, object> talkEditable = NcJson.GetDictionary(policyEditable, "talk");
+            IDictionary<string, object> emailSignatureEditable = NcJson.GetDictionary(policyEditable, "email_signature");
 
             bool seatAssigned = GetBool(status, "seat_assigned");
             bool isValid = GetBool(status, "is_valid");
@@ -80,11 +82,10 @@ namespace NcTalkOutlookAddIn.Services
             bool seatUsable = seatAssigned
                               && isValid
                               && string.Equals(seatState, "active", StringComparison.OrdinalIgnoreCase);
-            bool policyActive = seatUsable
-                                && sharePolicy != null
-                                && talkPolicy != null
-                                && shareEditable != null
-                                && talkEditable != null;
+            bool sharePolicyActive = seatUsable && sharePolicy != null && shareEditable != null;
+            bool talkPolicyActive = seatUsable && talkPolicy != null && talkEditable != null;
+            bool emailSignaturePolicyActive = seatUsable && emailSignaturePolicy != null && emailSignatureEditable != null;
+            bool policyActive = sharePolicyActive || talkPolicyActive || emailSignaturePolicyActive;
             bool warningVisible = !policyActive && ShouldWarnForSeat(status);
             string warningMessage = warningVisible ? BuildSeatWarningMessage(seatAssigned, isValid, seatState) : string.Empty;
 
@@ -95,14 +96,16 @@ namespace NcTalkOutlookAddIn.Services
                 warningVisible: warningVisible,
                 warningMessage: warningMessage,
                 mode: policyActive ? "policy" : "local",
-                reason: policyActive ? "policy_active" : "seat_not_usable",
+                reason: policyActive ? "policy_active" : (seatUsable ? "policy_domains_unavailable" : "seat_not_usable"),
                 seatAssigned: seatAssigned,
                 isValid: isValid,
                 seatState: seatState,
                 sharePolicy: sharePolicy,
                 talkPolicy: talkPolicy,
+                emailSignaturePolicy: emailSignaturePolicy,
                 shareEditable: shareEditable,
-                talkEditable: talkEditable);
+                talkEditable: talkEditable,
+                emailSignatureEditable: emailSignatureEditable);
             return normalizedStatus;
         }
 
@@ -121,8 +124,10 @@ namespace NcTalkOutlookAddIn.Services
                 seatState: string.Empty,
                 sharePolicy: null,
                 talkPolicy: null,
+                emailSignaturePolicy: null,
                 shareEditable: null,
-                talkEditable: null);
+                talkEditable: null,
+                emailSignatureEditable: null);
         }
 
         private bool ExecuteJsonRequest(string url, out HttpStatusCode statusCode, out IDictionary<string, object> parsed)

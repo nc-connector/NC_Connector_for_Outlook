@@ -64,15 +64,15 @@ namespace NcTalkOutlookAddIn.UI
 
         private bool IsCustomLanguageModeAvailable(string domain)
         {
-            if (_backendPolicyStatus == null
-                || !_backendPolicyStatus.EndpointAvailable
-                || !PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
-            {
-                return false;
-            }
             string normalizedDomain = string.Equals(domain, "talk", StringComparison.OrdinalIgnoreCase)
                 ? "talk"
                 : "share";
+            if (_backendPolicyStatus == null
+                || !_backendPolicyStatus.EndpointAvailable
+                || !PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, normalizedDomain))
+            {
+                return false;
+            }
             string languageKey = normalizedDomain == "talk" ? "language_talk_description" : "language_share_html_block";
             string templateKey = normalizedDomain == "talk" ? "talk_invitation_template" : "share_html_block_template";
             string languageValue = NormalizeLanguageChoice(_backendPolicyStatus.GetPolicyString(normalizedDomain, languageKey));

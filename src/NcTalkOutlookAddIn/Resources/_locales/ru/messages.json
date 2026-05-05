@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Общий доступ"
   },
+  "options_tab_signature": {
+    "message": "Подпись"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Подпись электронной почты"
+  },
+  "options_signature_identity_hint": {
+    "message": "Центральная подпись применяется только тогда, когда учетная запись отправителя Outlook совпадает с адресом электронной почты пользователя Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Добавлять подпись при создании письма"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Добавлять подпись при ответе"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Добавлять подпись при пересылке"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Центральная политика подписи неактивна или неполная."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Обновите backend NC Connector. Эта версия backend ещё не поддерживает централизованные подписи электронной почты."
+  },
   "options_tab_talklink": {
     "message": "Ссылка Talk"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Локальный порт IFB:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Кэш адресной книги (часы):"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "Когда TLS-политика операционной системы по умолчанию отключена, включите как минимум одну версию TLS (1.2 или 1.3)."
   }
 }
-
-
-

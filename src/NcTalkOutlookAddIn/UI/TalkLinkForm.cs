@@ -625,7 +625,7 @@ namespace NcTalkOutlookAddIn.UI
             bool searchDefault = defaults == null || defaults.TalkDefaultSearchVisible;
             TalkRoomType roomTypeDefault = defaults != null ? defaults.TalkDefaultRoomType : TalkRoomType.EventConversation;
 
-            if (PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
+            if (PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "talk"))
             {
                 bool policyBool;
                 string policyString;
@@ -715,7 +715,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private bool IsPolicyGeneratePasswordEnabled()
         {
-            if (!PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
+            if (!PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "talk"))
             {
                 return true;
             }

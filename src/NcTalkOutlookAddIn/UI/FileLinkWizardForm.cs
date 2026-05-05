@@ -188,7 +188,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyPolicyDefaultsToSettings()
         {
-            if (!PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
+            if (!PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "share"))
             {
                 return;
             }

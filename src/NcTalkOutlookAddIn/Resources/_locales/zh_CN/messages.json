@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "共享"
   },
+  "options_tab_signature": {
+    "message": "签名"
+  },
+  "options_signature_defaults_heading": {
+    "message": "电子邮件签名"
+  },
+  "options_signature_identity_hint": {
+    "message": "仅当 Outlook 发件人账户与 Nextcloud 用户电子邮件地址匹配时，才会应用集中签名。"
+  },
+  "options_signature_on_compose_label": {
+    "message": "撰写时添加签名"
+  },
+  "options_signature_on_reply_label": {
+    "message": "回复时添加签名"
+  },
+  "options_signature_on_forward_label": {
+    "message": "转发时添加签名"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "集中签名策略未启用或不完整。"
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "请更新 NC Connector 后端。此后端版本尚不支持集中管理的电子邮件签名。"
+  },
   "options_tab_talklink": {
     "message": "Talk 链接"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "本地 IFB 端口："
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "通讯录缓存（小时）："
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "当禁用操作系统默认 TLS 策略时，请至少启用一个 TLS 版本（1.2 或 1.3）。"
   }
 }
-
-
-

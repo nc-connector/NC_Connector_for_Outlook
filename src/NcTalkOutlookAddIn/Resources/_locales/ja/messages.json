@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "共有"
   },
+  "options_tab_signature": {
+    "message": "署名"
+  },
+  "options_signature_defaults_heading": {
+    "message": "メール署名"
+  },
+  "options_signature_identity_hint": {
+    "message": "中央管理の署名は、Outlook の差出人アカウントが Nextcloud ユーザーのメールアドレスと一致する場合にのみ適用されます。"
+  },
+  "options_signature_on_compose_label": {
+    "message": "新規作成時に署名を追加"
+  },
+  "options_signature_on_reply_label": {
+    "message": "返信時に署名を追加"
+  },
+  "options_signature_on_forward_label": {
+    "message": "転送時に署名を追加"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "中央管理の署名ポリシーが無効または不完全です。"
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "NC Connector バックエンドを更新してください。このバックエンドバージョンは、中央管理のメール署名をまだサポートしていません。"
+  },
   "options_tab_talklink": {
     "message": "Talk リンク"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "ローカル IFB ポート:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "アドレス帳キャッシュ（時間）:"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "OS 既定の TLS ポリシーを無効にする場合は、少なくとも 1 つの TLS バージョン（1.2 または 1.3）を有効にしてください。"
   }
 }
-
-
-

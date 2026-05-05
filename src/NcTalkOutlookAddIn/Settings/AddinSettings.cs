@@ -54,6 +54,9 @@ namespace NcTalkOutlookAddIn.Settings
             TalkDefaultAddUsers = true;
             TalkDefaultAddGuests = false;
             TalkDeleteRoomOnEventDelete = false;
+            EmailSignatureOnCompose = null;
+            EmailSignatureOnReply = null;
+            EmailSignatureOnForward = null;
         }
 
         public string ServerUrl { get; set; }
@@ -125,6 +128,12 @@ namespace NcTalkOutlookAddIn.Settings
         public bool TalkDefaultAddGuests { get; set; }
 
         public bool TalkDeleteRoomOnEventDelete { get; set; }
+
+        public bool? EmailSignatureOnCompose { get; set; }
+
+        public bool? EmailSignatureOnReply { get; set; }
+
+        public bool? EmailSignatureOnForward { get; set; }
 
         public AddinSettings Clone()
         {

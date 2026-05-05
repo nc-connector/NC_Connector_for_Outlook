@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Udostępnianie"
   },
+  "options_tab_signature": {
+    "message": "Podpis"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Podpis e-mail"
+  },
+  "options_signature_identity_hint": {
+    "message": "Centralny podpis jest stosowany tylko wtedy, gdy konto nadawcy w Outlooku odpowiada adresowi e-mail użytkownika Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Dodaj podpis podczas tworzenia wiadomości"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Dodaj podpis przy odpowiedzi"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Dodaj podpis przy przekazywaniu"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Centralna polityka podpisu jest nieaktywna lub niekompletna."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Zaktualizuj backend NC Connector. Ta wersja backendu nie obsługuje jeszcze centralnych podpisów e-mail."
+  },
   "options_tab_talklink": {
     "message": "Link Talk"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Lokalny port IFB:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Pamięć podręczna książki adresowej (godziny):"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "Gdy domyślna polityka TLS systemu operacyjnego jest wyłączona, włącz co najmniej jedną wersję TLS (1.2 lub 1.3)."
   }
 }
-
-
-

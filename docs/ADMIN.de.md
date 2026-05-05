@@ -103,6 +103,9 @@ Beispiel (Auszug):
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
   <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
+  <EmailSignatureOnCompose>true</EmailSignatureOnCompose>
+  <EmailSignatureOnReply>true</EmailSignatureOnReply>
+  <EmailSignatureOnForward>true</EmailSignatureOnForward>
 </Settings>
 ```
 
@@ -123,6 +126,26 @@ Empfehlung:
 Das Loeschen eines gespeicherten Outlook-Termins stellt die entfernte Talk-Raumloeschung nur an, wenn `TalkDeleteRoomOnEventDelete` lokal aktiviert oder per Backend-Policy `talk_delete_room_on_event_delete` gesperrt/aktiviert ist. Ausserdem muss der Termin NC-Connector-Metadaten (`X-NCTALK-TOKEN`) tragen. Generische Talk-Links in `Location` oder URL-Feldern werden ignoriert.
 
 Der Cleanup fuer neu erzeugte Termine, die vor dem Speichern verworfen werden, bleibt davon unberuehrt und loescht den gerade erzeugten Raum weiterhin best effort.
+
+## Zentrale E-Mail-Signatur
+
+Wenn das optionale NC-Connector-Backend installiert ist, kann Outlook eine zentrale HTML-Signatur aus der Backend-Policy verwenden. Das ist bewusst an den Seat-Benutzer gekoppelt:
+
+- der Backend-Endpunkt muss erreichbar sein
+- dem aktuellen Benutzer muss ein aktiver Seat zugewiesen sein
+- der Backend-Status muss `policy.email_signature` und `policy_editable.email_signature` enthalten
+- `policy.email_signature.email_signature_on_compose` muss `true` sein
+- `policy.email_signature.email_signature_template` muss HTML enthalten
+- `policy.email_signature.user_email` muss die E-Mail-Adresse des Nextcloud-Benutzers enthalten
+- das aktuelle Outlook-Absenderkonto muss genau zu dieser E-Mail-Adresse passen
+
+Die lokalen Einstellungen `EmailSignatureOnCompose`, `EmailSignatureOnReply` und `EmailSignatureOnForward` steuern, ob die Backend-Signatur bei neuen Mails, Antworten und Weiterleitungen eingefuegt wird. Wenn das Backend einen Wert per `policy_editable.email_signature.<key>=false` sperrt, ist die Option im UI gesperrt und Outlook verwendet den Backend-Wert.
+
+Wenn ein aelteres Backend Freigabe-/Talk-Policy liefert, aber noch keine `policy.email_signature`-Domain kennt, bleiben nur zentrale Signaturen deaktiviert. Die Settings zeigen dann einen Backend-Update-Hinweis; Freigabe und Talk bleiben von dieser Signatur-Domain getrennt.
+
+Wichtig fuer Rollout und Support: Wenn `EmailSignatureOnCompose` fuer das passende Outlook-Absenderkonto aktiv ist, gehoert der Signaturplatz dieser Identitaet NC Connector. Ist die Einfuegung bei Antworten oder Weiterleitungen deaktiviert, entfernt Outlook die beim Oeffnen erkannte Outlook-native Signatur oder Signatur aus anderen Add-ins, fuegt aber keine Backend-Signatur ein. Wenn die Backend-Signatur inaktiv oder unvollstaendig ist, die Compose-Signatur-Policy ausgeschaltet wurde oder das Outlook-Absenderkonto nicht zum Nextcloud-Benutzer passt, greift NC Connector nicht in Outlooks eigene Signaturen ein. Entfernt oder ersetzt wird dann nur ein Signaturblock, den NC Connector selbst in das geoeffnete Compose-Fenster eingefuegt hat.
+
+Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanitizer bereinigt wie Freigabe- und Talk-Templates. Outlook fuegt sie als markierten HTML-Block ein, damit sie in derselben Compose-Session gezielt aktualisiert oder wieder entfernt werden kann.
 
 ## Compose-Freigabe-Lifecycle (3.0.4)
 

@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Compartir"
   },
+  "options_tab_signature": {
+    "message": "Firma"
+  },
+  "options_signature_defaults_heading": {
+    "message": "Firma de correo electrónico"
+  },
+  "options_signature_identity_hint": {
+    "message": "La firma central solo se aplica cuando la cuenta remitente de Outlook coincide con la dirección de correo del usuario de Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Añadir firma al redactar"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Añadir firma al responder"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Añadir firma al reenviar"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "La política central de firma está inactiva o incompleta."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Actualice el backend de NC Connector. Esta versión del backend aún no admite firmas de correo centrales."
+  },
   "options_tab_talklink": {
     "message": "Enlace de Talk"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Puerto IFB local:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Caché de la libreta de direcciones (horas):"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "Cuando la política TLS predeterminada del sistema operativo está desactivada, active al menos una versión TLS (1.2 o 1.3)."
   }
 }
-
-
-

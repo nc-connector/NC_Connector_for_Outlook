@@ -214,7 +214,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private static string ResolveEffectiveLanguage(string languageOverride, BackendPolicyStatus policyStatus)
         {
             if (policyStatus != null
-                && policyStatus.PolicyActive
+                && policyStatus.IsDomainActive("share")
                 && policyStatus.IsLocked("share", "language_share_html_block"))
             {
                 string policyLang = policyStatus.GetPolicyString("share", "language_share_html_block");
@@ -235,7 +235,7 @@ namespace NcTalkOutlookAddIn.Utilities
 
                 // Resolve custom policy template for normal or password-only mode.
         private static string ResolvePolicyTemplate(BackendPolicyStatus policyStatus, bool passwordOnly, string effectiveLanguage)
-        {            if (policyStatus == null || !policyStatus.PolicyActive)
+        {            if (policyStatus == null || !policyStatus.IsDomainActive("share"))
             {
                 return string.Empty;
             }

@@ -22,6 +22,9 @@ namespace NcTalkOutlookAddIn
                 LogCore(
                     "Backend policy status fetched (trigger=" + (trigger ?? "n/a")
                     + ", active=" + (status != null && status.PolicyActive)
+                    + ", share=" + (status != null && status.IsDomainActive("share"))
+                    + ", talk=" + (status != null && status.IsDomainActive("talk"))
+                    + ", emailSignature=" + (status != null && status.IsDomainActive("email_signature"))
                     + ", warningVisible=" + (status != null && status.WarningVisible)
                     + ", mode=" + (status != null ? status.Mode : "local")
                     + ", reason=" + (status != null ? status.Reason : "n/a")
@@ -64,7 +67,7 @@ namespace NcTalkOutlookAddIn
         internal static string ResolveTalkDescriptionLanguage(BackendPolicyStatus policyStatus, string fallbackLanguageOverride)
         {
             if (policyStatus != null
-                && policyStatus.PolicyActive
+                && policyStatus.IsDomainActive("talk")
                 && policyStatus.IsLocked("talk", "language_talk_description"))
             {
                 string policyLanguageRaw = policyStatus.GetPolicyString("talk", "language_talk_description");
@@ -79,7 +82,7 @@ namespace NcTalkOutlookAddIn
         internal static string ResolveTalkInvitationTemplate(BackendPolicyStatus policyStatus)
         {
             // Guard against null/inactive backend policy state.
-            if (policyStatus == null || !policyStatus.PolicyActive)
+            if (policyStatus == null || !policyStatus.IsDomainActive("talk"))
             {
                 return string.Empty;
             }
@@ -88,7 +91,7 @@ namespace NcTalkOutlookAddIn
 
         internal static string ResolveTalkEventDescriptionType(BackendPolicyStatus policyStatus)
         {
-            if (policyStatus != null && policyStatus.PolicyActive)
+            if (policyStatus != null && policyStatus.IsDomainActive("talk"))
             {
                 string policyTypeRaw = policyStatus.GetPolicyString("talk", "event_description_type");
                 if (!string.IsNullOrWhiteSpace(policyTypeRaw))

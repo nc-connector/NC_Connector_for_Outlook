@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Megosztás"
   },
+  "options_tab_signature": {
+    "message": "Aláírás"
+  },
+  "options_signature_defaults_heading": {
+    "message": "E-mail aláírás"
+  },
+  "options_signature_identity_hint": {
+    "message": "A központi aláírás csak akkor kerül alkalmazásra, ha az Outlook feladói fiókja megegyezik a Nextcloud-felhasználó e-mail-címével."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Aláírás hozzáadása új levél írásakor"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Aláírás hozzáadása válaszkor"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Aláírás hozzáadása továbbításkor"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "A központi aláírási házirend inaktív vagy hiányos."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Kérjük, frissítse az NC Connector backendet. Ez a backendverzió még nem támogatja a központi e-mail aláírásokat."
+  },
   "options_tab_talklink": {
     "message": "Talk-link"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Helyi IFB-port:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Címjegyzék gyorsítótár (órák):"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."
   }
 }
-
-
-

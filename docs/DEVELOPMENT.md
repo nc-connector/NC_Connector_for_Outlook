@@ -23,6 +23,7 @@ The add-in connects Outlook classic to a Nextcloud server and provides:
 
 - **Nextcloud Talk** from calendar appointments (room creation, lobby, participant sync, moderator delegation)
 - **Nextcloud sharing** from the mail compose window (upload + link share + HTML block insertion)
+- **Central backend email signatures** for matching Outlook sender accounts
 - **Internet Free/Busy (IFB)** via a local HTTP endpoint that proxies requests to Nextcloud
 
 ## Release 3.0.4 delta summary
@@ -97,6 +98,7 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.SubscriptionEnsure.cs` — deferred appointment-subscription ensure and Outlook event-restriction handling
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.cs` — compose subscription core state + lifecycle entry points (`Dispose`, identity, shared helpers)
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.AttachmentFlow.cs` — compose attachment interception/evaluation/share-launch flow
+- `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.Signature.cs` — backend email-signature policy application for the matching Outlook sender account
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.MailComposeSubscription.SendCleanup.cs` — send/close cleanup lifecycle + separate-password dispatch handling
 - `src/NcTalkOutlookAddIn/NextcloudTalkAddIn.AppointmentSubscription.cs` — appointment runtime subscription lifecycle
 - `src/NcTalkOutlookAddIn/Controllers/SettingsWorkflowController.cs` — settings open/save/revert orchestration
@@ -112,6 +114,7 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/Services/` — Nextcloud HTTP integrations (Talk, sharing, IFB, login flow)
   - `Services/NcHttpClient.cs` is the shared request executor for auth headers, OCS headers, timeout/decompression, and optional fresh-connection mode.
   - All runtime HTTP calls (Talk, share/DAV, IFB, login flow, moderator avatar fetch) are routed through `NcHttpClient`.
+  - `Services/EmailSignaturePolicyService.cs` resolves backend email-signature policy values against local settings and lock state.
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
   - `UI/ScaledForm.cs` is the shared DPI-scaling base for forms that use logical pixel layout helpers.
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
@@ -120,6 +123,21 @@ Key code locations:
 - `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` — centralized JSON payload normalization (`PrepareJsonPayload`), dictionary/string/int helpers, and OCS error extraction
 - `src/NcTalkOutlookAddIn/Utilities/DeferredAppointmentEnsureState.cs` — encapsulated pending-key tracking + throttled logging state for deferred appointment ensure
 - `src/NcTalkOutlookAddIn/Utilities/PictureConverter.cs` — shared Image -> IPictureDisp conversion helper for ribbon icons
+
+#### Central email signature flow (mail compose)
+
+The compose subscription checks backend policy for the central email signature after a compose window opens and when Outlook changes sender-related properties.
+
+Runtime contract:
+
+- Backend signature insertion requires an active backend policy for the `email_signature` domain, an active assigned seat, non-empty `policy.email_signature.email_signature_template`, and `policy.email_signature.user_email`.
+- Missing `policy.email_signature` support disables only central signatures and surfaces a backend update hint; Share/Talk policy domains remain independent.
+- The current Outlook sender account must match `policy.email_signature.user_email`; other identities are left untouched.
+- Local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` can disable insertion for the corresponding compose type unless the backend locks the value.
+- For the matching sender account, enabled compose signature policy also owns the initial signature slot in replies and forwards: if reply/forward insertion is disabled, Outlook-native or third-party signatures captured at compose open are removed but no backend signature is inserted.
+- When compose signature policy is inactive or the sender does not match, NC Connector removes only its own marked signature block from the current compose body. It does not remove Outlook-native or third-party signature content.
+- Backend signature HTML is sanitized through `HtmlTemplateSanitizer` with the same fail-closed policy used by sharing and Talk templates.
+- The managed signature is written as a marked HTML block so later policy/sender changes can update or remove only NC Connector-owned content.
 
 ## Architecture
 

@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Sdílení"
   },
+  "options_tab_signature": {
+    "message": "Podpis"
+  },
+  "options_signature_defaults_heading": {
+    "message": "E-mailový podpis"
+  },
+  "options_signature_identity_hint": {
+    "message": "Centrální podpis se použije pouze tehdy, když účet odesílatele v Outlooku odpovídá e-mailové adrese uživatele Nextcloud."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Přidat podpis při psaní zprávy"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Přidat podpis při odpovědi"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Přidat podpis při přeposílání"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Centrální zásada podpisu je neaktivní nebo neúplná."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Aktualizujte prosím backend NC Connector. Tato verze backendu zatím nepodporuje centrální e-mailové podpisy."
+  },
   "options_tab_talklink": {
     "message": "Odkaz Talk"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Místní port IFB:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Mezipaměť adresáře (hodiny):"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "Když jsou výchozí zásady TLS operačního systému vypnuté, povolte alespoň jednu verzi TLS (1.2 nebo 1.3)."
   }
 }
-
-
-

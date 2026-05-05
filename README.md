@@ -18,7 +18,7 @@ The compose button “Insert Nextcloud share” starts the sharing wizard with u
 - **Enterprise-grade security**
 Lobby until start time, moderator delegation, automatic cleanup of discarded appointments, mandatory passwords, and expiration policies help protect sensitive meetings and files.
 - **Central backend policies (optional)**
-If the optional NC Connector backend is installed, Talk and Sharing defaults can be controlled centrally. On wizard open and in Settings, the add-in checks the backend status, applies valid seat policies, and locks admin-controlled options while still showing their effective values.
+If the optional NC Connector backend is installed, Talk, Sharing, and central email-signature defaults can be controlled centrally. On wizard open and in Settings, the add-in checks the backend status, applies valid seat policies, and locks admin-controlled options while still showing their effective values.
 - **Internet Free/Busy Gateway (IFB)**
 A local HTTP listener answers Outlook free/busy requests directly from Nextcloud. The installer configures registry values for search path and read URL. If the direct fetch returns HTTP 404, the add-in falls back to a scheduling POST so availability data is still provided.
 - **Debug logging at the press of a button**
@@ -79,6 +79,8 @@ Bundled third-party sanitizer/runtime dependencies and their licenses are docume
   - valid active seat enables backend policy values and admin locks
 - missing backend / no seat / invalid seat / expired grace time falls back to local settings
   - invalid seat states remain visible in the UI so users can contact their administrator
+- central backend email signatures are applied only for the Outlook sender account matching the Nextcloud user email; other Outlook signatures remain untouched
+- if an older backend exposes Share/Talk policy but no `policy.email_signature` domain yet, only central signatures stay disabled and Settings shows a backend update hint
 - backend share/Talk templates are only activated when the language override is set to `Custom`
 - `Custom` is only shown when the NC Connector backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
 - if `Custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block

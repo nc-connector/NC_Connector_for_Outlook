@@ -87,6 +87,9 @@ Legacy migration on first start:
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
   <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
+  <EmailSignatureOnCompose>true</EmailSignatureOnCompose>
+  <EmailSignatureOnReply>true</EmailSignatureOnReply>
+  <EmailSignatureOnForward>true</EmailSignatureOnForward>
 </Settings>
 ```
 
@@ -115,6 +118,8 @@ Runtime behavior:
 - if the backend is reachable but the license/seat state is no longer usable, Outlook also falls back to the locally saved add-in settings
 - invalid seat states remain visible in the UI so users can contact their administrator
 - separate password delivery is only available when the backend endpoint exists and the current user has an active assigned seat
+- central email signatures are only available when the backend endpoint exists, the current user has an active assigned seat, and the backend returns a complete `policy.email_signature` payload
+- if Share/Talk policy is available but `policy.email_signature` is missing, Outlook treats only the central signature domain as unsupported and shows a backend update hint
 - backend custom templates stay inactive until the corresponding language override is set to `custom`
 - the `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
 - if `custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
@@ -126,6 +131,26 @@ Central policy can currently control:
 - Sharing defaults and lock state
 - share HTML/password templates
 - Talk description language / custom invitation template
+- central email signature defaults and lock state
+
+### Central email signature behavior
+
+The backend can provide one central HTML email signature for the assigned seat user. Outlook applies it only when all of these conditions are true:
+
+- the backend endpoint is reachable and the current account has an active assigned seat
+- the backend status contains `policy.email_signature` and `policy_editable.email_signature`
+- `policy.email_signature.email_signature_on_compose=true`
+- `policy.email_signature.email_signature_template` contains HTML
+- `policy.email_signature.user_email` contains the Nextcloud user's email address
+- the current Outlook sender account matches that email address
+
+The local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` control whether the backend signature is inserted for new mails, replies, and forwards unless the backend locks the corresponding setting with `policy_editable.email_signature.<key>=false`.
+
+If an older backend already returns Share/Talk policy but does not expose the `policy.email_signature` domain yet, only central email signatures remain disabled. Settings then shows a backend update hint; Share and Talk stay controlled by their own policy domains.
+
+When `EmailSignatureOnCompose` is enabled for the matching Outlook sender account, NC Connector owns the signature slot for that identity. If reply or forward insertion is disabled, Outlook removes the Outlook-native or third-party signature captured when the compose window opened, but does not insert the backend signature. If the backend signature is inactive, incomplete, compose-signature policy is disabled, or the Outlook sender account does not match the Nextcloud user email, NC Connector leaves Outlook's own signature handling untouched. It only removes/replaces a signature block that NC Connector itself inserted into the open compose window.
+
+The backend signature HTML is sanitized with the same fail-closed template sanitizer used for sharing and Talk blocks. The backend delivers HTML only; Outlook inserts the managed signature as marked HTML so it can be updated or removed safely during the same compose session.
 
 ### Talk appointment-safe HTML subset (backend templates)
 

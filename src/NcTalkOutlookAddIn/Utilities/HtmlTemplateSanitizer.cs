@@ -142,6 +142,11 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             return SanitizeTemplateHtml(html, "talk");
         }
 
+        internal static string SanitizeEmailSignatureTemplateHtml(string html)
+        {
+            return SanitizeTemplateHtml(html, "email_signature");
+        }
+
                 // Appointment-specific compatibility transform for Talk HTML before the
         // HTML->RTF bridge. Keeps this behavior explicit and isolated from other
         // template rendering paths.

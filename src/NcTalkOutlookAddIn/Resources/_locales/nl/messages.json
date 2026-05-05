@@ -536,6 +536,30 @@
   "options_tab_sharing": {
     "message": "Delen"
   },
+  "options_tab_signature": {
+    "message": "Handtekening"
+  },
+  "options_signature_defaults_heading": {
+    "message": "E-mailhandtekening"
+  },
+  "options_signature_identity_hint": {
+    "message": "De centrale handtekening wordt alleen toegepast wanneer het Outlook-afzenderaccount overeenkomt met het e-mailadres van de Nextcloud-gebruiker."
+  },
+  "options_signature_on_compose_label": {
+    "message": "Handtekening toevoegen bij opstellen"
+  },
+  "options_signature_on_reply_label": {
+    "message": "Handtekening toevoegen bij antwoorden"
+  },
+  "options_signature_on_forward_label": {
+    "message": "Handtekening toevoegen bij doorsturen"
+  },
+  "options_signature_backend_inactive_tooltip": {
+    "message": "Het centrale handtekeningbeleid is inactief of onvolledig."
+  },
+  "options_signature_backend_update_required_tooltip": {
+    "message": "Werk de NC Connector-backend bij. Deze backendversie ondersteunt centrale e-mailhandtekeningen nog niet."
+  },
   "options_tab_talklink": {
     "message": "Talk-link"
   },
@@ -985,7 +1009,8 @@
   },
   "outlook_ifb_port_label": {
     "message": "Lokale IFB-poort:"
-  },  "outlook_ifb_cache_hours_label": {
+  },
+  "outlook_ifb_cache_hours_label": {
     "message": "Adresboekcache (uren):"
   },
   "outlook_debug_file_label": {
@@ -1397,6 +1422,3 @@
     "message": "Wanneer het standaard TLS-beleid van het besturingssysteem is uitgeschakeld, schakel dan minimaal een TLS-versie in (1.2 of 1.3)."
   }
 }
-
-
-

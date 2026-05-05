@@ -15,6 +15,16 @@ namespace NcTalkOutlookAddIn.Utilities
             return status != null && status.PolicyActive;
         }
 
+        internal static bool IsPolicyDomainAvailable(BackendPolicyStatus status, string domain)
+        {
+            return status != null && status.IsDomainAvailable(domain);
+        }
+
+        internal static bool IsPolicyDomainActive(BackendPolicyStatus status, string domain)
+        {
+            return status != null && status.IsDomainActive(domain);
+        }
+
         internal static bool HasBackendSeatEntitlement(BackendPolicyStatus status)
         {
             return status != null

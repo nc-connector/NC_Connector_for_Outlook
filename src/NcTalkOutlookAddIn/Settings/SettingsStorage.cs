@@ -475,6 +475,9 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TalkDefaultAddUsers", settings.TalkDefaultAddUsers.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TalkDefaultAddGuests", settings.TalkDefaultAddGuests.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TalkDeleteRoomOnEventDelete", settings.TalkDeleteRoomOnEventDelete.ToString(CultureInfo.InvariantCulture));
+            AppendOptionalBoolElement(document, root, "EmailSignatureOnCompose", settings.EmailSignatureOnCompose);
+            AppendOptionalBoolElement(document, root, "EmailSignatureOnReply", settings.EmailSignatureOnReply);
+            AppendOptionalBoolElement(document, root, "EmailSignatureOnForward", settings.EmailSignatureOnForward);
 
             var writerSettings = new XmlWriterSettings
             {
@@ -705,9 +708,39 @@ namespace NcTalkOutlookAddIn.Settings
                         settings.TalkDeleteRoomOnEventDelete = talkDeleteRoomOnEventDelete;
                     }
                     break;
+                case "EmailSignatureOnCompose":
+                    bool emailSignatureOnCompose;
+                    if (bool.TryParse(value, out emailSignatureOnCompose))
+                    {
+                        settings.EmailSignatureOnCompose = emailSignatureOnCompose;
+                    }
+                    break;
+                case "EmailSignatureOnReply":
+                    bool emailSignatureOnReply;
+                    if (bool.TryParse(value, out emailSignatureOnReply))
+                    {
+                        settings.EmailSignatureOnReply = emailSignatureOnReply;
+                    }
+                    break;
+                case "EmailSignatureOnForward":
+                    bool emailSignatureOnForward;
+                    if (bool.TryParse(value, out emailSignatureOnForward))
+                    {
+                        settings.EmailSignatureOnForward = emailSignatureOnForward;
+                    }
+                    break;
                 default:
                     break;
             }
+        }
+
+        private static void AppendOptionalBoolElement(XmlDocument document, XmlElement root, string name, bool? value)
+        {
+            if (!value.HasValue)
+            {
+                return;
+            }
+            AppendElement(document, root, name, value.Value.ToString(CultureInfo.InvariantCulture));
         }
 
         private static void AppendElement(XmlDocument document, XmlElement root, string name, string value)
@@ -747,4 +780,3 @@ namespace NcTalkOutlookAddIn.Settings
         }
     }
 }
-

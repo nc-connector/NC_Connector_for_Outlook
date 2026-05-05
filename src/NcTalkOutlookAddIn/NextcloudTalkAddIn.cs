@@ -573,7 +573,7 @@ namespace NcTalkOutlookAddIn
                 _currentSettings.AppPassword);
             BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "talk_delete_room_on_event_delete");
             if (policyStatus != null
-                && policyStatus.PolicyActive
+                && policyStatus.IsDomainActive("talk")
                 && policyStatus.IsLocked("talk", "talk_delete_room_on_event_delete"))
             {
                 bool policyEnabled;
