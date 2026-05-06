@@ -1266,7 +1266,27 @@ namespace NcTalkOutlookAddIn.UI
 
         private void OnSaveButtonClick(object sender, EventArgs e)
         {
+            bool requestedSignatureOnCompose = _emailSignatureOnComposeCheckBox.Checked;
+            bool requestedSignatureOnReply = _emailSignatureOnReplyCheckBox.Checked;
+            bool requestedSignatureOnForward = _emailSignatureOnForwardCheckBox.Checked;
+
             RefreshBackendPolicyStatus("settings_save");
+            if (IsEmailSignaturePolicyAvailable())
+            {
+                if (!IsPolicyLocked("email_signature", "email_signature_on_compose"))
+                {
+                    _emailSignatureOnComposeCheckBox.Checked = requestedSignatureOnCompose;
+                }
+                if (!IsPolicyLocked("email_signature", "email_signature_on_reply"))
+                {
+                    _emailSignatureOnReplyCheckBox.Checked = requestedSignatureOnReply;
+                }
+                if (!IsPolicyLocked("email_signature", "email_signature_on_forward"))
+                {
+                    _emailSignatureOnForwardCheckBox.Checked = requestedSignatureOnForward;
+                }
+            }
+
             RefreshTalkSystemAddressbookState(true, "settings_save");
 
             if (!_tlsUseSystemDefaultCheckBox.Checked

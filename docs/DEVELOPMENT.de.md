@@ -193,10 +193,13 @@ Runtime-Vertrag:
 - Fehlende `policy.email_signature`-Unterstuetzung deaktiviert nur zentrale Signaturen und zeigt einen Backend-Update-Hinweis; Freigabe-/Talk-Policy-Domains bleiben unabhaengig.
 - Das aktuelle Outlook-Absenderkonto muss zu `policy.email_signature.user_email` passen; andere Identitaeten bleiben unberuehrt.
 - Die lokalen Einstellungen `EmailSignatureOnCompose`, `EmailSignatureOnReply` und `EmailSignatureOnForward` koennen die Einfuegung fuer den jeweiligen Compose-Typ deaktivieren, solange das Backend den Wert nicht sperrt.
-- Fuer das passende Absenderkonto besitzt eine aktive Compose-Signatur-Policy auch bei Antworten und Weiterleitungen den initialen Signaturplatz: Wenn Reply-/Forward-Einfuegung deaktiviert ist, werden beim Compose-Start erkannte Outlook-native oder Drittanbieter-Signaturen entfernt, aber keine Backend-Signatur eingefuegt.
+- Fuer das passende Absenderkonto besitzt eine aktive Compose-Signatur-Policy auch bei Antworten und Weiterleitungen den initialen Signaturplatz. Beim Compose-Start erkannte Outlook-native oder Drittanbieter-Signaturen werden nur entfernt, wenn die Grenze zur zitierten Nachricht strukturell erkennbar ist; andernfalls bleiben zitierte Nachricht und Trenner erhalten.
 - Wenn die Compose-Signatur-Policy inaktiv ist oder der Absender nicht passt, entfernt NC Connector nur den eigenen markierten Signaturblock aus dem aktuellen Compose-Body. Outlook-native oder Drittanbieter-Signaturen werden nicht entfernt.
 - Backend-Signatur-HTML laeuft durch `HtmlTemplateSanitizer` mit derselben fail-closed Policy wie Freigabe- und Talk-Templates.
 - Die verwaltete Signatur wird als markierter HTML-Block geschrieben, damit spaetere Policy-/Sender-Aenderungen gezielt nur NC-Connector-eigene Inhalte aktualisieren oder entfernen.
+- Signaturverarbeitung laeuft nur fuer ungesendete Outlook-Compose-Items. Das Oeffnen einer empfangenen oder bereits gesendeten Nachricht zum Lesen darf den Body nie veraendern.
+- Inline-Antworten werden ueber Outlooks `Explorer.InlineResponse`-Event verfolgt und ueber `Explorer.ActiveInlineResponseWordEditor` geschrieben; Inspector-Compose-Fenster nutzen weiter den normalen `MailItem.HTMLBody`-Pfad. Inline-Signatureinfuegung verwendet Outlooks aktive Inline-Word-Selection, damit zitierter Inhalt und eingebettete Bilder erhalten bleiben. Inline-Word-Importe verwenden ein UTF-8-BOM-HTML-Dokument, damit Nicht-ASCII-Zeichen in Signaturen erhalten bleiben.
+- Die verwaltete Signatur ersetzt den Compose-Signaturplatz vor der zitierten Nachrichtengrenze, behaelt zwei leere Absaetze ueber der Signatur fuer eigenen Text und eine leere Zeile zwischen Signatur und Antwort-/Weiterleitungs-Trenner. Reine Textmarker wie `From:` oder `Von:` werden nie als direkte Schnittposition benutzt.
 
 Compose-Filelink-Paritaet (3.0.4):
 

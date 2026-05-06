@@ -4,6 +4,18 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.0.5] - 2026-04-30
+
+### Added
+- Opt-in setting for deleting the remote Talk room when a saved Outlook appointment is deleted, including backend policy control.
+
+### Changed
+- Saved appointment deletion now only removes Talk rooms when NC Connector metadata is present and the deletion opt-in is enabled.
+- Outlook Talk appointment metadata now uses the `X-NCTALK-*` property contract only; old NC Connector-specific Outlook user properties are no longer written or read.
+
+### Fixed
+- Removed the generic Talk URL fallback from Outlook appointment cleanup detection so ordinary Talk links in appointment fields no longer trigger room deletion.
+
 ## [3.0.4] - 2026-04-28
 
 ### Added
@@ -208,5 +220,4 @@ This project follows the principles of **Keep a Changelog** and **Semantic Versi
 
 ### Documentation
 - Expanded admin and developer documentation.
-
 

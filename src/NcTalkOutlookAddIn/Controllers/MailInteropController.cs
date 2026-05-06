@@ -4,7 +4,9 @@
 
 using System;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
@@ -370,6 +372,194 @@ namespace NcTalkOutlookAddIn.Controllers
                 ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object.");
                 ComInteropScope.TryRelease(application, LogCategories.Core, "Failed to release Word application COM object.");
             }
+        }
+
+        internal bool TryReplaceActiveInlineResponseSignatureSlot(Outlook.MailItem mail, string html, string composeKey, string operation)
+        {
+            if (mail == null)
+            {
+                return false;
+            }
+
+            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+            if (application == null)
+            {
+                DiagnosticsLogger.Log(
+                    LogCategories.Core,
+                    "Inline response HTML write skipped (operation="
+                    + (operation ?? "n/a")
+                    + ", composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ", reason=application_unavailable).");
+                return false;
+            }
+
+            Outlook.Explorer explorer = null;
+            Outlook.MailItem activeInlineMail = null;
+            object wordEditor = null;
+            object wordApplication = null;
+            object selection = null;
+            string tempHtmlPath = null;
+
+            try
+            {
+                explorer = application.ActiveExplorer();
+                if (explorer == null)
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline response HTML write skipped (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", reason=active_explorer_unavailable).");
+                    return false;
+                }
+
+                activeInlineMail = explorer.ActiveInlineResponse as Outlook.MailItem;
+                if (!ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.Core, "MailItem", "ActiveInlineResponse"))
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline response HTML write skipped (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", reason=active_inline_response_mismatch).");
+                    return false;
+                }
+
+                wordEditor = explorer.GetType().InvokeMember(
+                    "ActiveInlineResponseWordEditor",
+                    BindingFlags.GetProperty,
+                    null,
+                    explorer,
+                    null);
+                if (wordEditor == null)
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline response HTML write skipped (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", reason=word_editor_unavailable).");
+                    return false;
+                }
+
+                wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
+                if (wordApplication == null)
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline response signature slot write skipped (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", reason=word_application_unavailable).");
+                    return false;
+                }
+
+                selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
+                if (selection == null)
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline response signature slot write skipped (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", reason=word_selection_unavailable).");
+                    return false;
+                }
+
+                int selectionStart = Convert.ToInt32(
+                    selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null),
+                    CultureInfo.InvariantCulture);
+                int selectionEnd = Convert.ToInt32(
+                    selection.GetType().InvokeMember("End", BindingFlags.GetProperty, null, selection, null),
+                    CultureInfo.InvariantCulture);
+
+                if (!string.IsNullOrWhiteSpace(html))
+                {
+                    tempHtmlPath = Path.Combine(
+                        Path.GetTempPath(),
+                        "nc4ol-inline-signature-" + Guid.NewGuid().ToString("N") + ".html");
+                    File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
+                    selection.GetType().InvokeMember(
+                        "InsertFile",
+                        BindingFlags.InvokeMethod,
+                        null,
+                        selection,
+                        new object[] { tempHtmlPath, Type.Missing, false, false, false });
+                    selection.GetType().InvokeMember(
+                        "SetRange",
+                        BindingFlags.InvokeMethod,
+                        null,
+                        selection,
+                        new object[] { selectionStart, selectionStart });
+                }
+                DiagnosticsLogger.Log(
+                    LogCategories.Core,
+                    "Inline response signature inserted via ActiveInlineResponseWordEditor.Selection.InsertFile (operation="
+                    + (operation ?? "n/a")
+                    + ", composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ", selectionStart="
+                    + selectionStart.ToString(CultureInfo.InvariantCulture)
+                    + ", selectionEnd="
+                    + selectionEnd.ToString(CultureInfo.InvariantCulture)
+                    + ").");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to write inline response signature slot (operation="
+                    + (operation ?? "n/a")
+                    + ", composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ").",
+                    ex);
+                return false;
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
+                {
+                    try
+                    {
+                        File.Delete(tempHtmlPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline response HTML file.", ex);
+                    }
+                }
+
+                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release inline Word selection COM object.");
+                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release inline Word application COM object.");
+                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release inline Word editor COM object.");
+                if (!ReferenceEquals(activeInlineMail, mail))
+                {
+                    ComInteropScope.TryRelease(activeInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object.");
+                }
+                ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release active Explorer COM object.");
+            }
+        }
+
+        private static string EnsureHtmlDocumentForWordInsert(string html)
+        {
+            string value = html ?? string.Empty;
+            if (value.IndexOf("<html", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return value;
+            }
+
+            return "<html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body>"
+                   + value
+                   + "</body></html>";
         }
 
         internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)

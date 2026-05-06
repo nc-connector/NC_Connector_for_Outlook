@@ -32,41 +32,138 @@ namespace NcTalkOutlookAddIn
         }
 
         private void EnsureApplicationHook()
-        {            if (_outlookApplication == null || _applicationEvents != null)
+        {            if (_outlookApplication == null)
             {
                 return;
             }
             try
             {
-                _applicationEvents = _outlookApplication as Outlook.ApplicationEvents_11_Event;                if (_applicationEvents != null)
-                {
-                    _applicationEvents.ItemLoad += OnApplicationItemLoad;
-                }
+                EnsureExplorerInlineResponseHooks();
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook ApplicationEvents_11.ItemLoad.", ex);
-                _applicationEvents = null;
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook Explorer.InlineResponse.", ex);
             }
         }
 
         private void UnhookApplication()
-        {            if (_applicationEvents == null)
+        {
+            UnhookExplorerInlineResponseHooks();
+        }
+
+        private void EnsureExplorerInlineResponseHooks()
+        {
+            if (_outlookApplication == null)
             {
                 return;
             }
             try
             {
-                _applicationEvents.ItemLoad -= OnApplicationItemLoad;
+                if (_explorers == null)
+                {
+                    _explorers = _outlookApplication.Explorers;
+                    _explorersEvents = _explorers as Outlook.ExplorersEvents_Event;
+                    if (_explorersEvents != null)
+                    {
+                        _explorersEvents.NewExplorer += OnNewExplorer;
+                    }
+
+                    int count = _explorers != null ? _explorers.Count : 0;
+                    for (int i = 1; i <= count; i++)
+                    {
+                        Outlook.Explorer explorer = null;
+                        try
+                        {
+                            explorer = _explorers[i];
+                            HookInlineResponseExplorer(explorer);
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook existing Explorer.InlineResponse.", ex);
+                            ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release Explorer after hook failure.");
+                        }
+                    }
+                }
+
+                Outlook.Explorer activeExplorer = null;
+                try
+                {
+                    activeExplorer = _outlookApplication.ActiveExplorer();
+                    HookInlineResponseExplorer(activeExplorer);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook active Explorer.InlineResponse.", ex);
+                    ComInteropScope.TryRelease(activeExplorer, LogCategories.Core, "Failed to release ActiveExplorer after hook failure.");
+                }
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook ApplicationEvents_11.ItemLoad.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to ensure Explorer.InlineResponse hooks.", ex);
             }
-            finally
+        }
+
+        private bool HookInlineResponseExplorer(Outlook.Explorer explorer)
+        {
+            if (explorer == null)
             {
-                _applicationEvents = null;
+                return false;
             }
+            string explorerKey = ComInteropScope.ResolveIdentityKey(explorer, LogCategories.Core, "Explorer");
+            if (string.IsNullOrWhiteSpace(explorerKey) || _inlineResponseExplorerEvents.ContainsKey(explorerKey))
+            {
+                return false;
+            }
+
+            var explorerEvents = explorer as Outlook.ExplorerEvents_10_Event;
+            if (explorerEvents == null)
+            {
+                return false;
+            }
+
+            explorerEvents.InlineResponse += OnExplorerInlineResponse;
+            _inlineResponseExplorerEvents[explorerKey] = explorerEvents;
+            _inlineResponseExplorers[explorerKey] = explorer;
+            LogCore("Explorer.InlineResponse hooked (explorerKey=" + explorerKey + ").");
+            return true;
+        }
+
+        private void UnhookExplorerInlineResponseHooks()
+        {
+            foreach (var pair in _inlineResponseExplorerEvents)
+            {
+                try
+                {
+                    pair.Value.InlineResponse -= OnExplorerInlineResponse;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Explorer.InlineResponse.", ex);
+                }
+            }
+            _inlineResponseExplorerEvents.Clear();
+
+            foreach (var pair in _inlineResponseExplorers)
+            {
+                ComInteropScope.TryRelease(pair.Value, LogCategories.Core, "Failed to release tracked Explorer COM object.");
+            }
+            _inlineResponseExplorers.Clear();
+
+            if (_explorersEvents != null)
+            {
+                try
+                {
+                    _explorersEvents.NewExplorer -= OnNewExplorer;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Explorers.NewExplorer.", ex);
+                }
+                _explorersEvents = null;
+            }
+
+            ComInteropScope.TryFinalRelease(_explorers, LogCategories.Core, "Failed to release Explorers COM object.");
+            _explorers = null;
         }
 
         private void UnhookInspector()
@@ -100,7 +197,7 @@ namespace NcTalkOutlookAddIn
                 {
                     EnsureSubscriptionForAppointment(appointment);
                 }
-                var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null)
+                var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
                 {
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
                     EnsureMailComposeSubscription(mail, inspectorIdentityKey);
@@ -112,85 +209,61 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        private void OnApplicationItemLoad(object item)
+        private void OnNewExplorer(Outlook.Explorer explorer)
         {
-            var mail = item as Outlook.MailItem;            if (mail == null)
+            try
+            {
+                HookInlineResponseExplorer(explorer);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook new Explorer.InlineResponse.", ex);
+            }
+        }
+
+        private void OnExplorerInlineResponse(object item)
+        {
+            var mail = item as Outlook.MailItem;
+            if (mail == null || !IsMailComposeCandidate(mail, "inline_response"))
             {
                 return;
             }
-
-            Outlook.Explorer explorer = null;
-            object inlineResponseObject = null;
             try
             {
-                string inspectorIdentityKey = MailInteropController.ResolveMailInspectorIdentityKey(mail);
-                if (!string.IsNullOrWhiteSpace(inspectorIdentityKey))
-                {
-                    if (DiagnosticsLogger.IsEnabled)
-                    {
-                        LogFileLink("Application.ItemLoad compose subscription skipped (reason=inspector_context).");
-                    }
-                    return;
-                }
-                if (_outlookApplication != null)
-                {
-                    explorer = _outlookApplication.ActiveExplorer();
-                }
-                if (explorer == null)
-                {
-                    if (DiagnosticsLogger.IsEnabled)
-                    {
-                        LogFileLink("Application.ItemLoad compose subscription skipped (reason=no_active_explorer).");
-                    }
-                    return;
-                }
-
-                inlineResponseObject = explorer.ActiveInlineResponse;
-                var inlineResponseMail = inlineResponseObject as Outlook.MailItem;                if (inlineResponseMail == null)
-                {
-                    if (DiagnosticsLogger.IsEnabled)
-                    {
-                        LogFileLink("Application.ItemLoad compose subscription skipped (reason=no_inline_response).");
-                    }
-                    return;
-                }
-                if (!ComInteropScope.AreSameObject(
-                    mail,
-                    inlineResponseMail,
-                    LogCategories.FileLink,
-                    "ItemLoad.MailItem",
-                    "Explorer.ActiveInlineResponse"))
-                {
-                    if (DiagnosticsLogger.IsEnabled)
-                    {
-                        LogFileLink("Application.ItemLoad compose subscription skipped (reason=not_active_inline_response).");
-                    }
-                    return;
-                }
-
-                EnsureMailComposeSubscription(mail, string.Empty);
+                EnsureMailComposeSubscription(mail, string.Empty, true);
                 if (DiagnosticsLogger.IsEnabled)
                 {
-                    LogFileLink("Compose subscription ensured via Application.ItemLoad (inline).");
+                    LogFileLink("Compose subscription ensured via Explorer.InlineResponse.");
                 }
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to ensure compose subscription on Application.ItemLoad.", ex);
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to ensure compose subscription on Explorer.InlineResponse.", ex);
             }
-            finally
-            {                if (inlineResponseObject != null && !ReferenceEquals(inlineResponseObject, mail))
-                {
-                    ComInteropScope.TryRelease(
-                        inlineResponseObject,
-                        LogCategories.FileLink,
-                        "Failed to release ActiveInlineResponse COM object in ItemLoad handler.");
-                }
+        }
 
-                ComInteropScope.TryRelease(
-                    explorer,
-                    LogCategories.FileLink,
-                    "Failed to release ActiveExplorer COM object in ItemLoad handler.");
+        private static bool IsMailComposeCandidate(Outlook.MailItem mail, string reason)
+        {
+            if (mail == null)
+            {
+                return false;
+            }
+            try
+            {
+                if (mail.Sent)
+                {
+                    if (DiagnosticsLogger.IsEnabled)
+                    {
+                        LogFileLink("Mail compose subscription skipped (reason=" + (reason ?? "n/a") + ", sent=True).");
+                    }
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to verify mail compose state (reason=" + (reason ?? "n/a") + ").", ex);
+                return false;
             }
         }
     }

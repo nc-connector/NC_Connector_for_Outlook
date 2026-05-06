@@ -4,6 +4,7 @@
 
 using System;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Web;
 using NcTalkOutlookAddIn.Models;
@@ -86,6 +87,11 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
+                if (!IsMailComposeCandidate(_mail, "email_signature_" + (reason ?? "scheduled")))
+                {
+                    LogEmailSignature("Email signature skipped for non-compose mail (trigger=" + (reason ?? "n/a") + ").");
+                    return;
+                }
 
                 _owner.EnsureSettingsLoaded();
                 AddinSettings settings = _owner._currentSettings ?? new AddinSettings();
@@ -158,17 +164,34 @@ namespace NcTalkOutlookAddIn
                 }
 
                 string existing = _mail.HTMLBody ?? string.Empty;
-                bool removedManaged;
-                string bodyWithoutManaged = RemoveManagedSignatureBlocks(existing, out removedManaged);
+                int slotStart;
+                int slotEnd;
+                bool hasQuoteBoundary;
+                TryGetComposeSignatureSlotBounds(existing, out slotStart, out slotEnd, out hasQuoteBoundary);
+                string managedBlock = BuildManagedSignatureBlock(sanitizedHtml, hasQuoteBoundary);
+                string inlineManagedBlock = _isInlineResponse
+                    ? BuildManagedSignatureBlock(sanitizedHtml, false)
+                    : managedBlock;
+                bool replacedManaged;
+                string updated = ReplaceManagedSignatureBlocks(existing, managedBlock, out replacedManaged);
                 bool removedInitialSlot = false;
-                if (!_emailSignatureInitialSlotHandled)
+                if (!replacedManaged)
                 {
-                    bodyWithoutManaged = RemoveInitialSignatureSlot(bodyWithoutManaged, out removedInitialSlot);
-                    _emailSignatureInitialSlotHandled = true;
+                    bool removedManaged;
+                    string bodyWithoutManaged = RemoveManagedSignatureBlocks(updated, out removedManaged);
+                    updated = ReplaceComposeSignatureSlot(
+                        bodyWithoutManaged,
+                        managedBlock,
+                        !_emailSignatureInitialSlotHandled,
+                        composeKind,
+                        out removedInitialSlot);
+                    replacedManaged = removedManaged;
                 }
-
-                string managedBlock = BuildManagedSignatureBlock(sanitizedHtml);
-                _mail.HTMLBody = InsertAfterBodyStart(bodyWithoutManaged, managedBlock);
+                if (!TryWriteEmailSignatureHtmlBody(updated, "apply", inlineManagedBlock))
+                {
+                    return;
+                }
+                _emailSignatureInitialSlotHandled = true;
                 _emailSignatureManaged = true;
 
                 LogEmailSignature(
@@ -179,7 +202,7 @@ namespace NcTalkOutlookAddIn
                     + ", htmlLength="
                     + sanitizedHtml.Length.ToString(CultureInfo.InvariantCulture)
                     + ", removedManaged="
-                    + removedManaged.ToString(CultureInfo.InvariantCulture)
+                    + replacedManaged.ToString(CultureInfo.InvariantCulture)
                     + ", removedInitialSlot="
                     + removedInitialSlot.ToString(CultureInfo.InvariantCulture)
                     + ").");
@@ -216,16 +239,23 @@ namespace NcTalkOutlookAddIn
                     bool removedManaged;
                     string cleaned = RemoveManagedSignatureBlocks(existing, out removedManaged);
                     bool removedInitialSlot = false;
-                    if (!_emailSignatureInitialSlotHandled)
+                    if (!removedManaged && !_emailSignatureInitialSlotHandled)
                     {
-                        cleaned = RemoveInitialSignatureSlot(cleaned, out removedInitialSlot);
-                        _emailSignatureInitialSlotHandled = true;
+                        cleaned = ReplaceComposeSignatureSlot(
+                            cleaned,
+                            string.Empty,
+                            true,
+                            composeKind,
+                            out removedInitialSlot);
                     }
-
                     if (removedManaged || removedInitialSlot)
                     {
-                        _mail.HTMLBody = cleaned;
+                        if (!TryWriteEmailSignatureHtmlBody(cleaned, "clear_slot", string.Empty))
+                        {
+                            return;
+                        }
                     }
+                    _emailSignatureInitialSlotHandled = true;
                     _emailSignatureManaged = false;
 
                     LogEmailSignature(
@@ -268,7 +298,10 @@ namespace NcTalkOutlookAddIn
                     string cleaned = RemoveManagedSignatureBlocks(existing, out removed);
                     if (removed)
                     {
-                        _mail.HTMLBody = cleaned;
+                        if (!TryWriteEmailSignatureHtmlBody(cleaned, "clear_managed", string.Empty))
+                        {
+                            return;
+                        }
                     }
                     _emailSignatureManaged = false;
                     LogEmailSignature(
@@ -329,126 +362,278 @@ namespace NcTalkOutlookAddIn
                 return removed ? ManagedSignatureBlockRegex.Replace(html, string.Empty) : html;
             }
 
-            private static string BuildManagedSignatureBlock(string sanitizedHtml)
+            private bool TryWriteEmailSignatureHtmlBody(string html, string operation, string inlineSignatureSlotHtml = null)
+            {
+                if (!_isInlineResponse)
+                {
+                    _mail.HTMLBody = html ?? string.Empty;
+                    return true;
+                }
+
+                if (_owner == null || _owner._mailInteropController == null)
+                {
+                    LogEmailSignature("Inline email signature write skipped (operation=" + (operation ?? "n/a") + ", reason=interop_unavailable).");
+                    return false;
+                }
+
+                bool written = _owner._mailInteropController.TryReplaceActiveInlineResponseSignatureSlot(
+                    _mail,
+                    inlineSignatureSlotHtml ?? html ?? string.Empty,
+                    _composeKey,
+                    operation);
+                if (!written)
+                {
+                    LogEmailSignature("Inline email signature write skipped (operation=" + (operation ?? "n/a") + ", reason=inline_editor_unavailable).");
+                }
+                return written;
+            }
+
+            private static string BuildManagedSignatureBlock(string sanitizedHtml, bool addTrailingQuoteGap)
             {
                 string html = sanitizedHtml ?? string.Empty;
                 string hash = ComputeSignatureHash(html);
                 return ManagedSignatureStartPrefix
                        + hash
                        + " -->"
+                       + "<p style=\"margin:0;\"><br /></p>"
+                       + "<p style=\"margin:0;\"><br /></p>"
                        + "<div data-nc-connector-signature=\"true\">"
                        + html
                        + "</div>"
+                       + (addTrailingQuoteGap ? "<p style=\"margin:0;\"><br /></p>" : string.Empty)
                        + ManagedSignatureEnd;
             }
 
-            private static string InsertAfterBodyStart(string html, string managedBlock)
+            private static string ReplaceManagedSignatureBlocks(string html, string replacement, out bool replaced)
             {
-                string existing = html ?? string.Empty;
-                string insert = (managedBlock ?? string.Empty) + "<br />";
-                int bodyTagIndex = existing.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
-                if (bodyTagIndex >= 0)
-                {
-                    int bodyTagEnd = existing.IndexOf(">", bodyTagIndex);
-                    if (bodyTagEnd >= 0)
-                    {
-                        return existing.Insert(bodyTagEnd + 1, insert);
-                    }
-                }
-                return insert + existing;
-            }
-
-            private string RemoveInitialSignatureSlot(string html, out bool removed)
-            {
-                removed = false;
-                if (string.IsNullOrEmpty(html) || string.IsNullOrEmpty(_initialEmailSignatureSlotHtml))
+                replaced = false;
+                if (string.IsNullOrEmpty(html))
                 {
                     return html ?? string.Empty;
                 }
-
-                int slotStart = html.IndexOf(_initialEmailSignatureSlotHtml, StringComparison.Ordinal);
-                if (slotStart < 0)
+                replaced = ManagedSignatureBlockRegex.IsMatch(html);
+                if (!replaced)
                 {
                     return html;
                 }
-
-                removed = true;
-                return html.Substring(0, slotStart)
-                       + html.Substring(slotStart + _initialEmailSignatureSlotHtml.Length);
+                return ManagedSignatureBlockRegex.Replace(html, replacement ?? string.Empty);
             }
 
-            private static string CaptureInitialSignatureSlotHtml(Outlook.MailItem mail)
+            private static string ReplaceComposeSignatureSlot(
+                string html,
+                string replacement,
+                bool mayReplaceForeignSlot,
+                EmailSignatureComposeKind composeKind,
+                out bool removedForeignSlot)
             {
-                if (mail == null)
+                removedForeignSlot = false;
+                string existing = html ?? string.Empty;
+                int slotStart;
+                int slotEnd;
+                bool hasQuoteBoundary;
+                if (!TryGetComposeSignatureSlotBounds(existing, out slotStart, out slotEnd, out hasQuoteBoundary))
                 {
-                    return string.Empty;
+                    return (replacement ?? string.Empty) + existing;
                 }
 
-                try
+                string slot = slotEnd > slotStart ? existing.Substring(slotStart, slotEnd - slotStart) : string.Empty;
+                bool slotHasText = !string.IsNullOrWhiteSpace(StripHtmlToText(slot));
+                bool canReplaceForeignSlot = mayReplaceForeignSlot
+                    && (composeKind == EmailSignatureComposeKind.New || hasQuoteBoundary);
+                if (slotHasText && !canReplaceForeignSlot)
                 {
-                    Outlook.OlBodyFormat bodyFormat = mail.BodyFormat;
-                    if (bodyFormat == Outlook.OlBodyFormat.olFormatPlain)
-                    {
-                        return string.Empty;
-                    }
-                    string html = mail.HTMLBody ?? string.Empty;
-                    string slot = ExtractInitialSignatureSlot(html);
-                    return string.IsNullOrWhiteSpace(StripHtmlToText(slot)) ? string.Empty : slot;
+                    return existing.Insert(slotStart, replacement ?? string.Empty);
                 }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to capture initial Outlook signature slot.", ex);
-                    return string.Empty;
-                }
+
+                removedForeignSlot = slotHasText && canReplaceForeignSlot;
+                return existing.Substring(0, slotStart)
+                       + (replacement ?? string.Empty)
+                       + existing.Substring(slotEnd);
             }
 
-            private static string ExtractInitialSignatureSlot(string html)
+            private static bool TryGetComposeSignatureSlotBounds(string html, out int slotStart, out int slotEnd, out bool hasQuoteBoundary)
             {
-                if (string.IsNullOrWhiteSpace(html))
+                slotStart = 0;
+                slotEnd = 0;
+                hasQuoteBoundary = false;
+                if (string.IsNullOrEmpty(html))
                 {
-                    return string.Empty;
+                    return false;
                 }
 
                 int bodyStart = html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
-                int contentStart = 0;
                 if (bodyStart >= 0)
                 {
                     int bodyTagEnd = html.IndexOf(">", bodyStart);
                     if (bodyTagEnd >= 0)
                     {
-                        contentStart = bodyTagEnd + 1;
+                        slotStart = bodyTagEnd + 1;
                     }
                 }
 
-                int bodyEnd = html.IndexOf("</body>", contentStart, StringComparison.OrdinalIgnoreCase);
+                int bodyEnd = html.IndexOf("</body>", slotStart, StringComparison.OrdinalIgnoreCase);
                 if (bodyEnd < 0)
                 {
                     bodyEnd = html.Length;
                 }
 
-                int quoteStart = FindQuoteBoundary(html, contentStart, bodyEnd);
-                int contentEnd = quoteStart >= 0 ? quoteStart : bodyEnd;
-                return contentEnd <= contentStart
-                    ? string.Empty
-                    : html.Substring(contentStart, contentEnd - contentStart);
+                int quoteStart = FindQuoteBoundary(html, slotStart, bodyEnd);
+                slotEnd = quoteStart >= 0 ? quoteStart : bodyEnd;
+                hasQuoteBoundary = quoteStart >= 0;
+                if (slotEnd < slotStart)
+                {
+                    slotEnd = slotStart;
+                }
+                return true;
             }
 
             private static int FindQuoteBoundary(string html, int start, int end)
             {
-                string[] markers = new[]
+                string[] structuralMarkers = new[]
                 {
                     "id=\"divRplyFwdMsg\"",
                     "id=divRplyFwdMsg",
+                    "id=\"x_divRplyFwdMsg\"",
+                    "id=x_divRplyFwdMsg",
+                    "border:none;border-top",
+                    "border: none; border-top",
+                    "mso-border-top-alt",
                     "<blockquote",
-                    "<hr",
+                    "<hr"
+                };
+                int structuralBoundary = FindEarliestBoundaryMarker(html, start, end, structuralMarkers);
+                if (structuralBoundary >= 0)
+                {
+                    return NormalizeBoundaryToElementStart(html, start, structuralBoundary);
+                }
+
+                string[] textMarkers = new[]
+                {
                     "-----Original Message-----",
                     "Von:",
                     "From:"
                 };
+                int textBoundary = FindEarliestBoundaryMarker(html, start, end, textMarkers);
+                if (textBoundary < 0)
+                {
+                    return -1;
+                }
+
+                int headerElementStart = FindReplyHeaderElementStart(html, start, textBoundary);
+                if (headerElementStart >= 0)
+                {
+                    return headerElementStart;
+                }
+
+                // Keep visual separation intact when Outlook places a divider
+                // immediately before the localized header text marker.
+                int hrBeforeText = html.LastIndexOf("<hr", textBoundary, StringComparison.OrdinalIgnoreCase);
+                if (hrBeforeText >= start && hrBeforeText < textBoundary && (textBoundary - hrBeforeText) <= 512)
+                {
+                    return hrBeforeText;
+                }
+                return -1;
+            }
+
+            private static int NormalizeBoundaryToElementStart(string html, int start, int markerIndex)
+            {
+                if (string.IsNullOrEmpty(html) || markerIndex < start)
+                {
+                    return markerIndex;
+                }
+
+                if (markerIndex + 1 < html.Length && html[markerIndex] == '<')
+                {
+                    return markerIndex;
+                }
+
+                int tagStart = html.LastIndexOf("<", markerIndex, StringComparison.OrdinalIgnoreCase);
+                int tagEnd = html.IndexOf(">", tagStart >= 0 ? tagStart : markerIndex, StringComparison.OrdinalIgnoreCase);
+                if (tagStart >= start && tagEnd >= markerIndex)
+                {
+                    return tagStart;
+                }
+                return markerIndex;
+            }
+
+            private static int FindReplyHeaderElementStart(string html, int start, int textBoundary)
+            {
+                int openBlock = FindOpenAncestorTagStart(html, start, textBoundary, "div");
+                if (openBlock >= 0)
+                {
+                    return openBlock;
+                }
+
+                openBlock = FindOpenAncestorTagStart(html, start, textBoundary, "table");
+                if (openBlock >= 0)
+                {
+                    return openBlock;
+                }
+
+                int paragraphStart = html.LastIndexOf("<p", textBoundary, StringComparison.OrdinalIgnoreCase);
+                if (paragraphStart >= start)
+                {
+                    int paragraphEnd = html.IndexOf(">", paragraphStart, StringComparison.OrdinalIgnoreCase);
+                    if (paragraphEnd >= textBoundary)
+                    {
+                        return paragraphStart;
+                    }
+                    int previousParagraphClose = html.LastIndexOf("</p>", textBoundary, StringComparison.OrdinalIgnoreCase);
+                    if (previousParagraphClose < paragraphStart)
+                    {
+                        return paragraphStart;
+                    }
+                }
+
+                return -1;
+            }
+
+            private static int FindOpenAncestorTagStart(string html, int start, int textBoundary, string tagName)
+            {
+                if (string.IsNullOrEmpty(html) || string.IsNullOrEmpty(tagName) || textBoundary <= start)
+                {
+                    return -1;
+                }
+
+                string openMarker = "<" + tagName;
+                string closeMarker = "</" + tagName + ">";
+                int open = html.LastIndexOf(openMarker, textBoundary, StringComparison.OrdinalIgnoreCase);
+                if (open < start)
+                {
+                    return -1;
+                }
+
+                int close = html.LastIndexOf(closeMarker, textBoundary, StringComparison.OrdinalIgnoreCase);
+                if (close > open)
+                {
+                    return -1;
+                }
+
+                int tagEnd = html.IndexOf(">", open, StringComparison.OrdinalIgnoreCase);
+                if (tagEnd < 0 || tagEnd > textBoundary)
+                {
+                    return -1;
+                }
+
+                return open;
+            }
+
+            private static int FindEarliestBoundaryMarker(string html, int start, int end, string[] markers)
+            {
+                if (string.IsNullOrEmpty(html) || markers == null || markers.Length == 0)
+                {
+                    return -1;
+                }
+
                 int result = -1;
                 for (int i = 0; i < markers.Length; i++)
                 {
-                    int index = html.IndexOf(markers[i], start, StringComparison.OrdinalIgnoreCase);
+                    string marker = markers[i];
+                    if (string.IsNullOrEmpty(marker))
+                    {
+                        continue;
+                    }
+                    int index = html.IndexOf(marker, start, StringComparison.OrdinalIgnoreCase);
                     if (index < 0 || index >= end)
                     {
                         continue;
@@ -471,7 +656,11 @@ namespace NcTalkOutlookAddIn
 
             private EmailSignatureComposeKind ResolveEmailSignatureComposeKind()
             {
-                int verb = ReadLastVerbExecuted();
+                int verb;
+                if (!TryReadLastVerbExecuted(out verb))
+                {
+                    return EmailSignatureComposeKind.Unknown;
+                }
                 if (verb == 102 || verb == 103)
                 {
                     return EmailSignatureComposeKind.Reply;
@@ -483,8 +672,9 @@ namespace NcTalkOutlookAddIn
                 return EmailSignatureComposeKind.New;
             }
 
-            private int ReadLastVerbExecuted()
+            private bool TryReadLastVerbExecuted(out int verb)
             {
+                verb = 0;
                 Outlook.PropertyAccessor accessor = null;
                 try
                 {
@@ -492,16 +682,34 @@ namespace NcTalkOutlookAddIn
                     object value = accessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x10810003");
                     if (value == null)
                     {
-                        return 0;
+                        return true;
                     }
                     int parsed;
-                    return int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed)
-                        ? parsed
-                        : 0;
+                    if (!int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
+                    {
+                        return true;
+                    }
+                    verb = parsed;
+                    return true;
                 }
-                catch
+                catch (COMException ex)
                 {
-                    return 0;
+                    uint errorCode = unchecked((uint)ex.ErrorCode);
+                    if (errorCode == 0x8004010Fu)
+                    {
+                        if (DiagnosticsLogger.IsEnabled)
+                        {
+                            LogEmailSignature("Last verb is not set; treating unsent compose as new mail.");
+                        }
+                        return true;
+                    }
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", ex);
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", ex);
+                    return false;
                 }
                 finally
                 {

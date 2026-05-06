@@ -107,21 +107,23 @@ namespace NcTalkOutlookAddIn
             private bool _emailSignatureManaged;
             private bool _emailSignatureInitialSlotHandled;
             private bool _emailSignatureApplying;
-            private readonly string _initialEmailSignatureSlotHtml;
+            private bool _isInlineResponse;
             private string _pendingEmailSignatureReason = string.Empty;
             private bool _disposed;
             private const int BeforeAddShareBatchDebounceMs = 3000;
             private const int EmailSignatureApplyDebounceMs = 900;
+            private const int EmailSignatureInlineApplyDebounceMs = 250;
 
-            internal MailComposeSubscription(NextcloudTalkAddIn owner, Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
+            internal MailComposeSubscription(NextcloudTalkAddIn owner, Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey, bool isInlineResponse)
             {
                 _owner = owner;
                 _mail = mail;
+                _isInlineResponse = isInlineResponse;
                 _mailIdentityKey = string.IsNullOrWhiteSpace(mailIdentityKey)
                     ? ComInteropScope.ResolveIdentityKey(mail, LogCategories.FileLink, "MailItem")
                     : mailIdentityKey.Trim();
                 _inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityKey)
-                    ? MailInteropController.ResolveMailInspectorIdentityKey(mail)
+                    ? (isInlineResponse ? string.Empty : MailInteropController.ResolveMailInspectorIdentityKey(mail))
                     : inspectorIdentityKey.Trim();
                 _composeKey = BuildComposeKey(mail, _mailIdentityKey, _inspectorIdentityKey);
 
@@ -136,9 +138,8 @@ namespace NcTalkOutlookAddIn
                 _cleanupGraceTimer.Interval = ComposeShareCleanupSendGraceMs;
                 _cleanupGraceTimer.Tick += OnCleanupGraceTimerTick;
 
-                _emailSignatureTimer.Interval = EmailSignatureApplyDebounceMs;
+                _emailSignatureTimer.Interval = isInlineResponse ? EmailSignatureInlineApplyDebounceMs : EmailSignatureApplyDebounceMs;
                 _emailSignatureTimer.Tick += OnEmailSignatureTimerTick;
-                _initialEmailSignatureSlotHtml = CaptureInitialSignatureSlotHtml(mail);
 
                 _events = mail as Outlook.ItemEvents_10_Event;                if (_events != null)
                 {
@@ -156,9 +157,26 @@ namespace NcTalkOutlookAddIn
                     + (_mailIdentityKey ?? string.Empty)
                     + ", inspectorIdentity="
                     + (_inspectorIdentityKey ?? string.Empty)
+                    + ", inline="
+                    + _isInlineResponse.ToString(CultureInfo.InvariantCulture)
                     + ").");
 
                 ScheduleEmailSignatureApplication("compose_open");
+            }
+
+            internal void MarkInlineResponse()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+                if (_isInlineResponse)
+                {
+                    return;
+                }
+                _isInlineResponse = true;
+                _emailSignatureTimer.Interval = EmailSignatureInlineApplyDebounceMs;
+                ScheduleEmailSignatureApplication("inline_response");
             }
 
             internal bool IsFor(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
