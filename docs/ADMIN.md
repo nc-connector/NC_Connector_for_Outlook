@@ -142,7 +142,7 @@ The backend can provide one central HTML email signature for the assigned seat u
 - `policy.email_signature.email_signature_on_compose=true`
 - `policy.email_signature.email_signature_template` contains HTML
 - `policy.email_signature.user_email` contains the Nextcloud user's email address
-- the current Outlook sender account matches that email address
+- the effective Outlook sender identity matches that email address. If Outlook uses a `SentOnBehalfOfName`/From override for a shared mailbox or delegated Exchange identity, that override must resolve to the same SMTP address; otherwise no backend signature is inserted.
 
 The local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` control whether the backend signature is inserted for new mails, replies, and forwards unless the backend locks the corresponding setting with `policy_editable.email_signature.<key>=false`.
 

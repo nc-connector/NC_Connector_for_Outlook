@@ -137,7 +137,7 @@ Wenn das optionale NC-Connector-Backend installiert ist, kann Outlook eine zentr
 - `policy.email_signature.email_signature_on_compose` muss `true` sein
 - `policy.email_signature.email_signature_template` muss HTML enthalten
 - `policy.email_signature.user_email` muss die E-Mail-Adresse des Nextcloud-Benutzers enthalten
-- das aktuelle Outlook-Absenderkonto muss genau zu dieser E-Mail-Adresse passen
+- die effektive Outlook-Absenderidentitaet muss genau zu dieser E-Mail-Adresse passen. Wenn Outlook einen `SentOnBehalfOfName`-/Von-Override fuer ein Shared Mailbox- oder delegiertes Exchange-Konto verwendet, muss genau dieser Override auf dieselbe SMTP-Adresse aufloesbar sein; andernfalls wird keine Backend-Signatur eingefuegt.
 
 Die lokalen Einstellungen `EmailSignatureOnCompose`, `EmailSignatureOnReply` und `EmailSignatureOnForward` steuern, ob die Backend-Signatur bei neuen Mails, Antworten und Weiterleitungen eingefuegt wird. Wenn das Backend einen Wert per `policy_editable.email_signature.<key>=false` sperrt, ist die Option im UI gesperrt und Outlook verwendet den Backend-Wert.
 

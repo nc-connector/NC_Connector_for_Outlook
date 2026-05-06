@@ -132,7 +132,7 @@ Runtime contract:
 
 - Backend signature insertion requires an active backend policy for the `email_signature` domain, an active assigned seat, non-empty `policy.email_signature.email_signature_template`, and `policy.email_signature.user_email`.
 - Missing `policy.email_signature` support disables only central signatures and surfaces a backend update hint; Share/Talk policy domains remain independent.
-- The current Outlook sender account must match `policy.email_signature.user_email`; other identities are left untouched.
+- The effective Outlook sender identity must match `policy.email_signature.user_email`; other identities are left untouched. A `SentOnBehalfOfName`/From override for shared mailboxes or delegated Exchange identities takes precedence over `SendUsingAccount` and must resolve to the same SMTP address. If the sender identity cannot be resolved exactly, signature processing fails closed.
 - Local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` can disable insertion for the corresponding compose type unless the backend locks the value.
 - For the matching sender account, enabled compose signature policy also owns the initial signature slot in replies and forwards. Outlook-native or third-party signatures captured at compose open are removed only when the quoted-message boundary is structurally identifiable; otherwise the quoted message and separator are preserved.
 - When compose signature policy is inactive or the sender does not match, NC Connector removes only its own marked signature block from the current compose body. It does not remove Outlook-native or third-party signature content.
