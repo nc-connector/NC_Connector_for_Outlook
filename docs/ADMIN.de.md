@@ -153,7 +153,9 @@ Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanit
 
 ## Compose-Freigabe-Lifecycle (3.0.4)
 
-### Attachment-Automatisierung und Cleanup-Vertrag
+### Attachment-Automatisierung und Cleanup-Regeln
+- Der Button `Nextcloud Freigabe hinzufuegen` ist auch in Outlook-Inline-Antworten/-Weiterleitungen im Tab Nachricht verfuegbar und nutzt denselben Wizard-Pfad wie Mail-Compose-Inspectoren.
+- Inline-Antworten/-Weiterleitungen schreiben den Freigabeblock ueber Outlooks aktiven Inline-WordEditor. HTML/RTF-Mails behalten zwei leere Zeilen ueber dem Freigabeblock; Plain-Text-Mails bleiben Plain Text und verwenden den gerahmten `#`-Block.
 - Im Compose-Attachment-Modus werden serverseitige Artefakte direkt nach Share-Erstellung fuer Cleanup-Tracking registriert.
 - Cleanup wird erst nach bestaetigtem erfolgreichem Hauptversand wieder entfernt.
 - Wird das Compose-Fenster ohne erfolgreichen Versand geschlossen, loescht das Add-in die erzeugten Share-Ordner-Artefakte serverseitig (best effort, mit Grace-Timer fuer Send/Close-Race).

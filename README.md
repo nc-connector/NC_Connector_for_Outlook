@@ -14,7 +14,7 @@ This is a community project and is not an official Nextcloud GmbH product.
 - **One-click Nextcloud Talk**
 Open an appointment, choose Nextcloud Talk, configure the room, and select a moderator. Optionally, invited attendees can be added to the room automatically (separately for internal Nextcloud users and external email guests). The wizard writes title, location, and a description block (including help link) into the appointment.
 - **Sharing deluxe**
-The compose button “Insert Nextcloud share” starts the sharing wizard with upload queue, password generator, expiration date, note field, attachment automation, and optional separate password follow-up mail. The finished share is inserted as formatted HTML directly into the email.
+The “Insert Nextcloud share” button starts the sharing wizard with upload queue, password generator, expiration date, note field, attachment automation, and optional separate password follow-up mail. It is available in compose windows and inline replies/forwards. The finished share is inserted into the current editor as formatted HTML/RTF or, for plain-text mail, as a framed text block.
 - **Enterprise-grade security**
 Lobby until start time, moderator delegation, automatic cleanup of discarded appointments, mandatory passwords, and expiration policies help protect sensitive meetings and files.
 - **Central backend policies (optional)**
@@ -54,6 +54,8 @@ Bundled third-party sanitizer/runtime dependencies and their licenses are docume
 - Four steps (share, expiration date, files, note) with a password-protected upload folder.
 - Upload queue with duplicate checks, progress display and optional share creation.
 - Automatic HTML block with link, password, expiration date and optional note.
+- Inline replies and forwards use the same sharing wizard and keep two empty lines above the inserted block for the sender's own text.
+- Plain-text mail stays plain text and receives a framed `#` share block instead of HTML.
 - Optional compose attachment automation:
   - always route new attachments into NC Connector, or
   - prompt above a configurable total-size threshold.

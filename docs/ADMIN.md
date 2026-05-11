@@ -169,7 +169,9 @@ If backend policy/template delivery is enabled for Talk appointment descriptions
 
 ## Compose sharing lifecycle (3.0.4)
 
-### Attachment automation and cleanup contract
+### Attachment automation and cleanup rules
+- The `Insert Nextcloud share` button is also available in Outlook inline replies/forwards on the Message tab and uses the same wizard path as mail compose inspectors.
+- Inline replies/forwards write the share block through Outlook's active inline Word editor. HTML/RTF messages keep two empty lines above the share block; plain-text messages keep plain text and use the framed `#` block.
 - In compose attachment mode, created server artifacts are tracked immediately after share creation.
 - Cleanup tracking is cleared only after a confirmed successful primary mail send.
 - If a compose window is closed without a successful send, the add-in deletes the created share folder artifacts server-side (best effort, with send/close grace timer handling).

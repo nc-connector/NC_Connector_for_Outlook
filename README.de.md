@@ -14,7 +14,7 @@ Dies ist ein Community-Projekt und kein offizielles Produkt der Nextcloud GmbH.
 - **Ein Klick zu Nextcloud Talk**
 Termin öffnen, Nextcloud Talk wählen, Raum konfigurieren, Moderator definieren. Optional können eingeladene Teilnehmer direkt in den Raum übernommen werden (getrennt nach internen Nextcloud-Benutzern und externen E-Mail-Gästen). Der Wizard schreibt Titel/Ort/Beschreibung inklusive Hilfe-Link automatisch in den Termin.
 - **Sharing deluxe**
-Compose-Button Nextcloud Freigabe hinzufügen startet den Freigabe-Assistenten mit Upload-Queue, Passwortgenerator, Ablaufdatum, Notizfeld, Anhangs-Automatisierung und optionalem separatem Passwort-Follow-up. Die fertige Freigabe landet als formatiertes HTML direkt in der E-Mail.
+Der Button Nextcloud Freigabe hinzufügen startet den Freigabe-Assistenten mit Upload-Queue, Passwortgenerator, Ablaufdatum, Notizfeld, Anhangs-Automatisierung und optionalem separatem Passwort-Follow-up. Er ist in Compose-Fenstern und Inline-Antworten/-Weiterleitungen verfuegbar. Die fertige Freigabe landet im aktuellen Editor als HTML/RTF-Block oder bei Plain-Text-Mails als gerahmter Textblock.
 - **Enterprise-Sicherheit**
 Lobby bis Startzeit, Moderator-Delegation, automatisches Aufräumen nicht gespeicherter Termine, Pflicht-Passwörter und Ablauffristen schützen sensible Meetings und Dateien.
 - **Zentrale Backend-Policies (optional)**
@@ -53,6 +53,8 @@ Gebuendelte Drittanbieter-Abhaengigkeiten (Sanitizer/Laufzeit) und deren Lizenze
 - Vier Schritte (Freigabe, Ablaufdatum, Dateien, Notiz) mit passwortgeschütztem Upload-Ordner.
 - Upload-Queue mit Duplikatprüfung, Fortschrittsanzeige und optionaler Freigabe.
 - Automatische HTML-Bausteine mit Link, Passwort, Ablaufdatum und optionaler Notiz.
+- Inline-Antworten und Weiterleitungen nutzen denselben Freigabe-Assistenten und behalten zwei leere Zeilen ueber dem eingefuegten Block fuer eigenen Text.
+- Plain-Text-Mails bleiben Plain Text und bekommen statt HTML einen gerahmten `#`-Freigabeblock.
 - Optionale Anhangs-Automatisierung:
   - neue Anhaenge immer ueber NC Connector verarbeiten, oder
   - Prompt ab konfigurierbarer Gesamtgroesse anzeigen.
