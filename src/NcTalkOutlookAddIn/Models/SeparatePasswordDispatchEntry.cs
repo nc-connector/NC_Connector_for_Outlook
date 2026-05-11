@@ -14,6 +14,10 @@ namespace NcTalkOutlookAddIn.Models
 
         internal string Html { get; set; }
 
+        internal string PlainText { get; set; }
+
+        internal bool IsPlainText { get; set; }
+
         internal string To { get; set; }
 
         internal string Cc { get; set; }

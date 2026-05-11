@@ -82,6 +82,7 @@ namespace NcTalkOutlookAddIn.Controllers
             {                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
                 {
                     string languageOverride = settings != null ? settings.ShareBlockLang : "default";
+                    bool plainTextCompose = MailInteropController.IsPlainTextMail(mail);
                     NextcloudTalkAddIn.LogFileLinkMessage("Share created (folder=\"" + wizard.Result.FolderName + "\").");
 
                     NextcloudTalkAddIn.MailComposeSubscription composeSubscription = _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());                    if (composeSubscription != null)
@@ -89,9 +90,15 @@ namespace NcTalkOutlookAddIn.Controllers
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
                     string html;
+                    string plainText;
                     try
                     {
-                        html = FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
+                        html = plainTextCompose
+                            ? string.Empty
+                            : FileLinkHtmlBuilder.Build(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus);
+                        plainText = plainTextCompose
+                            ? FileLinkHtmlBuilder.BuildPlainText(wizard.Result, wizard.RequestSnapshot, languageOverride, policyStatus)
+                            : string.Empty;
                     }
                     catch (Exception ex)
                     {
@@ -109,9 +116,15 @@ namespace NcTalkOutlookAddIn.Controllers
                         && !string.IsNullOrWhiteSpace(wizard.Result.Password))
                     {
                         string passwordOnlyHtml;
+                        string passwordOnlyPlainText;
                         try
                         {
-                            passwordOnlyHtml = FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
+                            passwordOnlyHtml = plainTextCompose
+                                ? string.Empty
+                                : FileLinkHtmlBuilder.BuildPasswordOnly(wizard.Result, languageOverride, policyStatus);
+                            passwordOnlyPlainText = plainTextCompose
+                                ? FileLinkHtmlBuilder.BuildPasswordOnlyPlainText(wizard.Result, languageOverride, policyStatus)
+                                : string.Empty;
                         }
                         catch (Exception ex)
                         {
@@ -127,10 +140,19 @@ namespace NcTalkOutlookAddIn.Controllers
                         composeSubscription.RegisterSeparatePasswordDispatch(
                             wizard.Result,
                             wizard.RequestSnapshot,
-                            passwordOnlyHtml);
+                            passwordOnlyHtml,
+                            passwordOnlyPlainText,
+                            plainTextCompose);
                     }
 
-                    _owner.InsertHtmlIntoMail(mail, html);
+                    if (plainTextCompose)
+                    {
+                        _owner.InsertPlainTextIntoMail(mail, plainText);
+                    }
+                    else
+                    {
+                        _owner.InsertHtmlIntoMail(mail, html);
+                    }
                     return true;
                 }
             }

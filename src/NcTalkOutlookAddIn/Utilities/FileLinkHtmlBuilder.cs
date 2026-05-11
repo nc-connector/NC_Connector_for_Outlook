@@ -210,6 +210,134 @@ namespace NcTalkOutlookAddIn.Utilities
             return builder.ToString();
         }
 
+        internal static string BuildPlainText(FileLinkResult result, FileLinkRequest request, string languageOverride, BackendPolicyStatus policyStatus = null)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException("result");
+            }
+
+            bool attachmentMode = request != null && request.AttachmentMode;
+            bool separatePassword = request != null
+                && request.PasswordSeparateEnabled
+                && !string.IsNullOrWhiteSpace(result.Password);
+            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
+
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, false, effectiveLanguage);
+            if (!string.IsNullOrWhiteSpace(policyTemplate))
+            {
+                return FramePlainTextBlock(RenderPolicyTemplatePlainText(
+                    policyTemplate,
+                    result,
+                    request,
+                    effectiveLanguage,
+                    attachmentMode,
+                    separatePassword,
+                    passwordOnly: false));
+            }
+
+            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveLanguage = "default";
+            }
+
+            string downloadUrl = attachmentMode
+                ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
+                : (result.ShareUrl ?? string.Empty);
+
+            string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
+            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
+            var sections = new List<string>();
+            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
+            {
+                sections.Add(NormalizePlainTextBlock(request.Note));
+            }
+            sections.Add(NormalizePlainTextBlock(Strings.GetInLanguage(
+                effectiveLanguage,
+                "sharing_html_intro_line",
+                "The files have been provided securely via Nextcloud. You can download them using the link below.")));
+
+            var fields = new List<string>();
+            fields.Add(BuildPlainTextField(Strings.GetInLanguage(effectiveLanguage, "sharing_html_download_label", "Download link"), downloadUrl));
+            if (!string.IsNullOrWhiteSpace(result.Password) && !separatePassword)
+            {
+                fields.Add(BuildPlainTextField(passwordLabel, result.Password));
+            }
+            else if (separatePassword)
+            {
+                fields.Add(BuildPlainTextField(passwordLabel, passwordSeparateHint));
+            }
+            if (result.ExpireDate.HasValue)
+            {
+                fields.Add(BuildPlainTextField(
+                    Strings.GetInLanguage(effectiveLanguage, "sharing_html_expire_label", "Expiration date"),
+                    result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+            }
+            if (!attachmentMode)
+            {
+                fields.Add(BuildPlainTextField(
+                    Strings.GetInLanguage(effectiveLanguage, "sharing_html_permissions_label", "Your permissions"),
+                    BuildPermissionsPlainTextDisplay(
+                        result.Permissions,
+                        Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read"),
+                        Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload"),
+                        Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify"),
+                        Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete"))));
+            }
+
+            string fieldsText = NormalizePlainTextBlock(string.Join("\r\n", fields.FindAll(value => !string.IsNullOrWhiteSpace(value)).ToArray()));
+            if (!string.IsNullOrWhiteSpace(fieldsText))
+            {
+                sections.Add(fieldsText);
+            }
+
+            string footer = Strings.GetInLanguage(effectiveLanguage, "sharing_html_footer_line", "Nextcloud is a solution for secure e-mail and data exchange.");
+            if (!string.IsNullOrWhiteSpace(footer))
+            {
+                sections.Add(NormalizePlainTextBlock(footer));
+            }
+
+            return FramePlainTextBlock(string.Join("\r\n\r\n", sections.FindAll(value => !string.IsNullOrWhiteSpace(value)).ToArray()));
+        }
+
+        internal static string BuildPasswordOnlyPlainText(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException("result");
+            }
+
+            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, true, effectiveLanguage);
+            if (!string.IsNullOrWhiteSpace(policyTemplate))
+            {
+                return FramePlainTextBlock(RenderPolicyTemplatePlainText(
+                    policyTemplate,
+                    result,
+                    request: null,
+                    effectiveLanguage: effectiveLanguage,
+                    attachmentMode: false,
+                    separatePassword: false,
+                    passwordOnly: true));
+            }
+
+            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveLanguage = "default";
+            }
+
+            var sections = new List<string>();
+            sections.Add(NormalizePlainTextBlock(Strings.GetInLanguage(
+                effectiveLanguage,
+                "sharing_html_password_mail_intro",
+                "Here is your password for the shared link.")));
+            sections.Add(BuildPlainTextField(
+                Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password"),
+                result.Password));
+
+            return FramePlainTextBlock(string.Join("\r\n\r\n", sections.FindAll(value => !string.IsNullOrWhiteSpace(value)).ToArray()));
+        }
+
                 // Resolve effective HTML block language with policy override support.
         private static string ResolveEffectiveLanguage(string languageOverride, BackendPolicyStatus policyStatus)
         {
@@ -305,6 +433,146 @@ namespace NcTalkOutlookAddIn.Utilities
                 throw new InvalidOperationException("Share HTML template sanitized to empty output.");
             }
             return sanitized;
+        }
+
+        private static string RenderPolicyTemplatePlainText(
+            string template,
+            FileLinkResult result,
+            FileLinkRequest request,
+            string effectiveLanguage,
+            bool attachmentMode,
+            bool separatePassword,
+            bool passwordOnly)
+        {
+            if (string.IsNullOrWhiteSpace(template) || result == null)
+            {
+                return string.Empty;
+            }
+
+            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
+            string permissionRead = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read");
+            string permissionCreate = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload");
+            string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
+            string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
+
+            string downloadUrl = attachmentMode
+                ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
+                : (result.ShareUrl ?? string.Empty);
+
+            string passwordValue = result.Password ?? string.Empty;
+            if (!passwordOnly && separatePassword)
+            {
+                passwordValue = passwordSeparateHint;
+            }
+            string noteValue = string.Empty;
+            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
+            {
+                noteValue = request.Note.Trim();
+            }
+            string rightsValue = attachmentMode
+                ? string.Empty
+                : BuildPermissionsPlainTextDisplay(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete);
+
+            string expireValue = result.ExpireDate.HasValue
+                ? result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                : string.Empty;
+
+            string html = template;
+            if (attachmentMode)
+            {
+                html = StripTemplateRow(html, "RIGHTS");
+            }
+            html = html.Replace("{URL}", PlainTextToTemplateHtml(downloadUrl ?? string.Empty));
+            html = html.Replace("{PASSWORD}", PlainTextToTemplateHtml(passwordValue));
+            html = html.Replace("{EXPIRATIONDATE}", PlainTextToTemplateHtml(expireValue));
+            html = html.Replace("{RIGHTS}", PlainTextToTemplateHtml(rightsValue));
+            html = html.Replace("{NOTE}", PlainTextToTemplateHtml(noteValue));
+
+            string sanitized = HtmlTemplateSanitizer.SanitizeShareTemplateHtml(html);
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                throw new InvalidOperationException("Share plain-text template sanitized to empty output.");
+            }
+
+            string plainText = HtmlToPlainTextConverter.Convert(sanitized);
+            if (string.IsNullOrWhiteSpace(plainText))
+            {
+                throw new InvalidOperationException("Share plain-text template rendered to empty output.");
+            }
+
+            return plainText;
+        }
+
+        private static string PlainTextToTemplateHtml(string value)
+        {
+            string encoded = HttpUtility.HtmlEncode(NormalizePlainTextBlock(value));
+            return encoded.Replace("\r\n", "<br />");
+        }
+
+        private static string FramePlainTextBlock(string plainText)
+        {
+            string normalized = NormalizePlainTextBlock(plainText);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                throw new InvalidOperationException("Share plain-text block rendered to empty output.");
+            }
+
+            string border = new string('#', 60);
+            return border + "\r\n" + normalized + "\r\n" + border;
+        }
+
+        private static string BuildPlainTextField(string label, string value)
+        {
+            string normalizedValue = NormalizePlainTextBlock(value);
+            if (string.IsNullOrWhiteSpace(normalizedValue))
+            {
+                return string.Empty;
+            }
+
+            return (label ?? string.Empty).Trim() + ": " + normalizedValue;
+        }
+
+        private static string BuildPermissionsPlainTextDisplay(
+            FileLinkPermissionFlags permissions,
+            string readLabel,
+            string createLabel,
+            string writeLabel,
+            string deleteLabel)
+        {
+            var values = new List<string>();
+            values.Add(BuildPermissionPlainText(readLabel, (permissions & FileLinkPermissionFlags.Read) == FileLinkPermissionFlags.Read));
+            values.Add(BuildPermissionPlainText(createLabel, (permissions & FileLinkPermissionFlags.Create) == FileLinkPermissionFlags.Create));
+            values.Add(BuildPermissionPlainText(writeLabel, (permissions & FileLinkPermissionFlags.Write) == FileLinkPermissionFlags.Write));
+            values.Add(BuildPermissionPlainText(deleteLabel, (permissions & FileLinkPermissionFlags.Delete) == FileLinkPermissionFlags.Delete));
+            return string.Join(", ", values.ToArray());
+        }
+
+        private static string BuildPermissionPlainText(string label, bool enabled)
+        {
+            return (enabled ? "[x] " : "[ ] ") + (label ?? string.Empty).Trim();
+        }
+
+        private static string NormalizePlainTextBlock(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            string normalized = value.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\u00A0', ' ');
+            string[] lines = normalized.Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                lines[i] = lines[i].TrimEnd();
+            }
+
+            normalized = string.Join("\n", lines).Trim('\n', ' ', '\t');
+            while (normalized.Contains("\n\n\n"))
+            {
+                normalized = normalized.Replace("\n\n\n", "\n\n");
+            }
+
+            return normalized.Replace("\n", "\r\n").Trim();
         }
 
                 // Remove one placeholder row from backend-provided HTML templates.

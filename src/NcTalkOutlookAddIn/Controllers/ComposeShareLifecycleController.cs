@@ -91,7 +91,7 @@ namespace NcTalkOutlookAddIn.Controllers
             string lastFailureMessage = string.Empty;
             var sentRecipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var dispatch in queue)
-            {                if (dispatch == null || string.IsNullOrWhiteSpace(dispatch.Password) || string.IsNullOrWhiteSpace(dispatch.Html))
+            {                if (!IsDispatchUsable(dispatch))
                 {
                     continue;
                 }
@@ -106,7 +106,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     }
 
                     passwordMail.Subject = BuildSeparatePasswordMailSubject(dispatch);
-                    passwordMail.HTMLBody = dispatch.Html;
+                    ApplySeparatePasswordBody(passwordMail, dispatch);
                     List<string> resolvedRecipients = ApplySeparatePasswordRecipientsForSend(passwordMail, dispatch, composeKey);
                     int resolvedRecipientCount = resolvedRecipients.Count;
 
@@ -306,7 +306,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 fallback.CC = ccRecipients;
                 fallback.BCC = bccRecipients;
                 fallback.Subject = BuildSeparatePasswordMailSubject(dispatch);
-                fallback.HTMLBody = dispatch.Html ?? string.Empty;
+                ApplySeparatePasswordBody(fallback, dispatch);
                 fallback.Display(false);
                 NextcloudTalkAddIn.LogFileLinkMessage(
                     "Separate password mail manual fallback opened (composeKey="
@@ -432,6 +432,46 @@ namespace NcTalkOutlookAddIn.Controllers
                         "Failed to release password Recipient COM object.");
                 }
             }
+        }
+
+        private static bool IsDispatchUsable(SeparatePasswordDispatchEntry dispatch)
+        {
+            if (dispatch == null || string.IsNullOrWhiteSpace(dispatch.Password))
+            {
+                return false;
+            }
+
+            return dispatch.IsPlainText
+                ? !string.IsNullOrWhiteSpace(dispatch.PlainText)
+                : !string.IsNullOrWhiteSpace(dispatch.Html);
+        }
+
+        private static void ApplySeparatePasswordBody(Outlook.MailItem mail, SeparatePasswordDispatchEntry dispatch)
+        {
+            if (mail == null || dispatch == null)
+            {
+                return;
+            }
+
+            if (dispatch.IsPlainText)
+            {
+                mail.BodyFormat = Outlook.OlBodyFormat.olFormatPlain;
+                mail.Body = NormalizeMailPlainText(dispatch.PlainText);
+                return;
+            }
+
+            mail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
+            mail.HTMLBody = dispatch.Html ?? string.Empty;
+        }
+
+        private static string NormalizeMailPlainText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            return value.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n").Trim();
         }
 
         private static string BuildSeparatePasswordMailSubject(SeparatePasswordDispatchEntry dispatch)

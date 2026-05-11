@@ -244,8 +244,16 @@ namespace NcTalkOutlookAddIn
                     + ").");
             }
 
-            internal void RegisterSeparatePasswordDispatch(FileLinkResult result, FileLinkRequest request, string passwordOnlyHtml)
-            {                if (result == null || request == null || string.IsNullOrWhiteSpace(passwordOnlyHtml))
+            internal void RegisterSeparatePasswordDispatch(FileLinkResult result, FileLinkRequest request, string passwordOnlyHtml, string passwordOnlyPlainText, bool isPlainText)
+            {                if (result == null || request == null)
+                {
+                    return;
+                }
+                if (isPlainText && string.IsNullOrWhiteSpace(passwordOnlyPlainText))
+                {
+                    return;
+                }
+                if (!isPlainText && string.IsNullOrWhiteSpace(passwordOnlyHtml))
                 {
                     return;
                 }
@@ -260,6 +268,8 @@ namespace NcTalkOutlookAddIn
                     ShareUrl = result.ShareUrl ?? string.Empty,
                     Password = password.Trim(),
                     Html = passwordOnlyHtml,
+                    PlainText = passwordOnlyPlainText,
+                    IsPlainText = isPlainText,
                     To = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("To")),
                     Cc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("CC")),
                     Bcc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("BCC"))
@@ -273,6 +283,8 @@ namespace NcTalkOutlookAddIn
                     + _passwordDispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
                     + ", hasShareUrl="
                     + (!string.IsNullOrWhiteSpace(entry.ShareUrl)).ToString(CultureInfo.InvariantCulture)
+                    + ", plainText="
+                    + entry.IsPlainText.ToString(CultureInfo.InvariantCulture)
                     + ").");
             }
 

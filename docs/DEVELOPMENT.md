@@ -222,7 +222,8 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
    - Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file` to the final DAV path.
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
-6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` inserts the HTML into the message body (delegated to `Controllers/MailInteropController.cs`).
+   - plain-text compose keeps `MailItem.BodyFormat=olFormatPlain`; the share block is rendered as a framed text block with `#` separators and inserted through Outlook WordEditor at the current cursor position. `MailItem.Body` is not rewritten.
+6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` / `InsertPlainTextIntoMail(...)` insert the rendered block into the message body (delegated to `Controllers/MailInteropController.cs`).
 
 Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) with lifecycle logic delegated to `Controllers/ComposeShareLifecycleController`:
 
@@ -250,7 +251,7 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
 - Separate password-mail dispatch:
   - queue password-only HTML after share creation
   - capture recipients on send
-  - dispatch only after successful primary send
+  - dispatch only after successful primary send and keep the source compose mode for HTML vs plain-text follow-up mails
   - auto-send first, then manual fallback draft on failure.
 
 #### IFB flow

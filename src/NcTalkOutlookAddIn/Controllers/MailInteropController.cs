@@ -271,6 +271,164 @@ namespace NcTalkOutlookAddIn.Controllers
                 MessageBoxIcon.Error);
         }
 
+        internal void InsertPlainTextIntoMail(Outlook.MailItem mail, string plainText)
+        {
+            if (mail == null || string.IsNullOrWhiteSpace(plainText))
+            {
+                return;
+            }
+
+            try
+            {
+                string insertText = NormalizeMailPlainText(plainText);
+                if (!string.IsNullOrEmpty(insertText))
+                {
+                    insertText += "\r\n\r\n";
+                }
+
+                string source;
+                if (TryInsertPlainTextViaWordEditor(mail, insertText, out source))
+                {
+                    DiagnosticsLogger.Log(LogCategories.Core, "Inserted plain-text share block into mail (source=" + source + ").");
+                    return;
+                }
+
+                throw new InvalidOperationException("Outlook WordEditor insertion point unavailable.");
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text share block into mail.", error);
+                MessageBox.Show(
+                    string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, error.Message),
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private bool TryInsertPlainTextViaWordEditor(Outlook.MailItem mail, string text, out string source)
+        {
+            source = string.Empty;
+            if (mail == null || string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+
+            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+            Outlook.Explorer explorer = null;
+            Outlook.MailItem activeInlineMail = null;
+            Outlook.Inspector inspector = null;
+            object wordEditor = null;
+            object wordApplication = null;
+            object selection = null;
+            bool activeInlineMatches = false;
+
+            try
+            {
+                if (application != null)
+                {
+                    explorer = application.ActiveExplorer();
+                    if (explorer != null)
+                    {
+                        activeInlineMail = explorer.ActiveInlineResponse as Outlook.MailItem;
+                        activeInlineMatches = ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.Core, "MailItem", "ActiveInlineResponse");
+                        if (activeInlineMatches)
+                        {
+                            wordEditor = explorer.GetType().InvokeMember(
+                                "ActiveInlineResponseWordEditor",
+                                BindingFlags.GetProperty,
+                                null,
+                                explorer,
+                                null);
+                            source = "inline";
+                        }
+                    }
+                }
+
+                if (activeInlineMatches && wordEditor == null)
+                {
+                    return false;
+                }
+
+                if (wordEditor == null)
+                {
+                    inspector = mail.GetInspector;
+                    if (inspector == null)
+                    {
+                        return false;
+                    }
+
+                    wordEditor = inspector.WordEditor;
+                    source = "inspector";
+                }
+
+                if (wordEditor == null)
+                {
+                    return false;
+                }
+
+                wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
+                if (wordApplication == null)
+                {
+                    return false;
+                }
+
+                selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
+                if (selection == null)
+                {
+                    return false;
+                }
+
+                selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { text });
+                return true;
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain text via Outlook WordEditor.", error);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object after plain-text insert.");
+                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release Word application COM object after plain-text insert.");
+                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release Word editor COM object after plain-text insert.");
+                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release Outlook Inspector COM object after plain-text insert.");
+                if (!ReferenceEquals(activeInlineMail, mail))
+                {
+                    ComInteropScope.TryRelease(activeInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object after plain-text insert.");
+                }
+                ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release Outlook Explorer COM object after plain-text insert.");
+            }
+        }
+
+        internal static bool IsPlainTextMail(Outlook.MailItem mail)
+        {
+            if (mail == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return mail.BodyFormat == Outlook.OlBodyFormat.olFormatPlain;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read MailItem.BodyFormat.", ex);
+                return false;
+            }
+        }
+
+        private static string NormalizeMailPlainText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            return value.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n").Trim();
+        }
+
         private static bool TryInsertHtmlIntoMailBody(Outlook.MailItem mail, string html)
         {
             try

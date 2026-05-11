@@ -439,6 +439,11 @@ namespace NcTalkOutlookAddIn
             _mailInteropController.InsertHtmlIntoMail(mail, html);
         }
 
+        internal void InsertPlainTextIntoMail(Outlook.MailItem mail, string plainText)
+        {
+            _mailInteropController.InsertPlainTextIntoMail(mail, plainText);
+        }
+
         internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
         {
             return MailInteropController.TryWriteAppointmentHtmlBody(appointment, html);
