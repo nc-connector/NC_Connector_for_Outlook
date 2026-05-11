@@ -75,6 +75,7 @@ Output:
 3. Ribbon:
    - Calendar/appointment: **NC Connector → Insert Talk link**
    - Mail compose: **NC Connector → Insert Nextcloud share**
+   - Inline reply/forward: **Message → NC Connector → Insert Nextcloud share**
 4. Open **NC Connector → Settings** and configure server URL + credentials.
 
 ## Repository structure
@@ -225,11 +226,13 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
    - Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file` to the final DAV path.
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
-   - plain-text compose keeps `MailItem.BodyFormat=olFormatPlain`; the share block is rendered as a framed text block with `#` separators and inserted through Outlook WordEditor at the current cursor position. `MailItem.Body` is not rewritten.
+   - plain-text compose keeps `MailItem.BodyFormat=olFormatPlain`; the share block is rendered as a framed text block with `#` separators and inserted through Outlook WordEditor. Inline replies/forwards keep two empty paragraphs above the block for the sender's own text. `MailItem.Body` is not rewritten.
 6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` / `InsertPlainTextIntoMail(...)` insert the rendered block into the message body (delegated to `Controllers/MailInteropController.cs`).
 
 Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) with lifecycle logic delegated to `Controllers/ComposeShareLifecycleController`:
 
+- The FileLink ribbon entry is exposed in mail inspectors and in the Explorer inline reply/forward `Message` tab. Both entries call the same `FileLinkLaunchController` path.
+- Inline replies/forwards insert the rendered share HTML through `Explorer.ActiveInlineResponseWordEditor`; the inline path does not rewrite `MailItem.HTMLBody` and keeps two empty paragraphs above the share block for the sender's own text.
 - Debounced attachment evaluation (`ComposeAttachmentEvalDebounceMs`) after compose attachment changes.
 - Attachment automation modes:
   - always route attachments into NC sharing flow, or

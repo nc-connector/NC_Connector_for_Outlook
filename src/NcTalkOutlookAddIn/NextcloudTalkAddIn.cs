@@ -144,13 +144,31 @@ namespace NcTalkOutlookAddIn
         </group>
       </tab>
     </tabs>
+    <contextualTabs>
+      <tabSet idMso='TabComposeTools'>
+        <tab idMso='TabMessage'>
+          <group id='NcTalkInlineMailGroup' label='{1}'>
+            <button id='NcTalkInlineFileLinkButton'
+                    label='{5}'
+                    size='large'
+                    getImage='OnGetButtonImage'
+                    onAction='OnFileLinkButtonPressed'
+                    screentip='{6}'
+                    supertip='{7}' />
+          </group>
+        </tab>
+      </tabSet>
+    </contextualTabs>
   </ribbon>
 </customUI>",
                     EscapeXml(Strings.RibbonExplorerTabLabel),
                     EscapeXml(Strings.RibbonExplorerGroupLabel),
                     EscapeXml(Strings.RibbonSettingsButtonLabel),
                     EscapeXml(Strings.RibbonSettingsScreenTip),
-                    EscapeXml(Strings.RibbonSettingsSuperTip));
+                    EscapeXml(Strings.RibbonSettingsSuperTip),
+                    EscapeXml(Strings.RibbonFileLinkButtonLabel),
+                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
+                    EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
             }
             if (string.Equals(ribbonID, "Microsoft.Outlook.Mail.Compose", StringComparison.OrdinalIgnoreCase))
             {
@@ -432,6 +450,11 @@ namespace NcTalkOutlookAddIn
         internal string ResolveActiveInspectorIdentityKey()
         {
             return _mailInteropController.ResolveActiveInspectorIdentityKey();
+        }
+
+        internal bool IsActiveInlineResponse(Outlook.MailItem mail)
+        {
+            return _mailInteropController.IsActiveInlineResponse(mail);
         }
 
         internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)

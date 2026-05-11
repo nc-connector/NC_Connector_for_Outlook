@@ -210,9 +210,57 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
-        {            if (mail == null || string.IsNullOrWhiteSpace(html))
+        internal bool IsActiveInlineResponse(Outlook.MailItem mail)
+        {
+            if (mail == null)
             {
+                return false;
+            }
+
+            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+            Outlook.Explorer explorer = null;
+            Outlook.MailItem activeInlineMail = null;
+            try
+            {
+                explorer = application != null ? application.ActiveExplorer() : null;
+                activeInlineMail = explorer != null ? explorer.ActiveInlineResponse as Outlook.MailItem : null;
+                return ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.FileLink, "MailItem", "ActiveInlineResponse");
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to check active inline response.", error);
+                return false;
+            }
+            finally
+            {
+                if (!ReferenceEquals(activeInlineMail, mail))
+                {
+                    ComInteropScope.TryRelease(activeInlineMail, LogCategories.FileLink, "Failed to release ActiveInlineResponse MailItem COM object.");
+                }
+                ComInteropScope.TryRelease(explorer, LogCategories.FileLink, "Failed to release active Explorer COM object.");
+            }
+        }
+
+        internal void InsertHtmlIntoMail(Outlook.MailItem mail, string html)
+        {
+            if (mail == null || string.IsNullOrWhiteSpace(html))
+            {
+                return;
+            }
+            if (IsActiveInlineResponse(mail))
+            {
+                if (TryInsertHtmlIntoActiveInlineResponseWordEditor(mail, html))
+                {
+                    DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into inline response (ActiveInlineResponseWordEditor).");
+                    return;
+                }
+
+                DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML into inline response: inline WordEditor insertion failed.");
+                MessageBox.Show(
+                    string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, "inline WordEditor insertion failed"),
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
                 return;
             }
             if (TryInsertHtmlIntoMailBody(mail, html))
@@ -379,7 +427,29 @@ namespace NcTalkOutlookAddIn.Controllers
                     return false;
                 }
 
-                selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { text });
+                if (activeInlineMatches)
+                {
+                    int replyCursorStart = GetWordDocumentStart(wordEditor, 0);
+                    selection.GetType().InvokeMember(
+                        "SetRange",
+                        BindingFlags.InvokeMethod,
+                        null,
+                        selection,
+                        new object[] { replyCursorStart, replyCursorStart });
+                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
+                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
+                    selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { text });
+                    selection.GetType().InvokeMember(
+                        "SetRange",
+                        BindingFlags.InvokeMethod,
+                        null,
+                        selection,
+                        new object[] { replyCursorStart, replyCursorStart });
+                }
+                else
+                {
+                    selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { text });
+                }
                 return true;
             }
             catch (Exception error)
@@ -427,6 +497,106 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             return value.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n").Trim();
+        }
+
+        private bool TryInsertHtmlIntoActiveInlineResponseWordEditor(Outlook.MailItem mail, string html)
+        {
+            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+            Outlook.Explorer explorer = null;
+            Outlook.MailItem activeInlineMail = null;
+            object wordEditor = null;
+            object wordApplication = null;
+            object selection = null;
+            string tempHtmlPath = null;
+
+            try
+            {
+                explorer = application != null ? application.ActiveExplorer() : null;
+                activeInlineMail = explorer != null ? explorer.ActiveInlineResponse as Outlook.MailItem : null;
+                if (!ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.Core, "MailItem", "ActiveInlineResponse"))
+                {
+                    return false;
+                }
+
+                wordEditor = explorer.GetType().InvokeMember(
+                    "ActiveInlineResponseWordEditor",
+                    BindingFlags.GetProperty,
+                    null,
+                    explorer,
+                    null);
+                if (wordEditor == null)
+                {
+                    return false;
+                }
+
+                wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
+                if (wordApplication == null)
+                {
+                    return false;
+                }
+
+                selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
+                if (selection == null)
+                {
+                    return false;
+                }
+
+                int replyCursorStart = GetWordDocumentStart(wordEditor, 0);
+                selection.GetType().InvokeMember(
+                    "SetRange",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    selection,
+                    new object[] { replyCursorStart, replyCursorStart });
+                selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
+                selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
+
+                tempHtmlPath = Path.Combine(
+                    Path.GetTempPath(),
+                    "nc4ol-inline-share-" + Guid.NewGuid().ToString("N") + ".html");
+                File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
+                selection.GetType().InvokeMember(
+                    "InsertFile",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    selection,
+                    new object[] { tempHtmlPath, Type.Missing, false, false, false });
+                selection.GetType().InvokeMember(
+                    "SetRange",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    selection,
+                    new object[] { replyCursorStart, replyCursorStart });
+                return true;
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert HTML into inline response Word editor.", error);
+                return false;
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
+                {
+                    try
+                    {
+                        File.Delete(tempHtmlPath);
+                    }
+                    catch (Exception error)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline share HTML file.", error);
+                    }
+                }
+
+                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release inline share Word selection COM object.");
+                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release inline share Word application COM object.");
+                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release inline share Word editor COM object.");
+                if (!ReferenceEquals(activeInlineMail, mail))
+                {
+                    ComInteropScope.TryRelease(activeInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object after inline share insert.");
+                }
+                ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release active Explorer COM object after inline share insert.");
+            }
         }
 
         private static bool TryInsertHtmlIntoMailBody(Outlook.MailItem mail, string html)

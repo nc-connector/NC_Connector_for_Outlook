@@ -52,7 +52,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());
+            bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
+            _owner.EnsureMailComposeSubscription(mail, isInlineResponse ? string.Empty : _owner.ResolveActiveInspectorIdentityKey(), isInlineResponse);
             RunFileLinkWizardForMail(mail, null);
         }
 
@@ -85,7 +86,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     bool plainTextCompose = MailInteropController.IsPlainTextMail(mail);
                     NextcloudTalkAddIn.LogFileLinkMessage("Share created (folder=\"" + wizard.Result.FolderName + "\").");
 
-                    NextcloudTalkAddIn.MailComposeSubscription composeSubscription = _owner.EnsureMailComposeSubscription(mail, _owner.ResolveActiveInspectorIdentityKey());                    if (composeSubscription != null)
+                    bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
+                    NextcloudTalkAddIn.MailComposeSubscription composeSubscription = _owner.EnsureMailComposeSubscription(mail, isInlineResponse ? string.Empty : _owner.ResolveActiveInspectorIdentityKey(), isInlineResponse);
+                    if (composeSubscription != null)
                     {
                         composeSubscription.ArmShareCleanup(wizard.Result);
                     }
