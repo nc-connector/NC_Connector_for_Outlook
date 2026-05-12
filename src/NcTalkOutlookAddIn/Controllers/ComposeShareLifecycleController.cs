@@ -14,7 +14,7 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-        // Encapsulates compose share cleanup and separate password mail dispatch.
+    // Encapsulates compose share cleanup and separate password mail dispatch.
     internal sealed class ComposeShareLifecycleController
     {
         private readonly NextcloudTalkAddIn _owner;
@@ -31,7 +31,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 return true;
             }
 
-            _owner.EnsureSettingsLoaded();            if (_owner.CurrentSettings == null || !_owner.SettingsAreComplete())
+            _owner.EnsureSettingsLoaded();
+            if (_owner.CurrentSettings == null || !_owner.SettingsAreComplete())
             {
                 NextcloudTalkAddIn.LogFileLinkMessage(
                     "Compose share cleanup skipped (settings incomplete): relativeFolder="
@@ -79,7 +80,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal void DispatchSeparatePasswordMailQueue(string composeKey, List<SeparatePasswordDispatchEntry> queue)
-        {            if (queue == null || queue.Count == 0 || _owner.OutlookApplication == null)
+        {
+            if (queue == null || queue.Count == 0 || _owner.OutlookApplication == null)
             {
                 return;
             }
@@ -91,7 +93,8 @@ namespace NcTalkOutlookAddIn.Controllers
             string lastFailureMessage = string.Empty;
             var sentRecipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var dispatch in queue)
-            {                if (!IsDispatchUsable(dispatch))
+            {
+                if (!IsDispatchUsable(dispatch))
                 {
                     continue;
                 }
@@ -100,7 +103,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 Outlook.MailItem passwordMail = null;
                 try
                 {
-                    passwordMail = _owner.OutlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;                    if (passwordMail == null)
+                    passwordMail = _owner.OutlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
+                    if (passwordMail == null)
                     {
                         throw new InvalidOperationException("Password mail draft could not be created.");
                     }
@@ -198,7 +202,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static void AddRecipientAddresses(HashSet<string> recipients, List<string> addresses)
-        {            if (recipients == null || addresses == null)
+        {
+            if (recipients == null || addresses == null)
             {
                 return;
             }
@@ -213,7 +218,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static void AddUniqueRecipient(List<string> recipients, string address)
-        {            if (recipients == null)
+        {
+            if (recipients == null)
             {
                 return;
             }
@@ -282,7 +288,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         private bool TryOpenSeparatePasswordFallback(SeparatePasswordDispatchEntry dispatch, string composeKey)
-        {            if (dispatch == null || _owner.OutlookApplication == null)
+        {
+            if (dispatch == null || _owner.OutlookApplication == null)
             {
                 return false;
             }
@@ -290,7 +297,8 @@ namespace NcTalkOutlookAddIn.Controllers
             Outlook.MailItem fallback = null;
             try
             {
-                fallback = _owner.OutlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;                if (fallback == null)
+                fallback = _owner.OutlookApplication.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
+                if (fallback == null)
                 {
                     return false;
                 }
@@ -341,7 +349,8 @@ namespace NcTalkOutlookAddIn.Controllers
             Outlook.MailItem mail,
             SeparatePasswordDispatchEntry dispatch,
             string composeKey)
-        {            if (mail == null)
+        {
+            if (mail == null)
             {
                 throw new InvalidOperationException("Password mail is not available.");
             }
@@ -358,7 +367,8 @@ namespace NcTalkOutlookAddIn.Controllers
             Outlook.Recipients recipients = null;
             try
             {
-                recipients = mail.Recipients;                if (recipients == null)
+                recipients = mail.Recipients;
+                if (recipients == null)
                 {
                     throw new InvalidOperationException("Password mail recipients collection is not available.");
                 }
@@ -393,7 +403,8 @@ namespace NcTalkOutlookAddIn.Controllers
             Outlook.OlMailRecipientType type,
             string composeKey,
             List<string> resolvedRecipients)
-        {            if (recipients == null || addresses == null || addresses.Count == 0)
+        {
+            if (recipients == null || addresses == null || addresses.Count == 0)
             {
                 return;
             }
@@ -403,7 +414,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 Outlook.Recipient recipient = null;
                 try
                 {
-                    recipient = recipients.Add(address);                    if (recipient == null)
+                    recipient = recipients.Add(address);
+                    if (recipient == null)
                     {
                         throw new InvalidOperationException("Recipient could not be added.");
                     }
@@ -456,22 +468,12 @@ namespace NcTalkOutlookAddIn.Controllers
             if (dispatch.IsPlainText)
             {
                 mail.BodyFormat = Outlook.OlBodyFormat.olFormatPlain;
-                mail.Body = NormalizeMailPlainText(dispatch.PlainText);
+                mail.Body = PlainTextUtilities.NormalizeCrLfAndTrim(dispatch.PlainText);
                 return;
             }
 
             mail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
             mail.HTMLBody = dispatch.Html ?? string.Empty;
-        }
-
-        private static string NormalizeMailPlainText(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            return value.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n").Trim();
         }
 
         private static string BuildSeparatePasswordMailSubject(SeparatePasswordDispatchEntry dispatch)

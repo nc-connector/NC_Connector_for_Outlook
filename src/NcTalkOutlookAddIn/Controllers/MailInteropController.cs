@@ -13,7 +13,7 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-        // Encapsulates Outlook Mail/Inspector interop and HTML body insertion bridges.
+    // Encapsulates Outlook Mail/Inspector interop and HTML body insertion bridges.
     // Keeps COM/editor-specific behavior out of the add-in orchestration root.
     internal sealed class MailInteropController
     {
@@ -27,7 +27,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static string ResolveMailInspectorIdentityKey(Outlook.MailItem mail)
-        {            if (mail == null)
+        {
+            if (mail == null)
             {
                 return string.Empty;
             }
@@ -66,7 +67,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal IWin32Window TryCreateMailInspectorDialogOwner(Outlook.MailItem mail)
-        {            if (mail == null)
+        {
+            if (mail == null)
             {
                 return null;
             }
@@ -74,7 +76,8 @@ namespace NcTalkOutlookAddIn.Controllers
             Outlook.Inspector inspector = null;
             try
             {
-                inspector = mail.GetInspector;                if (inspector == null)
+                inspector = mail.GetInspector;
+                if (inspector == null)
                 {
                     return null;
                 }
@@ -93,7 +96,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         private static int ReadInspectorWindowHandle(Outlook.Inspector inspector)
-        {            if (inspector == null)
+        {
+            if (inspector == null)
             {
                 return 0;
             }
@@ -101,12 +105,14 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 try
                 {
-                    PropertyInfo property = inspector.GetType().GetProperty(propertyName);                    if (property == null)
+                    PropertyInfo property = inspector.GetType().GetProperty(propertyName);
+                    if (property == null)
                     {
                         continue;
                     }
 
-                    object value = property.GetValue(inspector, null);                    if (value == null)
+                    object value = property.GetValue(inspector, null);
+                    if (value == null)
                     {
                         continue;
                     }
@@ -129,7 +135,8 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal Outlook.MailItem GetActiveMailItem()
         {
-            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;            if (application == null)
+            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+            if (application == null)
             {
                 return null;
             }
@@ -178,7 +185,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read ActiveInlineResponse from Explorer.", ex);
                     inlineResponse = null;
                 }
-                var mailItem = inlineResponse as Outlook.MailItem;                if (mailItem != null)
+                var mailItem = inlineResponse as Outlook.MailItem;
+                if (mailItem != null)
                 {
                     return mailItem;
                 }
@@ -188,7 +196,8 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal string ResolveActiveInspectorIdentityKey()
         {
-            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;            if (application == null)
+            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+            if (application == null)
             {
                 return string.Empty;
             }
@@ -269,46 +278,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            IDataObject previousClipboard = null;
-            bool restoreClipboard = false;
-
-            try
+            if (TryInsertHtmlIntoInspectorWordEditor(mail, html))
             {
-                previousClipboard = Clipboard.GetDataObject();
-                restoreClipboard = previousClipboard != null;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read clipboard data object.", ex);
-                previousClipboard = null;
-                restoreClipboard = false;
-            }
-            try
-            {
-                Clipboard.SetText(html, TextDataFormat.Html);
-                if (TryPasteClipboardIntoMailInspector(mail))
-                {
-                    DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (WordEditor).");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML via WordEditor: " + ex.Message);
-            }
-            finally
-            {
-                if (restoreClipboard)
-                {
-                    try
-                    {
-                        Clipboard.SetDataObject(previousClipboard);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore clipboard after HTML insertion.", ex);
-                    }
-                }
+                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (WordEditor InsertFile).");
+                return;
             }
 
             DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML into mail: all insertion paths exhausted.");
@@ -328,7 +301,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                string insertText = NormalizeMailPlainText(plainText);
+                string insertText = PlainTextUtilities.NormalizeCrLfAndTrim(plainText);
                 if (!string.IsNullOrEmpty(insertText))
                 {
                     insertText += "\r\n\r\n";
@@ -363,111 +336,47 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
-            Outlook.Explorer explorer = null;
-            Outlook.MailItem activeInlineMail = null;
-            Outlook.Inspector inspector = null;
-            object wordEditor = null;
-            object wordApplication = null;
-            object selection = null;
-            bool activeInlineMatches = false;
+            bool activeInlineMatches = IsActiveInlineResponse(mail);
+            OutlookWordEditorContext context;
 
             try
             {
-                if (application != null)
+                if (activeInlineMatches)
                 {
-                    explorer = application.ActiveExplorer();
-                    if (explorer != null)
-                    {
-                        activeInlineMail = explorer.ActiveInlineResponse as Outlook.MailItem;
-                        activeInlineMatches = ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.Core, "MailItem", "ActiveInlineResponse");
-                        if (activeInlineMatches)
-                        {
-                            wordEditor = explorer.GetType().InvokeMember(
-                                "ActiveInlineResponseWordEditor",
-                                BindingFlags.GetProperty,
-                                null,
-                                explorer,
-                                null);
-                            source = "inline";
-                        }
-                    }
-                }
-
-                if (activeInlineMatches && wordEditor == null)
-                {
-                    return false;
-                }
-
-                if (wordEditor == null)
-                {
-                    inspector = mail.GetInspector;
-                    if (inspector == null)
+                    if (!OutlookWordEditorContext.TryOpenInline(application, mail, "plain-text share insert", null, out context))
                     {
                         return false;
                     }
-
-                    wordEditor = inspector.WordEditor;
-                    source = "inspector";
                 }
-
-                if (wordEditor == null)
+                else if (!OutlookWordEditorContext.TryOpenInspector(mail, "plain-text share insert", out context))
                 {
                     return false;
                 }
 
-                wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
-                if (wordApplication == null)
+                using (context)
                 {
-                    return false;
+                    source = context.Source ?? string.Empty;
+                    if (activeInlineMatches)
+                    {
+                        int replyCursorStart = context.GetDocumentStart(0);
+                        context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                        context.TypeParagraph();
+                        context.TypeParagraph();
+                        context.TypeText(text);
+                        context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                    }
+                    else
+                    {
+                        context.TypeText(text);
+                    }
                 }
 
-                selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
-                if (selection == null)
-                {
-                    return false;
-                }
-
-                if (activeInlineMatches)
-                {
-                    int replyCursorStart = GetWordDocumentStart(wordEditor, 0);
-                    selection.GetType().InvokeMember(
-                        "SetRange",
-                        BindingFlags.InvokeMethod,
-                        null,
-                        selection,
-                        new object[] { replyCursorStart, replyCursorStart });
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                    selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { text });
-                    selection.GetType().InvokeMember(
-                        "SetRange",
-                        BindingFlags.InvokeMethod,
-                        null,
-                        selection,
-                        new object[] { replyCursorStart, replyCursorStart });
-                }
-                else
-                {
-                    selection.GetType().InvokeMember("TypeText", BindingFlags.InvokeMethod, null, selection, new object[] { text });
-                }
                 return true;
             }
             catch (Exception error)
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain text via Outlook WordEditor.", error);
                 return false;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object after plain-text insert.");
-                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release Word application COM object after plain-text insert.");
-                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release Word editor COM object after plain-text insert.");
-                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release Outlook Inspector COM object after plain-text insert.");
-                if (!ReferenceEquals(activeInlineMail, mail))
-                {
-                    ComInteropScope.TryRelease(activeInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object after plain-text insert.");
-                }
-                ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release Outlook Explorer COM object after plain-text insert.");
             }
         }
 
@@ -489,84 +398,34 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        private static string NormalizeMailPlainText(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            return value.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n").Trim();
-        }
-
         private bool TryInsertHtmlIntoActiveInlineResponseWordEditor(Outlook.MailItem mail, string html)
         {
             Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
-            Outlook.Explorer explorer = null;
-            Outlook.MailItem activeInlineMail = null;
-            object wordEditor = null;
-            object wordApplication = null;
-            object selection = null;
+            OutlookWordEditorContext context;
             string tempHtmlPath = null;
 
             try
             {
-                explorer = application != null ? application.ActiveExplorer() : null;
-                activeInlineMail = explorer != null ? explorer.ActiveInlineResponse as Outlook.MailItem : null;
-                if (!ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.Core, "MailItem", "ActiveInlineResponse"))
+                if (!OutlookWordEditorContext.TryOpenInline(application, mail, "inline share insert", null, out context))
                 {
                     return false;
                 }
 
-                wordEditor = explorer.GetType().InvokeMember(
-                    "ActiveInlineResponseWordEditor",
-                    BindingFlags.GetProperty,
-                    null,
-                    explorer,
-                    null);
-                if (wordEditor == null)
+                using (context)
                 {
-                    return false;
+                    int replyCursorStart = context.GetDocumentStart(0);
+                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                    context.TypeParagraph();
+                    context.TypeParagraph();
+
+                    tempHtmlPath = Path.Combine(
+                        Path.GetTempPath(),
+                        "nc4ol-inline-share-" + Guid.NewGuid().ToString("N") + ".html");
+                    File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
+                    context.InsertFile(tempHtmlPath);
+                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
                 }
 
-                wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
-                if (wordApplication == null)
-                {
-                    return false;
-                }
-
-                selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
-                if (selection == null)
-                {
-                    return false;
-                }
-
-                int replyCursorStart = GetWordDocumentStart(wordEditor, 0);
-                selection.GetType().InvokeMember(
-                    "SetRange",
-                    BindingFlags.InvokeMethod,
-                    null,
-                    selection,
-                    new object[] { replyCursorStart, replyCursorStart });
-                selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-
-                tempHtmlPath = Path.Combine(
-                    Path.GetTempPath(),
-                    "nc4ol-inline-share-" + Guid.NewGuid().ToString("N") + ".html");
-                File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
-                selection.GetType().InvokeMember(
-                    "InsertFile",
-                    BindingFlags.InvokeMethod,
-                    null,
-                    selection,
-                    new object[] { tempHtmlPath, Type.Missing, false, false, false });
-                selection.GetType().InvokeMember(
-                    "SetRange",
-                    BindingFlags.InvokeMethod,
-                    null,
-                    selection,
-                    new object[] { replyCursorStart, replyCursorStart });
                 return true;
             }
             catch (Exception error)
@@ -587,15 +446,56 @@ namespace NcTalkOutlookAddIn.Controllers
                         DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline share HTML file.", error);
                     }
                 }
+            }
+        }
 
-                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release inline share Word selection COM object.");
-                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release inline share Word application COM object.");
-                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release inline share Word editor COM object.");
-                if (!ReferenceEquals(activeInlineMail, mail))
+        private static bool TryInsertHtmlIntoInspectorWordEditor(Outlook.MailItem mail, string html)
+        {
+            OutlookWordEditorContext context;
+            string tempHtmlPath = null;
+
+            try
+            {
+                if (!OutlookWordEditorContext.TryOpenInspector(mail, "HTML share insert", out context))
                 {
-                    ComInteropScope.TryRelease(activeInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object after inline share insert.");
+                    return false;
                 }
-                ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release active Explorer COM object after inline share insert.");
+
+                using (context)
+                {
+                    int replyCursorStart = context.GetDocumentStart(0);
+                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                    context.TypeParagraph();
+                    context.TypeParagraph();
+
+                    tempHtmlPath = Path.Combine(
+                        Path.GetTempPath(),
+                        "nc4ol-share-" + Guid.NewGuid().ToString("N") + ".html");
+                    File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
+                    context.InsertFile(tempHtmlPath);
+                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                }
+
+                return true;
+            }
+            catch (Exception error)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert HTML via inspector WordEditor.", error);
+                return false;
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
+                {
+                    try
+                    {
+                        File.Delete(tempHtmlPath);
+                    }
+                    catch (Exception error)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary share HTML file.", error);
+                    }
+                }
             }
         }
 
@@ -624,83 +524,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML via HTMLBody path: " + ex.Message);
+                DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML via HTMLBody path: " + error.Message);
                 return false;
-            }
-        }
-
-        private static bool TryPasteClipboardIntoMailInspector(Outlook.MailItem mail)
-        {
-            Outlook.Inspector inspector = null;
-            object wordEditor = null;
-            object application = null;
-            object selection = null;
-
-            try
-            {
-                inspector = mail.GetInspector;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access MailItem.GetInspector for HTML paste.", ex);
-                inspector = null;
-            }
-            if (inspector == null)
-            {
-                return false;
-            }
-            try
-            {
-                wordEditor = inspector.WordEditor;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to access Inspector.WordEditor for HTML paste.", ex);
-                wordEditor = null;
-            }
-            if (wordEditor == null)
-            {
-                return false;
-            }
-            try
-            {
-                application = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);                if (application == null)
-                {
-                    return false;
-                }
-
-                selection = application.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, application, null);                if (selection == null)
-                {
-                    return false;
-                }
-
-                // Insert near the top so we are reliably above the signature block.
-                try
-                {
-                    // wdStory = 6
-                    selection.GetType().InvokeMember("HomeKey", BindingFlags.InvokeMethod, null, selection, new object[] { 6, 0 });
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move cursor in Word editor before pasting HTML (best-effort).", ex);
-                }
-
-                selection.GetType().InvokeMember("Paste", BindingFlags.InvokeMethod, null, selection, null);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to paste HTML into Word editor.", ex);
-                return false;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object.");
-                ComInteropScope.TryRelease(application, LogCategories.Core, "Failed to release Word application COM object.");
             }
         }
 
@@ -1035,48 +862,12 @@ namespace NcTalkOutlookAddIn.Controllers
                 return false;
             }
 
-            Outlook.Explorer explorer = null;
-            Outlook.MailItem activeInlineMail = null;
-            object wordEditor = null;
-            object wordApplication = null;
-            object selection = null;
+            OutlookWordEditorContext context;
             string tempHtmlPath = null;
 
             try
             {
-                explorer = application.ActiveExplorer();
-                if (explorer == null)
-                {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inline response HTML write skipped (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", reason=active_explorer_unavailable).");
-                    return false;
-                }
-
-                activeInlineMail = explorer.ActiveInlineResponse as Outlook.MailItem;
-                if (!ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.Core, "MailItem", "ActiveInlineResponse"))
-                {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inline response HTML write skipped (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", reason=active_inline_response_mismatch).");
-                    return false;
-                }
-
-                wordEditor = explorer.GetType().InvokeMember(
-                    "ActiveInlineResponseWordEditor",
-                    BindingFlags.GetProperty,
-                    null,
-                    explorer,
-                    null);
-                if (wordEditor == null)
+                if (!OutlookWordEditorContext.TryOpenInline(application, mail, "inline signature slot write", composeKey, out context))
                 {
                     DiagnosticsLogger.Log(
                         LogCategories.Core,
@@ -1088,63 +879,77 @@ namespace NcTalkOutlookAddIn.Controllers
                     return false;
                 }
 
-                wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
-                if (wordApplication == null)
+                using (context)
                 {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inline response signature slot write skipped (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", reason=word_application_unavailable).");
-                    return false;
-                }
+                    object wordEditor = context.Document;
+                    object selection = context.Selection;
+                    if (selection == null)
+                    {
+                        DiagnosticsLogger.Log(
+                            LogCategories.Core,
+                            "Inline response signature slot write skipped (operation="
+                            + (operation ?? "n/a")
+                            + ", composeKey="
+                            + (composeKey ?? string.Empty)
+                            + ", reason=word_selection_unavailable).");
+                        return false;
+                    }
 
-                selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
-                if (selection == null)
-                {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inline response signature slot write skipped (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", reason=word_selection_unavailable).");
-                    return false;
-                }
+                    int selectionStart = OutlookWordEditorContext.GetIntProperty(selection, "Start");
+                    int selectionEnd = OutlookWordEditorContext.GetIntProperty(selection, "End");
+                    int originalSelectionStart = selectionStart;
+                    string signatureSlotSource;
+                    bool signatureSlotSelected = TrySelectInlineSignatureSlot(
+                        wordEditor,
+                        selection,
+                        out selectionStart,
+                        out selectionEnd,
+                        out signatureSlotSource);
+                    if (!signatureSlotSelected)
+                    {
+                        DiagnosticsLogger.Log(
+                            LogCategories.Core,
+                            "Inline response signature slot write skipped (operation="
+                            + (operation ?? "n/a")
+                            + ", composeKey="
+                            + (composeKey ?? string.Empty)
+                            + ", reason=signature_boundary_unavailable).");
+                        return false;
+                    }
 
-                int selectionStart = Convert.ToInt32(
-                    selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null),
-                    CultureInfo.InvariantCulture);
-                int selectionEnd = Convert.ToInt32(
-                    selection.GetType().InvokeMember("End", BindingFlags.GetProperty, null, selection, null),
-                    CultureInfo.InvariantCulture);
-                int originalSelectionStart = selectionStart;
-                string signatureSlotSource;
-                bool signatureSlotSelected = TrySelectInlineSignatureSlot(
-                    wordEditor,
-                    selection,
-                    out selectionStart,
-                    out selectionEnd,
-                    out signatureSlotSource);
-                if (!signatureSlotSelected)
-                {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inline response signature slot write skipped (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", reason=signature_boundary_unavailable).");
-                    return false;
-                }
+                    int fallbackReplyCursorStart = originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart;
+                    int replyCursorStart = context.GetDocumentStart(fallbackReplyCursorStart);
+                    if (!string.IsNullOrWhiteSpace(html))
+                    {
+                        if (signatureSlotSelected && selectionEnd > selectionStart)
+                        {
+                            bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
+                            if (deletedTable)
+                            {
+                                signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
+                            }
+                            if (!deletedTable)
+                            {
+                                selection.GetType().InvokeMember(
+                                    "Delete",
+                                    BindingFlags.InvokeMethod,
+                                    null,
+                                    selection,
+                                    null);
+                            }
+                            context.SetSelectionRange(selectionStart, selectionStart);
+                        }
+                        context.TypeParagraph();
+                        context.TypeParagraph();
 
-                int fallbackReplyCursorStart = originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart;
-                int replyCursorStart = GetWordDocumentStart(wordEditor, fallbackReplyCursorStart);
-                if (!string.IsNullOrWhiteSpace(html))
-                {
-                    if (signatureSlotSelected && selectionEnd > selectionStart)
+                        tempHtmlPath = Path.Combine(
+                            Path.GetTempPath(),
+                            "nc4ol-inline-signature-" + Guid.NewGuid().ToString("N") + ".html");
+                        File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
+                        context.InsertFile(tempHtmlPath);
+                        context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                    }
+                    else if (signatureSlotSelected && selectionEnd > selectionStart)
                     {
                         bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
                         if (deletedTable)
@@ -1160,76 +965,31 @@ namespace NcTalkOutlookAddIn.Controllers
                                 selection,
                                 null);
                         }
-                        selection.GetType().InvokeMember(
-                            "SetRange",
-                            BindingFlags.InvokeMethod,
-                            null,
-                            selection,
-                            new object[] { selectionStart, selectionStart });
+                        context.SetSelectionRange(replyCursorStart, replyCursorStart);
                     }
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
-                    selection.GetType().InvokeMember("TypeParagraph", BindingFlags.InvokeMethod, null, selection, null);
 
-                    tempHtmlPath = Path.Combine(
-                        Path.GetTempPath(),
-                        "nc4ol-inline-signature-" + Guid.NewGuid().ToString("N") + ".html");
-                    File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
-                    selection.GetType().InvokeMember(
-                        "InsertFile",
-                        BindingFlags.InvokeMethod,
-                        null,
-                        selection,
-                        new object[] { tempHtmlPath, Type.Missing, false, false, false });
-                    selection.GetType().InvokeMember(
-                        "SetRange",
-                        BindingFlags.InvokeMethod,
-                        null,
-                        selection,
-                        new object[] { replyCursorStart, replyCursorStart });
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline response signature inserted via ActiveInlineResponseWordEditor.Selection.InsertFile (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", selectionStart="
+                        + selectionStart.ToString(CultureInfo.InvariantCulture)
+                        + ", selectionEnd="
+                        + selectionEnd.ToString(CultureInfo.InvariantCulture)
+                        + ", replyCursorStart="
+                        + replyCursorStart.ToString(CultureInfo.InvariantCulture)
+                        + ", signatureSlotSelected="
+                        + signatureSlotSelected.ToString(CultureInfo.InvariantCulture)
+                        + ", signatureSlotSource="
+                        + (signatureSlotSource ?? "n/a")
+                        + ").");
                 }
-                else if (signatureSlotSelected && selectionEnd > selectionStart)
-                {
-                    bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
-                    if (deletedTable)
-                    {
-                        signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
-                    }
-                    if (!deletedTable)
-                    {
-                        selection.GetType().InvokeMember(
-                            "Delete",
-                            BindingFlags.InvokeMethod,
-                            null,
-                            selection,
-                            null);
-                    }
-                    selection.GetType().InvokeMember(
-                        "SetRange",
-                        BindingFlags.InvokeMethod,
-                        null,
-                        selection,
-                        new object[] { replyCursorStart, replyCursorStart });
-                }
-                DiagnosticsLogger.Log(
-                    LogCategories.Core,
-                    "Inline response signature inserted via ActiveInlineResponseWordEditor.Selection.InsertFile (operation="
-                    + (operation ?? "n/a")
-                    + ", composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ", selectionStart="
-                    + selectionStart.ToString(CultureInfo.InvariantCulture)
-                    + ", selectionEnd="
-                    + selectionEnd.ToString(CultureInfo.InvariantCulture)
-                    + ", replyCursorStart="
-                    + replyCursorStart.ToString(CultureInfo.InvariantCulture)
-                    + ", signatureSlotSelected="
-                    + signatureSlotSelected.ToString(CultureInfo.InvariantCulture)
-                    + ", signatureSlotSource="
-                    + (signatureSlotSource ?? "n/a")
-                    + ").");
+
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
                 DiagnosticsLogger.LogException(
                     LogCategories.Core,
@@ -1238,7 +998,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     + ", composeKey="
                     + (composeKey ?? string.Empty)
                     + ").",
-                    ex);
+                    error);
                 return false;
             }
             finally
@@ -1249,20 +1009,11 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         File.Delete(tempHtmlPath);
                     }
-                    catch (Exception ex)
+                    catch (Exception error)
                     {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline response HTML file.", ex);
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline response HTML file.", error);
                     }
                 }
-
-                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release inline Word selection COM object.");
-                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release inline Word application COM object.");
-                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release inline Word editor COM object.");
-                if (!ReferenceEquals(activeInlineMail, mail))
-                {
-                    ComInteropScope.TryRelease(activeInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object.");
-                }
-                ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release active Explorer COM object.");
             }
         }
 
@@ -1820,7 +1571,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static bool TryWriteAppointmentHtmlBody(Outlook.AppointmentItem appointment, string html)
-        {            if (appointment == null || string.IsNullOrWhiteSpace(html))
+        {
+            if (appointment == null || string.IsNullOrWhiteSpace(html))
             {
                 return false;
             }
@@ -1830,12 +1582,14 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                application = appointment.Application;                if (application == null)
+                application = appointment.Application;
+                if (application == null)
                 {
                     return false;
                 }
 
-                stagingMail = application.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;                if (stagingMail == null)
+                stagingMail = application.CreateItem(Outlook.OlItemType.olMailItem) as Outlook.MailItem;
+                if (stagingMail == null)
                 {
                     return false;
                 }
@@ -1848,7 +1602,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 stagingMail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
                 stagingMail.HTMLBody = bridgeHtml;
 
-                var rtfBody = stagingMail.RTFBody as byte[];                if (rtfBody == null || rtfBody.Length == 0)
+                var rtfBody = stagingMail.RTFBody as byte[];
+                if (rtfBody == null || rtfBody.Length == 0)
                 {
                     DiagnosticsLogger.Log(LogCategories.Talk, "Appointment HTML->RTF bridge produced empty RTF body.");
                     return false;

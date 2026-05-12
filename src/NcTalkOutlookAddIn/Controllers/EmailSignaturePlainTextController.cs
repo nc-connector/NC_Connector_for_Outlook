@@ -4,7 +4,6 @@
 
 using System;
 using System.Globalization;
-using System.Reflection;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
 
@@ -43,7 +42,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 return new Result { Success = false, Source = "empty" };
             }
 
-            WordEditorContext context;
+            OutlookWordEditorContext context;
             if (!TryOpenWordEditorContext(application, mail, isInlineResponse, composeKey, log, out context))
             {
                 return new Result { Success = false, Source = "word_editor_unavailable" };
@@ -85,7 +84,7 @@ namespace NcTalkOutlookAddIn.Controllers
             string composeKey,
             Action<string> log)
         {
-            WordEditorContext context;
+            OutlookWordEditorContext context;
             if (!TryOpenWordEditorContext(application, mail, isInlineResponse, composeKey, log, out context))
             {
                 return new Result { Success = false, Source = "word_editor_unavailable" };
@@ -118,7 +117,7 @@ namespace NcTalkOutlookAddIn.Controllers
             string composeKey,
             Action<string> log)
         {
-            WordEditorContext context;
+            OutlookWordEditorContext context;
             if (!TryOpenWordEditorContext(application, mail, isInlineResponse, composeKey, log, out context))
             {
                 return new Result { Success = false, Source = "word_editor_unavailable" };
@@ -144,7 +143,7 @@ namespace NcTalkOutlookAddIn.Controllers
             bool isInlineResponse,
             string composeKey,
             Action<string> log,
-            out WordEditorContext context)
+            out OutlookWordEditorContext context)
         {
             context = null;
             if (mail == null)
@@ -154,127 +153,22 @@ namespace NcTalkOutlookAddIn.Controllers
 
             if (isInlineResponse)
             {
-                return TryOpenInlineWordEditorContext(application, mail, composeKey, log, out context);
-            }
-
-            return TryOpenInspectorWordEditorContext(mail, log, out context);
-        }
-
-        private static bool TryOpenInspectorWordEditorContext(Outlook.MailItem mail, Action<string> log, out WordEditorContext context)
-        {
-            context = new WordEditorContext { Source = "inspector", Mail = mail };
-            try
-            {
-                context.Inspector = mail.GetInspector;
-                if (context.Inspector == null)
+                if (!OutlookWordEditorContext.TryOpenInline(application, mail, "plain-text signature", composeKey, out context))
                 {
-                    Log(log, "Plain-text signature skipped because MailItem.GetInspector returned null.");
-                    context.Dispose();
-                    context = null;
+                    Log(log, "Plain-text inline signature skipped because the inline Word editor is unavailable.");
                     return false;
                 }
 
-                context.Document = context.Inspector.WordEditor;
-                if (context.Document == null)
-                {
-                    Log(log, "Plain-text signature skipped because Inspector.WordEditor returned null.");
-                    context.Dispose();
-                    context = null;
-                    return false;
-                }
-
-                TryAttachWordSelection(context, log);
                 return true;
             }
-            catch (Exception ex)
+
+            if (!OutlookWordEditorContext.TryOpenInspector(mail, "plain-text signature", out context))
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open inspector Word editor for plain-text signature.", ex);
-                context.Dispose();
-                context = null;
+                Log(log, "Plain-text signature skipped because the inspector Word editor is unavailable.");
                 return false;
             }
-        }
 
-        private static bool TryOpenInlineWordEditorContext(
-            Outlook.Application application,
-            Outlook.MailItem mail,
-            string composeKey,
-            Action<string> log,
-            out WordEditorContext context)
-        {
-            context = new WordEditorContext { Source = "inline", Mail = mail };
-            try
-            {
-                if (application == null)
-                {
-                    Log(log, "Plain-text inline signature skipped because Outlook application is unavailable.");
-                    context.Dispose();
-                    context = null;
-                    return false;
-                }
-
-                context.Explorer = application.ActiveExplorer();
-                if (context.Explorer == null)
-                {
-                    Log(log, "Plain-text inline signature skipped because ActiveExplorer is unavailable.");
-                    context.Dispose();
-                    context = null;
-                    return false;
-                }
-
-                context.ActiveInlineMail = context.Explorer.ActiveInlineResponse as Outlook.MailItem;
-                if (!ComInteropScope.AreSameObject(mail, context.ActiveInlineMail, LogCategories.Core, "MailItem", "ActiveInlineResponse"))
-                {
-                    Log(log, "Plain-text inline signature skipped because ActiveInlineResponse does not match (composeKey=" + (composeKey ?? string.Empty) + ").");
-                    context.Dispose();
-                    context = null;
-                    return false;
-                }
-
-                context.Document = GetProperty(context.Explorer, "ActiveInlineResponseWordEditor");
-                if (context.Document == null)
-                {
-                    Log(log, "Plain-text inline signature skipped because ActiveInlineResponseWordEditor is unavailable.");
-                    context.Dispose();
-                    context = null;
-                    return false;
-                }
-
-                TryAttachWordSelection(context, log);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open inline Word editor for plain-text signature.", ex);
-                context.Dispose();
-                context = null;
-                return false;
-            }
-        }
-
-        private static void TryAttachWordSelection(WordEditorContext context, Action<string> log)
-        {
-            try
-            {
-                context.WordApplication = GetProperty(context.Document, "Application");
-                if (context.WordApplication == null)
-                {
-                    return;
-                }
-
-                context.Selection = GetProperty(context.WordApplication, "Selection");
-                if (context.Selection == null)
-                {
-                    return;
-                }
-
-                context.SelectionStart = GetIntProperty(context.Selection, "Start");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to resolve Word selection for plain-text signature.", ex);
-                context.Selection = null;
-            }
+            return true;
         }
 
         private static bool TryReplaceBookmarkText(object document, string bookmarkName, string text, bool addManagedBookmark, out string source)
@@ -293,16 +187,16 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
 
                 bookmark = GetBookmark(bookmarks, bookmarkName);
-                range = GetProperty(bookmark, "Range");
+                range = OutlookWordEditorContext.GetProperty(bookmark, "Range");
                 if (range == null)
                 {
                     source = bookmarkName + ":range_unavailable";
                     return false;
                 }
 
-                int start = GetIntProperty(range, "Start");
-                SetProperty(range, "Text", text ?? string.Empty);
-                int end = GetIntProperty(range, "End");
+                int start = OutlookWordEditorContext.GetIntProperty(range, "Start");
+                OutlookWordEditorContext.SetProperty(range, "Text", text ?? string.Empty);
+                int end = OutlookWordEditorContext.GetIntProperty(range, "End");
                 if (end <= start)
                 {
                     end = start + (text ?? string.Empty).Length;
@@ -316,9 +210,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 source = bookmarkName;
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to replace plain-text signature bookmark " + bookmarkName + ".", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to replace plain-text signature bookmark " + bookmarkName + ".", error);
                 source = bookmarkName + ":error";
                 return false;
             }
@@ -336,13 +230,13 @@ namespace NcTalkOutlookAddIn.Controllers
             return TryReplaceBookmarkText(document, bookmarkName, string.Empty, false, out source);
         }
 
-        private static bool TryInsertAtSelection(WordEditorContext context, string text, Action<string> log, out string source)
+        private static bool TryInsertAtSelection(OutlookWordEditorContext context, string text, Action<string> log, out string source)
         {
             source = string.Empty;
             object range = null;
             try
             {
-                int start = context.Selection != null ? GetIntProperty(context.Selection, "Start") : 0;
+                int start = context.Selection != null ? OutlookWordEditorContext.GetIntProperty(context.Selection, "Start") : 0;
                 range = CreateRange(context.Document, start, start);
                 if (range == null)
                 {
@@ -350,8 +244,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     return false;
                 }
 
-                SetProperty(range, "Text", text ?? string.Empty);
-                int end = GetIntProperty(range, "End");
+                OutlookWordEditorContext.SetProperty(range, "Text", text ?? string.Empty);
+                int end = OutlookWordEditorContext.GetIntProperty(range, "End");
                 if (end <= start)
                 {
                     end = start + (text ?? string.Empty).Length;
@@ -362,9 +256,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 source = context.Source ?? "word";
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text signature at Word selection.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text signature at Word selection.", error);
                 source = "error";
                 return false;
             }
@@ -395,7 +289,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 if (BookmarkExists(bookmarks, ManagedSignatureBookmarkName))
                 {
                     existingBookmark = GetBookmark(bookmarks, ManagedSignatureBookmarkName);
-                    InvokeMethod(existingBookmark, "Delete", null);
+                    OutlookWordEditorContext.InvokeMethod(existingBookmark, "Delete", null);
                 }
 
                 range = CreateRange(document, start, end);
@@ -404,11 +298,11 @@ namespace NcTalkOutlookAddIn.Controllers
                     return;
                 }
 
-                InvokeMethod(bookmarks, "Add", new object[] { ManagedSignatureBookmarkName, range });
+                OutlookWordEditorContext.InvokeMethod(bookmarks, "Add", new object[] { ManagedSignatureBookmarkName, range });
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to add managed plain-text signature bookmark.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to add managed plain-text signature bookmark.", error);
             }
             finally
             {
@@ -420,7 +314,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private static object GetBookmarks(object document)
         {
-            return GetProperty(document, "Bookmarks");
+            return OutlookWordEditorContext.GetProperty(document, "Bookmarks");
         }
 
         private static bool BookmarkExists(object bookmarks, string bookmarkName)
@@ -430,73 +324,18 @@ namespace NcTalkOutlookAddIn.Controllers
                 return false;
             }
 
-            object result = InvokeMethod(bookmarks, "Exists", new object[] { bookmarkName });
+            object result = OutlookWordEditorContext.InvokeMethod(bookmarks, "Exists", new object[] { bookmarkName });
             return result != null && Convert.ToBoolean(result, CultureInfo.InvariantCulture);
         }
 
         private static object GetBookmark(object bookmarks, string bookmarkName)
         {
-            return InvokeMethod(bookmarks, "Item", new object[] { bookmarkName });
+            return OutlookWordEditorContext.InvokeMethod(bookmarks, "Item", new object[] { bookmarkName });
         }
 
         private static object CreateRange(object document, int start, int end)
         {
-            return InvokeMethod(document, "Range", new object[] { start, end });
-        }
-
-        private static object GetProperty(object target, string propertyName)
-        {
-            if (target == null)
-            {
-                return null;
-            }
-
-            return target.GetType().InvokeMember(
-                propertyName,
-                BindingFlags.GetProperty,
-                null,
-                target,
-                null);
-        }
-
-        private static void SetProperty(object target, string propertyName, object value)
-        {
-            if (target == null)
-            {
-                return;
-            }
-
-            target.GetType().InvokeMember(
-                propertyName,
-                BindingFlags.SetProperty,
-                null,
-                target,
-                new[] { value });
-        }
-
-        private static object InvokeMethod(object target, string methodName, object[] args)
-        {
-            if (target == null)
-            {
-                return null;
-            }
-
-            return target.GetType().InvokeMember(
-                methodName,
-                BindingFlags.InvokeMethod,
-                null,
-                target,
-                args);
-        }
-
-        private static int GetIntProperty(object target, string propertyName)
-        {
-            object value = GetProperty(target, propertyName);
-            if (value == null)
-            {
-                return 0;
-            }
-            return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            return OutlookWordEditorContext.InvokeMethod(document, "Range", new object[] { start, end });
         }
 
         private static void RestoreSelection(object selection, int start, Action<string> log)
@@ -508,17 +347,17 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                InvokeMethod(selection, "SetRange", new object[] { start, start });
+                OutlookWordEditorContext.InvokeMethod(selection, "SetRange", new object[] { start, start });
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore cursor before plain-text signature.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore cursor before plain-text signature.", error);
             }
         }
 
         private static string BuildSignatureBlock(string plainText, bool includeLeadingUserGap)
         {
-            string normalized = NormalizeLineEndings(plainText).Trim();
+            string normalized = PlainTextUtilities.NormalizeCrLf(plainText).Trim();
             if (string.IsNullOrWhiteSpace(normalized))
             {
                 return string.Empty;
@@ -528,50 +367,11 @@ namespace NcTalkOutlookAddIn.Controllers
             return includeLeadingUserGap ? "\r\n\r\n" + block : block;
         }
 
-        private static string NormalizeLineEndings(string value)
-        {
-            return (value ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
-        }
-
         private static void Log(Action<string> log, string message)
         {
             if (log != null)
             {
                 log(message ?? string.Empty);
-            }
-        }
-
-        private sealed class WordEditorContext : IDisposable
-        {
-            internal Outlook.MailItem Mail;
-
-            internal Outlook.Inspector Inspector;
-
-            internal Outlook.Explorer Explorer;
-
-            internal Outlook.MailItem ActiveInlineMail;
-
-            internal object Document;
-
-            internal object WordApplication;
-
-            internal object Selection;
-
-            internal int SelectionStart;
-
-            internal string Source;
-
-            public void Dispose()
-            {
-                ComInteropScope.TryRelease(Selection, LogCategories.Core, "Failed to release Word selection COM object.");
-                ComInteropScope.TryRelease(WordApplication, LogCategories.Core, "Failed to release Word application COM object.");
-                ComInteropScope.TryRelease(Document, LogCategories.Core, "Failed to release Word editor COM object.");
-                if (!ReferenceEquals(ActiveInlineMail, Mail))
-                {
-                    ComInteropScope.TryRelease(ActiveInlineMail, LogCategories.Core, "Failed to release ActiveInlineResponse MailItem COM object.");
-                }
-                ComInteropScope.TryRelease(Explorer, LogCategories.Core, "Failed to release Outlook Explorer COM object.");
-                ComInteropScope.TryRelease(Inspector, LogCategories.Core, "Failed to release Outlook Inspector COM object.");
             }
         }
     }

@@ -124,6 +124,7 @@
     <Compile Include="Controllers\ComposeShareLifecycleController.cs" />
     <Compile Include="Controllers\EmailSignaturePlainTextController.cs" />
     <Compile Include="Controllers\MailInteropController.cs" />
+    <Compile Include="Controllers\OutlookWordEditorContext.cs" />
     <Compile Include="Services\FreeBusyManager.cs" />
     <Compile Include="Services\FreeBusyServer.cs" />
     <Compile Include="Services\IfbAddressBookCache.cs" />
@@ -169,6 +170,7 @@
     <Compile Include="Utilities\FileLinkHtmlBuilder.cs" />
     <Compile Include="Utilities\HtmlToPlainTextConverter.cs" />
     <Compile Include="Utilities\HtmlTemplateSanitizer.cs" />
+    <Compile Include="Utilities\PlainTextUtilities.cs" />
     <Compile Include="Utilities\DeferredAppointmentEnsureState.cs" />
     <Compile Include="Utilities\PictureConverter.cs" />
     <Compile Include="Utilities\AppDataPaths.cs" />
