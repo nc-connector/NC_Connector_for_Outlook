@@ -203,6 +203,7 @@ Runtime-Regeln:
 - Backend-Signatur-HTML laeuft durch `HtmlTemplateSanitizer` mit derselben fail-closed Policy wie Freigabe- und Talk-Templates.
 - HTML/RTF-Signaturen werden als markierte HTML-Bloecke geschrieben, damit spaetere Policy-/Sender-Aenderungen gezielt nur NC-Connector-eigene Inhalte aktualisieren oder entfernen. Plain-Text-Signaturen werden fuer die offene Compose-Session ueber das verwaltete Word-Bookmark verfolgt.
 - Signaturverarbeitung laeuft nur fuer ungesendete Outlook-Compose-Items. Das Oeffnen einer empfangenen oder bereits gesendeten Nachricht zum Lesen darf den Body nie veraendern.
+- Separate Passwort-Follow-up-Mails entstehen ohne Compose-Inspector. Vor dem Auto-Versand nutzen sie die `email_signature`-Policy wie eine neue Mail und haengen die Backend-Signatur nur an, wenn der beim urspruenglichen Compose ermittelte Absender zu `policy.email_signature.user_email` passt.
 - Inspector-Compose-Fenster nutzen fuer HTML/RTF `MailItem.HTMLBody` und fuer Plain Text WordEditor. Der HTML/RTF-Pfad merkt sich vor dem Body-Rewrite die aktive Word-Auswahl und stellt danach die Auswahl-Schrift wieder her, damit Outlooks aktuelle Schreibschrift aktiv bleibt.
 - Inline-Antworten/-Weiterleitungen werden ueber Outlooks `Explorer.InlineResponse`-Event verfolgt und ueber `Explorer.ActiveInlineResponseWordEditor` geschrieben. Inline-Word-Importe verwenden ein UTF-8-BOM-HTML-Dokument, damit Nicht-ASCII-Zeichen in Signaturen erhalten bleiben.
 - Die Antwort-/Weiterleitungs-Erkennung nutzt zuerst `PR_LAST_VERB_EXECUTED`. Wenn Outlook den Wert noch nicht gesetzt hat, nutzen ausgekoppelte Antworten/Weiterleitungen `PR_CONVERSATION_INDEX`; Inline-Antworten/-Weiterleitungen gelten ueber `Explorer.InlineResponse` als Antwort.
@@ -223,7 +224,7 @@ Compose-Filelink-Paritaet (3.0.4):
   - Batch-Entfernung (`Remove last selected attachments`)
   - Attachment-Mode-Wizardstart direkt im Datei-Schritt
   - Share-Cleanup bei unsent close inkl. Grace-Timer fuer Send/Close-Race
-  - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand.
+  - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand; Empfaenger und Absenderkonto werden beim Senden aus dem Original-Compose uebernommen.
 - `ComposeShareLifecycleController` kapselt die eigentliche Share-Cleanup-/Passwort-Dispatch-Logik; `MailComposeSubscription` haelt nur Queue- und Eventzustand.
 - `TalkAppointmentController` kapselt Appointment-Schreib-/Sync-Pfade; `NextcloudTalkAddIn` delegiert diese Aufrufe statt die komplette Fachlogik im Root zu halten.
 - Nach Appointment-Write werden die lokalen Outlook-`X-NCTALK-*`-Metadaten aktualisiert; serverseitige CalDAV-VEVENTs werden dafuer nicht gepatcht.

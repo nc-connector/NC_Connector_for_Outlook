@@ -23,5 +23,11 @@ namespace NcTalkOutlookAddIn.Models
         internal string Cc { get; set; }
 
         internal string Bcc { get; set; }
+
+        internal string SenderEmail { get; set; }
+
+        internal string SendUsingAccountSmtpAddress { get; set; }
+
+        internal string SentOnBehalfOfName { get; set; }
     }
 }

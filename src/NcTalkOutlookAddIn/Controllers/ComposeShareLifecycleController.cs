@@ -9,6 +9,7 @@ using System.Threading;
 using NcTalkOutlookAddIn.Models;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Services;
+using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
 
@@ -110,7 +111,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     }
 
                     passwordMail.Subject = BuildSeparatePasswordMailSubject(dispatch);
+                    ApplySeparatePasswordSender(passwordMail, dispatch, composeKey);
                     ApplySeparatePasswordBody(passwordMail, dispatch);
+                    ApplySeparatePasswordBackendSignature(passwordMail, dispatch, composeKey);
                     List<string> resolvedRecipients = ApplySeparatePasswordRecipientsForSend(passwordMail, dispatch, composeKey);
                     int resolvedRecipientCount = resolvedRecipients.Count;
 
@@ -314,6 +317,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 fallback.CC = ccRecipients;
                 fallback.BCC = bccRecipients;
                 fallback.Subject = BuildSeparatePasswordMailSubject(dispatch);
+                ApplySeparatePasswordSender(fallback, dispatch, composeKey);
                 ApplySeparatePasswordBody(fallback, dispatch);
                 fallback.Display(false);
                 NextcloudTalkAddIn.LogFileLinkMessage(
@@ -474,6 +478,211 @@ namespace NcTalkOutlookAddIn.Controllers
 
             mail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
             mail.HTMLBody = dispatch.Html ?? string.Empty;
+        }
+
+        private void ApplySeparatePasswordSender(Outlook.MailItem mail, SeparatePasswordDispatchEntry dispatch, string composeKey)
+        {
+            if (mail == null || dispatch == null)
+            {
+                return;
+            }
+
+            string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(dispatch.SendUsingAccountSmtpAddress);
+            if (!string.IsNullOrWhiteSpace(accountSmtp))
+            {
+                TrySetSeparatePasswordSendUsingAccount(mail, accountSmtp, composeKey);
+            }
+
+            string sentOnBehalfOfName = (dispatch.SentOnBehalfOfName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(sentOnBehalfOfName))
+            {
+                return;
+            }
+
+            try
+            {
+                mail.SentOnBehalfOfName = sentOnBehalfOfName;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Failed to set separate password sent-on-behalf identity (composeKey=" + (composeKey ?? string.Empty) + ").",
+                    ex);
+            }
+        }
+
+        private bool TrySetSeparatePasswordSendUsingAccount(Outlook.MailItem mail, string smtpAddress, string composeKey)
+        {
+            if (mail == null || _owner.OutlookApplication == null || string.IsNullOrWhiteSpace(smtpAddress))
+            {
+                return false;
+            }
+
+            Outlook.NameSpace session = null;
+            Outlook.Accounts accounts = null;
+            try
+            {
+                session = _owner.OutlookApplication.Session;
+                if (session == null)
+                {
+                    return false;
+                }
+
+                accounts = session.Accounts;
+                if (accounts == null)
+                {
+                    return false;
+                }
+
+                int count = accounts.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Outlook.Account account = null;
+                    try
+                    {
+                        account = accounts[i];
+                        string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(account != null ? account.SmtpAddress : string.Empty);
+                        if (!string.Equals(accountSmtp, smtpAddress, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        mail.SendUsingAccount = account;
+                        NextcloudTalkAddIn.LogFileLinkMessage(
+                            "Separate password send account applied (composeKey="
+                            + (composeKey ?? string.Empty)
+                            + ", hasAccount=True).");
+                        return true;
+                    }
+                    finally
+                    {
+                        ComInteropScope.TryRelease(
+                            account,
+                            LogCategories.FileLink,
+                            "Failed to release separate password Account COM object.");
+                    }
+                }
+
+                NextcloudTalkAddIn.LogFileLinkMessage(
+                    "Separate password send account not found (composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ", hasRequestedAccount=True).");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Failed to apply separate password send account (composeKey=" + (composeKey ?? string.Empty) + ").",
+                    ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(accounts, LogCategories.FileLink, "Failed to release separate password Accounts COM object.");
+                ComInteropScope.TryRelease(session, LogCategories.FileLink, "Failed to release separate password Session COM object.");
+            }
+        }
+
+        private void ApplySeparatePasswordBackendSignature(Outlook.MailItem mail, SeparatePasswordDispatchEntry dispatch, string composeKey)
+        {
+            if (mail == null || dispatch == null)
+            {
+                return;
+            }
+            _owner.EnsureSettingsLoaded();
+            if (_owner.CurrentSettings == null || !_owner.SettingsAreComplete())
+            {
+                LogSeparatePasswordSignatureSkipped(composeKey, "settings_incomplete");
+                return;
+            }
+
+            AddinSettings settings = _owner.CurrentSettings ?? new AddinSettings();
+            var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
+            BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "separate_password_email_signature");
+            var policy = new EmailSignaturePolicyService(policyStatus, settings).Resolve();
+            if (!policy.Active)
+            {
+                LogSeparatePasswordSignatureSkipped(composeKey, policy.Reason);
+                return;
+            }
+
+            string senderEmail = EmailSignaturePolicyService.NormalizeEmail(dispatch.SenderEmail);
+            if (!string.Equals(senderEmail, policy.UserEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                LogSeparatePasswordSignatureSkipped(composeKey, "identity_mismatch");
+                return;
+            }
+
+            string sanitized = HtmlTemplateSanitizer.SanitizeEmailSignatureTemplateHtml(policy.TemplateHtml);
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                LogSeparatePasswordSignatureSkipped(composeKey, "sanitized_empty");
+                return;
+            }
+
+            if (dispatch.IsPlainText)
+            {
+                string plainText = HtmlToPlainTextConverter.Convert(sanitized);
+                if (string.IsNullOrWhiteSpace(plainText))
+                {
+                    LogSeparatePasswordSignatureSkipped(composeKey, "plain_text_empty");
+                    return;
+                }
+
+                mail.BodyFormat = Outlook.OlBodyFormat.olFormatPlain;
+                mail.Body = CombinePlainTextSegments(mail.Body, plainText);
+            }
+            else
+            {
+                mail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
+                mail.HTMLBody = AppendHtmlSignature(mail.HTMLBody, sanitized);
+            }
+
+            NextcloudTalkAddIn.LogFileLinkMessage(
+                "Separate password backend signature applied (composeKey="
+                + (composeKey ?? string.Empty)
+                + ", plainText="
+                + dispatch.IsPlainText.ToString(CultureInfo.InvariantCulture)
+                + ").");
+        }
+
+        private static string CombinePlainTextSegments(string body, string signature)
+        {
+            string normalizedBody = PlainTextUtilities.NormalizeCrLfAndTrim(body);
+            string normalizedSignature = PlainTextUtilities.NormalizeCrLfAndTrim(signature);
+            if (string.IsNullOrWhiteSpace(normalizedBody))
+            {
+                return normalizedSignature;
+            }
+            if (string.IsNullOrWhiteSpace(normalizedSignature))
+            {
+                return normalizedBody;
+            }
+            return normalizedBody + "\r\n\r\n" + normalizedSignature;
+        }
+
+        private static string AppendHtmlSignature(string html, string sanitizedSignature)
+        {
+            string existing = html ?? string.Empty;
+            string signatureBlock = "<br><br><div data-nc-connector-signature=\"true\">" + (sanitizedSignature ?? string.Empty) + "</div>";
+            int bodyEnd = existing.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+            if (bodyEnd >= 0)
+            {
+                return existing.Insert(bodyEnd, signatureBlock);
+            }
+            return existing + signatureBlock;
+        }
+
+        private static void LogSeparatePasswordSignatureSkipped(string composeKey, string reason)
+        {
+            NextcloudTalkAddIn.LogFileLinkMessage(
+                "Separate password backend signature skipped (composeKey="
+                + (composeKey ?? string.Empty)
+                + ", reason="
+                + (reason ?? "n/a")
+                + ").");
         }
 
         private static string BuildSeparatePasswordMailSubject(SeparatePasswordDispatchEntry dispatch)

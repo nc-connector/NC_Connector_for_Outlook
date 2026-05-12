@@ -144,6 +144,7 @@ Runtime rules:
 - Backend signature HTML is sanitized through `HtmlTemplateSanitizer` with the same fail-closed policy used by sharing and Talk templates.
 - HTML/RTF signatures are written as marked HTML blocks so later policy/sender changes can update or remove only NC Connector-owned content. Plain-text signatures are tracked with the managed Word bookmark for the open compose session.
 - Signature processing only runs for unsent Outlook compose items. Opening a received or already sent message for reading must never modify its body.
+- Separate password follow-up mails are generated without a compose inspector. Before auto-send they reuse the `email_signature` policy as a new mail and append the backend signature only when the sender captured from the original compose item matches `policy.email_signature.user_email`.
 - Inspector compose windows use `MailItem.HTMLBody` for HTML/RTF and WordEditor for plain text. The HTML/RTF path captures the active Word selection before a body rewrite and restores the selection font afterwards, so Outlook's current compose font stays active.
 - Inline replies/forwards are tracked through Outlook's `Explorer.InlineResponse` event and written through `Explorer.ActiveInlineResponseWordEditor`. Inline Word imports use a UTF-8 BOM HTML document so non-ASCII signature text is preserved.
 - Reply/forward detection uses `PR_LAST_VERB_EXECUTED` first. If Outlook has not set it yet, popped-out replies/forwards use `PR_CONVERSATION_INDEX`; inline replies/forwards are treated as a response because they arrive through `Explorer.InlineResponse`.
@@ -257,6 +258,7 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
 - Separate password-mail dispatch:
   - queue password-only HTML after share creation
   - capture recipients on send
+  - capture the sender account on send and apply it to the follow-up mail before signature/body dispatch
   - dispatch only after successful primary send and keep the source compose mode for HTML vs plain-text follow-up mails
   - auto-send first, then manual fallback draft on failure.
 
