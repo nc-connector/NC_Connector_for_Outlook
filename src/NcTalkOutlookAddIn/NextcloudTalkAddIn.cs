@@ -274,12 +274,12 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        public void OnFileLinkButtonPressed(IRibbonControl control)
+        public async void OnFileLinkButtonPressed(IRibbonControl control)
         {
             try
             {
                 EnsureSettingsLoaded();
-                _fileLinkLaunchController.OnFileLinkButtonPressed(control);
+                await _fileLinkLaunchController.OnFileLinkButtonPressedAsync(control);
             }
             catch (Exception ex)
             {
@@ -290,6 +290,11 @@ namespace NcTalkOutlookAddIn
         internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
             return _fileLinkLaunchController.RunFileLinkWizardForMail(mail, launchOptions);
+        }
+
+        internal Task<bool> RunFileLinkWizardForMailAsync(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
+        {
+            return _fileLinkLaunchController.RunFileLinkWizardForMailAsync(mail, launchOptions);
         }
 
         internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null, bool isInlineResponse = false)

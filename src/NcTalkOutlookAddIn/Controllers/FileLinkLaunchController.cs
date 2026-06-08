@@ -16,7 +16,7 @@ using Microsoft.Office.Core;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-        // Handles ribbon-driven FileLink launch and wizard execution for mail compose windows.
+    // Handles ribbon-driven FileLink launch and wizard execution for mail compose windows.
     internal sealed class FileLinkLaunchController
     {
         private readonly NextcloudTalkAddIn _owner;
@@ -26,8 +26,9 @@ namespace NcTalkOutlookAddIn.Controllers
             _owner = owner;
         }
 
-        internal void OnFileLinkButtonPressed(IRibbonControl control)
-        {            if (_owner == null)
+        internal async Task OnFileLinkButtonPressedAsync(IRibbonControl control)
+        {
+            if (_owner == null)
             {
                 return;
             }
@@ -42,7 +43,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            Outlook.MailItem mail = _owner.GetActiveMailItem();            if (mail == null)
+            Outlook.MailItem mail = _owner.GetActiveMailItem();
+            if (mail == null)
             {
                 MessageBox.Show(
                     Strings.ErrorNoMailItem,
@@ -54,12 +56,18 @@ namespace NcTalkOutlookAddIn.Controllers
 
             bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
             _owner.EnsureMailComposeSubscription(mail, isInlineResponse ? string.Empty : _owner.ResolveActiveInspectorIdentityKey(), isInlineResponse);
-            RunFileLinkWizardForMail(mail, null);
+            await RunFileLinkWizardForMailAsync(mail, null);
         }
 
         internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
-            AddinSettings settings = _owner != null ? _owner.CurrentSettings : null;            if (_owner == null || mail == null || settings == null)
+            return RunFileLinkWizardForMailAsync(mail, launchOptions).GetAwaiter().GetResult();
+        }
+
+        internal async Task<bool> RunFileLinkWizardForMailAsync(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
+        {
+            AddinSettings settings = _owner != null ? _owner.CurrentSettings : null;
+            if (_owner == null || mail == null || settings == null)
             {
                 return false;
             }
@@ -67,10 +75,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 settings.ServerUrl,
                 settings.Username,
                 settings.AppPassword);
-            // Keep this method synchronous for existing callers and prefetch both policies in parallel.
             Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "sharing_wizard_open"));
             Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => _owner.FetchPasswordPolicyForFileLinkWizard(configuration));
-            Task.WhenAll(policyStatusTask, passwordPolicyTask).GetAwaiter().GetResult();
+            await Task.WhenAll(policyStatusTask, passwordPolicyTask);
             BackendPolicyStatus policyStatus = policyStatusTask.Result;
 
             string basePath = string.IsNullOrWhiteSpace(settings.FileLinkBasePath)
@@ -80,7 +87,8 @@ namespace NcTalkOutlookAddIn.Controllers
             PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
 
             using (var wizard = new FileLinkWizardForm(settings, configuration, passwordPolicy, policyStatus, basePath, launchOptions))
-            {                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
+            {
+                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
                 {
                     string languageOverride = settings != null ? settings.ShareBlockLang : "default";
                     bool plainTextCompose = MailInteropController.IsPlainTextMail(mail);
