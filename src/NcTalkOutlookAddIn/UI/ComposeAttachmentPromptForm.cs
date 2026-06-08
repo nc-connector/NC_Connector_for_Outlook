@@ -15,7 +15,7 @@ namespace NcTalkOutlookAddIn.UI
         RemoveLast
     }
 
-        // Two-action prompt for threshold-based compose attachment automation.
+    // Two-action prompt for threshold-based compose attachment automation.
     // There is intentionally no third cancel action.
     internal sealed class ComposeAttachmentPromptForm : ScaledForm
     {
@@ -81,6 +81,8 @@ namespace NcTalkOutlookAddIn.UI
         {
             using (var dialog = new ComposeAttachmentPromptForm(reasonText))
             {
+                // Timer prompts can fire while Outlook is not the foreground app.
+                dialog.TopMost = true;
                 dialog.ShowDialog(owner);
                 return dialog._decision;
             }

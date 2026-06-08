@@ -287,11 +287,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
-        {
-            return _fileLinkLaunchController.RunFileLinkWizardForMail(mail, launchOptions);
-        }
-
         internal Task<bool> RunFileLinkWizardForMailAsync(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
             return _fileLinkLaunchController.RunFileLinkWizardForMailAsync(mail, launchOptions);

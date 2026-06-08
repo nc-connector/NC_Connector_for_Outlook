@@ -82,6 +82,8 @@ namespace NcTalkOutlookAddIn
                 internal bool CleanupLocalPathAfterFlow { get; set; }
 
                 internal string Trigger { get; set; }
+
+                internal int BaselineAttachmentCount { get; set; }
             }
 
             private readonly NextcloudTalkAddIn _owner;

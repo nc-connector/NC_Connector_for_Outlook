@@ -59,11 +59,6 @@ namespace NcTalkOutlookAddIn.Controllers
             await RunFileLinkWizardForMailAsync(mail, null);
         }
 
-        internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
-        {
-            return RunFileLinkWizardForMailAsync(mail, launchOptions).GetAwaiter().GetResult();
-        }
-
         internal async Task<bool> RunFileLinkWizardForMailAsync(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
             AddinSettings settings = _owner != null ? _owner.CurrentSettings : null;

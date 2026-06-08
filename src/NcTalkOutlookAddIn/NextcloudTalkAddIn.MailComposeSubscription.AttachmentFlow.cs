@@ -227,13 +227,13 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void OnAttachmentEvalTimerTick(object sender, EventArgs e)
+            private async void OnAttachmentEvalTimerTick(object sender, EventArgs e)
             {
                 _attachmentEvalTimer.Stop();
 
                 try
                 {
-                    EvaluateAttachmentAutomation();
+                    await EvaluateAttachmentAutomationAsync();
                 }
                 catch (Exception ex)
                 {
@@ -244,13 +244,13 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void OnBeforeAddShareTimerTick(object sender, EventArgs e)
+            private async void OnBeforeAddShareTimerTick(object sender, EventArgs e)
             {
                 _beforeAddShareTimer.Stop();
 
                 try
                 {
-                    RunQueuedBeforeAddAttachmentShareFlow();
+                    await RunQueuedBeforeAddAttachmentShareFlowAsync();
                 }
                 catch (Exception ex)
                 {
@@ -261,10 +261,16 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void EvaluateAttachmentAutomation()
+            private async Task EvaluateAttachmentAutomationAsync()
             {
                 if (_disposed || _attachmentSuppressed)
                 {
+                    return;
+                }
+                if (_beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count > 0)
+                {
+                    _pendingAddedBatch.Clear();
+                    LogFileLink("Compose attachment evaluation skipped (composeKey=" + _composeKey + ", reason=before_add_flow_pending).");
                     return;
                 }
 
@@ -275,7 +281,7 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
-                AttachmentAutomationSettings settings = ReadAttachmentAutomationSettings();
+                AttachmentAutomationSettings settings = await ReadAttachmentAutomationSettingsAsync();
                 if (!settings.AlwaysConnector && !settings.OfferAboveEnabled)
                 {
                     _pendingAddedBatch.Clear();
@@ -313,7 +319,7 @@ namespace NcTalkOutlookAddIn
 
                 if (settings.AlwaysConnector)
                 {
-                    StartComposeAttachmentShareFlow("always", totalBytes, settings.ThresholdMb, lastAdded);
+                    await StartComposeAttachmentShareFlowAsync("always", totalBytes, settings.ThresholdMb, lastAdded);
                     return;
                 }
                 if (!settings.OfferAboveEnabled || totalBytes <= settings.ThresholdBytes)
@@ -359,7 +365,7 @@ namespace NcTalkOutlookAddIn
                         + ", thresholdBytes="
                         + settings.ThresholdBytes.ToString(CultureInfo.InvariantCulture)
                         + ").");
-                    StartComposeAttachmentShareFlow("threshold", totalBytes, settings.ThresholdMb, lastAdded);
+                    await StartComposeAttachmentShareFlowAsync("threshold", totalBytes, settings.ThresholdMb, lastAdded);
                     return;
                 }
 
@@ -374,18 +380,26 @@ namespace NcTalkOutlookAddIn
 
             private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
             {
+                // BeforeAttachmentAdd needs the decision before Outlook continues adding the file.
+                return ReadAttachmentAutomationSettingsAsync().GetAwaiter().GetResult();
+            }
+
+            private async Task<AttachmentAutomationSettings> ReadAttachmentAutomationSettingsAsync()
+            {
                 _owner.EnsureSettingsLoaded();
 
                 var settings = _owner._currentSettings ?? new AddinSettings();
                 int thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(settings.SharingAttachmentsOfferAboveMb);
                 bool alwaysConnector = settings.SharingAttachmentsAlwaysConnector;
-                bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;                if (_owner._currentSettings != null)
+                bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;
+                if (_owner._currentSettings != null)
                 {
                     var configuration = new TalkServiceConfiguration(
                         _owner._currentSettings.ServerUrl,
                         _owner._currentSettings.Username,
                         _owner._currentSettings.AppPassword);
-                    BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate");                    if (policyStatus != null && policyStatus.IsDomainActive("share"))
+                    BackendPolicyStatus policyStatus = await Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate")).ConfigureAwait(false);
+                    if (policyStatus != null && policyStatus.IsDomainActive("share"))
                     {
                         bool policyBool;
                         int policyInt;
@@ -534,7 +548,7 @@ namespace NcTalkOutlookAddIn
                 };
             }
 
-            private void StartComposeAttachmentShareFlow(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
+            private async Task StartComposeAttachmentShareFlowAsync(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
             {
                 OutlookAttachmentAutomationGuardService.GuardState guardState;
                 if (_owner.TryGetAttachmentAutomationGuardState("start_flow", _composeKey, out guardState))
@@ -570,7 +584,7 @@ namespace NcTalkOutlookAddIn
                 }
                 try
                 {
-                    bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
+                    bool wizardAccepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
                     LogFileLink(
                         "Compose attachment flow completed (composeKey="
                         + _composeKey
@@ -817,9 +831,28 @@ namespace NcTalkOutlookAddIn
                 int thresholdMb,
                 bool cleanupLocalPathAfterFlow)
             {
+                int baselineAttachmentCount = ReadComposeAttachmentCount("before_add_single_baseline");
+                RunAttachmentFlowTask(
+                    StartBeforeAddAttachmentShareFlowAsync(trigger, candidate, localPath, thresholdMb, cleanupLocalPathAfterFlow, baselineAttachmentCount),
+                    "Compose before-attachment-add share flow failed");
+            }
+
+            private async Task StartBeforeAddAttachmentShareFlowAsync(
+                string trigger,
+                AttachmentBatchEntry candidate,
+                string localPath,
+                int thresholdMb,
+                bool cleanupLocalPathAfterFlow,
+                int baselineAttachmentCount)
+            {
                 if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
                 {
                     LogFileLink("Compose before-attachment-add share flow skipped (composeKey=" + _composeKey + ", reason=missing_local_path).");
+                    return;
+                }
+                if (_beforeAddShareFlowRunning)
+                {
+                    QueueBeforeAddAttachmentShareFlow(trigger, candidate, localPath, thresholdMb, cleanupLocalPathAfterFlow);
                     return;
                 }
                 var launchOptions = new FileLinkWizardLaunchOptions
@@ -833,9 +866,12 @@ namespace NcTalkOutlookAddIn
                 };
                 launchOptions.InitialSelections.Add(new FileLinkSelection(FileLinkSelectionType.File, localPath));
 
+                _beforeAddShareFlowRunning = true;
+                _attachmentSuppressed = true;
+                _pendingAddedBatch.Clear();
                 try
                 {
-                    bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
+                    bool wizardAccepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
                     LogFileLink(
                         "Compose before-attachment-add share flow completed (composeKey="
                         + _composeKey
@@ -849,10 +885,18 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
+                    RemoveSuppressedBeforeAddAttachmentByName(
+                        candidate != null ? candidate.Name : string.Empty,
+                        candidate != null ? candidate.SizeBytes : 0,
+                        baselineAttachmentCount,
+                        "before_add_single");
                     if (cleanupLocalPathAfterFlow)
                     {
                         CleanupTemporaryFiles(new List<string> { localPath });
                     }
+                    _attachmentSuppressed = false;
+                    _beforeAddShareFlowRunning = false;
+                    RestartBeforeAddShareTimerIfNeeded();
                 }
             }
 
@@ -879,7 +923,8 @@ namespace NcTalkOutlookAddIn
                     LocalPath = localPath,
                     ThresholdMb = Math.Max(1, thresholdMb),
                     CleanupLocalPathAfterFlow = cleanupLocalPathAfterFlow,
-                    Trigger = string.IsNullOrWhiteSpace(trigger) ? "always_preadd" : trigger
+                    Trigger = string.IsNullOrWhiteSpace(trigger) ? "always_preadd" : trigger,
+                    BaselineAttachmentCount = ReadComposeAttachmentCount("before_add_queue_baseline")
                 });
 
                 LogFileLink(
@@ -909,7 +954,7 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void RunQueuedBeforeAddAttachmentShareFlow()
+            private async Task RunQueuedBeforeAddAttachmentShareFlowAsync()
             {
                 if (_disposed || _beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count == 0)
                 {
@@ -935,7 +980,8 @@ namespace NcTalkOutlookAddIn
                 {
                     for (int i = 0; i < batch.Count; i++)
                     {
-                        BeforeAddShareEntry entry = batch[i];                        if (entry == null || string.IsNullOrWhiteSpace(entry.LocalPath) || !File.Exists(entry.LocalPath))
+                        BeforeAddShareEntry entry = batch[i];
+                        if (entry == null || string.IsNullOrWhiteSpace(entry.LocalPath) || !File.Exists(entry.LocalPath))
                         {
                             continue;
                         }
@@ -961,7 +1007,9 @@ namespace NcTalkOutlookAddIn
                     launchOptions.AttachmentLastName = lastName;
                     launchOptions.AttachmentLastSizeBytes = lastSize;
 
-                    bool wizardAccepted = _owner.RunFileLinkWizardForMail(_mail, launchOptions);
+                    _attachmentSuppressed = true;
+                    _pendingAddedBatch.Clear();
+                    bool wizardAccepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
                     LogFileLink(
                         "Compose before-attachment-add queued share flow completed (composeKey="
                         + _composeKey
@@ -975,13 +1023,19 @@ namespace NcTalkOutlookAddIn
                 }
                 finally
                 {
-                    CleanupTemporaryFiles(temporaryFiles);
-                    _beforeAddShareFlowRunning = false;
-                    if (_pendingBeforeAddShareEntries.Count > 0 && !_disposed)
+                    for (int i = 0; i < batch.Count; i++)
                     {
-                        _beforeAddShareTimer.Stop();
-                        _beforeAddShareTimer.Start();
+                        BeforeAddShareEntry entry = batch[i];
+                        RemoveSuppressedBeforeAddAttachmentByName(
+                            entry != null && entry.Candidate != null ? entry.Candidate.Name : string.Empty,
+                            entry != null && entry.Candidate != null ? entry.Candidate.SizeBytes : 0,
+                            entry != null ? entry.BaselineAttachmentCount : 0,
+                            "before_add_batch");
                     }
+                    CleanupTemporaryFiles(temporaryFiles);
+                    _attachmentSuppressed = false;
+                    _beforeAddShareFlowRunning = false;
+                    RestartBeforeAddShareTimerIfNeeded();
                 }
             }
 
@@ -1120,6 +1174,149 @@ namespace NcTalkOutlookAddIn
                 string fallbackDirectory = Path.Combine(directory, Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(fallbackDirectory);
                 return Path.Combine(fallbackDirectory, fileName);
+            }
+
+            private async void RunAttachmentFlowTask(Task task, string failureMessage)
+            {
+                if (task == null)
+                {
+                    return;
+                }
+                try
+                {
+                    await task;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.FileLink,
+                        (failureMessage ?? "Compose attachment flow failed") + " (composeKey=" + _composeKey + ").",
+                        ex);
+                }
+            }
+
+            private void RestartBeforeAddShareTimerIfNeeded()
+            {
+                if (_pendingBeforeAddShareEntries.Count == 0 || _disposed)
+                {
+                    return;
+                }
+                try
+                {
+                    _beforeAddShareTimer.Stop();
+                    _beforeAddShareTimer.Start();
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.FileLink,
+                        "Failed to restart queued before-attachment-add share flow (composeKey=" + _composeKey + ").",
+                        ex);
+                }
+            }
+
+            private int ReadComposeAttachmentCount(string reason)
+            {
+                Outlook.Attachments attachments = null;
+                try
+                {
+                    attachments = _mail.Attachments;
+                    return attachments != null ? attachments.Count : 0;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.FileLink,
+                        "Failed to read compose attachment count (composeKey="
+                        + _composeKey
+                        + ", reason="
+                        + (reason ?? string.Empty)
+                        + ").",
+                        ex);
+                    return 0;
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(
+                        attachments,
+                        LogCategories.FileLink,
+                        "Failed to release COM object (compose attachments collection count).");
+                }
+            }
+
+            private void RemoveSuppressedBeforeAddAttachmentByName(string attachmentName, long sizeBytes, int baselineAttachmentCount, string reason)
+            {
+                if (string.IsNullOrWhiteSpace(attachmentName))
+                {
+                    return;
+                }
+
+                Outlook.Attachments attachments = null;
+                try
+                {
+                    attachments = _mail.Attachments;
+                    if (attachments == null || attachments.Count <= Math.Max(0, baselineAttachmentCount))
+                    {
+                        return;
+                    }
+
+                    for (int index = attachments.Count; index >= 1; index--)
+                    {
+                        Outlook.Attachment attachment = null;
+                        try
+                        {
+                            attachment = attachments[index];
+                            if (attachment == null)
+                            {
+                                continue;
+                            }
+
+                            string currentName = ReadAttachmentName(attachment);
+                            long currentSize = ReadAttachmentSizeBytes(attachment);
+                            if (!string.Equals(currentName, attachmentName, StringComparison.OrdinalIgnoreCase)
+                                || Math.Max(0, currentSize) != Math.Max(0, sizeBytes))
+                            {
+                                continue;
+                            }
+
+                            attachments.Remove(index);
+                            LogFileLink(
+                                "Suppressed host attachment removed after before-add cancel (composeKey="
+                                + _composeKey
+                                + ", reason="
+                                + (reason ?? string.Empty)
+                                + ", attachment="
+                                + attachmentName
+                                + ").");
+                            return;
+                        }
+                        finally
+                        {
+                            ComInteropScope.TryRelease(
+                                attachment,
+                                LogCategories.FileLink,
+                                "Failed to release COM object (suppressed compose attachment).");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.FileLink,
+                        "Failed to remove suppressed compose attachment (composeKey="
+                        + _composeKey
+                        + ", attachment="
+                        + attachmentName
+                        + ").",
+                        ex);
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(
+                        attachments,
+                        LogCategories.FileLink,
+                        "Failed to release COM object (suppressed compose attachments collection).");
+                }
             }
 
             private void RemoveAttachmentsByIndices(List<int> indices, string reason)
