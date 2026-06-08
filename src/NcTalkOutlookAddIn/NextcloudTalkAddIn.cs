@@ -212,14 +212,28 @@ namespace NcTalkOutlookAddIn
 
         public async void OnTalkButtonPressed(IRibbonControl control)
         {
-            EnsureSettingsLoaded();
-            await _talkRibbonController.OnTalkButtonPressedAsync(control);
+            try
+            {
+                EnsureSettingsLoaded();
+                await _talkRibbonController.OnTalkButtonPressedAsync(control);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Talk ribbon handler failed.", ex);
+            }
         }
 
         public async void OnSettingsButtonPressed(IRibbonControl control)
         {
-            EnsureSettingsLoaded();
-            await CreateSettingsWorkflowController().RunAsync();
+            try
+            {
+                EnsureSettingsLoaded();
+                await CreateSettingsWorkflowController().RunAsync();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Settings ribbon handler failed.", ex);
+            }
         }
 
         private SettingsWorkflowController CreateSettingsWorkflowController()
@@ -262,8 +276,15 @@ namespace NcTalkOutlookAddIn
 
         public void OnFileLinkButtonPressed(IRibbonControl control)
         {
-            EnsureSettingsLoaded();
-            _fileLinkLaunchController.OnFileLinkButtonPressed(control);
+            try
+            {
+                EnsureSettingsLoaded();
+                _fileLinkLaunchController.OnFileLinkButtonPressed(control);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "FileLink ribbon handler failed.", ex);
+            }
         }
 
         internal bool RunFileLinkWizardForMail(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
@@ -697,14 +718,22 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            switch (appointment.MeetingStatus)
+            try
             {
-                case Outlook.OlMeetingStatus.olNonMeeting:
-                case Outlook.OlMeetingStatus.olMeeting:
-                case Outlook.OlMeetingStatus.olMeetingCanceled:
-                    return true;
-                default:
-                    return false;
+                switch (appointment.MeetingStatus)
+                {
+                    case Outlook.OlMeetingStatus.olNonMeeting:
+                    case Outlook.OlMeetingStatus.olMeeting:
+                    case Outlook.OlMeetingStatus.olMeetingCanceled:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            catch (COMException ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to read appointment organizer state.", ex);
+                return false;
             }
         }
 

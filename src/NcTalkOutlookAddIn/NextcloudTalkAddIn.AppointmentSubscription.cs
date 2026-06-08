@@ -4,6 +4,7 @@
 
 using System;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
@@ -277,6 +278,24 @@ namespace NcTalkOutlookAddIn
 
             private void OnDeferredWriteLobbyTick(object sender, EventArgs e)
             {
+                try
+                {
+                    OnDeferredWriteLobbyTickCore();
+                }
+                catch (COMException ex)
+                {
+                    StopDeferredWriteLobbyTimerAfterError();
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Deferred post-write lobby verification stopped after Outlook invalidated the appointment.", ex);
+                }
+                catch (Exception ex)
+                {
+                    StopDeferredWriteLobbyTimerAfterError();
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Deferred post-write lobby verification failed.", ex);
+                }
+            }
+
+            private void OnDeferredWriteLobbyTickCore()
+            {
                 if (_disposed || _roomDeleted || _appointment == null)
                 {
                     _deferredWriteLobbyAttempts = 0;
@@ -349,6 +368,19 @@ namespace NcTalkOutlookAddIn
                     _deferredWriteLobbyAttempts = 0;
                     StopDeferredWriteLobbyTimer();
                     LogTalk("Deferred post-write lobby verification failed after retries (token=" + _roomToken + ").");
+                }
+            }
+
+            private void StopDeferredWriteLobbyTimerAfterError()
+            {
+                _deferredWriteLobbyAttempts = 0;
+                try
+                {
+                    StopDeferredWriteLobbyTimer();
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to stop deferred lobby verification timer after error.", ex);
                 }
             }
 
