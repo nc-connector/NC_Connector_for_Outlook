@@ -88,6 +88,8 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _sharingDefaultPermDeleteCheckBox = new CheckBox();
         private readonly CheckBox _sharingDefaultPasswordCheckBox = new CheckBox();
         private readonly CheckBox _sharingDefaultPasswordSeparateCheckBox = new CheckBox();
+        private readonly Label _sharingPasswordDeliveryModeLabel = new Label();
+        private readonly ComboBox _sharingPasswordDeliveryModeCombo = new ComboBox();
         private readonly Label _sharingDefaultExpireDaysLabel = new Label();
         private readonly NumericUpDown _sharingDefaultExpireDaysUpDown = new NumericUpDown();
         private readonly GroupBox _sharingAttachmentAutomationGroup = new GroupBox();
@@ -703,7 +705,9 @@ namespace NcTalkOutlookAddIn.UI
             int leftColumnX = ScaleLogical(18);
             int rightColumnX = Math.Max(ScaleLogical(260), (groupWidth / 2) + ScaleLogical(8));
             int rightColumnRequired = Math.Max(
-                Math.Max(_sharingDefaultPasswordCheckBox.PreferredSize.Width, _sharingDefaultPasswordSeparateCheckBox.PreferredSize.Width),
+                Math.Max(
+                    Math.Max(_sharingDefaultPasswordCheckBox.PreferredSize.Width, _sharingDefaultPasswordSeparateCheckBox.PreferredSize.Width),
+                    _sharingPasswordDeliveryModeLabel.PreferredSize.Width + _sharingPasswordDeliveryModeCombo.Width + ScaleLogical(12)),
                 _sharingDefaultExpireDaysLabel.PreferredSize.Width + _sharingDefaultExpireDaysUpDown.Width + ScaleLogical(12));
             bool stackRightColumn = rightColumnX + rightColumnRequired + ScaleLogical(12) > groupWidth;
             int rightColumnTop = ScaleLogical(114);
@@ -714,11 +718,13 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             _sharingDefaultPasswordCheckBox.Location = new Point(rightColumnX, rightColumnTop);
-            _sharingDefaultPasswordSeparateCheckBox.Location = new Point(rightColumnX, _sharingDefaultPasswordCheckBox.Bottom + ScaleLogical(12));
-            _sharingDefaultExpireDaysLabel.Location = new Point(rightColumnX, _sharingDefaultPasswordSeparateCheckBox.Bottom + ScaleLogical(12));
+            _sharingDefaultExpireDaysLabel.Location = new Point(rightColumnX, _sharingDefaultPasswordCheckBox.Bottom + ScaleLogical(12));
             _sharingDefaultExpireDaysUpDown.Location = new Point(rightColumnX, _sharingDefaultExpireDaysLabel.Bottom + ScaleLogical(6));
+            _sharingDefaultPasswordSeparateCheckBox.Location = new Point(rightColumnX, _sharingDefaultExpireDaysUpDown.Bottom + ScaleLogical(12));
+            _sharingPasswordDeliveryModeLabel.Location = new Point(rightColumnX, _sharingDefaultPasswordSeparateCheckBox.Bottom + ScaleLogical(12));
+            _sharingPasswordDeliveryModeCombo.Location = new Point(rightColumnX, _sharingPasswordDeliveryModeLabel.Bottom + ScaleLogical(6));
 
-            int columnsBottom = Math.Max(_sharingDefaultPermDeleteCheckBox.Bottom, _sharingDefaultExpireDaysUpDown.Bottom);
+            int columnsBottom = Math.Max(_sharingDefaultPermDeleteCheckBox.Bottom, _sharingPasswordDeliveryModeCombo.Bottom);
             int automationTop = columnsBottom + ScaleLogical(18);
             int automationWidth = Math.Max(ScaleLogical(320), groupWidth - ScaleLogical(24));
             _sharingAttachmentAutomationGroup.SetBounds(ScaleLogical(12), automationTop, automationWidth, _sharingAttachmentAutomationGroup.Height);
@@ -1221,6 +1227,7 @@ namespace NcTalkOutlookAddIn.UI
                 _sharingDefaultPasswordCheckBox.Checked = Result.SharingDefaultPasswordEnabled;
                 _sharingDefaultPasswordSeparateCheckBox.Checked =
                     PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus) && Result.SharingDefaultPasswordSeparateEnabled;
+                SharePasswordDeliveryModeComboHelper.Select(_sharingPasswordDeliveryModeCombo, Result.SharingDefaultPasswordDeliveryMode);
                 int expireDays = Result.SharingDefaultExpireDays;
                 if (expireDays <= 0)
                 {
@@ -1323,6 +1330,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.SharingDefaultPasswordEnabled = _sharingDefaultPasswordCheckBox.Checked;
             Result.SharingDefaultPasswordSeparateEnabled =
                 PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus) && _sharingDefaultPasswordSeparateCheckBox.Checked;
+            Result.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryModeComboHelper.GetSelected(_sharingPasswordDeliveryModeCombo);
             Result.SharingDefaultExpireDays = (int)_sharingDefaultExpireDaysUpDown.Value;
             Result.SharingAttachmentsAlwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
             Result.SharingAttachmentsOfferAboveEnabled = _sharingAttachmentsOfferAboveCheckBox.Checked;
@@ -1753,6 +1761,14 @@ namespace NcTalkOutlookAddIn.UI
             if (_backendPolicyStatus.TryGetPolicyBool("share", "share_send_password_separately", out policyBool))
             {
                 _sharingDefaultPasswordSeparateCheckBox.Checked = policyBool;
+            }
+            policyString = _backendPolicyStatus.GetPolicyString("share", "share_send_password_mode");
+            if (IsPolicyLocked("share", "share_send_password_mode")
+                && _backendPolicyStatus.HasPolicyKey("share", "share_send_password_mode"))
+            {
+                SharePasswordDeliveryModeComboHelper.Select(
+                    _sharingPasswordDeliveryModeCombo,
+                    SharePasswordDeliveryPolicy.ParseMode(policyString));
             }
             if (!PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus))
             {
@@ -2242,6 +2258,7 @@ namespace NcTalkOutlookAddIn.UI
             bool lockSharePermDelete = IsPolicyLocked("share", "share_permission_delete");
             bool lockSharePassword = IsPolicyLocked("share", "share_set_password");
             bool lockSharePasswordSeparate = IsPolicyLocked("share", "share_send_password_separately");
+            bool lockSharePasswordDeliveryMode = IsPolicyLocked("share", "share_send_password_mode");
             bool lockShareExpire = IsPolicyLocked("share", "share_expire_days");
             bool lockShareLang = IsPolicyLocked("share", "language_share_html_block");
             bool lockTalkPassword = IsPolicyLocked("talk", "talk_set_password");
@@ -2257,6 +2274,8 @@ namespace NcTalkOutlookAddIn.UI
             bool lockSignatureOnForward = IsPolicyLocked("email_signature", "email_signature_on_forward");
             bool separatePasswordAvailable = PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
             string separatePasswordUnavailableTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
+            bool passwordDeliveryModeAvailable = PolicyUiHelper.HasPasswordDeliveryMode(_backendPolicyStatus);
+            string passwordDeliveryUnavailableTooltip = PolicyUiHelper.GetPasswordDeliveryModeUnavailableTooltip(_backendPolicyStatus);
             bool emailSignatureAvailable = IsEmailSignaturePolicyAvailable();
             string emailSignatureUnavailableTooltip = GetEmailSignatureUnavailableTooltip();
 
@@ -2275,6 +2294,17 @@ namespace NcTalkOutlookAddIn.UI
             if (!separatePasswordAvailable || !_sharingDefaultPasswordCheckBox.Checked)
             {
                 _sharingDefaultPasswordSeparateCheckBox.Checked = false;
+            }
+            bool deliveryModeEnabled =
+                passwordDeliveryModeAvailable
+                && _sharingDefaultPasswordCheckBox.Checked
+                && _sharingDefaultPasswordSeparateCheckBox.Checked
+                && !lockSharePasswordDeliveryMode
+                && !_isBusy;
+            _sharingPasswordDeliveryModeCombo.Enabled = deliveryModeEnabled;
+            if (!passwordDeliveryModeAvailable)
+            {
+                SharePasswordDeliveryModeComboHelper.Select(_sharingPasswordDeliveryModeCombo, SharePasswordDeliveryMode.Plain);
             }
             _sharingDefaultExpireDaysUpDown.Enabled = !lockShareExpire && !_isBusy;
             _shareBlockLangCombo.Enabled = !lockShareLang && !_isBusy;
@@ -2303,6 +2333,17 @@ namespace NcTalkOutlookAddIn.UI
                     ? separatePasswordUnavailableTooltip
                     : (lockSharePasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
                 !separatePasswordAvailable || lockSharePasswordSeparate);
+            _disabledTooltipHints.Apply(
+                _sharingPasswordDeliveryModeCombo,
+                !passwordDeliveryModeAvailable
+                    ? passwordDeliveryUnavailableTooltip
+                    : (lockSharePasswordDeliveryMode
+                        ? Strings.PolicyAdminControlledTooltip
+                        : (!_sharingDefaultPasswordSeparateCheckBox.Checked ? Strings.SharingPasswordDeliveryEnableSeparateTooltip : string.Empty)),
+                !passwordDeliveryModeAvailable
+                    || lockSharePasswordDeliveryMode
+                    || !_sharingDefaultPasswordSeparateCheckBox.Checked,
+                _sharingPasswordDeliveryModeLabel);
             _disabledTooltipHints.Apply(_sharingDefaultExpireDaysUpDown, lockShareExpire ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareExpire, _sharingDefaultExpireDaysLabel);
             _disabledTooltipHints.Apply(_shareBlockLangCombo, lockShareLang ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareLang, _shareBlockLangLabel);
             _disabledTooltipHints.Apply(_talkDefaultPasswordCheckBox, lockTalkPassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockTalkPassword);
@@ -2423,21 +2464,35 @@ namespace NcTalkOutlookAddIn.UI
             _sharingDefaultPasswordCheckBox.Text = Strings.SharingDefaultPasswordLabel;
             _sharingDefaultPasswordCheckBox.Location = new Point(260, 114);
             _sharingDefaultPasswordCheckBox.AutoSize = true;
+            _sharingDefaultPasswordCheckBox.CheckedChanged += (s, e) => UpdateControlState();
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultPasswordCheckBox);
 
             _sharingDefaultPasswordSeparateCheckBox.Text = Strings.SharingDefaultPasswordSeparateLabel;
             _sharingDefaultPasswordSeparateCheckBox.Location = new Point(260, 138);
             _sharingDefaultPasswordSeparateCheckBox.AutoSize = true;
+            _sharingDefaultPasswordSeparateCheckBox.CheckedChanged += (s, e) => UpdateControlState();
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultPasswordSeparateCheckBox);
 
+            _sharingPasswordDeliveryModeLabel.Text = Strings.SharingPasswordDeliveryModeLabel;
+            _sharingPasswordDeliveryModeLabel.Location = new Point(260, 162);
+            _sharingPasswordDeliveryModeLabel.AutoSize = true;
+            _sharingDefaultsGroup.Controls.Add(_sharingPasswordDeliveryModeLabel);
+
+            _sharingPasswordDeliveryModeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _sharingPasswordDeliveryModeCombo.IntegralHeight = false;
+            _sharingPasswordDeliveryModeCombo.Location = new Point(260, 184);
+            _sharingPasswordDeliveryModeCombo.Width = 220;
+            SharePasswordDeliveryModeComboHelper.Populate(_sharingPasswordDeliveryModeCombo);
+            _sharingDefaultsGroup.Controls.Add(_sharingPasswordDeliveryModeCombo);
+
             _sharingDefaultExpireDaysLabel.Text = Strings.SharingDefaultExpireDaysLabel;
-            _sharingDefaultExpireDaysLabel.Location = new Point(260, 170);
+            _sharingDefaultExpireDaysLabel.Location = new Point(260, 216);
             _sharingDefaultExpireDaysLabel.AutoSize = true;
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultExpireDaysLabel);
 
             _sharingDefaultExpireDaysUpDown.Minimum = 1;
             _sharingDefaultExpireDaysUpDown.Maximum = 3650;
-            _sharingDefaultExpireDaysUpDown.Location = new Point(260, 194);
+            _sharingDefaultExpireDaysUpDown.Location = new Point(260, 240);
             _sharingDefaultExpireDaysUpDown.Width = 90;
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultExpireDaysUpDown);
 
@@ -2485,6 +2540,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _toolTip.SetToolTip(_sharingDefaultPermissionsLabel, Strings.TooltipSharingPermissions);
             _toolTip.SetToolTip(_sharingDefaultPasswordSeparateCheckBox, string.Empty);
+            _toolTip.SetToolTip(_sharingPasswordDeliveryModeCombo, string.Empty);
             _toolTip.SetToolTip(_sharingAttachmentsAlwaysCheckBox, Strings.TooltipSharingAttachmentsAlways);
             _toolTip.SetToolTip(_sharingAttachmentsOfferAboveCheckBox, Strings.TooltipSharingAttachmentsOffer);
         }

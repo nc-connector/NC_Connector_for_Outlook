@@ -80,6 +80,8 @@ namespace NcTalkOutlookAddIn.UI
         private readonly TextBox _passwordTextBox = new TextBox();
         private readonly Button _passwordGenerateButton = new Button();
         private readonly CheckBox _passwordSeparateToggleCheckBox = new CheckBox();
+        private readonly Label _passwordDeliveryModeLabel = new Label();
+        private readonly ComboBox _passwordDeliveryModeCombo = new ComboBox();
         private readonly CheckBox _expireToggleCheckBox = new CheckBox();
         private readonly DateTimePicker _expireDatePicker = new DateTimePicker();
         private readonly Label _expireHintLabel = new Label();
@@ -228,6 +230,12 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _defaults.SharingDefaultPasswordSeparateEnabled = policyBool;
             }
+            policyString = _backendPolicyStatus.GetPolicyString("share", "share_send_password_mode");
+            if (IsPolicyLocked("share_send_password_mode")
+                && _backendPolicyStatus.HasPolicyKey("share", "share_send_password_mode"))
+            {
+                _defaults.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryPolicy.ParseMode(policyString);
+            }
             if (!PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus))
             {
                 _defaults.SharingDefaultPasswordSeparateEnabled = false;
@@ -259,9 +267,12 @@ namespace NcTalkOutlookAddIn.UI
             bool lockPermDelete = IsPolicyLocked("share_permission_delete");
             bool lockPassword = IsPolicyLocked("share_set_password");
             bool lockPasswordSeparate = IsPolicyLocked("share_send_password_separately");
+            bool lockPasswordDeliveryMode = IsPolicyLocked("share_send_password_mode");
             bool lockExpireDays = IsPolicyLocked("share_expire_days");
             bool separatePasswordAvailable = PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
             string separatePasswordUnavailableTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
+            bool passwordDeliveryModeAvailable = PolicyUiHelper.HasPasswordDeliveryMode(_backendPolicyStatus);
+            string passwordDeliveryUnavailableTooltip = PolicyUiHelper.GetPasswordDeliveryModeUnavailableTooltip(_backendPolicyStatus);
 
             _shareNameTextBox.ReadOnly = _attachmentMode || lockShareName;
             _permissionCreateCheckBox.Enabled = !_attachmentMode && !lockPermCreate;
@@ -288,6 +299,17 @@ namespace NcTalkOutlookAddIn.UI
                     : (lockPasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
                 !separatePasswordAvailable || lockPasswordSeparate,
                 _passwordTextBox);
+            _disabledTooltipHints.Apply(
+                _passwordDeliveryModeCombo,
+                !passwordDeliveryModeAvailable
+                    ? passwordDeliveryUnavailableTooltip
+                    : (lockPasswordDeliveryMode
+                        ? Strings.PolicyAdminControlledTooltip
+                        : (!_passwordSeparateToggleCheckBox.Checked ? Strings.SharingPasswordDeliveryEnableSeparateTooltip : string.Empty)),
+                !passwordDeliveryModeAvailable
+                    || lockPasswordDeliveryMode
+                    || !_passwordSeparateToggleCheckBox.Checked,
+                _passwordDeliveryModeLabel);
             _disabledTooltipHints.Apply(_expireToggleCheckBox, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, lockExpireDays, _expireHintLabel);
             _disabledTooltipHints.Apply(_expireDatePicker, lockExpireDays ? Strings.PolicyAdminControlledTooltip : string.Empty, false, _expireHintLabel);
 
@@ -615,7 +637,19 @@ namespace NcTalkOutlookAddIn.UI
             _passwordSeparateToggleCheckBox.Text = Strings.FileLinkWizardPasswordSeparateToggle;
             _passwordSeparateToggleCheckBox.AutoSize = true;
             _passwordSeparateToggleCheckBox.Checked = _defaults.SharingDefaultPasswordSeparateEnabled;
+            _passwordSeparateToggleCheckBox.CheckedChanged += (s, e) => UpdatePasswordState();
             panel.Controls.Add(_passwordSeparateToggleCheckBox);
+
+            _passwordDeliveryModeLabel.Text = Strings.SharingPasswordDeliveryModeLabel;
+            _passwordDeliveryModeLabel.AutoSize = true;
+            panel.Controls.Add(_passwordDeliveryModeLabel);
+
+            _passwordDeliveryModeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _passwordDeliveryModeCombo.IntegralHeight = false;
+            _passwordDeliveryModeCombo.Width = 220;
+            SharePasswordDeliveryModeComboHelper.Populate(_passwordDeliveryModeCombo);
+            SharePasswordDeliveryModeComboHelper.Select(_passwordDeliveryModeCombo, _defaults.SharingDefaultPasswordDeliveryMode);
+            panel.Controls.Add(_passwordDeliveryModeCombo);
 
             if (_attachmentMode)
             {
@@ -732,7 +766,11 @@ namespace NcTalkOutlookAddIn.UI
 
             _passwordSeparateToggleCheckBox.Location = new Point(left, passwordBottom + sectionGap);
 
-            int requiredHeight = _passwordSeparateToggleCheckBox.Bottom + ScaleLogical(16);
+            _passwordDeliveryModeLabel.Location = new Point(left, _passwordSeparateToggleCheckBox.Bottom + rowGap);
+            int deliveryModeWidth = Math.Min(ScaleLogical(260), contentWidth);
+            _passwordDeliveryModeCombo.SetBounds(left + ScaleLogical(16), _passwordDeliveryModeLabel.Bottom + ScaleLogical(6), deliveryModeWidth, Math.Max(ScaleLogical(24), _passwordDeliveryModeCombo.PreferredHeight + ScaleLogical(2)));
+
+            int requiredHeight = _passwordDeliveryModeCombo.Bottom + ScaleLogical(16);
             _generalStepPanel.AutoScrollMinSize = new Size(0, requiredHeight);
         }
 
@@ -1309,6 +1347,7 @@ namespace NcTalkOutlookAddIn.UI
                 _passwordToggleCheckBox.Checked
                 && PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus)
                 && _passwordSeparateToggleCheckBox.Checked;
+            _request.PasswordDeliveryMode = SharePasswordDeliveryModeComboHelper.GetSelected(_passwordDeliveryModeCombo);
             _request.ExpireEnabled = _expireToggleCheckBox.Checked;
             _request.ExpireDate = _expireToggleCheckBox.Checked ? _expireDatePicker.Value.Date : (DateTime?)null;
             _request.NoteEnabled = !_attachmentMode && _noteToggleCheckBox.Checked;
@@ -1334,6 +1373,7 @@ namespace NcTalkOutlookAddIn.UI
                 PasswordEnabled = source.PasswordEnabled,
                 Password = source.Password,
                 PasswordSeparateEnabled = source.PasswordSeparateEnabled,
+                PasswordDeliveryMode = source.PasswordDeliveryMode,
                 ExpireEnabled = source.ExpireEnabled,
                 ExpireDate = source.ExpireDate,
                 NoteEnabled = source.NoteEnabled,
@@ -1605,11 +1645,20 @@ namespace NcTalkOutlookAddIn.UI
         {
             bool enabled = _passwordToggleCheckBox.Checked;
             bool lockPasswordSeparate = IsPolicyLocked("share_send_password_separately");
+            bool lockPasswordDeliveryMode = IsPolicyLocked("share_send_password_mode");
             bool separatePasswordAvailable = PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
             string separatePasswordUnavailableTooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(_backendPolicyStatus);
+            bool passwordDeliveryModeAvailable = PolicyUiHelper.HasPasswordDeliveryMode(_backendPolicyStatus);
+            string passwordDeliveryUnavailableTooltip = PolicyUiHelper.GetPasswordDeliveryModeUnavailableTooltip(_backendPolicyStatus);
             _passwordTextBox.Enabled = enabled;
             _passwordGenerateButton.Enabled = enabled;
             _passwordSeparateToggleCheckBox.Enabled = enabled && !lockPasswordSeparate && separatePasswordAvailable;
+            _passwordDeliveryModeCombo.Enabled =
+                enabled
+                && separatePasswordAvailable
+                && passwordDeliveryModeAvailable
+                && _passwordSeparateToggleCheckBox.Checked
+                && !lockPasswordDeliveryMode;
             _disabledTooltipHints.Apply(
                 _passwordSeparateToggleCheckBox,
                 !separatePasswordAvailable
@@ -1617,9 +1666,24 @@ namespace NcTalkOutlookAddIn.UI
                     : (lockPasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
                 !separatePasswordAvailable || lockPasswordSeparate,
                 _passwordTextBox);
+            _disabledTooltipHints.Apply(
+                _passwordDeliveryModeCombo,
+                !passwordDeliveryModeAvailable
+                    ? passwordDeliveryUnavailableTooltip
+                    : (lockPasswordDeliveryMode
+                        ? Strings.PolicyAdminControlledTooltip
+                        : (!_passwordSeparateToggleCheckBox.Checked ? Strings.SharingPasswordDeliveryEnableSeparateTooltip : string.Empty)),
+                !passwordDeliveryModeAvailable
+                    || lockPasswordDeliveryMode
+                    || !_passwordSeparateToggleCheckBox.Checked,
+                _passwordDeliveryModeLabel);
             if (!enabled || !separatePasswordAvailable)
             {
                 _passwordSeparateToggleCheckBox.Checked = false;
+            }
+            if (!passwordDeliveryModeAvailable)
+            {
+                SharePasswordDeliveryModeComboHelper.Select(_passwordDeliveryModeCombo, SharePasswordDeliveryMode.Plain);
             }
             if (_generalStepPanel != null)
             {

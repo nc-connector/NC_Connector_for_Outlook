@@ -41,6 +41,7 @@ namespace NcTalkOutlookAddIn.Settings
             SharingDefaultPermDelete = false;
             SharingDefaultPasswordEnabled = true;
             SharingDefaultPasswordSeparateEnabled = false;
+            SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryMode.Plain;
             SharingDefaultExpireDays = 7;
             SharingAttachmentsAlwaysConnector = false;
             SharingAttachmentsOfferAboveEnabled = true;
@@ -102,6 +103,8 @@ namespace NcTalkOutlookAddIn.Settings
         public bool SharingDefaultPasswordEnabled { get; set; }
 
         public bool SharingDefaultPasswordSeparateEnabled { get; set; }
+
+        public SharePasswordDeliveryMode SharingDefaultPasswordDeliveryMode { get; set; }
 
         public int SharingDefaultExpireDays { get; set; }
 

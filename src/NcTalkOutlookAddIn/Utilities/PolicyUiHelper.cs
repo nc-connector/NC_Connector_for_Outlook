@@ -53,5 +53,26 @@ namespace NcTalkOutlookAddIn.Utilities
 
             return string.Empty;
         }
+
+        internal static bool HasPasswordDeliveryMode(BackendPolicyStatus status)
+        {
+            return HasBackendSeatEntitlement(status)
+                   && IsPolicyDomainActive(status, "share")
+                   && status.HasPolicyKey("share", "share_send_password_mode")
+                   && !string.IsNullOrWhiteSpace(status.GetPolicyString("share", "share_send_password_mode"));
+        }
+
+        internal static string GetPasswordDeliveryModeUnavailableTooltip(BackendPolicyStatus status)
+        {
+            string entitlementTooltip = GetSeparatePasswordUnavailableTooltip(status);
+            if (!string.IsNullOrWhiteSpace(entitlementTooltip))
+            {
+                return entitlementTooltip;
+            }
+
+            return HasPasswordDeliveryMode(status)
+                ? string.Empty
+                : Strings.SharingPasswordDeliveryUnavailableTooltip;
+        }
     }
 }

@@ -462,6 +462,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "SharingDefaultPermDelete", settings.SharingDefaultPermDelete.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "SharingDefaultPasswordEnabled", settings.SharingDefaultPasswordEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "SharingDefaultPasswordSeparateEnabled", settings.SharingDefaultPasswordSeparateEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "SharingDefaultPasswordDeliveryMode", SharePasswordDeliveryPolicy.ToStorageValue(settings.SharingDefaultPasswordDeliveryMode));
             AppendElement(document, root, "SharingDefaultExpireDays", settings.SharingDefaultExpireDays.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "SharingAttachmentsAlwaysConnector", settings.SharingAttachmentsAlwaysConnector.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "SharingAttachmentsOfferAboveEnabled", settings.SharingAttachmentsOfferAboveEnabled.ToString(CultureInfo.InvariantCulture));
@@ -624,6 +625,9 @@ namespace NcTalkOutlookAddIn.Settings
                     {
                         settings.SharingDefaultPasswordSeparateEnabled = sharingPasswordSeparate;
                     }
+                    break;
+                case "SharingDefaultPasswordDeliveryMode":
+                    settings.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryPolicy.ParseMode(value);
                     break;
                 case "SharingDefaultExpireDays":
                     int expireDays;
