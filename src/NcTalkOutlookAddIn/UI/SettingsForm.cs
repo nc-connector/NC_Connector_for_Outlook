@@ -164,8 +164,8 @@ namespace NcTalkOutlookAddIn.UI
             MaximizeBox = true;
             MinimizeBox = true;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(720, 620);
-            MinimumSize = new Size(ScaleLogical(780), ScaleLogical(680));
+            ClientSize = new Size(820, 720);
+            MinimumSize = new Size(ScaleLogical(800), ScaleLogical(700));
             Icon = BrandingAssets.GetAppIcon(32);
 
             BrandedHeader.AttachToParent(_headerPanel, Controls, HeaderHeight);
@@ -2323,9 +2323,9 @@ namespace NcTalkOutlookAddIn.UI
 
             _disabledTooltipHints.Apply(_fileLinkBaseTextBox, lockShareBase ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareBase, _fileLinkBaseHintLabel);
             _disabledTooltipHints.Apply(_sharingDefaultShareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _sharingDefaultShareNameLabel);
-            _disabledTooltipHints.Apply(_sharingDefaultPermCreateCheckBox, lockSharePermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermCreate, _sharingDefaultPermissionsLabel);
-            _disabledTooltipHints.Apply(_sharingDefaultPermWriteCheckBox, lockSharePermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermWrite, _sharingDefaultPermissionsLabel);
-            _disabledTooltipHints.Apply(_sharingDefaultPermDeleteCheckBox, lockSharePermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermDelete, _sharingDefaultPermissionsLabel);
+            _disabledTooltipHints.Apply(_sharingDefaultPermCreateCheckBox, lockSharePermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermCreate);
+            _disabledTooltipHints.Apply(_sharingDefaultPermWriteCheckBox, lockSharePermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermWrite);
+            _disabledTooltipHints.Apply(_sharingDefaultPermDeleteCheckBox, lockSharePermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePermDelete);
             _disabledTooltipHints.Apply(_sharingDefaultPasswordCheckBox, lockSharePassword ? Strings.PolicyAdminControlledTooltip : string.Empty, lockSharePassword);
             _disabledTooltipHints.Apply(
                 _sharingDefaultPasswordSeparateCheckBox,

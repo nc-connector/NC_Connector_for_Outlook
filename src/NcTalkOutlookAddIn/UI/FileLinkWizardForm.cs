@@ -282,14 +282,14 @@ namespace NcTalkOutlookAddIn.UI
             _expireToggleCheckBox.Enabled = !lockExpireDays;
 
             _disabledTooltipHints.Apply(_shareNameTextBox, lockShareName ? Strings.PolicyAdminControlledTooltip : string.Empty, lockShareName, _shareNameLabel, _titleLabel);
-            _disabledTooltipHints.Apply(_permissionCreateCheckBox, lockPermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermCreate, _permissionsLabel);
-            _disabledTooltipHints.Apply(_permissionWriteCheckBox, lockPermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermWrite, _permissionsLabel);
-            _disabledTooltipHints.Apply(_permissionDeleteCheckBox, lockPermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermDelete, _permissionsLabel);
+            _disabledTooltipHints.Apply(_permissionCreateCheckBox, lockPermCreate ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermCreate);
+            _disabledTooltipHints.Apply(_permissionWriteCheckBox, lockPermWrite ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermWrite);
+            _disabledTooltipHints.Apply(_permissionDeleteCheckBox, lockPermDelete ? Strings.PolicyAdminControlledTooltip : string.Empty, lockPermDelete);
             _disabledTooltipHints.Apply(
                 _passwordToggleCheckBox,
                 lockPassword ? Strings.PolicyAdminControlledTooltip : string.Empty,
                 lockPassword,
-                _passwordGenerateButton,
+                (Control)null,
                 _passwordGenerateButton,
                 _passwordTextBox);
             _disabledTooltipHints.Apply(
@@ -298,6 +298,7 @@ namespace NcTalkOutlookAddIn.UI
                     ? separatePasswordUnavailableTooltip
                     : (lockPasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
                 !separatePasswordAvailable || lockPasswordSeparate,
+                (Control)null,
                 _passwordTextBox);
             _disabledTooltipHints.Apply(
                 _passwordDeliveryModeCombo,
@@ -742,33 +743,35 @@ namespace NcTalkOutlookAddIn.UI
             int generateWidth = _passwordGenerateButton.Width;
             int generateHeight = _passwordGenerateButton.Height;
             int passwordHeight = Math.Max(ScaleLogical(24), _passwordTextBox.PreferredHeight + ScaleLogical(2));
-            int passwordMinWidth = ScaleLogical(140);
-            int inlineStartX = _passwordToggleCheckBox.Right + ScaleLogical(10);
-            int inlineAvailable = (left + contentWidth) - inlineStartX;
+            int passwordIndent = ScaleLogical(16);
+            int passwordMinWidth = ScaleLogical(180);
+            int passwordMaxWidth = ScaleLogical(420);
+            int passwordInputLeft = left + passwordIndent;
+            int passwordAvailable = (left + contentWidth) - passwordInputLeft;
 
             int passwordBottom;
-            if (inlineAvailable >= passwordMinWidth + ScaleLogical(8) + generateWidth)
+            if (passwordAvailable >= passwordMinWidth + ScaleLogical(8) + generateWidth)
             {
-                int passwordWidth = Math.Max(passwordMinWidth, inlineAvailable - generateWidth - ScaleLogical(8));
-                int rowY = _passwordToggleCheckBox.Top - ScaleLogical(2);
-                _passwordTextBox.SetBounds(inlineStartX, rowY, passwordWidth, passwordHeight);
+                int passwordWidth = Math.Min(passwordMaxWidth, Math.Max(passwordMinWidth, passwordAvailable - generateWidth - ScaleLogical(8)));
+                int rowY = _passwordToggleCheckBox.Bottom + ScaleLogical(6);
+                _passwordTextBox.SetBounds(passwordInputLeft, rowY, passwordWidth, passwordHeight);
                 _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), rowY - ScaleLogical(2), generateWidth, generateHeight);
-                passwordBottom = Math.Max(_passwordToggleCheckBox.Bottom, Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom));
+                passwordBottom = Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom);
             }
             else
             {
                 int rowY = _passwordToggleCheckBox.Bottom + ScaleLogical(6);
                 int passwordWidth = Math.Max(passwordMinWidth, Math.Max(ScaleLogical(120), contentWidth - generateWidth - ScaleLogical(24)));
-                _passwordTextBox.SetBounds(left + ScaleLogical(16), rowY, passwordWidth, passwordHeight);
+                _passwordTextBox.SetBounds(passwordInputLeft, rowY, passwordWidth, passwordHeight);
                 _passwordGenerateButton.SetBounds(_passwordTextBox.Right + ScaleLogical(8), rowY - ScaleLogical(2), generateWidth, generateHeight);
                 passwordBottom = Math.Max(_passwordTextBox.Bottom, _passwordGenerateButton.Bottom);
             }
 
             _passwordSeparateToggleCheckBox.Location = new Point(left, passwordBottom + sectionGap);
 
-            _passwordDeliveryModeLabel.Location = new Point(left, _passwordSeparateToggleCheckBox.Bottom + rowGap);
+            _passwordDeliveryModeLabel.Location = new Point(passwordInputLeft, _passwordSeparateToggleCheckBox.Bottom + rowGap);
             int deliveryModeWidth = Math.Min(ScaleLogical(260), contentWidth);
-            _passwordDeliveryModeCombo.SetBounds(left + ScaleLogical(16), _passwordDeliveryModeLabel.Bottom + ScaleLogical(6), deliveryModeWidth, Math.Max(ScaleLogical(24), _passwordDeliveryModeCombo.PreferredHeight + ScaleLogical(2)));
+            _passwordDeliveryModeCombo.SetBounds(passwordInputLeft, _passwordDeliveryModeLabel.Bottom + ScaleLogical(6), deliveryModeWidth, Math.Max(ScaleLogical(24), _passwordDeliveryModeCombo.PreferredHeight + ScaleLogical(2)));
 
             int requiredHeight = _passwordDeliveryModeCombo.Bottom + ScaleLogical(16);
             _generalStepPanel.AutoScrollMinSize = new Size(0, requiredHeight);
@@ -1665,6 +1668,7 @@ namespace NcTalkOutlookAddIn.UI
                     ? separatePasswordUnavailableTooltip
                     : (lockPasswordSeparate ? Strings.PolicyAdminControlledTooltip : string.Empty),
                 !separatePasswordAvailable || lockPasswordSeparate,
+                (Control)null,
                 _passwordTextBox);
             _disabledTooltipHints.Apply(
                 _passwordDeliveryModeCombo,
