@@ -791,6 +791,11 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string SharingDefaultPermDeleteLabel { get { return Get("options_sharing_default_perm_delete", "Delete"); } }
         internal static string SharingDefaultPasswordLabel { get { return Get("options_sharing_default_password_label", "Set password"); } }
         internal static string SharingDefaultPasswordSeparateLabel { get { return Get("options_sharing_default_password_separate_label", "Send password separately"); } }
+        internal static string SharingPasswordDeliveryModeLabel { get { return Get("sharing_password_delivery_mode_label", "Password delivery"); } }
+        internal static string SharingPasswordDeliveryPlain { get { return Get("sharing_password_delivery_plain", "Plaintext"); } }
+        internal static string SharingPasswordDeliverySecrets { get { return Get("sharing_password_delivery_secrets", "Nextcloud Secret Link"); } }
+        internal static string SharingPasswordDeliveryEnableSeparateTooltip { get { return Get("sharing_password_delivery_enable_separate_tooltip", "Enable separate password delivery first."); } }
+        internal static string SharingPasswordDeliveryUnavailableTooltip { get { return Get("sharing_password_delivery_unavailable_tooltip", "Nextcloud Secrets is not available. Plaintext will be used."); } }
         internal static string SharingDefaultExpireDaysLabel { get { return Get("options_sharing_default_expire_days_label", "Expiration (days)"); } }
         internal static string SharingAttachmentAutomationHeading { get { return Get("options_sharing_attachments_heading", "Attachment automation"); } }
         internal static string SharingAttachmentsAlwaysConnectorLabel { get { return Get("options_sharing_attachments_always_label", "Always handle attachments via NC Connector"); } }
@@ -930,10 +935,13 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string SharingHtmlPasswordSeparateHint { get { return Get("sharing_html_password_separate_hint", "The password will be sent in a separate email."); } }
         internal static string SharingHtmlPasswordMailIntro { get { return Get("sharing_html_password_mail_intro", "Here is your password for the shared link."); } }
+        internal static string SharingHtmlSecretMailIntro { get { return Get("sharing_html_secret_mail_intro", "Open this one-time secret link to view the password for the shared link."); } }
+        internal static string SharingHtmlSecretLinkLabel { get { return Get("sharing_html_secret_link_label", "Secret link"); } }
         internal static string SharingPasswordMailSubject { get { return Get("sharing_password_mail_subject", "Password for shared link"); } }
         internal static string SharingPasswordMailSubjectWithLabel { get { return Get("sharing_password_mail_subject_with_label", "Password for shared link: {0}"); } }
         internal static string SharingPasswordMailNotificationTitle { get { return Get("sharing_password_mail_notify_title", "NC Connector"); } }
         internal static string SharingPasswordMailNotificationSuccess { get { return Get("sharing_password_mail_notify_success", "Password email sent to {0} recipient(s)."); } }
+        internal static string SharingPasswordSecretsFallbackWarning { get { return Get("sharing_password_secrets_fallback_warning", "Nextcloud Secrets is not available. The password was sent as a separate plain-text email."); } }
 
         // Generic dialog title
         internal static string DialogTitle { get { return Get("extName", "NC Connector for Outlook"); } }

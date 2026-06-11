@@ -1322,11 +1322,20 @@
   "sharing_html_password_mail_intro": {
     "message": "送信済み共有リンクのパスワードはこちらです。"
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "共有リンクのパスワードを表示するには、この一度限りのシークレットリンクを開いてください。"
+  },
+  "sharing_html_secret_link_label": {
+    "message": "シークレットリンク"
+  },
   "sharing_html_password_separate_hint": {
     "message": "パスワードは別メールで送信されます。"
   },
   "sharing_password_mail_notify_success": {
     "message": "パスワード電子メールが $1 受信者に送信されました。"
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "Nextcloud Secrets を利用できません。パスワードは別のプレーンテキストメールで送信されました。"
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "options_tls_selection_required": {
     "message": "OS 既定の TLS ポリシーを無効にする場合は、少なくとも 1 つの TLS バージョン（1.2 または 1.3）を有効にしてください。"
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "パスワードの送信方法"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "プレーンテキスト"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Nextcloud シークレットリンク"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "先にパスワードの別送信を有効にしてください。"
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "Nextcloud Secrets を利用できません。プレーンテキストが使用されます。"
   }
 }

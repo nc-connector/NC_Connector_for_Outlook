@@ -246,7 +246,14 @@ namespace NcTalkOutlookAddIn
                     + ").");
             }
 
-            internal void RegisterSeparatePasswordDispatch(FileLinkResult result, FileLinkRequest request, string passwordOnlyHtml, string passwordOnlyPlainText, bool isPlainText)
+            internal void RegisterSeparatePasswordDispatch(
+                FileLinkResult result,
+                FileLinkRequest request,
+                string passwordOnlyHtml,
+                string passwordOnlyPlainText,
+                bool isPlainText,
+                string languageOverride,
+                BackendPolicyStatus policyStatus)
             {                if (result == null || request == null)
                 {
                     return;
@@ -264,14 +271,24 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
+                SharePasswordDeliveryPolicy deliveryPolicy = SharePasswordDeliveryPolicy.Resolve(policyStatus, request.PasswordDeliveryMode);
                 var entry = new SeparatePasswordDispatchEntry
                 {
                     ShareLabel = result.FolderName ?? string.Empty,
                     ShareUrl = result.ShareUrl ?? string.Empty,
+                    ShareId = result.ShareId ?? string.Empty,
+                    ShareToken = result.ShareToken ?? string.Empty,
+                    RelativePath = result.RelativePath ?? string.Empty,
+                    ExpireDate = result.ExpireDate,
+                    Permissions = result.Permissions,
                     Password = password.Trim(),
                     Html = passwordOnlyHtml,
                     PlainText = passwordOnlyPlainText,
                     IsPlainText = isPlainText,
+                    DeliveryMode = deliveryPolicy.Mode,
+                    SecretsExpireDays = deliveryPolicy.SecretsExpireDays,
+                    LanguageOverride = string.IsNullOrWhiteSpace(languageOverride) ? "default" : languageOverride,
+                    BackendPolicyStatus = policyStatus,
                     To = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("To")),
                     Cc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("CC")),
                     Bcc = ComposeShareLifecycleController.BuildNormalizedRecipientCsv(ReadMailRecipientList("BCC"))
@@ -287,6 +304,8 @@ namespace NcTalkOutlookAddIn
                     + (!string.IsNullOrWhiteSpace(entry.ShareUrl)).ToString(CultureInfo.InvariantCulture)
                     + ", plainText="
                     + entry.IsPlainText.ToString(CultureInfo.InvariantCulture)
+                    + ", deliveryMode="
+                    + entry.DeliveryMode.ToString()
                     + ").");
             }
 

@@ -110,6 +110,9 @@
     <Compile Include="Models\FileLinkUploadItemProgress.cs" />
     <Compile Include="Models\BackendPolicyStatus.cs" />
     <Compile Include="Models\EmailSignaturePolicy.cs" />
+    <Compile Include="Models\SharePasswordDeliveryMode.cs" />
+    <Compile Include="Models\SharePasswordDeliveryPolicy.cs" />
+    <Compile Include="Models\SecretsLinkResult.cs" />
     <Compile Include="Models\NextcloudUser.cs" />
     <Compile Include="Models\PasswordPolicyInfo.cs" />
     <Compile Include="Models\TalkParticipant.cs" />
@@ -138,6 +141,7 @@
     <Compile Include="Services\FileLinkService.cs" />
     <Compile Include="Services\BackendPolicyService.cs" />
     <Compile Include="Services\EmailSignaturePolicyService.cs" />
+    <Compile Include="Services\SecretsService.cs" />
     <Compile Include="Services\OutlookAttachmentAutomationGuardService.cs" />
     <Compile Include="Services\PasswordPolicyService.cs" />
     <Compile Include="UI\SettingsForm.cs" />
@@ -149,6 +153,7 @@
     <Compile Include="UI\ComposeAttachmentPromptForm.cs" />
     <Compile Include="UI\FileLinkWizardForm.cs" />
     <Compile Include="UI\FileLinkWizardForm.DragDrop.cs" />
+    <Compile Include="UI\SharePasswordDeliveryModeComboHelper.cs" />
     <Compile Include="Utilities\DiagnosticsLogger.cs" />
     <Compile Include="Utilities\FooterButtonLayoutHelper.cs" />
     <Compile Include="Utilities\LogCategories.cs" />
@@ -161,6 +166,7 @@
     <Compile Include="Utilities\PasswordGenerator.cs" />
     <Compile Include="Utilities\PasswordGenerationHelper.cs" />
     <Compile Include="Utilities\PolicyUiHelper.cs" />
+    <Compile Include="Utilities\SecretsCrypto.cs" />
     <Compile Include="Utilities\TimeUtilities.cs" />
     <Compile Include="Utilities\DpiScaling.cs" />
     <Compile Include="Utilities\UiThemeManager.cs" />

@@ -1343,11 +1343,20 @@
   "sharing_html_password_mail_intro": {
     "message": "Hier ist Ihr Passwort zur gesendeten Freigabe."
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "Oeffnen Sie diesen einmaligen Secret-Link, um das Passwort zur Freigabe anzuzeigen."
+  },
+  "sharing_html_secret_link_label": {
+    "message": "Secret-Link"
+  },
   "sharing_html_password_separate_hint": {
     "message": "Das Passwort wird in einer separaten E-Mail gesendet."
   },
   "sharing_password_mail_notify_success": {
     "message": "Passwort-E-Mail wurde an $1 Empfaenger gesendet."
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "Nextcloud Secrets ist nicht verfuegbar. Das Passwort wurde als separate Klartext-E-Mail gesendet."
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Ihr NC Connector Seat ist derzeit pausiert. Bitte wenden Sie sich an Ihren Nextcloud-Administrator."
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "Passwortzustellung"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "Klartext"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Nextcloud Secret-Link"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "Aktiviere zuerst die separate Passwortzustellung."
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "Nextcloud Secrets ist nicht verfuegbar. Klartext wird verwendet."
   }
 }

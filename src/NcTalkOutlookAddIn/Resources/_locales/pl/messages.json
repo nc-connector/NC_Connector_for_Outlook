@@ -1322,11 +1322,20 @@
   "sharing_html_password_mail_intro": {
     "message": "Oto hasło do wysłanego linku udostępniania."
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "Otwórz ten jednorazowy tajny link, aby zobaczyć hasło do udostępnionego linku."
+  },
+  "sharing_html_secret_link_label": {
+    "message": "Tajny link"
+  },
   "sharing_html_password_separate_hint": {
     "message": "Hasło zostanie wysłane w osobnym e-mailu."
   },
   "sharing_password_mail_notify_success": {
     "message": "E-mail z hasłem wysłany do odbiorców $1."
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "Nextcloud Secrets jest niedostępny. Hasło wysłano w osobnej wiadomości e-mail jako zwykły tekst."
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "options_tls_selection_required": {
     "message": "Gdy domyślna polityka TLS systemu operacyjnego jest wyłączona, włącz co najmniej jedną wersję TLS (1.2 lub 1.3)."
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "Dostarczanie hasła"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "Zwykły tekst"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Tajny link Nextcloud"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "Najpierw włącz osobne dostarczanie hasła."
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "Nextcloud Secrets jest niedostępny. Zostanie użyty zwykły tekst."
   }
 }

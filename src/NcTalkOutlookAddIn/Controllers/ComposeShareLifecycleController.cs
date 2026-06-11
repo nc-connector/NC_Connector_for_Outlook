@@ -91,10 +91,32 @@ namespace NcTalkOutlookAddIn.Controllers
             int autoSendFailures = 0;
             int fallbackOpenedCount = 0;
             int fallbackOpenFailures = 0;
+            int secretsFallbackCount = 0;
             string lastFailureMessage = string.Empty;
             var sentRecipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var dispatch in queue)
+            List<SeparatePasswordDispatchEntry> dispatchQueue = ExpandSeparatePasswordDispatchEntries(queue);
+            int queuedSecrets = CountSecretsDispatches(queue);
+            if (queuedSecrets > 0)
             {
+                NextcloudTalkAddIn.LogFileLinkMessage(
+                    "Separate password dispatch queue prepared (composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ", queued="
+                    + queue.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", expanded="
+                    + dispatchQueue.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", secretsQueued="
+                    + queuedSecrets.ToString(CultureInfo.InvariantCulture)
+                    + ", secretsExpanded="
+                    + CountSecretsDispatches(dispatchQueue).ToString(CultureInfo.InvariantCulture)
+                    + ").");
+            }
+            foreach (var queuedDispatch in dispatchQueue)
+            {
+                SeparatePasswordDispatchEntry dispatch = PrepareSeparatePasswordDispatch(
+                    queuedDispatch,
+                    composeKey,
+                    ref secretsFallbackCount);
                 if (!IsDispatchUsable(dispatch))
                 {
                     continue;
@@ -163,6 +185,10 @@ namespace NcTalkOutlookAddIn.Controllers
                         "Failed to release password MailItem COM object.");
                 }
             }
+            if (secretsFallbackCount > 0)
+            {
+                ShowPasswordSecretsFallbackDialog();
+            }
             int recipientCount = sentRecipients.Count;
             if (attemptedDispatches > 0 && successfulDispatches == attemptedDispatches && autoSendFailures == 0 && recipientCount > 0)
             {
@@ -202,6 +228,243 @@ namespace NcTalkOutlookAddIn.Controllers
                     ShowPasswordMailFailureDialog(lastFailureMessage);
                 }
             }
+        }
+
+        private static List<SeparatePasswordDispatchEntry> ExpandSeparatePasswordDispatchEntries(List<SeparatePasswordDispatchEntry> queue)
+        {
+            var expanded = new List<SeparatePasswordDispatchEntry>();
+            if (queue == null)
+            {
+                return expanded;
+            }
+
+            for (int i = 0; i < queue.Count; i++)
+            {
+                SeparatePasswordDispatchEntry entry = queue[i];
+                if (entry == null || entry.DeliveryMode != SharePasswordDeliveryMode.Secrets)
+                {
+                    expanded.Add(entry);
+                    continue;
+                }
+
+                int added = 0;
+                added += AddPerRecipientEntries(expanded, entry, ExtractRecipientAddresses(entry.To), "to");
+                added += AddPerRecipientEntries(expanded, entry, ExtractRecipientAddresses(entry.Cc), "cc");
+                added += AddPerRecipientEntries(expanded, entry, ExtractRecipientAddresses(entry.Bcc), "bcc");
+                if (added == 0)
+                {
+                    expanded.Add(entry);
+                }
+            }
+
+            return expanded;
+        }
+
+        private static int CountSecretsDispatches(List<SeparatePasswordDispatchEntry> queue)
+        {
+            if (queue == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int i = 0; i < queue.Count; i++)
+            {
+                SeparatePasswordDispatchEntry entry = queue[i];
+                if (entry != null && entry.DeliveryMode == SharePasswordDeliveryMode.Secrets)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static int AddPerRecipientEntries(
+            List<SeparatePasswordDispatchEntry> target,
+            SeparatePasswordDispatchEntry source,
+            List<string> recipients,
+            string field)
+        {
+            if (target == null || source == null || recipients == null || recipients.Count == 0)
+            {
+                return 0;
+            }
+
+            int added = 0;
+            for (int i = 0; i < recipients.Count; i++)
+            {
+                string address = NormalizeRecipientAddress(recipients[i]);
+                if (string.IsNullOrWhiteSpace(address))
+                {
+                    continue;
+                }
+                SeparatePasswordDispatchEntry clone = ClonePasswordDispatch(source);
+                clone.To = string.Equals(field, "to", StringComparison.OrdinalIgnoreCase) ? address : string.Empty;
+                clone.Cc = string.Equals(field, "cc", StringComparison.OrdinalIgnoreCase) ? address : string.Empty;
+                clone.Bcc = string.Equals(field, "bcc", StringComparison.OrdinalIgnoreCase) ? address : string.Empty;
+                target.Add(clone);
+                added++;
+            }
+            return added;
+        }
+
+        private SeparatePasswordDispatchEntry PrepareSeparatePasswordDispatch(
+            SeparatePasswordDispatchEntry dispatch,
+            string composeKey,
+            ref int secretsFallbackCount)
+        {
+            if (dispatch == null || dispatch.DeliveryMode != SharePasswordDeliveryMode.Secrets)
+            {
+                return dispatch;
+            }
+
+            try
+            {
+                NextcloudTalkAddIn.LogFileLinkMessage(
+                    "Separate password Secrets link create start (composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ", to="
+                    + CountRecipientsInCsv(dispatch.To).ToString(CultureInfo.InvariantCulture)
+                    + ", cc="
+                    + CountRecipientsInCsv(dispatch.Cc).ToString(CultureInfo.InvariantCulture)
+                    + ", bcc="
+                    + CountRecipientsInCsv(dispatch.Bcc).ToString(CultureInfo.InvariantCulture)
+                    + ", expireDays="
+                    + dispatch.SecretsExpireDays.ToString(CultureInfo.InvariantCulture)
+                    + ", mailPlainText="
+                    + dispatch.IsPlainText.ToString(CultureInfo.InvariantCulture)
+                    + ").");
+                SecretsLinkResult secret = CreatePasswordSecret(dispatch);
+                SeparatePasswordDispatchEntry prepared = BuildPasswordDispatchBody(
+                    dispatch,
+                    secret.ShareUrl,
+                    SharePasswordDeliveryMode.Secrets,
+                    secretLink: true);
+                NextcloudTalkAddIn.LogFileLinkMessage(
+                    "Separate password Secrets link created (composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ", hasUuid="
+                    + (!string.IsNullOrWhiteSpace(secret.Uuid)).ToString(CultureInfo.InvariantCulture)
+                    + ", hasExpires="
+                    + secret.Expires.HasValue.ToString(CultureInfo.InvariantCulture)
+                    + ", hasHtml="
+                    + (!string.IsNullOrWhiteSpace(prepared.Html)).ToString(CultureInfo.InvariantCulture)
+                    + ", hasPlainText="
+                    + (!string.IsNullOrWhiteSpace(prepared.PlainText)).ToString(CultureInfo.InvariantCulture)
+                    + ").");
+                return prepared;
+            }
+            catch (Exception ex)
+            {
+                secretsFallbackCount++;
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Separate password Secrets link creation failed, falling back to plain mail (composeKey=" + (composeKey ?? string.Empty) + ").",
+                    ex);
+                SeparatePasswordDispatchEntry fallback = ClonePasswordDispatch(dispatch);
+                fallback.DeliveryMode = SharePasswordDeliveryMode.Plain;
+                return fallback;
+            }
+        }
+
+        private SecretsLinkResult CreatePasswordSecret(SeparatePasswordDispatchEntry dispatch)
+        {
+            _owner.EnsureSettingsLoaded();
+            if (_owner.CurrentSettings == null || !_owner.SettingsAreComplete())
+            {
+                throw new InvalidOperationException("Settings are incomplete.");
+            }
+
+            AddinSettings settings = _owner.CurrentSettings;
+            var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
+            var service = new SecretsService(configuration);
+            return service.CreateSecretLink(
+                dispatch.Password,
+                BuildSecretsTitle(dispatch),
+                dispatch.SecretsExpireDays);
+        }
+
+        private static string BuildSecretsTitle(SeparatePasswordDispatchEntry dispatch)
+        {
+            string shareLabel = dispatch != null ? (dispatch.ShareLabel ?? string.Empty).Trim() : string.Empty;
+            if (string.IsNullOrWhiteSpace(shareLabel))
+            {
+                return "NCC share password";
+            }
+            return "NCC " + shareLabel;
+        }
+
+        private static SeparatePasswordDispatchEntry BuildPasswordDispatchBody(
+            SeparatePasswordDispatchEntry source,
+            string deliveryValue,
+            SharePasswordDeliveryMode mode,
+            bool secretLink)
+        {
+            FileLinkResult result = BuildFileLinkResultForDelivery(source, deliveryValue);
+            string html = source.IsPlainText
+                ? string.Empty
+                : FileLinkHtmlBuilder.BuildPasswordOnly(result, source.LanguageOverride, source.BackendPolicyStatus, secretLink);
+            string plainText = source.IsPlainText
+                ? FileLinkHtmlBuilder.BuildPasswordOnlyPlainText(result, source.LanguageOverride, source.BackendPolicyStatus, secretLink)
+                : string.Empty;
+
+            SeparatePasswordDispatchEntry prepared = ClonePasswordDispatch(source);
+            prepared.Password = deliveryValue ?? string.Empty;
+            prepared.Html = html;
+            prepared.PlainText = plainText;
+            prepared.DeliveryMode = mode;
+            return prepared;
+        }
+
+        private static FileLinkResult BuildFileLinkResultForDelivery(SeparatePasswordDispatchEntry dispatch, string deliveryValue)
+        {
+            if (dispatch == null)
+            {
+                throw new ArgumentNullException("dispatch");
+            }
+
+            return new FileLinkResult(
+                dispatch.ShareUrl,
+                dispatch.ShareId,
+                dispatch.ShareToken,
+                deliveryValue ?? string.Empty,
+                dispatch.ExpireDate,
+                dispatch.Permissions,
+                dispatch.ShareLabel,
+                dispatch.RelativePath);
+        }
+
+        private static SeparatePasswordDispatchEntry ClonePasswordDispatch(SeparatePasswordDispatchEntry source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            return new SeparatePasswordDispatchEntry
+            {
+                ShareLabel = source.ShareLabel,
+                ShareUrl = source.ShareUrl,
+                ShareId = source.ShareId,
+                ShareToken = source.ShareToken,
+                RelativePath = source.RelativePath,
+                ExpireDate = source.ExpireDate,
+                Permissions = source.Permissions,
+                Password = source.Password,
+                Html = source.Html,
+                PlainText = source.PlainText,
+                IsPlainText = source.IsPlainText,
+                DeliveryMode = source.DeliveryMode,
+                SecretsExpireDays = source.SecretsExpireDays,
+                LanguageOverride = source.LanguageOverride,
+                BackendPolicyStatus = source.BackendPolicyStatus,
+                To = source.To,
+                Cc = source.Cc,
+                Bcc = source.Bcc,
+                SenderEmail = source.SenderEmail,
+                SendUsingAccountSmtpAddress = source.SendUsingAccountSmtpAddress,
+                SentOnBehalfOfName = source.SentOnBehalfOfName
+            };
         }
 
         internal static void AddRecipientAddresses(HashSet<string> recipients, List<string> addresses)
@@ -714,6 +977,22 @@ namespace NcTalkOutlookAddIn.Controllers
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to show separate password failure dialog.", ex);
+            }
+        }
+
+        private static void ShowPasswordSecretsFallbackDialog()
+        {
+            try
+            {
+                MessageBox.Show(
+                    Strings.SharingPasswordSecretsFallbackWarning,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to show separate password Secrets fallback warning.", ex);
             }
         }
     }

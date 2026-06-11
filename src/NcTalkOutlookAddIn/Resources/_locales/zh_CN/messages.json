@@ -1322,11 +1322,20 @@
   "sharing_html_password_mail_intro": {
     "message": "这是您已发送共享链接的密码。"
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "打开这个一次性密钥链接以查看共享链接的密码。"
+  },
+  "sharing_html_secret_link_label": {
+    "message": "密钥链接"
+  },
   "sharing_html_password_separate_hint": {
     "message": "密码将通过单独邮件发送。"
   },
   "sharing_password_mail_notify_success": {
     "message": "密码电子邮件已发送至$1 收件人。"
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "Nextcloud Secrets 不可用。密码已作为单独的纯文本邮件发送。"
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "options_tls_selection_required": {
     "message": "当禁用操作系统默认 TLS 策略时，请至少启用一个 TLS 版本（1.2 或 1.3）。"
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "密码发送方式"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "纯文本"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Nextcloud Secret 链接"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "请先启用单独发送密码。"
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "Nextcloud Secrets 不可用。将使用纯文本。"
   }
 }

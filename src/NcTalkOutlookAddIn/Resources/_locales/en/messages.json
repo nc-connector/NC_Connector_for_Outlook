@@ -1343,11 +1343,20 @@
   "sharing_html_password_mail_intro": {
     "message": "Here is your password for the shared link."
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "Open this one-time secret link to view the password for the shared link."
+  },
+  "sharing_html_secret_link_label": {
+    "message": "Secret link"
+  },
   "sharing_html_password_separate_hint": {
     "message": "The password will be sent in a separate email."
   },
   "sharing_password_mail_notify_success": {
     "message": "Password email sent to $1 recipient(s)."
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "Nextcloud Secrets is not available. The password was sent as a separate plain-text email."
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "sharing_password_separate_paused_tooltip": {
     "message": "Your NC Connector seat is currently paused. Please contact your Nextcloud administrator."
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "Password delivery"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "Plaintext"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Nextcloud Secret Link"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "Enable separate password delivery first."
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "Nextcloud Secrets is not available. Plaintext will be used."
   }
 }

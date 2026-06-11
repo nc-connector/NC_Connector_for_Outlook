@@ -148,7 +148,9 @@ namespace NcTalkOutlookAddIn.Controllers
                             wizard.RequestSnapshot,
                             passwordOnlyHtml,
                             passwordOnlyPlainText,
-                            plainTextCompose);
+                            plainTextCompose,
+                            languageOverride,
+                            policyStatus);
                     }
 
                     if (plainTextCompose)

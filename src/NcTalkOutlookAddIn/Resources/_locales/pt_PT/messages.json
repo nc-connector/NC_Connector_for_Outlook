@@ -1322,11 +1322,20 @@
   "sharing_html_password_mail_intro": {
     "message": "Aqui está a sua palavra-passe para a ligação partilhada enviada."
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "Abra esta ligação secreta de utilização única para ver a palavra-passe da partilha."
+  },
+  "sharing_html_secret_link_label": {
+    "message": "Ligação secreta"
+  },
   "sharing_html_password_separate_hint": {
     "message": "A palavra-passe será enviada num e-mail separado."
   },
   "sharing_password_mail_notify_success": {
     "message": "E-mail de palavra-passe enviado para $1 destinatário(s)."
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "O Nextcloud Secrets não está disponível. A palavra-passe foi enviada num e-mail separado em texto simples."
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "options_tls_selection_required": {
     "message": "Quando a política TLS predefinida do sistema operativo estiver desativada, ative pelo menos uma versão TLS (1.2 ou 1.3)."
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "Entrega da palavra-passe"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "Texto simples"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Ligação secreta Nextcloud"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "Ative primeiro o envio separado da palavra-passe."
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "O Nextcloud Secrets não está disponível. Será usado texto simples."
   }
 }

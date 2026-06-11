@@ -1322,11 +1322,20 @@
   "sharing_html_password_mail_intro": {
     "message": "這是您已傳送共享連結的密碼。"
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "開啟這個一次性密鑰連結以查看分享連結的密碼。"
+  },
+  "sharing_html_secret_link_label": {
+    "message": "密鑰連結"
+  },
   "sharing_html_password_separate_hint": {
     "message": "密碼將以獨立郵件傳送。"
   },
   "sharing_password_mail_notify_success": {
     "message": "密碼電子郵件已發送至$1 收件者。"
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "Nextcloud Secrets 無法使用。密碼已透過單獨的純文字郵件傳送。"
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "options_tls_selection_required": {
     "message": "當作業系統預設 TLS 原則停用時，請至少啟用一個 TLS 版本（1.2 或 1.3）。"
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "密碼傳送方式"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "純文字"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Nextcloud Secret 連結"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "請先啟用單獨傳送密碼。"
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "Nextcloud Secrets 無法使用。將使用純文字。"
   }
 }

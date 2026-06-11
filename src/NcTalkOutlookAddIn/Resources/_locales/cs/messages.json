@@ -1322,11 +1322,20 @@
   "sharing_html_password_mail_intro": {
     "message": "Zde je vaše heslo k odeslanému sdílenému odkazu."
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "Otevřete tento jednorázový tajný odkaz pro zobrazení hesla ke sdílenému odkazu."
+  },
+  "sharing_html_secret_link_label": {
+    "message": "Tajný odkaz"
+  },
   "sharing_html_password_separate_hint": {
     "message": "Heslo bude odesláno v samostatném e-mailu."
   },
   "sharing_password_mail_notify_success": {
     "message": "E-mail s heslem byl odeslán $1 příjemcům."
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "Nextcloud Secrets není k dispozici. Heslo bylo odesláno v samostatném e-mailu jako prostý text."
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "options_tls_selection_required": {
     "message": "Když jsou výchozí zásady TLS operačního systému vypnuté, povolte alespoň jednu verzi TLS (1.2 nebo 1.3)."
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "Doručení hesla"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "Prostý text"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Odkaz Nextcloud Secret"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "Nejprve povolte samostatné odeslání hesla."
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "Nextcloud Secrets není k dispozici. Použije se prostý text."
   }
 }

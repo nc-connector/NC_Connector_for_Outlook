@@ -2,6 +2,8 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // See LICENSE.txt for details.
 
+using System;
+
 namespace NcTalkOutlookAddIn.Models
 {
     internal sealed class SeparatePasswordDispatchEntry
@@ -10,6 +12,16 @@ namespace NcTalkOutlookAddIn.Models
 
         internal string ShareUrl { get; set; }
 
+        internal string ShareId { get; set; }
+
+        internal string ShareToken { get; set; }
+
+        internal string RelativePath { get; set; }
+
+        internal DateTime? ExpireDate { get; set; }
+
+        internal FileLinkPermissionFlags Permissions { get; set; }
+
         internal string Password { get; set; }
 
         internal string Html { get; set; }
@@ -17,6 +29,14 @@ namespace NcTalkOutlookAddIn.Models
         internal string PlainText { get; set; }
 
         internal bool IsPlainText { get; set; }
+
+        internal SharePasswordDeliveryMode DeliveryMode { get; set; }
+
+        internal int SecretsExpireDays { get; set; }
+
+        internal string LanguageOverride { get; set; }
+
+        internal BackendPolicyStatus BackendPolicyStatus { get; set; }
 
         internal string To { get; set; }
 

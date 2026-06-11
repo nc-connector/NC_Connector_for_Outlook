@@ -39,6 +39,9 @@ namespace NcTalkOutlookAddIn.Utilities
         private static readonly Regex ShareCallTokenRegex = new Regex(
             "(\\/(?:s|call)\\/)([A-Za-z0-9_-]+)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex SecretsShareFragmentRegex = new Regex(
+            "(\\/apps\\/secrets\\/share\\/[^#\\s]+)#[^\\s<>\"']+",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex DavUserPathRegex = new Regex(
             "(\\/dav\\/files\\/)([^\\/\\s]+)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -221,6 +224,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 value = UrlCredentialRegex.Replace(value, "$1<CRED>@");
                 value = SecretQueryRegex.Replace(value, "$1<REDACTED>");
                 value = SecretJsonRegex.Replace(value, "$1\"<REDACTED>\"");
+                value = SecretsShareFragmentRegex.Replace(value, "$1#<REDACTED>");
                 value = ShareCallTokenRegex.Replace(value, "$1<TOKEN>");
                 value = DavUserPathRegex.Replace(value, "$1<USER>");
                 value = UserFieldRegex.Replace(value, "$1<REDACTED_USER>");

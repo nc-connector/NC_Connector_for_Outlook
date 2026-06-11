@@ -43,7 +43,8 @@ namespace NcTalkOutlookAddIn.Utilities
                     effectiveLanguage,
                     attachmentMode,
                     separatePassword,
-                    passwordOnly: false);
+                    passwordOnly: false,
+                    secretLink: false);
             }
             if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
             {
@@ -144,7 +145,7 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
                 // Creates the password-only follow-up HTML block.
-        internal static string BuildPasswordOnly(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null)
+        internal static string BuildPasswordOnly(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null, bool secretLink = false)
         {
             if (result == null)
             {
@@ -161,17 +162,24 @@ namespace NcTalkOutlookAddIn.Utilities
                     effectiveLanguage: effectiveLanguage,
                     attachmentMode: false,
                     separatePassword: false,
-                    passwordOnly: true);
+                    passwordOnly: true,
+                    secretLink: secretLink);
             }
             if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
             {
                 effectiveLanguage = "default";
             }
-            string intro = Strings.GetInLanguage(
-                effectiveLanguage,
-                "sharing_html_password_mail_intro",
-                "Here is your password for the shared link.");
+            string intro = secretLink
+                ? Strings.GetInLanguage(
+                    effectiveLanguage,
+                    "sharing_html_secret_mail_intro",
+                    "Open this one-time secret link to view the password for the shared link.")
+                : Strings.GetInLanguage(
+                    effectiveLanguage,
+                    "sharing_html_password_mail_intro",
+                    "Here is your password for the shared link.");
             string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
+            string secretLinkLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_secret_link_label", "Secret link");
             string brandBlue = BrandingAssets.BrandBlueHex;
 
             var builder = new StringBuilder();
@@ -200,7 +208,9 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.AppendLine("<div style=\"padding:18px 18px 12px 18px;\">");
             builder.AppendLine("<p style=\"margin:0 0 14px 0;line-height:1.4;\">" + HttpUtility.HtmlEncode(intro) + "<br /></p>");
             builder.AppendLine("<table style=\"width:100%;border-collapse:collapse;margin-bottom:10px;\">");
-            AppendRow(builder, passwordLabel, BuildPasswordValueHtml(result.Password));
+            AppendRow(builder, passwordLabel, secretLink
+                ? BuildSecretLinkValueHtml(result.Password, secretLinkLabel, brandBlue)
+                : BuildPasswordValueHtml(result.Password));
             builder.AppendLine("</table>");
             builder.AppendLine("</div>");
             builder.AppendLine("</td>");
@@ -300,7 +310,7 @@ namespace NcTalkOutlookAddIn.Utilities
             return FramePlainTextBlock(string.Join("\r\n\r\n", sections.FindAll(value => !string.IsNullOrWhiteSpace(value)).ToArray()));
         }
 
-        internal static string BuildPasswordOnlyPlainText(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null)
+        internal static string BuildPasswordOnlyPlainText(FileLinkResult result, string languageOverride, BackendPolicyStatus policyStatus = null, bool secretLink = false)
         {
             if (result == null)
             {
@@ -327,12 +337,19 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             var sections = new List<string>();
-            sections.Add(NormalizePlainTextBlock(Strings.GetInLanguage(
-                effectiveLanguage,
-                "sharing_html_password_mail_intro",
-                "Here is your password for the shared link.")));
+            sections.Add(NormalizePlainTextBlock(secretLink
+                ? Strings.GetInLanguage(
+                    effectiveLanguage,
+                    "sharing_html_secret_mail_intro",
+                    "Open this one-time secret link to view the password for the shared link.")
+                : Strings.GetInLanguage(
+                    effectiveLanguage,
+                    "sharing_html_password_mail_intro",
+                    "Here is your password for the shared link.")));
             sections.Add(BuildPlainTextField(
-                Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password"),
+                secretLink
+                    ? Strings.GetInLanguage(effectiveLanguage, "sharing_html_secret_link_label", "Secret link")
+                    : Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password"),
                 result.Password));
 
             return FramePlainTextBlock(string.Join("\r\n\r\n", sections.FindAll(value => !string.IsNullOrWhiteSpace(value)).ToArray()));
@@ -384,7 +401,8 @@ namespace NcTalkOutlookAddIn.Utilities
             string effectiveLanguage,
             bool attachmentMode,
             bool separatePassword,
-            bool passwordOnly)
+            bool passwordOnly,
+            bool secretLink)
         {            if (string.IsNullOrWhiteSpace(template) || result == null)
             {
                 return string.Empty;
@@ -422,7 +440,14 @@ namespace NcTalkOutlookAddIn.Utilities
                 html = StripTemplateRow(html, "RIGHTS");
             }
             html = html.Replace("{URL}", HttpUtility.HtmlEncode(downloadUrl ?? string.Empty));
-            html = html.Replace("{PASSWORD}", HttpUtility.HtmlEncode(passwordValue));
+            html = html.Replace(
+                "{PASSWORD}",
+                passwordOnly && secretLink
+                    ? BuildSecretLinkValueHtml(
+                        passwordValue,
+                        Strings.GetInLanguage(effectiveLanguage, "sharing_html_secret_link_label", "Secret link"),
+                        BrandingAssets.BrandBlueHex)
+                    : HttpUtility.HtmlEncode(passwordValue));
             html = html.Replace("{EXPIRATIONDATE}", HttpUtility.HtmlEncode(expireValue));
             html = html.Replace("{RIGHTS}", rightsValue);
             html = html.Replace("{NOTE}", HttpUtility.HtmlEncode(noteValue));
@@ -650,6 +675,19 @@ namespace NcTalkOutlookAddIn.Utilities
             passwordBuilder.Append(HttpUtility.HtmlEncode(password ?? string.Empty));
             passwordBuilder.Append("</span>");
             return passwordBuilder.ToString();
+        }
+
+        private static string BuildSecretLinkValueHtml(string secretUrl, string linkText, string brandBlue)
+        {
+            string href = HttpUtility.HtmlAttributeEncode(secretUrl ?? string.Empty);
+            string text = HttpUtility.HtmlEncode(string.IsNullOrWhiteSpace(linkText) ? "Secret link" : linkText.Trim());
+            string color = string.IsNullOrWhiteSpace(brandBlue) ? BrandingAssets.BrandBlueHex : brandBlue;
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "<a href=\"{0}\" style=\"color:{1};font-weight:bold;text-decoration:underline;word-break:normal;\" target=\"_blank\" rel=\"noopener\">{2}</a>",
+                href,
+                HttpUtility.HtmlAttributeEncode(color),
+                text);
         }
 
         private static string BuildAttachmentZipDownloadUrl(string shareUrl, string shareToken)

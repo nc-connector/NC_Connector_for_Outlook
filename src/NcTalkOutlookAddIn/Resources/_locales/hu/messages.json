@@ -1322,11 +1322,20 @@
   "sharing_html_password_mail_intro": {
     "message": "Itt találja a jelszót az elküldött megosztási hivatkozáshoz."
   },
+  "sharing_html_secret_mail_intro": {
+    "message": "Nyissa meg ezt az egyszer használható titkos hivatkozást a megosztási jelszó megtekintéséhez."
+  },
+  "sharing_html_secret_link_label": {
+    "message": "Titkos hivatkozás"
+  },
   "sharing_html_password_separate_hint": {
     "message": "A jelszót külön e-mailben küldjük el."
   },
   "sharing_password_mail_notify_success": {
     "message": "Jelszavas e-mail elküldve a $1 címzett(ek)nek."
+  },
+  "sharing_password_secrets_fallback_warning": {
+    "message": "A Nextcloud Secrets nem érhető el. A jelszó külön, egyszerű szövegű e-mailben lett elküldve."
   },
   "sharing_password_mail_notify_title": {
     "message": "NC Connector"
@@ -1423,5 +1432,20 @@
   },
   "options_tls_selection_required": {
     "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."
+  },
+  "sharing_password_delivery_mode_label": {
+    "message": "Jelszó kézbesítése"
+  },
+  "sharing_password_delivery_plain": {
+    "message": "Egyszerű szöveg"
+  },
+  "sharing_password_delivery_secrets": {
+    "message": "Nextcloud titkos hivatkozás"
+  },
+  "sharing_password_delivery_enable_separate_tooltip": {
+    "message": "Először engedélyezze a jelszó külön kézbesítését."
+  },
+  "sharing_password_delivery_unavailable_tooltip": {
+    "message": "A Nextcloud Secrets nem érhető el. Egyszerű szöveg lesz használva."
   }
 }

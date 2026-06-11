@@ -28,6 +28,8 @@ namespace NcTalkOutlookAddIn.Models
 
         internal bool PasswordSeparateEnabled { get; set; }
 
+        internal SharePasswordDeliveryMode PasswordDeliveryMode { get; set; }
+
         internal bool ExpireEnabled { get; set; }
 
         internal DateTime? ExpireDate { get; set; }
