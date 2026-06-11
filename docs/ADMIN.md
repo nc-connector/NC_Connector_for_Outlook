@@ -184,6 +184,8 @@ If backend policy/template delivery is enabled for Talk appointment descriptions
 - If `Send password separately` is enabled, the main HTML block does not contain inline password text.
 - This feature is only available when the NC Connector backend endpoint exists and the current user has an active assigned seat.
 - Follow-up password mail dispatch runs only after the primary mail send is confirmed.
+- If backend policy selects Nextcloud Secrets, Outlook creates one encrypted one-time Secrets link per final recipient.
+- If Secrets creation fails, Outlook falls back to the existing plain follow-up mail and shows a warning.
 - Dispatch strategy:
   - first try automatic send
   - if automatic send fails, open a prefilled manual fallback draft.

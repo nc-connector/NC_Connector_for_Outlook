@@ -167,6 +167,8 @@ Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanit
 ### Separater Passwort-Follow-up-Versand
 - Ist `Passwort separat senden` aktiv, enthaelt der Haupt-HTML-Block kein Inline-Passwort.
 - Der Passwort-Follow-up-Versand startet erst nach bestaetigtem erfolgreichem Hauptversand.
+- Wenn die Backend-Policy Nextcloud Secrets auswaehlt, erzeugt Outlook pro finalem Empfaenger einen verschluesselten einmaligen Secrets-Link.
+- Wenn die Secrets-Erstellung fehlschlaegt, faellt Outlook auf die bisherige separate Klartext-Passwortmail zurueck und zeigt einen Hinweis.
 - Versandstrategie:
   - zuerst automatischer Versand
   - bei Fehlern ein vorbefuellter manueller Fallback-Entwurf.

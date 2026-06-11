@@ -261,6 +261,9 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
   - queue password-only HTML after share creation
   - capture recipients on send
   - capture the sender account on send and apply it to the follow-up mail before signature/body dispatch
+  - when backend policy requests Nextcloud Secrets, split the final recipient list and create one one-time Secrets link per recipient
+  - Secrets links are encrypted locally with AES-GCM through Windows CNG; no new crypto dependency is bundled
+  - if Secrets creation fails, fall back to the existing plain separate password mail and warn the user
   - dispatch only after successful primary send and keep the source compose mode for HTML vs plain-text follow-up mails
   - auto-send first, then manual fallback draft on failure.
 
@@ -292,6 +295,12 @@ Sharing:
 - Create public share: `POST /ocs/v2.php/apps/files_sharing/api/v1/shares`
 - Upload/folder creation: `remote.php/dav/...` (WebDAV)
 - Large file upload: `MKCOL /remote.php/dav/uploads/<user>/<upload-id>`, chunk `PUT`s, then `MOVE /remote.php/dav/uploads/<user>/<upload-id>/.file` to the final file path
+
+Secrets (optional separate password mode):
+
+- Create encrypted secret: `POST /ocs/v2.php/apps/secrets/api/v1/secrets`
+- Public one-time link: `/index.php/apps/secrets/share/<uuid>#<local-key>`
+- The key stays in the URL fragment and is not sent to Nextcloud.
 
 IFB (DAV via proxy):
 

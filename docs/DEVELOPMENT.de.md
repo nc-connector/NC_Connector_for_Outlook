@@ -226,7 +226,10 @@ Compose-Filelink-Paritaet (3.1.0):
   - Batch-Entfernung (`Remove last selected attachments`)
   - Attachment-Mode-Wizardstart direkt im Datei-Schritt
   - Share-Cleanup bei unsent close inkl. Grace-Timer fuer Send/Close-Race
-  - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand; Empfaenger und Absenderkonto werden beim Senden aus dem Original-Compose uebernommen.
+  - separates Passwort-Follow-up nach bestaetigtem erfolgreichem Hauptversand; Empfaenger und Absenderkonto werden beim Senden aus dem Original-Compose uebernommen
+  - bei Backend-Policy `Nextcloud Secret Link` wird die finale Empfaengerliste aufgeteilt und pro Empfaenger ein eigener einmaliger Secrets-Link erstellt
+  - Secrets-Links werden lokal per AES-GCM ueber Windows CNG verschluesselt; es wird keine neue Crypto-Abhaengigkeit gebuendelt
+  - wenn Secrets-Erstellung fehlschlaegt, faellt der Versand auf die bisherige separate Klartext-Passwortmail zurueck und zeigt einen Hinweis.
 - `ComposeShareLifecycleController` kapselt die eigentliche Share-Cleanup-/Passwort-Dispatch-Logik; `MailComposeSubscription` haelt nur Queue- und Eventzustand.
 - `TalkAppointmentController` kapselt Appointment-Schreib-/Sync-Pfade; `NextcloudTalkAddIn` delegiert diese Aufrufe statt die komplette Fachlogik im Root zu halten.
 - Nach Appointment-Write werden die lokalen Outlook-`X-NCTALK-*`-Metadaten aktualisiert; serverseitige CalDAV-VEVENTs werden dafuer nicht gepatcht.
