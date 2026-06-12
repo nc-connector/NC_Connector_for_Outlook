@@ -74,7 +74,7 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 try
                 {
-                    return LoadFromXmlFile(_filePath);
+                    return ApplyManagedSetupPolicy(LoadFromXmlFile(_filePath));
                 }
                 catch (Exception ex)
                 {
@@ -86,14 +86,14 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 try
                 {
-                    return LoadFromIniFile(legacyPath);
+                    return ApplyManagedSetupPolicy(LoadFromIniFile(legacyPath));
                 }
                 catch (Exception ex)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to load legacy settings INI.", ex);
                 }
             }
-            return new AddinSettings();
+            return ApplyManagedSetupPolicy(new AddinSettings());
         }
 
         internal void Save(AddinSettings settings)
@@ -105,7 +105,7 @@ namespace NcTalkOutlookAddIn.Settings
             try
             {
                 Directory.CreateDirectory(_dataDirectory);
-                SaveToXmlFile(_filePath, settings, _profileName);
+                SaveToXmlFile(_filePath, ApplyManagedSetupPolicy(settings.Clone()), _profileName);
             }
             catch (Exception ex)
             {
@@ -432,6 +432,17 @@ namespace NcTalkOutlookAddIn.Settings
 
                 ApplySettingValue(settings, key, value);
             }
+            return settings;
+        }
+
+        private static AddinSettings ApplyManagedSetupPolicy(AddinSettings settings)
+        {
+            if (settings == null)
+            {
+                settings = new AddinSettings();
+            }
+
+            settings.ApplyManagedSetupPolicy(ManagedSetupPolicy.Load());
             return settings;
         }
 

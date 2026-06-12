@@ -479,6 +479,9 @@
   "options_base_url_label": {
     "message": "URL Nextcloud"
   },
+  "options_managed_nextcloud_url_tooltip": {
+    "message": "URL Nextcloud управляется вашей организацией."
+  },
   "options_base_url_placeholder": {
     "message": "https://cloud.example.com"
   },

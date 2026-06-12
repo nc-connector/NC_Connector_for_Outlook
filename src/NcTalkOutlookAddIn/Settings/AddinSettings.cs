@@ -69,6 +69,9 @@ namespace NcTalkOutlookAddIn.Settings
             EmailSignatureOnCompose = null;
             EmailSignatureOnReply = null;
             EmailSignatureOnForward = null;
+            ManagedNextcloudUrl = string.Empty;
+            ManagedNextcloudUrlSource = string.Empty;
+            ManagedNextcloudUrlLocked = false;
         }
 
         public string ServerUrl { get; set; }
@@ -172,10 +175,42 @@ namespace NcTalkOutlookAddIn.Settings
 
         public bool? EmailSignatureOnForward { get; set; }
 
+        internal string ManagedNextcloudUrl { get; private set; }
+
+        internal string ManagedNextcloudUrlSource { get; private set; }
+
+        internal bool ManagedNextcloudUrlLocked { get; private set; }
+
+        internal bool HasManagedNextcloudUrl
+        {
+            get { return !string.IsNullOrWhiteSpace(ManagedNextcloudUrl); }
+        }
+
         public AddinSettings Clone()
         {
             var copy = (AddinSettings)MemberwiseClone();
             return copy;
+        }
+
+        internal void ApplyManagedSetupPolicy(ManagedSetupPolicy policy)
+        {
+            ManagedNextcloudUrl = string.Empty;
+            ManagedNextcloudUrlSource = string.Empty;
+            ManagedNextcloudUrlLocked = false;
+
+            if (policy == null || !policy.HasNextcloudUrl)
+            {
+                return;
+            }
+
+            ManagedNextcloudUrl = policy.NextcloudUrl;
+            ManagedNextcloudUrlSource = policy.Source;
+            ManagedNextcloudUrlLocked = policy.NextcloudUrlLocked;
+
+            if (ManagedNextcloudUrlLocked || string.IsNullOrWhiteSpace(ServerUrl))
+            {
+                ServerUrl = ManagedNextcloudUrl;
+            }
         }
 
         internal static int NormalizeIfbPort(int port)

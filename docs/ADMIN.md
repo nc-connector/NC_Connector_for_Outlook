@@ -7,6 +7,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 - [Updates / upgrade behavior](#updates--upgrade-behavior)
 - [Files & registry](#files--registry)
 - [Settings (profile XML)](#settings-profile-xml)
+- [Managed Nextcloud URL (Registry/GPO)](#managed-nextcloud-url-registrygpo)
 - [Compose sharing lifecycle (3.1.0)](#compose-sharing-lifecycle-310)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
 - [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
@@ -110,6 +111,27 @@ Because profile XML settings live in the user profile, common rollout approaches
 Recommendation:
 - Pre-seed only base URL and defaults.
 - Let users fetch credentials via Login Flow v2 or enter them manually (recommended for DPAPI compatibility).
+
+## Managed Nextcloud URL (Registry/GPO)
+
+Outlook can read the Nextcloud URL from Windows policy registry keys:
+
+- `HKLM\Software\Policies\NC Connector`
+- `HKCU\Software\Policies\NC Connector`
+
+Values:
+
+- `NextcloudUrl` (`REG_SZ`): full Nextcloud URL, for example `https://cloud.example.com`
+- `NextcloudUrlLocked` (`REG_DWORD` or string, optional): `1` / `true` locks the URL field in Settings
+
+Priority:
+
+- `HKLM` wins over `HKCU`
+- both 64-bit and 32-bit registry views are read
+- if the value is not locked, it only pre-fills empty profiles
+- if the value is locked, Outlook always uses the registry URL and disables the URL field
+
+Credentials are still user-specific. Users fetch an app password through the login flow or enter it manually.
 
 ### Optional NC Connector backend policies
 

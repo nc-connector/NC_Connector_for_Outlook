@@ -122,7 +122,8 @@ Key code locations:
   - `Services/UpdateCheckService.cs` checks `nc-connector.de` once per day for Outlook release metadata and stores the cached result in profile settings.
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
   - `UI/ScaledForm.cs` is the shared DPI-scaling base for forms that use logical pixel layout helpers.
-- `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
+- `src/NcTalkOutlookAddIn/Settings/` — persisted settings model, storage, and managed setup policy
+  - `Settings/ManagedSetupPolicy.cs` reads the managed Nextcloud URL from Windows policy registry keys.
 - `src/NcTalkOutlookAddIn/Utilities/` — logging, theming, i18n, small shared helpers
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` — centralized sanitizer for backend-provided share/talk HTML templates
 - `src/NcTalkOutlookAddIn/Utilities/HtmlToPlainTextConverter.cs` — DOM-based HTML-to-plain-text rendering for plain-text email signatures

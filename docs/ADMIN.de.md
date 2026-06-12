@@ -8,6 +8,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 - [Updates / Upgrade-Verhalten](#updates--upgrade-verhalten)
 - [Dateien & Registry](#dateien--registry)
 - [Einstellungen (Profil-XML)](#einstellungen-profil-xml)
+- [Verwaltete Nextcloud-URL (Registry/GPO)](#verwaltete-nextcloud-url-registrygpo)
 - [Compose-Freigabe-Lifecycle (3.1.0)](#compose-freigabe-lifecycle-310)
 - [Talk-Termin-Templates (HTML) — Outlook-sicheres Subset](#talk-termin-templates-html--outlook-sicheres-subset)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
@@ -129,6 +130,27 @@ Empfehlung:
 
 - Nur Base-URL und Defaults pre-seeden.
 - Credentials entweder ueber Login Flow v2 oder per Benutzer setzen lassen (empfohlen fuer DPAPI-Kompatibilitaet).
+
+## Verwaltete Nextcloud-URL (Registry/GPO)
+
+Outlook kann die Nextcloud-URL aus Windows-Policy-Registry-Keys lesen:
+
+- `HKLM\Software\Policies\NC Connector`
+- `HKCU\Software\Policies\NC Connector`
+
+Werte:
+
+- `NextcloudUrl` (`REG_SZ`): vollstaendige Nextcloud-URL, zum Beispiel `https://cloud.example.com`
+- `NextcloudUrlLocked` (`REG_DWORD` oder String, optional): `1` / `true` sperrt das URL-Feld in den Einstellungen
+
+Prioritaet:
+
+- `HKLM` gewinnt vor `HKCU`
+- 64-bit- und 32-bit-Registry-Views werden gelesen
+- wenn der Wert nicht gesperrt ist, fuellt er nur leere Profile vor
+- wenn der Wert gesperrt ist, nutzt Outlook immer die Registry-URL und deaktiviert das URL-Feld
+
+Credentials bleiben benutzerspezifisch. Benutzer holen ein App-Passwort ueber den Login-Flow oder geben es manuell ein.
 
 ## Talk-Raum-Loeschschutz
 

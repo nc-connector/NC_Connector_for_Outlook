@@ -483,6 +483,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string SignatureBackendInactiveTooltip { get { return Get("options_signature_backend_inactive_tooltip", "Central signature policy is inactive or incomplete."); } }
         internal static string SignatureBackendUpdateRequiredTooltip { get { return Get("options_signature_backend_update_required_tooltip", "Please update the NC Connector backend. This backend version does not support central email signatures yet."); } }
         internal static string LabelServerUrl { get { return Get("options_base_url_label", "Nextcloud URL"); } }
+        internal static string TooltipManagedNextcloudUrl { get { return Get("options_managed_nextcloud_url_tooltip", "Nextcloud URL is managed by your organization."); } }
         internal static string LabelUsername { get { return Get("options_user_label", "Username"); } }
         internal static string LabelAppPassword { get { return Get("options_app_pass_label", "App password"); } }
         internal static string GroupAuthentication { get { return Get("options_auth_heading", "Authentication"); } }

@@ -96,6 +96,7 @@
     <Compile Include="NextcloudTalkAddIn.SubscriptionEnsure.cs" />
     <Compile Include="Settings\AddinSettings.cs" />
     <Compile Include="Settings\AuthenticationMode.cs" />
+    <Compile Include="Settings\ManagedSetupPolicy.cs" />
     <Compile Include="Settings\SettingsStorage.cs" />
     <Compile Include="Models\TalkRoomType.cs" />
     <Compile Include="Models\TalkRoomRequest.cs" />

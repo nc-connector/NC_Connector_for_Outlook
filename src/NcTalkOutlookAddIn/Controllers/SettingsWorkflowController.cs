@@ -51,8 +51,15 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal async Task RunAsync()
         {
-            AddinSettings currentSettings = (_getCurrentSettings != null ? _getCurrentSettings() : null) ?? new AddinSettings();
+            AddinSettings currentSettings = ((_getCurrentSettings != null ? _getCurrentSettings() : null) ?? new AddinSettings()).Clone();
+            currentSettings.ApplyManagedSetupPolicy(ManagedSetupPolicy.Load());
             _logSettings("Settings dialog opened.");
+            if (currentSettings.HasManagedNextcloudUrl)
+            {
+                _logSettings(
+                    "Managed Nextcloud URL policy active (source=" + currentSettings.ManagedNextcloudUrlSource
+                    + ", locked=" + currentSettings.ManagedNextcloudUrlLocked + ").");
+            }
 
             var configuration = new TalkServiceConfiguration(
                 currentSettings.ServerUrl ?? string.Empty,

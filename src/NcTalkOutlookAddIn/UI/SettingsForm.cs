@@ -1336,7 +1336,7 @@ namespace NcTalkOutlookAddIn.UI
                 _initialIfbEnabled = Result.IfbEnabled;
                 _ifbDefaultApplied = _initialIfbEnabled || !string.IsNullOrEmpty(Result.IfbPreviousFreeBusyPath);
                 _lastKnownServerVersion = Result.LastKnownServerVersion ?? string.Empty;
-                _serverUrlTextBox.Text = Result.ServerUrl;
+                _serverUrlTextBox.Text = Result.ManagedNextcloudUrlLocked ? Result.ManagedNextcloudUrl : Result.ServerUrl;
                 _usernameTextBox.Text = Result.Username;
                 _appPasswordTextBox.Text = Result.AppPassword;
                 _manualRadio.Checked = Result.AuthMode == AuthenticationMode.Manual;
@@ -1443,7 +1443,7 @@ namespace NcTalkOutlookAddIn.UI
                 return;
             }
 
-            Result.ServerUrl = _serverUrlTextBox.Text.Trim();
+            Result.ServerUrl = Result.ManagedNextcloudUrlLocked ? Result.ManagedNextcloudUrl : _serverUrlTextBox.Text.Trim();
             Result.Username = _usernameTextBox.Text.Trim();
             Result.AppPassword = _appPasswordTextBox.Text;
             Result.AuthMode = _loginFlowRadio.Checked ? AuthenticationMode.LoginFlow : AuthenticationMode.Manual;
@@ -2351,11 +2351,17 @@ namespace NcTalkOutlookAddIn.UI
         private void UpdateControlState()
         {
             bool manual = _manualRadio.Checked;
+            bool managedUrlLocked = Result != null && Result.ManagedNextcloudUrlLocked;
 
+            _serverUrlTextBox.Enabled = !managedUrlLocked && !_isBusy;
             _usernameTextBox.Enabled = manual && !_isBusy;
             _appPasswordTextBox.Enabled = manual && !_isBusy;
             _loginFlowButton.Enabled = !manual && !_isBusy;
             _testButton.Enabled = !_isBusy;
+            _disabledTooltipHints.Apply(
+                _serverUrlTextBox,
+                managedUrlLocked ? Strings.TooltipManagedNextcloudUrl : string.Empty,
+                managedUrlLocked);
 
             bool credentialsAvailable =
                 !string.IsNullOrWhiteSpace(_serverUrlTextBox.Text) &&
