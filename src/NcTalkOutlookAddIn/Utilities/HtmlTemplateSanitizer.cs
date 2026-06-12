@@ -170,7 +170,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 var parser = new HtmlParser();
                 var document = parser.ParseDocument(html);
-                var body = document != null ? document.Body : null;                if (body == null)
+                var body = document != null ? document.Body : null;
+                if (body == null)
                 {
                     return html;
                 }
@@ -355,7 +356,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
         }
 
         private static Assembly ResolveSanitizerDependency(object sender, ResolveEventArgs args)
-        {            if (string.IsNullOrWhiteSpace(args == null ? null : args.Name))
+        {
+            if (string.IsNullOrWhiteSpace(args == null ? null : args.Name))
             {
                 return null;
             }
@@ -523,7 +525,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             HtmlStructureStats outputStats,
             NormalizationReport normalizationReport,
             bool emptied)
-        {            if (inputStats == null)
+        {
+            if (inputStats == null)
             {
                 inputStats = new HtmlStructureStats();
             }
@@ -559,7 +562,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             Dictionary<string, int> inputCounts,
             Dictionary<string, int> outputCounts,
             int maxEntries)
-        {            if (inputCounts == null || inputCounts.Count == 0)
+        {
+            if (inputCounts == null || inputCounts.Count == 0)
             {
                 return "none";
             }
@@ -601,7 +605,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             {
                 var parser = new HtmlParser();
                 var document = parser.ParseDocument(html);
-                var body = document != null ? document.Body : null;                if (body == null)
+                var body = document != null ? document.Body : null;
+                if (body == null)
                 {
                     return stats;
                 }
@@ -646,7 +651,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             }
             var parser = new HtmlParser();
             var document = parser.ParseDocument(html);
-            var body = document != null ? document.Body : null;            if (body == null)
+            var body = document != null ? document.Body : null;
+            if (body == null)
             {
                 return html;
             }
@@ -833,7 +839,8 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
         }
 
         private static bool TryWrapElementChildrenInFontColor(IDocument document, IElement targetElement, string color)
-        {            if (document == null || targetElement == null || string.IsNullOrWhiteSpace(color))
+        {
+            if (document == null || targetElement == null || string.IsNullOrWhiteSpace(color))
             {
                 return false;
             }

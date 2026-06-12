@@ -44,7 +44,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal void Apply(Control primary, string text, bool showHint, Control anchorOverride, params Control[] fallbackTargets)
-        {            if (primary == null)
+        {
+            if (primary == null)
             {
                 return;
             }
@@ -53,7 +54,8 @@ namespace NcTalkOutlookAddIn.Utilities
             _anchorOverridesByPrimary[primary] = anchorOverride;
             _fallbackTargetsByPrimary[primary] = normalizedFallbackTargets;
             _showHintByPrimary[primary] = showHint;
-            Track(primary);            if (anchorOverride != null)
+            Track(primary);
+            if (anchorOverride != null)
             {
                 Track(anchorOverride);
             }
@@ -69,7 +71,8 @@ namespace NcTalkOutlookAddIn.Utilities
             if (normalizedFallbackTargets.Length > 0)
             {
                 foreach (Control target in normalizedFallbackTargets)
-                {                    if (target != null && !ReferenceEquals(target, primary))
+                {
+                    if (target != null && !ReferenceEquals(target, primary))
                     {
                         _toolTip.SetToolTip(target, text);
                     }
@@ -80,7 +83,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private void UpdateHint(Control primary, string text, bool showHint, Control anchorOverride, Control[] fallbackTargets)
-        {            if (primary == null)
+        {
+            if (primary == null)
             {
                 return;
             }
@@ -100,7 +104,8 @@ namespace NcTalkOutlookAddIn.Utilities
 
             Label hint = GetOrCreateHint(primary);
             if (!ReferenceEquals(hint.Parent, anchor.Parent))
-            {                if (hint.Parent != null)
+            {
+                if (hint.Parent != null)
                 {
                     hint.Parent.Controls.Remove(hint);
                 }
@@ -145,7 +150,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private void Track(Control primary)
-        {            if (primary == null || _trackedControls.Contains(primary))
+        {
+            if (primary == null || _trackedControls.Contains(primary))
             {
                 return;
             }
@@ -160,7 +166,8 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private void OnTrackedControlChanged(object sender, EventArgs e)
         {
-            Control changed = sender as Control;            if (changed == null)
+            Control changed = sender as Control;
+            if (changed == null)
             {
                 return;
             }
@@ -196,7 +203,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private void RefreshHint(Control primary)
-        {            if (primary == null)
+        {
+            if (primary == null)
             {
                 return;
             }
@@ -222,7 +230,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static Control ResolveAnchor(Control primary, Control anchorOverride, Control[] fallbackTargets)
-        {            if (primary == null)
+        {
+            if (primary == null)
             {
                 return null;
             }
@@ -237,7 +246,8 @@ namespace NcTalkOutlookAddIn.Utilities
             if (fallbackTargets != null)
             {
                 foreach (Control target in fallbackTargets)
-                {                    if (target == null || !target.Visible)
+                {
+                    if (target == null || !target.Visible)
                     {
                         continue;
                     }
@@ -252,7 +262,8 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static void PositionHint(Control anchor, Control hint)
         {
-            Control parent = anchor.Parent;            if (parent == null)
+            Control parent = anchor.Parent;
+            if (parent == null)
             {
                 return;
             }
@@ -277,7 +288,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static int FindNearestRightNeighborLeft(Control anchor, Control hint, Control parent, int hintTop, int hintHeight)
-        {            if (anchor == null || parent == null)
+        {
+            if (anchor == null || parent == null)
             {
                 return 0;
             }
@@ -285,7 +297,8 @@ namespace NcTalkOutlookAddIn.Utilities
             int hintBottom = hintTop + hintHeight;
 
             foreach (Control sibling in parent.Controls)
-            {                if (sibling == null || !sibling.Visible || ReferenceEquals(sibling, anchor) || ReferenceEquals(sibling, hint))
+            {
+                if (sibling == null || !sibling.Visible || ReferenceEquals(sibling, anchor) || ReferenceEquals(sibling, hint))
                 {
                     continue;
                 }

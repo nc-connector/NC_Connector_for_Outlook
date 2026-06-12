@@ -235,9 +235,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 activeInlineMail = explorer != null ? explorer.ActiveInlineResponse as Outlook.MailItem : null;
                 return ComInteropScope.AreSameObject(mail, activeInlineMail, LogCategories.FileLink, "MailItem", "ActiveInlineResponse");
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to check active inline response.", error);
+                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to check active inline response.", ex);
                 return false;
             }
             finally
@@ -316,11 +316,11 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 throw new InvalidOperationException("Outlook WordEditor insertion point unavailable.");
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text share block into mail.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text share block into mail.", ex);
                 MessageBox.Show(
-                    string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, error.Message),
+                    string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -373,9 +373,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain text via Outlook WordEditor.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain text via Outlook WordEditor.", ex);
                 return false;
             }
         }
@@ -428,9 +428,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert HTML into inline response Word editor.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert HTML into inline response Word editor.", ex);
                 return false;
             }
             finally
@@ -441,9 +441,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         File.Delete(tempHtmlPath);
                     }
-                    catch (Exception error)
+                    catch (Exception ex)
                     {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline share HTML file.", error);
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline share HTML file.", ex);
                     }
                 }
             }
@@ -478,9 +478,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert HTML via inspector WordEditor.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert HTML via inspector WordEditor.", ex);
                 return false;
             }
             finally
@@ -491,9 +491,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         File.Delete(tempHtmlPath);
                     }
-                    catch (Exception error)
+                    catch (Exception ex)
                     {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary share HTML file.", error);
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary share HTML file.", ex);
                     }
                 }
             }
@@ -524,9 +524,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML via HTMLBody path: " + error.Message);
+                DiagnosticsLogger.Log(LogCategories.Core, "Failed to insert HTML via HTMLBody path: " + ex.Message);
                 return false;
             }
         }
@@ -707,9 +707,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 RestoreWordSelectionFont(selection, snapshot);
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move Word selection to body start.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move Word selection to body start.", ex);
                 return false;
             }
         }
@@ -734,9 +734,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     WriteWordFontProperty(font, "Size", snapshot.FontSize);
                 }
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection font.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection font.", ex);
             }
             finally
             {
@@ -757,9 +757,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return Convert.ToInt32(content.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, content, null), CultureInfo.InvariantCulture);
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document start.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document start.", ex);
                 return fallback;
             }
             finally
@@ -989,7 +989,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(
                     LogCategories.Core,
@@ -998,7 +998,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     + ", composeKey="
                     + (composeKey ?? string.Empty)
                     + ").",
-                    error);
+                    ex);
                 return false;
             }
             finally
@@ -1009,9 +1009,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         File.Delete(tempHtmlPath);
                     }
-                    catch (Exception error)
+                    catch (Exception ex)
                     {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline response HTML file.", error);
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline response HTML file.", ex);
                     }
                 }
             }
@@ -1150,9 +1150,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     bookmarks,
                     new object[] { true });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to show hidden Outlook Word bookmarks.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to show hidden Outlook Word bookmarks.", ex);
             }
         }
 
@@ -1205,9 +1205,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     CultureInfo.InvariantCulture);
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook Word bookmark range (" + bookmarkName + ").", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook Word bookmark range (" + bookmarkName + ").", ex);
                 return false;
             }
             finally
@@ -1277,9 +1277,9 @@ namespace NcTalkOutlookAddIn.Controllers
                     CultureInfo.InvariantCulture);
                 return tableEnd > tableStart && tableStart <= start && tableEnd >= end;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                GC.KeepAlive(error);
+                GC.KeepAlive(ex);
                 return false;
             }
             finally
@@ -1310,9 +1310,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 table.GetType().InvokeMember("Delete", BindingFlags.InvokeMethod, null, table, null);
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                GC.KeepAlive(error);
+                GC.KeepAlive(ex);
                 return false;
             }
             finally
@@ -1382,9 +1382,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return cellTables.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, cellTables, new object[] { 1 });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                GC.KeepAlive(error);
+                GC.KeepAlive(ex);
                 return null;
             }
             finally
@@ -1485,9 +1485,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return false;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to find inline reply quote separator.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to find inline reply quote separator.", ex);
                 return false;
             }
             finally
@@ -1518,9 +1518,9 @@ namespace NcTalkOutlookAddIn.Controllers
                        || BorderAtIndexIsVisible(borders, -3)
                        || BorderAtIndexIsVisible(borders, -5);
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to inspect inline reply paragraph borders.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to inspect inline reply paragraph borders.", ex);
                 return false;
             }
             finally
@@ -1546,9 +1546,9 @@ namespace NcTalkOutlookAddIn.Controllers
                        && int.TryParse(Convert.ToString(lineStyle, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
                        && value != 0;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                GC.KeepAlive(error);
+                GC.KeepAlive(ex);
                 return false;
             }
             finally

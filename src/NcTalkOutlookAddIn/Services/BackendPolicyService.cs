@@ -25,7 +25,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         internal BackendPolicyStatus FetchStatus()
-        {            if (_configuration == null || !_configuration.IsComplete())
+        {
+            if (_configuration == null || !_configuration.IsComplete())
             {
                 return BuildLocalStatus(
                     endpointAvailable: false,
@@ -146,7 +147,8 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", response.TransportException);
                 }
@@ -168,7 +170,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static IDictionary<string, object> NormalizePayload(IDictionary<string, object> payload)
-        {            if (payload == null)
+        {
+            if (payload == null)
             {
                 return null;
             }
@@ -206,7 +209,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static bool ShouldWarnForSeat(IDictionary<string, object> status)
-        {            if (status == null)
+        {
+            if (status == null)
             {
                 return false;
             }
@@ -223,12 +227,14 @@ namespace NcTalkOutlookAddIn.Services
             return false;
         }
         private static bool GetBool(IDictionary<string, object> parent, string key)
-        {            if (parent == null || string.IsNullOrWhiteSpace(key))
+        {
+            if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return false;
             }
 
-            object raw;            if (!parent.TryGetValue(key, out raw) || raw == null)
+            object raw;
+            if (!parent.TryGetValue(key, out raw) || raw == null)
             {
                 return false;
             }

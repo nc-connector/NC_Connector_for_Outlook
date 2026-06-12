@@ -41,7 +41,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static int LayoutCentered(Control container, IList<Button> buttons, int horizontalPadding, int bottomPadding, int spacing, bool uniformWidths)
-        {            if (container == null || buttons == null || buttons.Count == 0)
+        {
+            if (container == null || buttons == null || buttons.Count == 0)
             {
                 return 0;
             }
@@ -123,7 +124,8 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static int CalculateTotalWidth(IList<Button> buttons, int spacing)
         {
-            int total = 0;            if (buttons == null)
+            int total = 0;
+            if (buttons == null)
             {
                 return total;
             }

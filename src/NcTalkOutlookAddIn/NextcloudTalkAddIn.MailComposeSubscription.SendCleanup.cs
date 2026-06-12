@@ -228,7 +228,8 @@ namespace NcTalkOutlookAddIn
 
             private static bool IsMailSentUnavailableAfterSend(Exception ex)
             {
-                var comException = ex as COMException;                if (comException == null)
+                var comException = ex as COMException;
+                if (comException == null)
                 {
                     return false;
                 }
@@ -238,7 +239,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private static string ToHResultHex(Exception ex)
-            {                if (ex == null)
+            {
+                if (ex == null)
                 {
                     return "0x00000000";
                 }
@@ -402,7 +404,8 @@ namespace NcTalkOutlookAddIn
             {
                 to = string.Empty;
                 cc = string.Empty;
-                bcc = string.Empty;                if (_mail == null)
+                bcc = string.Empty;
+                if (_mail == null)
                 {
                     return false;
                 }
@@ -412,7 +415,8 @@ namespace NcTalkOutlookAddIn
                 Outlook.Recipients recipients = null;
                 try
                 {
-                    recipients = _mail.Recipients;                    if (recipients == null)
+                    recipients = _mail.Recipients;
+                    if (recipients == null)
                     {
                         return false;
                     }
@@ -434,7 +438,8 @@ namespace NcTalkOutlookAddIn
                         Outlook.Recipient recipient = null;
                         try
                         {
-                            recipient = recipients[i];                            if (recipient == null)
+                            recipient = recipients[i];
+                            if (recipient == null)
                             {
                                 continue;
                             }
@@ -531,7 +536,8 @@ namespace NcTalkOutlookAddIn
             private string ReadMailRecipientList(string fieldName)
             {
                 try
-                {                    if (_mail == null)
+                {
+                    if (_mail == null)
                     {
                         return string.Empty;
                     }

@@ -14,7 +14,8 @@ namespace NcTalkOutlookAddIn.UI
     internal sealed partial class FileLinkWizardForm
     {
         private void AttachFileQueueDropTarget(Control control)
-        {            if (control == null)
+        {
+            if (control == null)
             {
                 return;
             }
@@ -26,7 +27,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDragEnter(object sender, DragEventArgs e)
-        {            if (e == null)
+        {
+            if (e == null)
             {
                 return;
             }
@@ -35,7 +37,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDragOver(object sender, DragEventArgs e)
-        {            if (e == null)
+        {
+            if (e == null)
             {
                 return;
             }
@@ -44,7 +47,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDragDrop(object sender, DragEventArgs e)
-        {            if (e == null)
+        {
+            if (e == null)
             {
                 return;
             }
@@ -58,7 +62,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static DragDropEffects ResolveFileDropEffect(DragEventArgs e)
-        {            if (e == null || e.Data == null)
+        {
+            if (e == null || e.Data == null)
             {
                 return DragDropEffects.None;
             }
@@ -69,11 +74,13 @@ namespace NcTalkOutlookAddIn.UI
 
         private static List<FileLinkSelection> BuildSelectionsFromFileDropData(IDataObject dataObject)
         {
-            var selections = new List<FileLinkSelection>();            if (dataObject == null || !dataObject.GetDataPresent(DataFormats.FileDrop))
+            var selections = new List<FileLinkSelection>();
+            if (dataObject == null || !dataObject.GetDataPresent(DataFormats.FileDrop))
             {
                 return selections;
             }
-            var paths = dataObject.GetData(DataFormats.FileDrop) as string[];            if (paths == null || paths.Length == 0)
+            var paths = dataObject.GetData(DataFormats.FileDrop) as string[];
+            if (paths == null || paths.Length == 0)
             {
                 return selections;
             }
@@ -90,7 +97,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private bool TryAddSelection(FileLinkSelection selection, HashSet<string> existingPaths)
-        {            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
+        {
+            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
             {
                 return false;
             }
@@ -121,7 +129,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static bool SelectionPathExists(FileLinkSelection selection)
-        {            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
+        {
+            if (selection == null || string.IsNullOrWhiteSpace(selection.LocalPath))
             {
                 return false;
             }

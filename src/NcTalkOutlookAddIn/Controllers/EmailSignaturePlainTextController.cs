@@ -210,9 +210,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 source = bookmarkName;
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to replace plain-text signature bookmark " + bookmarkName + ".", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to replace plain-text signature bookmark " + bookmarkName + ".", ex);
                 source = bookmarkName + ":error";
                 return false;
             }
@@ -256,9 +256,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 source = context.Source ?? "word";
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text signature at Word selection.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text signature at Word selection.", ex);
                 source = "error";
                 return false;
             }
@@ -300,9 +300,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 OutlookWordEditorContext.InvokeMethod(bookmarks, "Add", new object[] { ManagedSignatureBookmarkName, range });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to add managed plain-text signature bookmark.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to add managed plain-text signature bookmark.", ex);
             }
             finally
             {
@@ -349,9 +349,9 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 OutlookWordEditorContext.InvokeMethod(selection, "SetRange", new object[] { start, start });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore cursor before plain-text signature.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore cursor before plain-text signature.", ex);
             }
         }
 

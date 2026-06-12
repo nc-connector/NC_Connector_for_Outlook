@@ -61,7 +61,8 @@ namespace NcTalkOutlookAddIn.Services
         {
             lock (_syncRoot)
             {
-                int normalizedPort = NormalizePort(port);                if (_listener != null && _listener.IsListening)
+                int normalizedPort = NormalizePort(port);
+                if (_listener != null && _listener.IsListening)
                 {
                     if (_listenPort == normalizedPort)
                     {
@@ -104,7 +105,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private void StopListenerLocked()
-        {            if (_cancellation != null)
+        {
+            if (_cancellation != null)
             {
                 _cancellation.Cancel();
                 _cancellation.Dispose();
@@ -167,7 +169,8 @@ namespace NcTalkOutlookAddIn.Services
                 HttpListenerContext context = null;
                 try
                 {
-                    context = _listener.GetContext();                    if (context != null)
+                    context = _listener.GetContext();
+                    if (context != null)
                     {
                         DiagnosticsLogger.Log(LogCategory, "HTTP " + context.Request.HttpMethod + " " + context.Request.RawUrl);
                     }
@@ -362,7 +365,8 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
                     DiagnosticsLogger.LogException(LogCategory, "Free/busy REPORT request failed without HTTP response.", response.TransportException);
@@ -439,7 +443,8 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategory, "CalDAV scheduling request failed without HTTP response.", response.TransportException);
                     throw new FreeBusyRequestException("CalDAV scheduling failed: " + response.TransportException.Message, null, false, null);

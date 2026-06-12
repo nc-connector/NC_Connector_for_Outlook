@@ -50,7 +50,8 @@ namespace NcTalkOutlookAddIn
         private void TryApplyOfficeUiLanguage()
         {
             try
-            {                if (_outlookApplication == null)
+            {
+                if (_outlookApplication == null)
                 {
                     return;
                 }
@@ -73,7 +74,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private string ResolveCurrentOutlookProfileName()
-        {            if (_outlookApplication == null)
+        {
+            if (_outlookApplication == null)
             {
                 return string.Empty;
             }
@@ -81,7 +83,8 @@ namespace NcTalkOutlookAddIn
             object session = null;
             try
             {
-                session = _outlookApplication.Session;                if (session == null)
+                session = _outlookApplication.Session;
+                if (session == null)
                 {
                     return string.Empty;
                 }
@@ -143,7 +146,8 @@ namespace NcTalkOutlookAddIn
         {
             UnhookApplication();
             UnhookInspector();
-            UnhookMailComposeSubscriptions();            if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
+            UnhookMailComposeSubscriptions();
+            if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
             {
                 try
                 {

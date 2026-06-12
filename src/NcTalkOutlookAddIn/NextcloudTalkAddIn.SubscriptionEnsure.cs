@@ -51,7 +51,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private void EnsureSubscriptionForAppointment(Outlook.AppointmentItem appointment, bool allowDeferredRetry)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return;
             }
@@ -127,7 +128,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private bool QueueDeferredAppointmentSubscriptionEnsure(Outlook.AppointmentItem appointment, COMException triggerException)
-        {            if (appointment == null)
+        {
+            if (appointment == null)
             {
                 return false;
             }

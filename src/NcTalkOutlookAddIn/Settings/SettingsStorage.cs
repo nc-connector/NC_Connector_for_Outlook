@@ -97,7 +97,8 @@ namespace NcTalkOutlookAddIn.Settings
         }
 
         internal void Save(AddinSettings settings)
-        {            if (settings == null)
+        {
+            if (settings == null)
             {
                 settings = new AddinSettings();
             }
@@ -278,7 +279,8 @@ namespace NcTalkOutlookAddIn.Settings
             try
             {
                 using (RegistryKey officeRoot = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Office", false))
-                {                    if (officeRoot != null)
+                {
+                    if (officeRoot != null)
                     {
                         foreach (string version in officeRoot.GetSubKeyNames())
                         {
@@ -300,7 +302,8 @@ namespace NcTalkOutlookAddIn.Settings
                 RegistryKey profileRoot = null;
                 try
                 {
-                    profileRoot = Registry.CurrentUser.OpenSubKey(path, false);                    if (profileRoot == null)
+                    profileRoot = Registry.CurrentUser.OpenSubKey(path, false);
+                    if (profileRoot == null)
                     {
                         continue;
                     }
@@ -319,7 +322,8 @@ namespace NcTalkOutlookAddIn.Settings
                     DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Outlook profile list from registry path '" + path + "'.", ex);
                 }
                 finally
-                {                    if (profileRoot != null)
+                {
+                    if (profileRoot != null)
                     {
                         profileRoot.Dispose();
                     }
@@ -400,13 +404,15 @@ namespace NcTalkOutlookAddIn.Settings
             var document = new XmlDocument();
             document.Load(path);
 
-            XmlElement root = document.DocumentElement;            if (root == null || !string.Equals(root.Name, "Settings", StringComparison.OrdinalIgnoreCase))
+            XmlElement root = document.DocumentElement;
+            if (root == null || !string.Equals(root.Name, "Settings", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException("Profile settings XML root element is missing.");
             }
             foreach (XmlNode child in root.ChildNodes)
             {
-                XmlElement element = child as XmlElement;                if (element == null)
+                XmlElement element = child as XmlElement;
+                if (element == null)
                 {
                     continue;
                 }
@@ -493,7 +499,8 @@ namespace NcTalkOutlookAddIn.Settings
         }
 
         private static void ApplySettingValue(AddinSettings settings, string key, string value)
-        {            if (settings == null || string.IsNullOrWhiteSpace(key))
+        {
+            if (settings == null || string.IsNullOrWhiteSpace(key))
             {
                 return;
             }

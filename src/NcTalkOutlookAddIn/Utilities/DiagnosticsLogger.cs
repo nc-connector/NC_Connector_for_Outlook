@@ -190,7 +190,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void LogException(string category, string context, Exception ex)
-        {            if (ex == null)
+        {
+            if (ex == null)
             {
                 WriteLogLine(category, context);
                 return;
@@ -242,7 +243,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static string ReplaceServerUrls(string value)
-        {            if (string.IsNullOrEmpty(value) || _serverUrlTokens == null || _serverUrlTokens.Length == 0)
+        {
+            if (string.IsNullOrEmpty(value) || _serverUrlTokens == null || _serverUrlTokens.Length == 0)
             {
                 return value;
             }
@@ -267,7 +269,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 return value;
             }
             return EmailRegex.Replace(value, match =>
-            {                if (match == null || string.IsNullOrEmpty(match.Value))
+            {
+                if (match == null || string.IsNullOrEmpty(match.Value))
                 {
                     return "<EMAIL>";
                 }
@@ -378,7 +381,8 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             try
             {
-                string[] files = Directory.GetFiles(LogDirectory, DailyLogFilePrefix + "*");                if (files == null || files.Length == 0)
+                string[] files = Directory.GetFiles(LogDirectory, DailyLogFilePrefix + "*");
+                if (files == null || files.Length == 0)
                 {
                     return;
                 }

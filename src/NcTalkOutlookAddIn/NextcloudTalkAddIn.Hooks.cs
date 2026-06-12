@@ -13,13 +13,15 @@ namespace NcTalkOutlookAddIn
     public sealed partial class NextcloudTalkAddIn
     {
         private void EnsureInspectorHook()
-        {            if (_outlookApplication == null || _inspectors != null)
+        {
+            if (_outlookApplication == null || _inspectors != null)
             {
                 return;
             }
             try
             {
-                _inspectors = _outlookApplication.Inspectors;                if (_inspectors != null)
+                _inspectors = _outlookApplication.Inspectors;
+                if (_inspectors != null)
                 {
                     _inspectors.NewInspector += OnNewInspector;
                 }
@@ -32,7 +34,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private void EnsureApplicationHook()
-        {            if (_outlookApplication == null)
+        {
+            if (_outlookApplication == null)
             {
                 return;
             }
@@ -167,7 +170,8 @@ namespace NcTalkOutlookAddIn
         }
 
         private void UnhookInspector()
-        {            if (_inspectors == null)
+        {
+            if (_inspectors == null)
             {
                 return;
             }
@@ -187,17 +191,20 @@ namespace NcTalkOutlookAddIn
         }
 
         private void OnNewInspector(Outlook.Inspector inspector)
-        {            if (inspector == null)
+        {
+            if (inspector == null)
             {
                 return;
             }
             try
             {
-                var appointment = inspector.CurrentItem as Outlook.AppointmentItem;                if (appointment != null)
+                var appointment = inspector.CurrentItem as Outlook.AppointmentItem;
+                if (appointment != null)
                 {
                     EnsureSubscriptionForAppointment(appointment);
                 }
-                var mail = inspector.CurrentItem as Outlook.MailItem;                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
+                var mail = inspector.CurrentItem as Outlook.MailItem;
+                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
                 {
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
                     EnsureMailComposeSubscription(mail, inspectorIdentityKey);

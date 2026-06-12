@@ -140,7 +140,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static void SelectLanguageChoice(ComboBox combo, string value)
-        {            if (combo == null)
+        {
+            if (combo == null)
             {
                 return;
             }
@@ -161,7 +162,8 @@ namespace NcTalkOutlookAddIn.UI
             {
                 foreach (var item in combo.Items)
                 {
-                    var option = item as LanguageOption;                    if (option != null && option.Enabled)
+                    var option = item as LanguageOption;
+                    if (option != null && option.Enabled)
                     {
                         combo.SelectedItem = option;
                         combo.Tag = option.Value;
@@ -173,7 +175,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static string GetSelectedLanguageChoice(ComboBox combo)
-        {            if (combo == null)
+        {
+            if (combo == null)
             {
                 return "default";
             }
@@ -183,7 +186,8 @@ namespace NcTalkOutlookAddIn.UI
 
         private void HandleLanguageComboDrawItem(object sender, DrawItemEventArgs e)
         {
-            ComboBox combo = sender as ComboBox;            if (combo == null || e.Index < 0 || e.Index >= combo.Items.Count)
+            ComboBox combo = sender as ComboBox;
+            if (combo == null || e.Index < 0 || e.Index >= combo.Items.Count)
             {
                 return;
             }
@@ -199,11 +203,13 @@ namespace NcTalkOutlookAddIn.UI
 
         private void HandleLanguageComboSelectionCommitted(object sender, EventArgs e)
         {
-            ComboBox combo = sender as ComboBox;            if (combo == null)
+            ComboBox combo = sender as ComboBox;
+            if (combo == null)
             {
                 return;
             }
-            var selected = combo.SelectedItem as LanguageOption;            if (selected == null)
+            var selected = combo.SelectedItem as LanguageOption;
+            if (selected == null)
             {
                 return;
             }
@@ -220,7 +226,8 @@ namespace NcTalkOutlookAddIn.UI
         {
             foreach (var item in _talkDefaultRoomTypeCombo.Items)
             {
-                var option = item as TalkRoomTypeOption;                if (option != null && option.Value == value)
+                var option = item as TalkRoomTypeOption;
+                if (option != null && option.Value == value)
                 {
                     _talkDefaultRoomTypeCombo.SelectedItem = option;
                     return;

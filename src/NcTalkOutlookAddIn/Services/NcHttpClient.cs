@@ -151,7 +151,8 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     request.ContentType = string.IsNullOrWhiteSpace(options.ContentType)
                         ? "application/json"
-                        : options.ContentType;                    if (options.BodyWriter != null)
+                        : options.ContentType;
+                        if (options.BodyWriter != null)
                     {
                         if (options.ContentLength >= 0)
                         {
@@ -164,7 +165,8 @@ namespace NcTalkOutlookAddIn.Services
                     }
                     else
                     {
-                        byte[] bytes = options.PayloadBytes;                        if (bytes == null)
+                        byte[] bytes = options.PayloadBytes;
+                        if (bytes == null)
                         {
                             string payload = options.Payload ?? string.Empty;
                             Encoding requestEncoding = options.RequestEncoding ?? Encoding.UTF8;
@@ -187,7 +189,8 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 catch (WebException ex)
                 {
-                    response = ex.Response as HttpWebResponse;                    if (response == null)
+                    response = ex.Response as HttpWebResponse;
+                    if (response == null)
                     {
                         result.HasHttpResponse = false;
                         result.TransportException = ex;
@@ -237,7 +240,8 @@ namespace NcTalkOutlookAddIn.Services
                 }
             }
             finally
-            {                if (response != null)
+            {
+                if (response != null)
                 {
                     response.Close();
                 }

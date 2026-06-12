@@ -50,7 +50,8 @@ namespace NcTalkOutlookAddIn.Utilities
                     return cached;
                 }
 
-                Icon icon = CreateIconFromPng(AppIconPng, size);                if (icon != null)
+                Icon icon = CreateIconFromPng(AppIconPng, size);
+                if (icon != null)
                 {
                     IconCache[size] = icon;
                 }
@@ -64,7 +65,8 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 var assembly = Assembly.GetExecutingAssembly();
                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
-                {                    if (stream == null)
+                {
+                    if (stream == null)
                     {
                         return null;
                     }
@@ -83,7 +85,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static Icon CreateIconFromPng(Image image, int size)
-        {            if (image == null)
+        {
+            if (image == null)
             {
                 return null;
             }

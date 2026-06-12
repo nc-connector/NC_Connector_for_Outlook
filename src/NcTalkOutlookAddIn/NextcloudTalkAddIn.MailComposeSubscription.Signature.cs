@@ -860,9 +860,9 @@ namespace NcTalkOutlookAddIn
                     verb = parsed;
                     return true;
                 }
-                catch (COMException error)
+                catch (COMException ex)
                 {
-                    uint errorCode = unchecked((uint)error.ErrorCode);
+                    uint errorCode = unchecked((uint)ex.ErrorCode);
                     if (errorCode == 0x8004010Fu)
                     {
                         if (DiagnosticsLogger.IsEnabled)
@@ -871,12 +871,12 @@ namespace NcTalkOutlookAddIn
                         }
                         return true;
                     }
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", error);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", ex);
                     return false;
                 }
-                catch (Exception error)
+                catch (Exception ex)
                 {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", error);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail last verb for email signature compose kind.", ex);
                     return false;
                 }
                 finally
@@ -917,9 +917,9 @@ namespace NcTalkOutlookAddIn
                     byteCount = ResolveConversationIndexByteCount(value);
                     return byteCount > 0;
                 }
-                catch (COMException error)
+                catch (COMException ex)
                 {
-                    uint errorCode = unchecked((uint)error.ErrorCode);
+                    uint errorCode = unchecked((uint)ex.ErrorCode);
                     if (errorCode == 0x8004010Fu)
                     {
                         if (DiagnosticsLogger.IsEnabled)
@@ -928,12 +928,12 @@ namespace NcTalkOutlookAddIn
                         }
                         return false;
                     }
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read conversation index for email signature compose kind.", error);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read conversation index for email signature compose kind.", ex);
                     return false;
                 }
-                catch (Exception error)
+                catch (Exception ex)
                 {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read conversation index for email signature compose kind.", error);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read conversation index for email signature compose kind.", ex);
                     return false;
                 }
                 finally

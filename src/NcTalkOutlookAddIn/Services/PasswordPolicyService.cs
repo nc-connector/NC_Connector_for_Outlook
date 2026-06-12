@@ -59,12 +59,14 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 var ocs = NcJson.GetDictionary(root, "ocs");
                 var data = NcJson.GetDictionary(ocs, "data");
-                var caps = NcJson.GetDictionary(data, "capabilities");                if (caps == null)
+                var caps = NcJson.GetDictionary(data, "capabilities");
+                if (caps == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy capabilities block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
                 }
-                var policy = NcJson.GetDictionary(caps, "password_policy") ?? NcJson.GetDictionary(caps, "passwordPolicy");                if (policy == null)
+                var policy = NcJson.GetDictionary(caps, "password_policy") ?? NcJson.GetDictionary(caps, "passwordPolicy");
+                if (policy == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy block missing.");
                     return new PasswordPolicyInfo(false, 0, string.Empty);
@@ -91,7 +93,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         internal string GeneratePassword(PasswordPolicyInfo policy)
-        {            if (policy == null || !policy.HasPolicy || string.IsNullOrEmpty(policy.GenerateUrl) || !_configuration.IsComplete())
+        {
+            if (policy == null || !policy.HasPolicy || string.IsNullOrEmpty(policy.GenerateUrl) || !_configuration.IsComplete())
             {
                 return null;
             }
@@ -108,7 +111,8 @@ namespace NcTalkOutlookAddIn.Services
                 DiagnosticsLogger.LogApi("GET " + apiUrl);
                 IDictionary<string, object> root;
                 HttpStatusCode statusCode;
-                ExecuteJsonRequest("GET", apiUrl, null, out statusCode, out root);                if (statusCode != HttpStatusCode.OK || root == null)
+                ExecuteJsonRequest("GET", apiUrl, null, out statusCode, out root);
+                if (statusCode != HttpStatusCode.OK || root == null)
                 {
                     return null;
                 }
@@ -143,7 +147,8 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Api, "Password policy request failed without HTTP response.", response.TransportException);
                 }
@@ -155,7 +160,8 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
-            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);            if (response.JsonParseException != null)
+            DiagnosticsLogger.LogApi(method + " " + url + " -> " + statusCode);
+            if (response.JsonParseException != null)
             {
                 DiagnosticsLogger.LogException(LogCategories.Api, "Password policy response parsing failed.", response.JsonParseException);
                 DiagnosticsLogger.LogApi("Password policy response sample: " + GetResponseSample(response.ResponseText));
@@ -203,7 +209,8 @@ namespace NcTalkOutlookAddIn.Services
             return normalized.Length <= 180 ? normalized : normalized.Substring(0, 180) + "...";
         }
         private static int GetFirstPositiveInt(IDictionary<string, object> parent, params string[] keys)
-        {            if (parent == null || keys == null)
+        {
+            if (parent == null || keys == null)
             {
                 return 0;
             }
@@ -219,7 +226,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         private static string GetFirstString(IDictionary<string, object> parent, params string[] keys)
-        {            if (parent == null || keys == null)
+        {
+            if (parent == null || keys == null)
             {
                 return null;
             }

@@ -350,7 +350,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
-        {            if (_uploadInProgress && _cancellationSource != null && !_cancellationSource.IsCancellationRequested)
+        {
+            if (_uploadInProgress && _cancellationSource != null && !_cancellationSource.IsCancellationRequested)
             {
                 _cancellationSource.Cancel();
                 e.Cancel = true;
@@ -493,7 +494,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void UpdateStepHostBounds()
-        {            if (_stepHost == null || IsDisposed || Disposing)
+        {
+            if (_stepHost == null || IsDisposed || Disposing)
             {
                 return;
             }
@@ -510,7 +512,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void LayoutProgressPanel()
-        {            if (_progressPanel == null || _progressPanel.IsDisposed || _progressPanel.Disposing)
+        {
+            if (_progressPanel == null || _progressPanel.IsDisposed || _progressPanel.Disposing)
             {
                 return;
             }
@@ -534,7 +537,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void LayoutCurrentStep()
-        {            if (_stepHost == null || _stepHost.IsDisposed || _stepHost.Disposing)
+        {
+            if (_stepHost == null || _stepHost.IsDisposed || _stepHost.Disposing)
             {
                 return;
             }
@@ -563,7 +567,8 @@ namespace NcTalkOutlookAddIn.UI
             int topMostButton = int.MaxValue;
             var buttons = new[] { _backButton, _uploadButton, _nextButton, _finishButton, _cancelButton };
             foreach (Button button in buttons)
-            {                if (button != null && button.Visible)
+            {
+                if (button != null && button.Visible)
                 {
                     topMostButton = Math.Min(topMostButton, button.Top);
                 }
@@ -708,7 +713,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void LayoutGeneralStep(Size clientSize)
-        {            if (_generalStepPanel == null || _generalStepPanel.IsDisposed || _generalStepPanel.Disposing)
+        {
+            if (_generalStepPanel == null || _generalStepPanel.IsDisposed || _generalStepPanel.Disposing)
             {
                 return;
             }
@@ -778,7 +784,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void LayoutExpirationStep(Size clientSize)
-        {            if (_expirationStepPanel == null || _expirationStepPanel.IsDisposed || _expirationStepPanel.Disposing)
+        {
+            if (_expirationStepPanel == null || _expirationStepPanel.IsDisposed || _expirationStepPanel.Disposing)
             {
                 return;
             }
@@ -811,7 +818,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void LayoutNoteStep(Size clientSize)
-        {            if (_noteStepPanel == null || _noteStepPanel.IsDisposed || _noteStepPanel.Disposing)
+        {
+            if (_noteStepPanel == null || _noteStepPanel.IsDisposed || _noteStepPanel.Disposing)
             {
                 return;
             }
@@ -962,7 +970,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void ApplyFileStepButtonSize(Button button, int targetWidth)
-        {            if (button == null)
+        {
+            if (button == null)
             {
                 return;
             }
@@ -1030,7 +1039,8 @@ namespace NcTalkOutlookAddIn.UI
                 Dock = DockStyle.Fill,
                 Visible = false,
                 AutoScroll = true
-            };            if (_stepHost != null)
+            };
+            if (_stepHost != null)
             {
                 _stepHost.Controls.Add(panel);
                 panel.BringToFront();
@@ -1207,7 +1217,8 @@ namespace NcTalkOutlookAddIn.UI
             internal Func<int, bool> HorizontalWheelHandler { get; set; }
 
             protected override void WndProc(ref Message m)
-            {                if (m.Msg == WmMouseWheel && HorizontalWheelHandler != null)
+            {
+                if (m.Msg == WmMouseWheel && HorizontalWheelHandler != null)
                 {
                     long wParam = m.WParam.ToInt64();
                     int delta = unchecked((short)((wParam >> 16) & 0xffff));
@@ -1251,7 +1262,8 @@ namespace NcTalkOutlookAddIn.UI
                     return;
                 }
 
-                ApplyFormData();                if (_allowEmptyUpload && (_uploadContext == null || !_uploadCompleted))
+                ApplyFormData();
+                if (_allowEmptyUpload && (_uploadContext == null || !_uploadCompleted))
                 {
                     _uploadContext = _service.PrepareUpload(_request, CancellationToken.None);
                     _uploadCompleted = true;
@@ -1315,7 +1327,8 @@ namespace NcTalkOutlookAddIn.UI
             finally
             {
                 UseWaitCursor = false;
-                Cursor.Current = previousCursor;                if (_cancellationSource != null)
+                Cursor.Current = previousCursor;
+                if (_cancellationSource != null)
                 {
                     _cancellationSource.Dispose();
                     _cancellationSource = null;
@@ -1445,7 +1458,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void TryCleanupUnfinalizedUploadContext(string reason)
-        {            if (_shareFinalized || _uploadContext == null)
+        {
+            if (_shareFinalized || _uploadContext == null)
             {
                 return;
             }
@@ -1458,7 +1472,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void TryCleanupPreparedUploadContext(FileLinkUploadContext context, string reason)
-        {            if (context == null)
+        {
+            if (context == null)
             {
                 return;
             }
@@ -1492,7 +1507,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void LoadInitialSelections()
-        {            if (_launchOptions == null || _launchOptions.InitialSelections == null)
+        {
+            if (_launchOptions == null || _launchOptions.InitialSelections == null)
             {
                 return;
             }
@@ -1547,7 +1563,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private string BuildAttachmentModeInfoText()
-        {            if (_launchOptions == null || string.Equals(_launchOptions.AttachmentTrigger, "always", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_launchOptions == null || string.Equals(_launchOptions.AttachmentTrigger, "always", StringComparison.OrdinalIgnoreCase))
             {
                 return Strings.FileLinkWizardAttachmentModeReasonAlways;
             }
@@ -1600,7 +1617,8 @@ namespace NcTalkOutlookAddIn.UI
             }
             try
             {
-                var state = _attachmentGuardService.ReadLiveState();                if (state == null || !state.LockActive)
+                var state = _attachmentGuardService.ReadLiveState();
+                if (state == null || !state.LockActive)
                 {
                     return true;
                 }
@@ -1700,7 +1718,8 @@ namespace NcTalkOutlookAddIn.UI
             bool enabled = _expireToggleCheckBox.Checked;
             bool lockExpireDays = IsPolicyLocked("share_expire_days");
             _expireDatePicker.Enabled = enabled && !lockExpireDays;
-            _expireHintLabel.Enabled = enabled;            if (_expirationStepPanel != null)
+            _expireHintLabel.Enabled = enabled;
+            if (_expirationStepPanel != null)
             {
                 LayoutExpirationStep(_expirationStepPanel.ClientSize);
             }
@@ -1708,7 +1727,8 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdateNoteState()
         {
-            _noteTextBox.Enabled = _noteToggleCheckBox.Checked;            if (_noteStepPanel != null)
+            _noteTextBox.Enabled = _noteToggleCheckBox.Checked;
+            if (_noteStepPanel != null)
             {
                 LayoutNoteStep(_noteStepPanel.ClientSize);
             }
@@ -1757,7 +1777,8 @@ namespace NcTalkOutlookAddIn.UI
                     _lastAutoScrolledUploadItem = null;
                 }
 
-                FileLinkSelection selection = item.Tag as FileLinkSelection;                if (selection != null)
+                FileLinkSelection selection = item.Tag as FileLinkSelection;
+                if (selection != null)
                 {
                     _items.Remove(selection);
                     SelectionUploadState state;
@@ -1779,7 +1800,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void AddSelections(IEnumerable<FileLinkSelection> selections)
-        {            if (selections == null)
+        {
+            if (selections == null)
             {
                 return;
             }
@@ -1834,7 +1856,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void UpdateQueueColumnWidths()
-        {            if (_fileListView == null || _fileListView.Columns.Count < 3 || _fileListView.IsDisposed || _fileListView.Disposing)
+        {
+            if (_fileListView == null || _fileListView.Columns.Count < 3 || _fileListView.IsDisposed || _fileListView.Disposing)
             {
                 return;
             }
@@ -1897,7 +1920,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void UpdatePathColumnScrollRange()
-        {            if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing || _fileListView.Columns.Count == 0)
+        {
+            if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing || _fileListView.Columns.Count == 0)
             {
                 _pathColumnHorizontalOffset = 0;
                 _pathColumnMaxHorizontalOffset = 0;
@@ -1938,7 +1962,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDrawColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
-        {            if (e == null)
+        {
+            if (e == null)
             {
                 return;
             }
@@ -1947,7 +1972,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDrawItem(object sender, DrawListViewItemEventArgs e)
-        {            if (e == null)
+        {
+            if (e == null)
             {
                 return;
             }
@@ -1958,7 +1984,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleFileListViewDrawSubItem(object sender, DrawListViewSubItemEventArgs e)
-        {            if (e == null || e.Item == null || e.SubItem == null)
+        {
+            if (e == null || e.Item == null || e.SubItem == null)
             {
                 return;
             }
@@ -2069,7 +2096,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void ApplyQueueRowStyle(SelectionUploadState state, Color backgroundColor, Color textColor)
-        {            if (state == null || state.Item == null)
+        {
+            if (state == null || state.Item == null)
             {
                 return;
             }
@@ -2136,12 +2164,14 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void DisposeStateProgressBar(SelectionUploadState state)
-        {            if (state == null || state.ProgressBar == null)
+        {
+            if (state == null || state.ProgressBar == null)
             {
                 return;
             }
             var bar = state.ProgressBar;
-            state.ProgressBar = null;            if (_fileListView != null && !_fileListView.IsDisposed && !_fileListView.Disposing)
+            state.ProgressBar = null;
+            if (_fileListView != null && !_fileListView.IsDisposed && !_fileListView.Disposing)
             {
                 _fileListView.Controls.Remove(bar);
             }
@@ -2330,7 +2360,8 @@ namespace NcTalkOutlookAddIn.UI
             if (_fileListView.Items.Count == 0)
             {
                 foreach (var state in _selectionStates.Values)
-                {                    if (state.ProgressBar != null)
+                {
+                    if (state.ProgressBar != null)
                     {
                         state.ProgressBar.Visible = false;
                     }
@@ -2347,7 +2378,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void PositionProgressBar(SelectionUploadState state)
-        {            if (_fileListView == null || _fileListView.Columns.Count < 3)
+        {
+            if (_fileListView == null || _fileListView.Columns.Count < 3)
             {
                 return;
             }
@@ -2357,7 +2389,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void PositionProgressBar(SelectionUploadState state, int statusLeft, int statusWidth)
-        {            if (state == null || state.ProgressBar == null)
+        {
+            if (state == null || state.ProgressBar == null)
             {
                 return;
             }
@@ -2417,7 +2450,8 @@ namespace NcTalkOutlookAddIn.UI
 
         private bool TryGetListViewItemBounds(int index, out Rectangle bounds)
         {
-            bounds = Rectangle.Empty;            if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing)
+            bounds = Rectangle.Empty;
+            if (_fileListView == null || _fileListView.IsDisposed || _fileListView.Disposing)
             {
                 return false;
             }
@@ -2579,7 +2613,8 @@ namespace NcTalkOutlookAddIn.UI
             {
                 FlushBufferedUploadProgress();
                 ResetUploadProgressPump();
-                _lastAutoScrolledUploadItem = null;                if (_cancellationSource != null)
+                _lastAutoScrolledUploadItem = null;
+                if (_cancellationSource != null)
                 {
                     _cancellationSource.Dispose();
                     _cancellationSource = null;
@@ -2703,7 +2738,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void HandleUploadProgress(FileLinkUploadItemProgress progress)
-        {            if (progress == null || progress.Selection == null)
+        {
+            if (progress == null || progress.Selection == null)
             {
                 return;
             }
@@ -2792,9 +2828,11 @@ namespace NcTalkOutlookAddIn.UI
             ListViewItem activeUploadItem = null;
             for (int i = snapshot.Count - 1; i >= 0; i--)
             {
-                FileLinkUploadItemProgress queued = snapshot[i];                if (queued != null && queued.Status == FileLinkUploadStatus.Uploading)
+                FileLinkUploadItemProgress queued = snapshot[i];
+                if (queued != null && queued.Status == FileLinkUploadStatus.Uploading)
                 {
-                    SelectionUploadState activeState;                    if (_selectionStates.TryGetValue(queued.Selection, out activeState) && activeState != null)
+                    SelectionUploadState activeState;
+                    if (_selectionStates.TryGetValue(queued.Selection, out activeState) && activeState != null)
                     {
                         activeUploadItem = activeState.Item;
                         break;
@@ -2834,7 +2872,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void ApplyUploadProgress(FileLinkUploadItemProgress progress)
-        {            if (progress == null || progress.Selection == null)
+        {
+            if (progress == null || progress.Selection == null)
             {
                 return;
             }
@@ -2854,7 +2893,8 @@ namespace NcTalkOutlookAddIn.UI
                 ApplyQueueRowStyle(state, ActiveQueueItemBackground, ActiveQueueItemText);
                 EnsureUploadItemVisible(state.Item, false);
                 int percent = state.TotalBytes > 0 ? (int)Math.Min(100, (state.UploadedBytes * 100L) / state.TotalBytes) : 100;
-                percent = Math.Max(0, Math.Min(100, percent));                if (state.ProgressBar == null)
+                percent = Math.Max(0, Math.Min(100, percent));
+                if (state.ProgressBar == null)
                 {
                     state.ProgressBar = CreateProgressBar();
                 }
@@ -2922,7 +2962,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void EnsureUploadItemVisible(ListViewItem item, bool forceScroll)
-        {            if (item == null || item.ListView != _fileListView || _fileListView.IsDisposed || _fileListView.Disposing)
+        {
+            if (item == null || item.ListView != _fileListView || _fileListView.IsDisposed || _fileListView.Disposing)
             {
                 return;
             }
@@ -2994,7 +3035,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private string HandleDuplicate(FileLinkDuplicateInfo info)
-        {            if (info == null)
+        {
+            if (info == null)
             {
                 return null;
             }

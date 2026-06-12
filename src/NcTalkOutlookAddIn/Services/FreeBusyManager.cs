@@ -32,7 +32,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         internal void ApplySettings(AddinSettings settings)
-        {            if (_application == null || settings == null)
+        {
+            if (_application == null || settings == null)
             {
                 return;
             }
@@ -231,7 +232,8 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 using (var key = OpenOrCreateSubKey(path))
-                {                    if (key == null)
+                {
+                    if (key == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' (value '" + valueName + "').");
                         if (critical)
@@ -305,7 +307,8 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 using (var key = OpenOrCreateSubKey(path))
-                {                    if (key == null)
+                {
+                    if (key == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Ifb, "No access to registry '" + path + "' while restoring.");
                         return;
@@ -352,7 +355,8 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(path, false))
-                {                    if (key == null)
+                {
+                    if (key == null)
                     {
                         return false;
                     }
@@ -383,7 +387,8 @@ namespace NcTalkOutlookAddIn.Services
         {
             try
             {
-                var key = Registry.CurrentUser.OpenSubKey(path, true);                if (key != null)
+                var key = Registry.CurrentUser.OpenSubKey(path, true);
+                if (key != null)
                 {
                     return key;
                 }

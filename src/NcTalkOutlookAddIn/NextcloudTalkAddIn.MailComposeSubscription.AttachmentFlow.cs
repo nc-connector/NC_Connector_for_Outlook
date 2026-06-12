@@ -439,7 +439,8 @@ namespace NcTalkOutlookAddIn
 
                 try
                 {
-                    attachments = _mail.Attachments;                    if (attachments == null)
+                    attachments = _mail.Attachments;
+                    if (attachments == null)
                     {
                         return snapshots;
                     }
@@ -449,7 +450,8 @@ namespace NcTalkOutlookAddIn
                         Outlook.Attachment attachment = null;
                         try
                         {
-                            attachment = attachments[index];                            if (attachment == null)
+                            attachment = attachments[index];
+                            if (attachment == null)
                             {
                                 continue;
                             }
@@ -500,7 +502,8 @@ namespace NcTalkOutlookAddIn
 
             private static long SumAttachmentBytes(List<AttachmentSnapshot> snapshots)
             {
-                long total = 0;                if (snapshots == null)
+                long total = 0;
+                if (snapshots == null)
                 {
                     return 0;
                 }
@@ -614,7 +617,8 @@ namespace NcTalkOutlookAddIn
                     SizeBytes = 0
                 };
                 path = string.Empty;
-                pathIsTemporary = false;                if (attachment == null)
+                pathIsTemporary = false;
+                if (attachment == null)
                 {
                     LogFileLink("Compose before-attachment-add candidate build skipped (composeKey=" + _composeKey + ", reason=attachment_null).");
                     return false;
@@ -705,7 +709,8 @@ namespace NcTalkOutlookAddIn
 
             private bool TryMaterializeBeforeAddAttachmentToTemp(Outlook.Attachment attachment, string attachmentName, out string path)
             {
-                path = string.Empty;                if (attachment == null)
+                path = string.Empty;
+                if (attachment == null)
                 {
                     return false;
                 }
@@ -743,7 +748,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private string TryResolveBeforeAddPathFromAttachmentMetadata(Outlook.Attachment attachment)
-            {                if (attachment == null)
+            {
+                if (attachment == null)
                 {
                     return string.Empty;
                 }
@@ -1044,7 +1050,8 @@ namespace NcTalkOutlookAddIn
                 Outlook.Attachments attachments = null;
                 try
                 {
-                    attachments = _mail.Attachments;                    if (attachments == null)
+                    attachments = _mail.Attachments;
+                    if (attachments == null)
                     {
                         return;
                     }
@@ -1054,7 +1061,8 @@ namespace NcTalkOutlookAddIn
                         Outlook.Attachment attachment = null;
                         try
                         {
-                            attachment = attachments[index];                            if (attachment == null)
+                            attachment = attachments[index];
+                            if (attachment == null)
                             {
                                 continue;
                             }
@@ -1106,7 +1114,8 @@ namespace NcTalkOutlookAddIn
 
             private bool TryResolveAttachmentLocalPath(Outlook.Attachment attachment, string attachmentName, List<string> temporaryFiles, out string localPath)
             {
-                localPath = string.Empty;                if (attachment == null)
+                localPath = string.Empty;
+                if (attachment == null)
                 {
                     return false;
                 }
@@ -1132,7 +1141,8 @@ namespace NcTalkOutlookAddIn
                         return false;
                     }
 
-                    localPath = targetPath;                    if (temporaryFiles != null)
+                    localPath = targetPath;
+                    if (temporaryFiles != null)
                     {
                         temporaryFiles.Add(targetPath);
                     }
@@ -1320,7 +1330,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private void RemoveAttachmentsByIndices(List<int> indices, string reason)
-            {                if (indices == null || indices.Count == 0)
+            {
+                if (indices == null || indices.Count == 0)
                 {
                     return;
                 }
@@ -1334,7 +1345,8 @@ namespace NcTalkOutlookAddIn
 
                 try
                 {
-                    attachments = _mail.Attachments;                    if (attachments == null)
+                    attachments = _mail.Attachments;
+                    if (attachments == null)
                     {
                         return;
                     }
@@ -1393,7 +1405,8 @@ namespace NcTalkOutlookAddIn
 
                 try
                 {
-                    attachments = _mail.Attachments;                    if (attachments == null || attachments.Count <= 0)
+                    attachments = _mail.Attachments;
+                    if (attachments == null || attachments.Count <= 0)
                     {
                         return;
                     }
@@ -1432,7 +1445,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private void CleanupTemporaryFiles(List<string> temporaryFiles)
-            {                if (temporaryFiles == null || temporaryFiles.Count == 0)
+            {
+                if (temporaryFiles == null || temporaryFiles.Count == 0)
                 {
                     return;
                 }

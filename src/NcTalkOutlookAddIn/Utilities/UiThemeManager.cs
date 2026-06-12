@@ -174,7 +174,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void ApplyToForm(Form form, params ToolTip[] toolTips)
-        {            if (form == null)
+        {
+            if (form == null)
             {
                 return;
             }
@@ -206,7 +207,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 return;
             }
 
-            ApplyToControlTree(form, palette);            if (toolTips != null)
+            ApplyToControlTree(form, palette);
+            if (toolTips != null)
             {
                 foreach (var toolTip in toolTips)
                 {
@@ -239,7 +241,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void ApplyToControlTree(Control root, UiThemePalette palette)
-        {            if (root == null || palette == null || !palette.IsDark)
+        {
+            if (root == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -270,7 +273,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabChromeToControlTree(Control root, UiThemePalette palette)
-        {            if (root == null || palette == null)
+        {
+            if (root == null || palette == null)
             {
                 return;
             }
@@ -290,7 +294,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyControlColors(Control control, UiThemePalette palette)
-        {            if (control == null || palette == null || !palette.IsDark)
+        {
+            if (control == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -376,7 +381,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyToToolTip(ToolTip toolTip, UiThemePalette palette)
-        {            if (toolTip == null || palette == null || !palette.IsDark)
+        {
+            if (toolTip == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -393,7 +399,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyDateTimePicker(DateTimePicker picker, UiThemePalette palette)
-        {            if (picker == null || palette == null || !palette.IsDark)
+        {
+            if (picker == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -407,7 +414,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyListView(ListView view, UiThemePalette palette)
-        {            if (view == null || palette == null || !palette.IsDark)
+        {
+            if (view == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -417,7 +425,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyComboBox(ComboBox comboBox, UiThemePalette palette)
-        {            if (comboBox == null || palette == null || !palette.IsDark)
+        {
+            if (comboBox == null || palette == null || !palette.IsDark)
             {
                 return;
             }
@@ -475,7 +484,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabControl(TabControl control, UiThemePalette palette)
-        {            if (control == null || palette == null)
+        {
+            if (control == null || palette == null)
             {
                 return;
             }
@@ -691,7 +701,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void DisableWindowsTheme(Control control)
-        {            if (control == null || control.Handle == IntPtr.Zero)
+        {
+            if (control == null || control.Handle == IntPtr.Zero)
             {
                 return;
             }
@@ -711,7 +722,8 @@ namespace NcTalkOutlookAddIn.Utilities
         private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
 
         private static void ApplyTabStretchToControlTree(Control root)
-        {            if (root == null)
+        {
+            if (root == null)
             {
                 return;
             }
@@ -726,7 +738,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabStretch(TabControl control)
-        {            if (control == null)
+        {
+            if (control == null)
             {
                 return;
             }
@@ -788,7 +801,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyTabSizing(TabControl control)
-        {            if (control == null || control.TabPages == null || control.TabPages.Count == 0)
+        {
+            if (control == null || control.TabPages == null || control.TabPages.Count == 0)
             {
                 return;
             }
@@ -840,7 +854,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static bool IsAdaptiveTabControl(TabControl control)
-        {            if (control == null)
+        {
+            if (control == null)
             {
                 return false;
             }
@@ -853,7 +868,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static void ApplyAdaptiveTabLayout(TabControl control)
-        {            if (control == null)
+        {
+            if (control == null)
             {
                 return;
             }
@@ -977,7 +993,8 @@ namespace NcTalkOutlookAddIn.Utilities
                     }
                     foreach (string name in valueNames)
                     {
-                        object value = ReadRegistryValue(Registry.CurrentUser, key, name);                        if (value == null)
+                        object value = ReadRegistryValue(Registry.CurrentUser, key, name);
+                        if (value == null)
                         {
                             continue;
                         }
@@ -1070,7 +1087,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static OfficeUiTheme? ParseOfficeThemeValue(object rawValue)
-        {            if (rawValue == null)
+        {
+            if (rawValue == null)
             {
                 return null;
             }
@@ -1117,7 +1135,8 @@ namespace NcTalkOutlookAddIn.Utilities
 
         private static int? ReadRegistryDword(RegistryKey root, string subKey, string valueName)
         {
-            object value = ReadRegistryValue(root, subKey, valueName);            if (value == null)
+            object value = ReadRegistryValue(root, subKey, valueName);
+            if (value == null)
             {
                 return null;
             }
@@ -1136,14 +1155,16 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static object ReadRegistryValue(RegistryKey root, string subKey, string valueName)
-        {            if (root == null || string.IsNullOrWhiteSpace(subKey) || string.IsNullOrWhiteSpace(valueName))
+        {
+            if (root == null || string.IsNullOrWhiteSpace(subKey) || string.IsNullOrWhiteSpace(valueName))
             {
                 return null;
             }
             try
             {
                 using (var key = root.OpenSubKey(subKey))
-                {                    if (key == null)
+                {
+                    if (key == null)
                     {
                         return null;
                     }

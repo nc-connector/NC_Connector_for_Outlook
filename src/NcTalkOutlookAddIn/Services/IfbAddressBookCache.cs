@@ -53,7 +53,8 @@ namespace NcTalkOutlookAddIn.Services
         }
 
         internal SystemAddressbookStatus GetSystemAddressbookStatus(TalkServiceConfiguration configuration, int cacheHours, bool forceRefresh)
-        {            if (configuration == null || !configuration.IsComplete())
+        {
+            if (configuration == null || !configuration.IsComplete())
             {
                 const string detail = "Talk credentials are incomplete.";
                 DiagnosticsLogger.Log(LogCategories.Ifb, "System address book status check failed: " + detail);
@@ -95,7 +96,8 @@ namespace NcTalkOutlookAddIn.Services
 
         internal bool TryGetUid(TalkServiceConfiguration configuration, int cacheHours, string email, out string uid)
         {
-            uid = null;            if (configuration == null || !configuration.IsComplete() || string.IsNullOrWhiteSpace(email))
+            uid = null;
+            if (configuration == null || !configuration.IsComplete() || string.IsNullOrWhiteSpace(email))
             {
                 return false;
             }
@@ -109,7 +111,8 @@ namespace NcTalkOutlookAddIn.Services
 
         internal bool TryGetPrimaryEmailForUid(TalkServiceConfiguration configuration, int cacheHours, string uid, out string email)
         {
-            email = null;            if (configuration == null || !configuration.IsComplete() || string.IsNullOrWhiteSpace(uid))
+            email = null;
+            if (configuration == null || !configuration.IsComplete() || string.IsNullOrWhiteSpace(uid))
             {
                 return false;
             }
@@ -123,7 +126,8 @@ namespace NcTalkOutlookAddIn.Services
 
         internal bool TryResolveEmail(TalkServiceConfiguration configuration, int cacheHours, string emailOrLocalPart, out string resolvedEmail)
         {
-            resolvedEmail = null;            if (configuration == null || !configuration.IsComplete())
+            resolvedEmail = null;
+            if (configuration == null || !configuration.IsComplete())
             {
                 return false;
             }
@@ -174,7 +178,8 @@ namespace NcTalkOutlookAddIn.Services
 
         internal List<NextcloudUser> GetUsers(TalkServiceConfiguration configuration, int cacheHours, bool forceRefresh)
         {
-            var users = new List<NextcloudUser>();            if (configuration == null || !configuration.IsComplete())
+            var users = new List<NextcloudUser>();
+            if (configuration == null || !configuration.IsComplete())
             {
                 return users;
             }
@@ -225,7 +230,8 @@ namespace NcTalkOutlookAddIn.Services
             try
             {
                 string json = File.ReadAllText(_cacheFilePath);
-                var data = _serializer.Deserialize<CacheContainer>(json);                if (data == null || data.GeneratedUtc <= DateTime.MinValue || data.Entries == null)
+                var data = _serializer.Deserialize<CacheContainer>(json);
+                if (data == null || data.GeneratedUtc <= DateTime.MinValue || data.Entries == null)
                 {
                     return false;
                 }
@@ -237,7 +243,8 @@ namespace NcTalkOutlookAddIn.Services
                 var uidMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var localMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var entry in data.Entries)
-                {                    if (entry == null || string.IsNullOrWhiteSpace(entry.Email) || string.IsNullOrWhiteSpace(entry.Uid))
+                {
+                    if (entry == null || string.IsNullOrWhiteSpace(entry.Email) || string.IsNullOrWhiteSpace(entry.Uid))
                     {
                         continue;
                     }
@@ -301,7 +308,8 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Ifb, "Address book could not be loaded from server.", response.TransportException);
                     throw new InvalidOperationException("Address book could not be loaded: " + response.TransportException.Message, response.TransportException);
@@ -326,11 +334,13 @@ namespace NcTalkOutlookAddIn.Services
             var localMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var entry in entries)
-            {                if (entry == null || string.IsNullOrWhiteSpace(entry.Uid))
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Uid))
                 {
                     continue;
                 }
-                string uidKey = entry.Uid.Trim();                if (entry.Emails != null)
+                string uidKey = entry.Uid.Trim();
+                if (entry.Emails != null)
                 {
                     foreach (var email in entry.Emails)
                     {

@@ -143,7 +143,8 @@ namespace NcTalkOutlookAddIn
                 _emailSignatureTimer.Interval = isInlineResponse ? EmailSignatureInlineApplyDebounceMs : EmailSignatureApplyDebounceMs;
                 _emailSignatureTimer.Tick += OnEmailSignatureTimerTick;
 
-                _events = mail as Outlook.ItemEvents_10_Event;                if (_events != null)
+                _events = mail as Outlook.ItemEvents_10_Event;
+                if (_events != null)
                 {
                     _events.BeforeAttachmentAdd += OnBeforeAttachmentAdd;
                     _events.AttachmentAdd += OnAttachmentAdd;
@@ -182,7 +183,8 @@ namespace NcTalkOutlookAddIn
             }
 
             internal bool IsFor(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
-            {                if (mail == null)
+            {
+                if (mail == null)
                 {
                     return false;
                 }
@@ -207,7 +209,8 @@ namespace NcTalkOutlookAddIn
             }
 
             internal void ArmShareCleanup(FileLinkResult result)
-            {                if (result == null)
+            {
+                if (result == null)
                 {
                     return;
                 }
@@ -254,7 +257,8 @@ namespace NcTalkOutlookAddIn
                 bool isPlainText,
                 string languageOverride,
                 BackendPolicyStatus policyStatus)
-            {                if (result == null || request == null)
+            {
+                if (result == null || request == null)
                 {
                     return;
                 }
@@ -310,7 +314,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private static string BuildComposeKey(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
-            {                if (mail != null)
+            {
+                if (mail != null)
                 {
                     try
                     {
@@ -352,7 +357,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private static string ReadAttachmentName(Outlook.Attachment attachment)
-            {                if (attachment == null)
+            {
+                if (attachment == null)
                 {
                     return string.Empty;
                 }
@@ -384,7 +390,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private static long ReadAttachmentSizeBytes(Outlook.Attachment attachment)
-            {                if (attachment == null)
+            {
+                if (attachment == null)
                 {
                     return 0;
                 }
@@ -400,7 +407,8 @@ namespace NcTalkOutlookAddIn
             }
 
             private static string ReadAttachmentPathName(Outlook.Attachment attachment)
-            {                if (attachment == null)
+            {
+                if (attachment == null)
                 {
                     return string.Empty;
                 }
@@ -432,7 +440,8 @@ namespace NcTalkOutlookAddIn
                     var pendingTemporaryFiles = new List<string>();
                     for (int i = 0; i < _pendingBeforeAddShareEntries.Count; i++)
                     {
-                        BeforeAddShareEntry pendingEntry = _pendingBeforeAddShareEntries[i];                        if (pendingEntry == null || !pendingEntry.CleanupLocalPathAfterFlow || string.IsNullOrWhiteSpace(pendingEntry.LocalPath))
+                        BeforeAddShareEntry pendingEntry = _pendingBeforeAddShareEntries[i];
+                        if (pendingEntry == null || !pendingEntry.CleanupLocalPathAfterFlow || string.IsNullOrWhiteSpace(pendingEntry.LocalPath))
                         {
                             continue;
                         }

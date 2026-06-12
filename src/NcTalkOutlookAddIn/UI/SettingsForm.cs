@@ -235,13 +235,15 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void AttachResponsiveResizeHandlers(params Control[] controls)
-        {            if (controls == null)
+        {
+            if (controls == null)
             {
                 return;
             }
             for (int i = 0; i < controls.Length; i++)
             {
-                Control control = controls[i];                if (control == null)
+                Control control = controls[i];
+                if (control == null)
                 {
                     continue;
                 }
@@ -1110,7 +1112,8 @@ namespace NcTalkOutlookAddIn.UI
             try
             {
                 var assembly = Assembly.GetExecutingAssembly();
-                var version = assembly.GetName().Version;                if (version != null)
+                var version = assembly.GetName().Version;
+                if (version != null)
                 {
                     return version.ToString();
                 }
@@ -1551,7 +1554,8 @@ namespace NcTalkOutlookAddIn.UI
                 : Strings.StatusTestFailureUnknown;
 
             string summary = ExtractFirstLine(message);
-            SetStatus(string.Format(statusFormat, summary), true);            if (ex != null && ex.IsTransportError)
+            SetStatus(string.Format(statusFormat, summary), true);
+            if (ex != null && ex.IsTransportError)
             {
                 MessageBox.Show(
                     this,
@@ -2056,7 +2060,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static void SelectComboValue(ComboBox combo, int value, int fallback)
-        {            if (combo == null)
+        {
+            if (combo == null)
             {
                 return;
             }
@@ -2076,12 +2081,14 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private static int ParseComboValue(ComboBox combo, int fallback)
-        {            if (combo == null)
+        {
+            if (combo == null)
             {
                 return fallback;
             }
             string selected = combo.SelectedItem as string;
-            int parsed;            if (selected != null && int.TryParse(selected, out parsed))
+            int parsed;
+            if (selected != null && int.TryParse(selected, out parsed))
             {
                 return parsed;
             }

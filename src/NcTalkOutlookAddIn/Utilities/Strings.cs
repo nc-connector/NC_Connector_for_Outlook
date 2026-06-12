@@ -177,7 +177,8 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             try
             {
-                CultureInfo culture = provider();                if (culture == null)
+                CultureInfo culture = provider();
+                if (culture == null)
                 {
                     return;
                 }
@@ -323,7 +324,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 Assembly assembly = typeof(Strings).Assembly;
 
                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
-                {                    if (stream == null)
+                {
+                    if (stream == null)
                     {
                         DiagnosticsLogger.Log(LogCategories.Core, "Locale resource not found: " + resourceName);
                         return null;
@@ -335,10 +337,12 @@ namespace NcTalkOutlookAddIn.Utilities
                         var serializer = new JavaScriptSerializer();
                         var parsed = serializer.Deserialize<Dictionary<string, LocaleMessage>>(json);
 
-                        var dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);                        if (parsed != null)
+                        var dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        if (parsed != null)
                         {
                             foreach (var item in parsed)
-                            {                                if (item.Value == null || string.IsNullOrEmpty(item.Value.message))
+                            {
+                                if (item.Value == null || string.IsNullOrEmpty(item.Value.message))
                                 {
                                     continue;
                                 }
@@ -388,7 +392,8 @@ namespace NcTalkOutlookAddIn.Utilities
 
                 foreach (string code in _languageCandidates)
                 {
-                    Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);                    if (dictionary == null)
+                    Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);
+                    if (dictionary == null)
                     {
                         continue;
                     }
@@ -419,7 +424,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 }
                 foreach (string code in new[] { normalized, EnglishLanguageCode, DefaultLanguageCode })
                 {
-                    Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);                    if (dictionary == null)
+                    Dictionary<string, string> dictionary = GetTranslationsForLanguage(code);
+                    if (dictionary == null)
                     {
                         continue;
                     }

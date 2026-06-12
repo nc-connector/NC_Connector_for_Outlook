@@ -21,7 +21,8 @@ namespace NcTalkOutlookAddIn.Controllers
             string mailIdentityKey,
             string inspectorIdentityKey,
             Func<NextcloudTalkAddIn.MailComposeSubscription> factory)
-        {            if (mail == null || factory == null)
+        {
+            if (mail == null || factory == null)
             {
                 return null;
             }
@@ -30,13 +31,15 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 for (int i = 0; i < _subscriptions.Count; i++)
                 {
-                    NextcloudTalkAddIn.MailComposeSubscription existing = _subscriptions[i];                    if (existing != null && existing.IsFor(mail, mailIdentityKey, inspectorIdentityKey))
+                    NextcloudTalkAddIn.MailComposeSubscription existing = _subscriptions[i];
+                    if (existing != null && existing.IsFor(mail, mailIdentityKey, inspectorIdentityKey))
                     {
                         return existing;
                     }
                 }
 
-                NextcloudTalkAddIn.MailComposeSubscription created = factory();                if (created != null)
+                NextcloudTalkAddIn.MailComposeSubscription created = factory();
+                if (created != null)
                 {
                     _subscriptions.Add(created);
                 }
@@ -69,7 +72,8 @@ namespace NcTalkOutlookAddIn.Controllers
             for (int i = 0; i < current.Length; i++)
             {
                 try
-                {                    if (current[i] != null)
+                {
+                    if (current[i] != null)
                     {
                         current[i].Dispose();
                     }

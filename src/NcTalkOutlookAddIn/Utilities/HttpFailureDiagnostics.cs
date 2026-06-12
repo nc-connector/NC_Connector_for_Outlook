@@ -49,7 +49,8 @@ namespace NcTalkOutlookAddIn.Utilities
     internal static class HttpFailureDiagnostics
     {
         internal static HttpFailureInfo Analyze(WebException ex)
-        {            if (ex == null)
+        {
+            if (ex == null)
             {
                 return BuildInfo(HttpFailureKind.Generic, string.Empty);
             }
@@ -59,7 +60,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static string BuildLogSummary(WebException ex, HttpFailureInfo info)
-        {            if (info == null)
+        {
+            if (info == null)
             {
                 return "kind=unknown";
             }
@@ -170,7 +172,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 return HttpFailureKind.ProxyOrConnect;
             }
 
-            SocketException socket = FindSocketException(ex);            if (socket != null)
+            SocketException socket = FindSocketException(ex);
+            if (socket != null)
             {
                 switch (socket.SocketErrorCode)
                 {
@@ -193,7 +196,8 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             while (ex != null)
             {
-                SocketException socket = ex as SocketException;                if (socket != null)
+                SocketException socket = ex as SocketException;
+                if (socket != null)
                 {
                     return socket;
                 }
@@ -219,7 +223,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         private static bool ContainsAny(string source, params string[] fragments)
-        {            if (string.IsNullOrEmpty(source) || fragments == null)
+        {
+            if (string.IsNullOrEmpty(source) || fragments == null)
             {
                 return false;
             }

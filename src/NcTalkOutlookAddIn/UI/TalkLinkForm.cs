@@ -392,7 +392,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void InitializeSettingsOptionCheckBox(CheckBox checkBox, string text)
-        {            if (checkBox == null)
+        {
+            if (checkBox == null)
             {
                 return;
             }
@@ -599,7 +600,8 @@ namespace NcTalkOutlookAddIn.UI
                 // Determines whether event conversations are supported (Nextcloud >= 31).
         private static bool DetermineEventConversationSupport(AddinSettings defaults, out string versionText)
         {
-            versionText = string.Empty;            if (defaults == null)
+            versionText = string.Empty;
+            if (defaults == null)
             {
                 return true;
             }
@@ -925,7 +927,8 @@ namespace NcTalkOutlookAddIn.UI
         {
             foreach (var item in _roomTypeComboBox.Items)
             {
-                var option = item as RoomTypeOption;                if (option != null && option.Value == type)
+                var option = item as RoomTypeOption;
+                if (option != null && option.Value == type)
                 {
                     _roomTypeComboBox.SelectedItem = option;
                     return;

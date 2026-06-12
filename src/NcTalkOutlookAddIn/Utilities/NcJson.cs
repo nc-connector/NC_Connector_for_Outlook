@@ -53,12 +53,14 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static IDictionary<string, object> GetDictionary(IDictionary<string, object> parent, string key)
-        {            if (parent == null || string.IsNullOrWhiteSpace(key))
+        {
+            if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return null;
             }
 
-            object value;            if (!parent.TryGetValue(key, out value) || value == null)
+            object value;
+            if (!parent.TryGetValue(key, out value) || value == null)
             {
                 return null;
             }
@@ -66,12 +68,14 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static string GetString(IDictionary<string, object> parent, string key)
-        {            if (parent == null || string.IsNullOrWhiteSpace(key))
+        {
+            if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return null;
             }
 
-            object value;            if (!parent.TryGetValue(key, out value) || value == null)
+            object value;
+            if (!parent.TryGetValue(key, out value) || value == null)
             {
                 return null;
             }
@@ -96,12 +100,14 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static bool TryGetInt(IDictionary<string, object> parent, string key, out int value)
         {
-            value = 0;            if (parent == null || string.IsNullOrWhiteSpace(key))
+            value = 0;
+            if (parent == null || string.IsNullOrWhiteSpace(key))
             {
                 return false;
             }
 
-            object raw;            if (!parent.TryGetValue(key, out raw) || raw == null)
+            object raw;
+            if (!parent.TryGetValue(key, out raw) || raw == null)
             {
                 return false;
             }

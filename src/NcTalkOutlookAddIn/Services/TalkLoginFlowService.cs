@@ -131,7 +131,8 @@ namespace NcTalkOutlookAddIn.Services
             });
 
             if (!response.HasHttpResponse)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     HttpFailureInfo failure = response.FailureInfo ?? HttpFailureDiagnostics.Analyze(response.TransportException);
                     DiagnosticsLogger.LogException(LogCategories.Api, "Login flow request failed without HTTP response (" + HttpFailureDiagnostics.BuildLogSummary(response.TransportException, failure) + ").", response.TransportException);

@@ -48,7 +48,8 @@ namespace NcTalkOutlookAddIn.UI
             _moderatorListBox.Items.Clear();
             int added = 0;
             foreach (var user in _userDirectory)
-            {                if (user == null)
+            {
+                if (user == null)
                 {
                     continue;
                 }
@@ -77,7 +78,8 @@ namespace NcTalkOutlookAddIn.UI
 
         private void SelectModeratorFromList()
         {
-            var selected = _moderatorListBox.SelectedItem as NextcloudUser;            if (selected == null)
+            var selected = _moderatorListBox.SelectedItem as NextcloudUser;
+            if (selected == null)
             {
                 return;
             }
@@ -152,7 +154,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void SetModeratorAvatar(NextcloudUser user)
-        {            if (user == null)
+        {
+            if (user == null)
             {
                 _moderatorAvatarBox.Image = null;
                 return;
@@ -194,7 +197,8 @@ namespace NcTalkOutlookAddIn.UI
             int avatarY = e.Bounds.Top + ((e.Bounds.Height - avatarSize) / 2);
             var avatarBounds = new Rectangle(avatarX, avatarY, avatarSize, avatarSize);
 
-            Image avatar = user != null ? GetCachedAvatar(user.UserId) : null;            if (avatar == null && user != null)
+            Image avatar = user != null ? GetCachedAvatar(user.UserId) : null;
+            if (avatar == null && user != null)
             {
                 EnsureAvatarLoaded(user.UserId);
                 avatar = GetCachedAvatar(user.UserId);
@@ -233,7 +237,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void EnsureAvatarLoaded(string userId)
-        {            if (string.IsNullOrWhiteSpace(userId) || _configuration == null || !_configuration.IsComplete())
+        {
+            if (string.IsNullOrWhiteSpace(userId) || _configuration == null || !_configuration.IsComplete())
             {
                 return;
             }
@@ -263,7 +268,8 @@ namespace NcTalkOutlookAddIn.UI
 
                 lock (_avatarLock)
                 {
-                    _avatarLoading.Remove(userId);                    if (fetched != null)
+                    _avatarLoading.Remove(userId);
+                    if (fetched != null)
                     {
                         Image existing;
                         if (_avatarCache.TryGetValue(userId, out existing))
@@ -280,7 +286,8 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     BeginInvoke((Action)(() =>
                     {
-                        _moderatorListBox.Invalidate();                        if (_selectedModerator != null && string.Equals(_selectedModerator.UserId, userId, StringComparison.OrdinalIgnoreCase))
+                        _moderatorListBox.Invalidate();
+                        if (_selectedModerator != null && string.Equals(_selectedModerator.UserId, userId, StringComparison.OrdinalIgnoreCase))
                         {
                             _moderatorAvatarBox.Image = GetCachedAvatar(userId);
                         }
@@ -315,7 +322,8 @@ namespace NcTalkOutlookAddIn.UI
             });
 
             if (!response.HasHttpResponse || response.StatusCode != HttpStatusCode.OK)
-            {                if (response.TransportException != null)
+            {
+                if (response.TransportException != null)
                 {
                     DiagnosticsLogger.LogException(LogCategories.Talk, "Avatar request failed for user '" + userId + "'.", response.TransportException);
                 }
@@ -334,7 +342,8 @@ namespace NcTalkOutlookAddIn.UI
         }
 
         private void DrawAvatarPlaceholder(Graphics graphics, Rectangle bounds, string userId)
-        {            if (graphics == null)
+        {
+            if (graphics == null)
             {
                 return;
             }

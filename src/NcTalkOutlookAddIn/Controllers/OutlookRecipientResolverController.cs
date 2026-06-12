@@ -14,7 +14,8 @@ namespace NcTalkOutlookAddIn.Controllers
     {
         internal static List<string> CollectAppointmentAttendeeEmails(Outlook.AppointmentItem appointment)
         {
-            var emails = new List<string>();            if (appointment == null)
+            var emails = new List<string>();
+            if (appointment == null)
             {
                 return emails;
             }
@@ -41,7 +42,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     Outlook.Recipient recipient = null;
                     try
                     {
-                        recipient = recipients[i];                        if (recipient == null)
+                        recipient = recipients[i];
+                        if (recipient == null)
                         {
                             continue;
                         }
@@ -91,7 +93,8 @@ namespace NcTalkOutlookAddIn.Controllers
         }
 
         internal static string TryResolveRecipientSmtpAddress(Outlook.Recipient recipient)
-        {            if (recipient == null)
+        {
+            if (recipient == null)
             {
                 return null;
             }
@@ -160,7 +163,8 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             try
             {
-                Outlook.PropertyAccessor accessor = recipient.PropertyAccessor;                if (accessor != null)
+                Outlook.PropertyAccessor accessor = recipient.PropertyAccessor;
+                if (accessor != null)
                 {
                     try
                     {

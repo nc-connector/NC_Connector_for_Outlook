@@ -152,7 +152,8 @@ namespace NcTalkOutlookAddIn.Services
                 try
                 {
                     object raw = Registry.GetValue(root.Name + "\\" + relativePath, valueName, null);
-                    int parsed;                    if (raw != null && int.TryParse(Convert.ToString(raw), out parsed))
+                    int parsed;
+                    if (raw != null && int.TryParse(Convert.ToString(raw), out parsed))
                     {
                         value = parsed;
                         return true;
@@ -184,7 +185,8 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 try
                 {
-                    object raw = Registry.GetValue(root.Name + "\\" + relativePath, valueName, null);                    if (raw == null)
+                    object raw = Registry.GetValue(root.Name + "\\" + relativePath, valueName, null);
+                    if (raw == null)
                     {
                         continue;
                     }

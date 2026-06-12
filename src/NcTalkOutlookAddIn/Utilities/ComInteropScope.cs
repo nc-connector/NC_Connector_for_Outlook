@@ -13,7 +13,8 @@ namespace NcTalkOutlookAddIn.Utilities
     internal static class ComInteropScope
     {
         internal static void TryRelease(object comObject, string category, string failureMessage)
-        {            if (comObject == null || !Marshal.IsComObject(comObject))
+        {
+            if (comObject == null || !Marshal.IsComObject(comObject))
             {
                 return;
             }
@@ -28,7 +29,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static void TryFinalRelease(object comObject, string category, string failureMessage)
-        {            if (comObject == null || !Marshal.IsComObject(comObject))
+        {
+            if (comObject == null || !Marshal.IsComObject(comObject))
             {
                 return;
             }
@@ -43,7 +45,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         internal static string ResolveIdentityKey(object comObject, string category, string objectName)
-        {            if (comObject == null || !Marshal.IsComObject(comObject))
+        {
+            if (comObject == null || !Marshal.IsComObject(comObject))
             {
                 return string.Empty;
             }
@@ -91,7 +94,8 @@ namespace NcTalkOutlookAddIn.Utilities
             string category,
             string firstName,
             string secondName)
-        {            if (first == null || second == null)
+        {
+            if (first == null || second == null)
             {
                 return false;
             }

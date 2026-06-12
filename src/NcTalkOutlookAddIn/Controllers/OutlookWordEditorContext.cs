@@ -64,9 +64,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 context = candidate;
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open inspector Word editor for " + (operation ?? "mail compose") + ".", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open inspector Word editor for " + (operation ?? "mail compose") + ".", ex);
                 candidate.Dispose();
                 return false;
             }
@@ -118,9 +118,9 @@ namespace NcTalkOutlookAddIn.Controllers
                 context = candidate;
                 return true;
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open inline Word editor for " + (operation ?? "mail compose") + ".", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open inline Word editor for " + (operation ?? "mail compose") + ".", ex);
                 candidate.Dispose();
                 return false;
             }
@@ -257,9 +257,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 return GetIntProperty(content, propertyName);
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document " + propertyName + " boundary.", error);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document " + propertyName + " boundary.", ex);
                 return fallback;
             }
             finally
