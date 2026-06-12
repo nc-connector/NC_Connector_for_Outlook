@@ -842,6 +842,161 @@ namespace NcTalkOutlookAddIn.Controllers
             internal string FontSize;
         }
 
+        internal bool TryReplaceInspectorSignatureSlot(Outlook.MailItem mail, string html, string composeKey, string operation, bool placeCursorAtBodyStart = false)
+        {
+            if (mail == null)
+            {
+                return false;
+            }
+
+            OutlookWordEditorContext context;
+            string tempHtmlPath = null;
+
+            try
+            {
+                if (!OutlookWordEditorContext.TryOpenInspector(mail, "signature slot write", out context))
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inspector signature slot write skipped (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", reason=word_editor_unavailable).");
+                    return false;
+                }
+
+                using (context)
+                {
+                    object wordEditor = context.Document;
+                    object selection = context.Selection;
+                    if (selection == null)
+                    {
+                        DiagnosticsLogger.Log(
+                            LogCategories.Core,
+                            "Inspector signature slot write skipped (operation="
+                            + (operation ?? "n/a")
+                            + ", composeKey="
+                            + (composeKey ?? string.Empty)
+                            + ", reason=word_selection_unavailable).");
+                        return false;
+                    }
+
+                    int selectionStart = OutlookWordEditorContext.GetIntProperty(selection, "Start");
+                    int selectionEnd = OutlookWordEditorContext.GetIntProperty(selection, "End");
+                    int originalSelectionStart = selectionStart;
+                    string signatureSlotSource;
+                    bool signatureSlotSelected = TrySelectOutlookSignatureSlot(
+                        wordEditor,
+                        selection,
+                        out selectionStart,
+                        out selectionEnd,
+                        out signatureSlotSource);
+                    if (!signatureSlotSelected)
+                    {
+                        DiagnosticsLogger.Log(
+                            LogCategories.Core,
+                            "Inspector signature slot write skipped (operation="
+                            + (operation ?? "n/a")
+                            + ", composeKey="
+                            + (composeKey ?? string.Empty)
+                            + ", reason=signature_boundary_unavailable).");
+                        return false;
+                    }
+
+                    int cursorStart = placeCursorAtBodyStart
+                        ? context.GetDocumentStart(0)
+                        : originalSelectionStart;
+                    if (signatureSlotSelected && selectionEnd > selectionStart)
+                    {
+                        bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
+                        if (deletedTable)
+                        {
+                            signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
+                        }
+                        if (!deletedTable)
+                        {
+                            selection.GetType().InvokeMember(
+                                "Delete",
+                                BindingFlags.InvokeMethod,
+                                null,
+                                selection,
+                                null);
+                        }
+                        try
+                        {
+                            context.SetSelectionRange(selectionStart, selectionStart);
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move Word selection after inspector signature slot delete.", ex);
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(html))
+                    {
+                        tempHtmlPath = Path.Combine(
+                            Path.GetTempPath(),
+                            "nc4ol-inspector-signature-" + Guid.NewGuid().ToString("N") + ".html");
+                        File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
+                        context.InsertFile(tempHtmlPath);
+                    }
+                    try
+                    {
+                        context.SetSelectionRange(cursorStart, cursorStart);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore cursor after inspector signature slot write.", ex);
+                    }
+
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inspector signature slot written via WordEditor.Selection.InsertFile (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", selectionStart="
+                        + selectionStart.ToString(CultureInfo.InvariantCulture)
+                        + ", selectionEnd="
+                        + selectionEnd.ToString(CultureInfo.InvariantCulture)
+                        + ", signatureSlotSelected="
+                        + signatureSlotSelected.ToString(CultureInfo.InvariantCulture)
+                        + ", signatureSlotSource="
+                        + (signatureSlotSource ?? "n/a")
+                        + ").");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to write inspector signature slot (operation="
+                    + (operation ?? "n/a")
+                    + ", composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ").",
+                    ex);
+                return false;
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
+                {
+                    try
+                    {
+                        File.Delete(tempHtmlPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inspector signature HTML file.", ex);
+                    }
+                }
+            }
+        }
+
         internal bool TryReplaceActiveInlineResponseSignatureSlot(Outlook.MailItem mail, string html, string composeKey, string operation)
         {
             if (mail == null)
@@ -899,7 +1054,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     int selectionEnd = OutlookWordEditorContext.GetIntProperty(selection, "End");
                     int originalSelectionStart = selectionStart;
                     string signatureSlotSource;
-                    bool signatureSlotSelected = TrySelectInlineSignatureSlot(
+                    bool signatureSlotSelected = TrySelectOutlookSignatureSlot(
                         wordEditor,
                         selection,
                         out selectionStart,
@@ -1017,7 +1172,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        private static bool TrySelectInlineSignatureSlot(
+        private static bool TrySelectOutlookSignatureSlot(
             object wordEditor,
             object selection,
             out int selectionStart,
@@ -1125,7 +1280,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to select Outlook auto-signature bookmark for inline response.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to select Outlook auto-signature bookmark.", ex);
                 return false;
             }
             finally

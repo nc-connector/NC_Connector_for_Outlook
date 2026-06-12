@@ -151,7 +151,7 @@ namespace NcTalkOutlookAddIn
                 {
                     if (shouldClearForeign)
                     {
-                        ClearEmailSignatureSlotWithoutInsert("compose_type_disabled", composeKind);
+                        ClearEmailSignatureSlotWithoutInsert("compose_type_disabled:" + (reason ?? "n/a"), composeKind);
                     }
                     else
                     {
@@ -209,10 +209,34 @@ namespace NcTalkOutlookAddIn
                 {
                     bool removedManaged;
                     string bodyWithoutManaged = RemoveManagedSignatureBlocks(updated, out removedManaged);
+                    bool mayReplaceForeignSlot = !_emailSignatureInitialSlotHandled;
+                    if (mayReplaceForeignSlot
+                        && !_isInlineResponse
+                        && IsEmailSignaturePropertyTrigger(reason)
+                        && _owner != null
+                        && _owner._mailInteropController != null
+                        && _owner._mailInteropController.TryReplaceInspectorSignatureSlot(_mail, managedBlock, _composeKey, "apply"))
+                    {
+                        _emailSignatureInitialSlotHandled = true;
+                        _emailSignatureManaged = true;
+                        LogEmailSignature(
+                            "Email signature applied via inspector signature slot (trigger="
+                            + (reason ?? "n/a")
+                            + ", kind="
+                            + composeKind
+                            + ", htmlLength="
+                            + sanitizedHtml.Length.ToString(CultureInfo.InvariantCulture)
+                            + ").");
+                        return;
+                    }
+                    if (IsEmailSignaturePropertyTrigger(reason))
+                    {
+                        mayReplaceForeignSlot = false;
+                    }
                     updated = ReplaceComposeSignatureSlot(
                         bodyWithoutManaged,
                         managedBlock,
-                        !_emailSignatureInitialSlotHandled,
+                        mayReplaceForeignSlot,
                         composeKind,
                         out removedInitialSlot);
                     replacedManaged = removedManaged;
@@ -334,12 +358,36 @@ namespace NcTalkOutlookAddIn
                     bool removedInitialSlot = false;
                     if (!removedManaged && !_emailSignatureInitialSlotHandled)
                     {
-                        cleaned = ReplaceComposeSignatureSlot(
-                            cleaned,
-                            clearReplacement,
-                            true,
-                            composeKind,
-                            out removedInitialSlot);
+                        bool mayReplaceForeignSlot = true;
+                        if (!_isInlineResponse
+                            && IsEmailSignaturePropertyTrigger(reason)
+                            && _owner != null
+                            && _owner._mailInteropController != null
+                            && _owner._mailInteropController.TryReplaceInspectorSignatureSlot(_mail, clearReplacement, _composeKey, "clear_slot", true))
+                        {
+                            _emailSignatureInitialSlotHandled = true;
+                            _emailSignatureManaged = false;
+                            LogEmailSignature(
+                                "Email signature slot cleared via inspector signature slot (reason="
+                                + (reason ?? "n/a")
+                                + ", kind="
+                                + composeKind
+                                + ").");
+                            return;
+                        }
+                        if (IsEmailSignaturePropertyTrigger(reason))
+                        {
+                            mayReplaceForeignSlot = false;
+                        }
+                        if (!removedInitialSlot && mayReplaceForeignSlot)
+                        {
+                            cleaned = ReplaceComposeSignatureSlot(
+                                cleaned,
+                                clearReplacement,
+                                true,
+                                composeKind,
+                                out removedInitialSlot);
+                        }
                     }
                     if (removedManaged || removedInitialSlot || _isInlineResponse)
                     {
@@ -1143,6 +1191,12 @@ namespace NcTalkOutlookAddIn
                 return string.Equals(propertyName, "SendUsingAccount", StringComparison.OrdinalIgnoreCase)
                        || string.Equals(propertyName, "SenderEmailAddress", StringComparison.OrdinalIgnoreCase)
                        || string.Equals(propertyName, "SentOnBehalfOfName", StringComparison.OrdinalIgnoreCase);
+            }
+
+            private static bool IsEmailSignaturePropertyTrigger(string reason)
+            {
+                return !string.IsNullOrWhiteSpace(reason)
+                       && reason.Trim().StartsWith("property_", StringComparison.OrdinalIgnoreCase);
             }
 
             private static string ComputeSignatureHash(string value)
