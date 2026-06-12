@@ -5,162 +5,106 @@
 
 # NC Connector for Outlook
 
-NC Connector for Outlook connects Outlook seamlessly with your Nextcloud. The add-in automates Talk rooms for appointments, provides a local free/busy proxy, and ships a powerful filelink wizard for emails. The goal is a professional workflow from calendar to file storage — without context switching and with clear admin controls.
+NC Connector brings Nextcloud shares, Talk meetings, managed signatures, and Free/Busy data into Outlook classic. It is built for organizations that keep Outlook and use Nextcloud as their own infrastructure.
 
-This is a community project and is not an official Nextcloud GmbH product.
+## What the add-in does
 
-## Highlights
+- create Nextcloud shares directly from new mails, replies, and forwards
+- upload large files with Nextcloud chunked WebDAV upload v2 and send links instead of attachments
+- control password, expiration date, permissions, and separate password delivery
+- send passwords either as plain follow-up mail or as a Nextcloud Secret link
+- create and update Talk rooms directly from Outlook appointments
+- apply managed email signatures from the optional backend
+- provide Outlook Free/Busy data through a local Nextcloud proxy
+- write debug logs for support cases, with optional anonymization
 
-- **One-click Nextcloud Talk**
-Open an appointment, choose Nextcloud Talk, configure the room, and select a moderator. Optionally, invited attendees can be added to the room automatically (separately for internal Nextcloud users and external email guests). The wizard writes title, location, and a description block (including help link) into the appointment.
-- **Sharing deluxe**
-The “Insert Nextcloud share” button starts the sharing wizard with upload queue, password generator, expiration date, note field, attachment automation, and optional separate password follow-up mail. It is available in compose windows and inline replies/forwards. The finished share is inserted into the current editor as formatted HTML/RTF or, for plain-text mail, as a framed text block.
-- **Enterprise-grade security**
-Lobby until start time, moderator delegation, automatic cleanup of discarded appointments, mandatory passwords, and expiration policies help protect sensitive meetings and files.
-- **Central backend policies (optional)**
-If the optional NC Connector backend is installed, Talk, Sharing, and central email-signature defaults can be controlled centrally. On wizard open and in Settings, the add-in checks the backend status, applies valid seat policies, and locks admin-controlled options while still showing their effective values.
-- **Internet Free/Busy Gateway (IFB)**
-A local HTTP listener answers Outlook free/busy requests directly from Nextcloud. The installer configures registry values for search path and read URL. If the direct fetch returns HTTP 404, the add-in falls back to a scheduling POST so availability data is still provided.
-- **Debug logging at the press of a button**
-Enable it in the Debug tab. Writes structured logs (authentication, appointment and filelink flows, IFB) to `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. Runtime exceptions are still written there even when the debug switch is off. The path is displayed in the UI. A new `Anonymize logs` option (default: enabled) masks NC URL, tokens/secrets, emails, and local user path fragments.
+## Optional backend
 
-## Changelog
+Without the backend, sharing, Talk, and IFB work locally in Outlook. With NC Connector Backend, teams get central management:
 
-See [`CHANGELOG.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/CHANGELOG.md).
+- seat assignment and policies
+- defaults for sharing, Talk, and signatures
+- custom HTML templates for shares, password mails, and Talk invitations
+- separate password delivery and optional Nextcloud Secret links
+- admin locks for selected options
 
-## Third-party licenses
+## Sharing
 
-Bundled third-party sanitizer/runtime dependencies and their licenses are documented in [`VENDOR.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md).
+The sharing wizard uploads files and folders to Nextcloud and inserts the finished share block into the mail. HTML/RTF receives a formatted block, plain text receives a clean text block.
 
-## Feature overview
+Key points:
 
-### Nextcloud Talk directly from the appointment
-- Talk dialog with lobby, password, listable scope, room type, and moderator search.
-- Automatically writes title, location and a description block (incl. help link and password) into the appointment.
-- Room tracking, lobby updates, delegation workflow, and cleanup when an appointment is discarded or moved.
-- Deleting saved appointments only removes the remote Talk room after explicit opt-in and NC Connector metadata verification.
-- Calendar changes (drag & drop or dialog edits) keep the Talk room lobby/start time in sync.
-- Talk metadata is persisted locally in Outlook using explicit `X-NCTALK-*` MAPI/UserProperties so restart/edit/delete flows remain stable inside Outlook.
-- If moderator delegation is enabled, NC Connector first updates room name, lobby time, description, and participants when you save the appointment, then hands moderation over.
-- Live system-addressbook availability checks (on Talk click, settings open/save, wizard open) with deterministic lock behavior:
-  - `Add users`, `Add guests`, and moderator controls are disabled when unavailable.
-  - Settings show a red warning block with setup guide link.
-  - Talk wizard shows an inline red warning block in the moderator section.
-- Optional participant sync after saving the appointment:
-  - **Users:** internal Nextcloud users are added to the room.
-  - **Guests:** external email addresses are invited as guests (Nextcloud may also send an additional invitation email).
+- available in compose windows, replies, forwards, and inline replies
+- optional expiration date and custom permissions per share
+- attachment automation for large attachments or always through NC Connector
+- separate password mails are sent only after the primary mail was sent successfully
+- if auto-send fails, NC Connector opens a prepared manual password mail
 
-### Nextcloud Sharing in the compose window
-- Four steps (share, expiration date, files, note) with a password-protected upload folder.
-- Upload queue with duplicate checks, progress display and optional share creation.
-- Automatic HTML block with link, password, expiration date and optional note.
-- Inline replies and forwards use the same sharing wizard and keep two empty lines above the inserted block for the sender's own text.
-- Plain-text mail stays plain text and receives a framed `#` share block instead of HTML.
-- Optional compose attachment automation:
-  - always route new attachments into NC Connector, or
-  - prompt above a configurable total-size threshold.
-- Compose attachment automation now runs a pre-add check (`BeforeAttachmentAdd`) and can best-effort cancel host add operations before Outlook post-add handling, when a resolvable local file path is available.
-- Threshold prompt uses exactly two actions:
-  - `Share with NC Connector`
-  - `Remove last selected attachments` (batch-aware, not single-file only).
-- Attachment-mode specifics:
-  - fixed share base name `email_attachment` with deterministic suffixes (`_1`, `_2`, ...)
-  - recipient permission is always read-only
-  - HTML output uses ZIP download URL `/s/<token>/download` and hides the permissions row.
-- File queue input now accepts Explorer drag & drop for files and folders across the full file step (queue and action area), not only through the add buttons.
-- Optional separate password-mail flow:
-  - requires the optional NC Connector backend plus an active seat assigned to the current user
-  - hide inline password in main HTML block
-  - send password in a follow-up email after successful primary send
-  - fallback to a prefilled manual draft if auto-send fails.
+## Talk
 
-### Administration & compliance
-- Login Flow V2 (app password is created automatically) and central options (base URL, debug mode, sharing paths, defaults for Sharing/Talk).
-- Optional NC Connector backend status/policy contract:
-  - checked on Talk wizard open, Sharing wizard open, and Settings open/save
-  - valid active seat enables backend policy values and admin locks
-- missing backend / no seat / invalid seat / expired grace time falls back to local settings
-  - invalid seat states remain visible in the UI so users can contact their administrator
-- central backend email signatures are applied only for the Outlook sender account matching the Nextcloud user email; other Outlook signatures remain untouched
-- if an older backend exposes Share/Talk policy but no `policy.email_signature` domain yet, only central signatures stay disabled and Settings shows a backend update hint
-- backend share/Talk templates are only activated when the language override is set to `Custom`
-- `Custom` is only shown when the NC Connector backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
-- if `Custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
-- Full localization (see [`Translations.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md)) and structured debug logs for support cases.
+An Outlook appointment can create a Nextcloud Talk room directly. The dialog supports lobby, password, room type, and moderation.
 
-## Language & translations
+NC Connector can sync appointment changes back to the room and add invited attendees. Deleting saved Talk appointments removes rooms only when this behavior is explicitly enabled.
 
-- The UI language follows the Outlook/Office UI language. If Outlook is set to **Use system settings**, this usually matches the Windows display language.
-- Supported languages are documented in [`Translations.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md). Fallback is `de`, then `en`.
+## Signatures
 
-### Language overrides (text blocks)
+With the backend, Outlook can insert managed email signatures or remove local signatures when the policy says so. NC Connector only touches the signature for the matching sender address. Signatures from other accounts stay untouched.
 
-In Settings under **Advanced**, you can choose the language for inserted text blocks independently of the UI language:
-
-- **Sharing HTML block** (email): language of the formatted HTML block inserted when sharing.
-- **Talk description text** (appointment): language of the inserted text (e.g., password line / help link).
-
-Option `Default (UI)` uses the current UI language (including fallbacks).
-
-Option `Custom` is only shown when the NC Connector backend endpoint exists. It becomes selectable only when the effective backend policy for the respective domain is actually `custom` and a backend template is present. Otherwise it stays disabled and Outlook keeps using the local UI-default block.
-
-## System requirements
-
-- Windows 10 or Windows 11 (64-bit)
-- Microsoft Outlook classic >= 2019
-- .NET Framework 4.7.2 Runtime
-- Nextcloud Server with Talk and Files Sharing apps
-
-## Installation and updates
+## Installation
 
 1. Close Outlook.
-2. Run the latest MSI (for example `NCConnectorForOutlook-3.1.0.msi`) and confirm the UAC prompt (administrator rights are required). The setup configures URLACL and all required registry keys for IFB.
-3. Start Outlook and click **NC Connector → Settings** in the ribbon.
-4. Choose the login mode, run the connection test, and save. If the test succeeds, IFB is active automatically.
-5. Verify the filelink base directory and enable debug logging if needed.
-6. Optional: in `Settings -> IFB`, set a custom local IFB port (default is `7777`).
+2. Install the latest MSI from [GitHub Releases](https://github.com/nc-connector/NC_Connector_for_Outlook/releases).
+3. Start Outlook and open **NC Connector -> Settings**.
+4. Enter the Nextcloud URL.
+5. Use Login with Nextcloud or enter an app password manually.
+6. Test the connection and save.
 
-Updates are applied by installing a MSI package over the existing installation (same, older, or newer version). Personal settings are kept and migrated to profile-based XML files (`settings_<OutlookProfile>.xml`) under `%LOCALAPPDATA%\NC4OL`. Uninstall removes the add-in, stops the IFB listener, and resets the registry values.
+Updates are installed by running the new MSI over the existing installation. Personal settings are kept.
 
-### Release 3.1.0 operational notes
+## Requirements
 
-- Runtime artifacts are consolidated in `%LOCALAPPDATA%\NC4OL`:
-  - settings files (`settings_<OutlookProfile>.xml`)
-  - IFB/system-addressbook cache
-  - daily debug logs (`addin-runtime.log_YYYYMMDD`, keep latest 7 and remove >30 days best effort)
-- The local IFB listener port is now configurable in `Settings -> IFB`; diagnostics and manual URLACL checks should use the effective configured port instead of assuming `7777`.
-- Legacy INI settings from older builds are migrated on first start and removed after successful migration.
-- TLS mode can be switched live in Settings (`OS default`, `TLS 1.2`, `TLS 1.3`, or `TLS 1.2 + 1.3`) and is applied immediately to runtime networking.
-- Settings connectivity operations (connection test and login flow) force a fresh HTTP/TLS handshake, so TLS-mode checks are not masked by pooled keep-alive sockets.
-- Backend-managed email signatures apply only when the Outlook sender identity matches the Nextcloud user email from policy. Other Outlook accounts and their local signatures are left untouched.
-- Inline replies and forwards expose the `Insert Nextcloud share` action on the Message tab and keep write space above the inserted share block.
-- Large file uploads use Nextcloud chunked WebDAV upload v2 and show per-file upload speed in the sharing wizard.
-- Attachment-mode compose shares arm server-side cleanup immediately after share creation and clear cleanup only after confirmed successful mail send.
-- If separate password mail is enabled, the main mail hides inline password information and password follow-up dispatch is triggered only after confirmed successful primary send. The follow-up mail keeps the captured sender identity, receives the backend signature when policy and sender match, and opens a manual fallback draft if automatic send fails. This feature is only available with backend endpoint + active assigned seat.
-- Saved Talk appointment deletion is opt-in: generic Talk URLs in appointment fields are ignored, while cleanup for discarded unsaved appointments remains active.
-- Outlook Talk metadata is local-only. The add-in does not patch server-side calendar `.ics` objects for Talk metadata.
+- Windows 10 or Windows 11
+- Outlook classic 2019 or newer
+- .NET Framework 4.7.2
+- Nextcloud with Files Sharing
+- for Talk features: Nextcloud Talk
+- for Secret-link password delivery: Nextcloud Secrets and NC Connector Backend
+
+## Language
+
+The UI language follows the Outlook/Office language. Supported languages are documented in [`Translations.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md). Fallback is German, then English.
+
+Text blocks for shares and Talk can be configured independently from the UI language. Backend templates are used only when the backend is available and the policy allows them.
 
 ## Troubleshooting
 
-- **Debug log**: enable it in the *Debug* tab for verbose traces. Log file format: `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`. With debug enabled, attachment pre-add decisions/fallback reasons are included. Runtime exceptions are written there even when debug logging is disabled. The `Anonymize logs` switch is enabled by default.
-- **Add-in not visible**: installation must be run with admin rights. Check `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn` and optionally run a repair from an elevated prompt: `msiexec /i "NCConnectorForOutlook-3.1.0.msi" ADDLOCAL=ALL`.
-- **Test IFB**: use the configured IFB port from `Settings -> IFB` (default `7777`): `powershell -Command "Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/freebusy/<mail>.vfb -UseBasicParsing"`. If behavior differs, verify the registry under `HKCU\Software\Microsoft\Office\<Version>\Outlook\Options\Calendar`.
-- **Check TLS/proxy**: `powershell -Command "Test-NetConnection <your-domain> -Port 443"`. If you see SSL warnings, verify certificates/proxy settings. You can switch TLS mode at runtime in `Settings -> Advanced -> Transport security (TLS)` (`OS default` or forced TLS versions like 1.2/1.3). Connection test/login flow use fresh handshakes, so TLS mode changes are evaluated directly. If secure-channel errors still occur, check certificate trust, TLS-inspecting proxies, DNS, and machine TLS/Schannel policy before considering machine-wide registry/GPO overrides.
-- **Attachment automation does not trigger for large files**: In Microsoft 365 / Exchange environments, Outlook can block attachments before add-in events fire (for example due to server-side size limits). In those cases, use the **`Insert Nextcloud share`** button.
-- **Sharing errors**: the debug log includes HTTP status codes and exception details. Required wizard fields are validated.
+Debug logs can be enabled in Settings. Files are written to:
+
+`%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
+
+Anonymization is enabled by default and masks server URL, credentials, email addresses, and local user path fragments.
+
+For common setup, IFB, and backend policy issues, see the [Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md).
+
+## More documentation
+
+- [Changelog](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/CHANGELOG.md)
+- [Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md)
+- [Development Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md)
+- [Third-party licenses](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md)
 
 ## Screenshots
 
 <details>
 <summary><strong>Settings</strong></summary>
 
-| <a href="Screenshots/settings.jpg"><img src="Screenshots/settings.jpg" alt="Settings dialog" width="230"></a> |
+| <a href="Screenshots/settings.jpg"><img src="Screenshots/settings.jpg" alt="Settings" width="230"></a> |
 | --- |
 
 </details>
 
 <details>
-<summary><strong>Talk link workflow</strong></summary>
+<summary><strong>Talk link</strong></summary>
 
 | <a href="Screenshots/1_talk.jpg"><img src="Screenshots/1_talk.jpg" alt="Talk step 1" width="230"></a> | <a href="Screenshots/2_talk.jpg"><img src="Screenshots/2_talk.jpg" alt="Talk step 2" width="230"></a> |
 | --- | --- |
@@ -184,5 +128,3 @@ Updates are applied by installing a MSI package over the existing installation (
 | --- |
 
 </details>
-
-
