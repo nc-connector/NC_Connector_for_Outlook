@@ -94,6 +94,7 @@ Was das Script macht:
    - Inline-Antwort/-Weiterleitung: **Nachricht → NC Connector → Nextcloud Freigabe hinzufügen**
 5) Optional: IFB in Settings aktivieren, Port pruefen (`Einstellungen -> IFB`, Standard `7777`) und Endpunkt testen
    - `Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/ -UseBasicParsing`
+6) Einstellungen -> Erweitert: `Jetzt prüfen` ausführen und kontrollieren, dass aktuelle Version, letzte Prüfung, Download-Link und Änderungsübersicht angezeigt werden.
 
 ## Logging
 
@@ -166,6 +167,13 @@ Services:
 - `src/NcTalkOutlookAddIn/Services/NcHttpClient.cs` (zentraler Request-Executor fuer Auth-Header, OCS-Header, Timeout/Decompression und optionalen Fresh-Connection-Mode)
   - Alle Runtime-HTTP-Aufrufe (Talk, Share/DAV, IFB, Login-Flow, Moderator-Avatar-Fetch) laufen zentral ueber `NcHttpClient`.
 - `src/NcTalkOutlookAddIn/Services/EmailSignaturePolicyService.cs` (loest Backend-E-Mail-Signatur-Policy gegen lokale Settings und Lock-State auf)
+- `src/NcTalkOutlookAddIn/Services/UpdateCheckService.cs` (fragt einmal pro Tag `nc-connector.de` nach Outlook-Release-Metadaten und speichert das Ergebnis in den Profil-Settings)
+
+Update-Check:
+
+- Endpoint: `GET https://nc-connector.de/wp-json/ncc/v1/update-check`
+- Gesendet werden Produkt, installierte Version, Kanal und ein taeglich wechselnder anonymer Client-Hash.
+- Downloads zeigen direkt auf GitHub-Release-Dateien; die Homepage zaehlt nur taegliche Installationen und liefert Release-Metadaten.
 
 UI:
 

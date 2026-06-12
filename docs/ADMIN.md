@@ -29,6 +29,9 @@ Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon 
 - Updates/reinstalls are performed by installing an MSI package over the existing installation (same, older, or newer version).
 - The MSI is configured as a **major upgrade** (stable `UpgradeCode`) so an existing installation is replaced automatically.
 - User settings are kept because they are stored in the user profile.
+- Outlook checks `nc-connector.de` once per day for release metadata. Downloads open GitHub release assets directly; the MSI is not downloaded through the homepage.
+- The startup popup is opt-in (`Settings -> Advanced -> Inform me about new versions`). The Advanced tab still shows the cached latest version, download link, and changelog summary.
+- The update request sends product, installed version, channel, and a daily anonymous client hash. It does not send Nextcloud URLs, email addresses, usernames, passwords, license keys, or tenant data.
 
 ## Files & registry
 
@@ -85,6 +88,12 @@ Legacy migration on first start:
   <IfbCacheHours>24</IfbCacheHours>
   <DebugLoggingEnabled>false</DebugLoggingEnabled>
   <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
+  <UpdateNotifyEnabled>false</UpdateNotifyEnabled>
+  <UpdateInstallId>LOCAL_RANDOM_ID</UpdateInstallId>
+  <UpdateLastCheckedAtUtc>2026-06-12T08:00:00.0000000Z</UpdateLastCheckedAtUtc>
+  <UpdateLatestVersion>3.1.1</UpdateLatestVersion>
+  <UpdateReleaseUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/tag/v3.1.1</UpdateReleaseUrl>
+  <UpdateDownloadUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/download/v3.1.1/NCConnectorForOutlook-3.1.1.msi</UpdateDownloadUrl>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
   <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
   <EmailSignatureOnCompose>true</EmailSignatureOnCompose>

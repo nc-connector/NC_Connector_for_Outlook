@@ -507,6 +507,26 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TransportTlsSelectionRequired { get { return Get("options_tls_selection_required", "When OS default TLS policy is disabled, enable at least one TLS version (1.2 or 1.3)."); } }
         internal static string LanguageOverrideDefaultOption { get { return Get("options_lang_default", "Default (UI)"); } }
         internal static string LanguageOverrideCustomOption { get { return Get("options_lang_custom", "Custom (backend template)"); } }
+        internal static string UpdateSettingsHeading { get { return Get("options_update_heading", "Updates"); } }
+        internal static string UpdateNotifyLabel { get { return Get("options_update_notify_label", "Inform me about new versions"); } }
+        internal static string UpdateInstalledVersionFormat { get { return Get("options_update_installed_format", "Installed version: {0}"); } }
+        internal static string UpdateLatestVersionFormat { get { return Get("options_update_latest_format", "Latest version: {0}"); } }
+        internal static string UpdateLastCheckedFormat { get { return Get("options_update_last_checked_format", "Last check: {0}"); } }
+        internal static string UpdateNotChecked { get { return Get("options_update_not_checked", "not checked yet"); } }
+        internal static string UpdateCheckNowButton { get { return Get("options_update_check_now", "Check now"); } }
+        internal static string UpdateDownloadLink { get { return Get("options_update_download", "GitHub download"); } }
+        internal static string UpdateNoDownloadLink { get { return Get("options_update_no_download", "No download available"); } }
+        internal static string UpdateChangelogHeading { get { return Get("options_update_changelog_heading", "What is new"); } }
+        internal static string UpdateChangelogEmpty { get { return Get("options_update_changelog_empty", "No changelog summary available yet."); } }
+        internal static string UpdateCheckRunning { get { return Get("options_update_check_running", "Checking for updates..."); } }
+        internal static string UpdateCheckFailedFormat { get { return Get("options_update_check_failed_format", "Update check failed: {0}"); } }
+        internal static string UpdateNoUpdateAvailable { get { return Get("options_update_no_update", "You are using the latest version."); } }
+        internal static string UpdateAvailableStatusFormat { get { return Get("options_update_available_status_format", "Version {0} is available."); } }
+        internal static string UpdateAvailableTitle { get { return Get("options_update_available_title", "NC Connector update available"); } }
+        internal static string UpdateAvailableMessageFormat { get { return Get("options_update_available_message_format", "NC Connector {0} is available.\n\n{1}\n\nOpen the GitHub download now?"); } }
+        internal static string UpdateChangelogAdded { get { return Get("options_update_changelog_added", "Added"); } }
+        internal static string UpdateChangelogChanged { get { return Get("options_update_changelog_changed", "Changed"); } }
+        internal static string UpdateChangelogFixed { get { return Get("options_update_changelog_fixed", "Fixed"); } }
 
         internal static string ButtonSave { get { return Get("options_save_button", "Save"); } }
         internal static string ButtonCancel { get { return Get("ui_button_cancel", "Cancel"); } }

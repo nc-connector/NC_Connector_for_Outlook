@@ -9,7 +9,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Settings
 {
-        // Persistent add-in settings (credentials, sharing/IFB options, etc.).
+    // Persistent add-in settings (credentials, sharing/IFB options, etc.).
     internal class AddinSettings
     {
         internal const int DefaultIfbPort = 7777;
@@ -34,6 +34,17 @@ namespace NcTalkOutlookAddIn.Settings
             TransportTlsEnable12 = true;
             TransportTlsEnable13 = false;
             LastKnownServerVersion = string.Empty;
+            UpdateNotifyEnabled = false;
+            UpdateInstallId = string.Empty;
+            UpdateLastCheckedAtUtc = string.Empty;
+            UpdateLatestVersion = string.Empty;
+            UpdateReleaseUrl = string.Empty;
+            UpdateDownloadUrl = string.Empty;
+            UpdatePublishedAt = string.Empty;
+            UpdateChangelogTitle = string.Empty;
+            UpdateChangelogText = string.Empty;
+            UpdateLastNotifiedVersion = string.Empty;
+            UpdateLastNotifiedDateUtc = string.Empty;
             FileLinkBasePath = DefaultFileLinkBasePath;
             SharingDefaultShareName = Strings.SharingDefaultShareNameLabel;
             SharingDefaultPermCreate = false;
@@ -90,7 +101,30 @@ namespace NcTalkOutlookAddIn.Settings
 
         public string LastKnownServerVersion { get; set; }
 
+        public bool UpdateNotifyEnabled { get; set; }
+
+        public string UpdateInstallId { get; set; }
+
+        public string UpdateLastCheckedAtUtc { get; set; }
+
+        public string UpdateLatestVersion { get; set; }
+
+        public string UpdateReleaseUrl { get; set; }
+
+        public string UpdateDownloadUrl { get; set; }
+
+        public string UpdatePublishedAt { get; set; }
+
+        public string UpdateChangelogTitle { get; set; }
+
+        public string UpdateChangelogText { get; set; }
+
+        public string UpdateLastNotifiedVersion { get; set; }
+
+        public string UpdateLastNotifiedDateUtc { get; set; }
+
         public string FileLinkBasePath { get; set; }
+
 
         public string SharingDefaultShareName { get; set; }
 

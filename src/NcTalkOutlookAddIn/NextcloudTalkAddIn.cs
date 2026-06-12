@@ -54,6 +54,7 @@ namespace NcTalkOutlookAddIn
         private readonly FileLinkLaunchController _fileLinkLaunchController;
         private readonly TalkRibbonController _talkRibbonController;
         private readonly MailInteropController _mailInteropController;
+        private readonly UpdateCheckService _updateCheckService = new UpdateCheckService();
         private readonly DeferredAppointmentEnsureState _deferredAppointmentEnsureState = new DeferredAppointmentEnsureState();
         private SynchronizationContext _uiSynchronizationContext;
         private IRibbonUI _ribbonUi;

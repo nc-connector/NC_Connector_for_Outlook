@@ -1447,5 +1447,65 @@
   },
   "sharing_password_delivery_unavailable_tooltip": {
     "message": "Nextcloud Secrets is niet beschikbaar. Platte tekst wordt gebruikt."
+  },
+  "options_update_heading": {
+    "message": "Updates"
+  },
+  "options_update_notify_label": {
+    "message": "Informeer mij over nieuwe versies"
+  },
+  "options_update_installed_format": {
+    "message": "Geïnstalleerde versie: $1"
+  },
+  "options_update_latest_format": {
+    "message": "Nieuwste versie: $1"
+  },
+  "options_update_last_checked_format": {
+    "message": "Laatste controle: $1"
+  },
+  "options_update_not_checked": {
+    "message": "nog niet gecontroleerd"
+  },
+  "options_update_check_now": {
+    "message": "Nu controleren"
+  },
+  "options_update_download": {
+    "message": "GitHub-download"
+  },
+  "options_update_no_download": {
+    "message": "Geen download beschikbaar"
+  },
+  "options_update_changelog_heading": {
+    "message": "Wat is nieuw"
+  },
+  "options_update_changelog_empty": {
+    "message": "Nog geen wijzigingsoverzicht beschikbaar."
+  },
+  "options_update_check_running": {
+    "message": "Controleren op updates..."
+  },
+  "options_update_check_failed_format": {
+    "message": "Updatecontrole mislukt: $1"
+  },
+  "options_update_no_update": {
+    "message": "U gebruikt de huidige versie."
+  },
+  "options_update_available_status_format": {
+    "message": "Versie $1 is beschikbaar."
+  },
+  "options_update_available_title": {
+    "message": "NC Connector-update beschikbaar"
+  },
+  "options_update_available_message_format": {
+    "message": "NC Connector $1 is beschikbaar.\n\n$2\n\nGitHub-download nu openen?"
+  },
+  "options_update_changelog_added": {
+    "message": "Toegevoegd"
+  },
+  "options_update_changelog_changed": {
+    "message": "Gewijzigd"
+  },
+  "options_update_changelog_fixed": {
+    "message": "Opgelost"
   }
 }

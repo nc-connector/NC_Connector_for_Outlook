@@ -1447,5 +1447,65 @@
   },
   "sharing_password_delivery_unavailable_tooltip": {
     "message": "Nextcloud Secrets jest niedostępny. Zostanie użyty zwykły tekst."
+  },
+  "options_update_heading": {
+    "message": "Aktualizacje"
+  },
+  "options_update_notify_label": {
+    "message": "Informuj mnie o nowych wersjach"
+  },
+  "options_update_installed_format": {
+    "message": "Zainstalowana wersja: $1"
+  },
+  "options_update_latest_format": {
+    "message": "Najnowsza wersja: $1"
+  },
+  "options_update_last_checked_format": {
+    "message": "Ostatnie sprawdzenie: $1"
+  },
+  "options_update_not_checked": {
+    "message": "jeszcze nie sprawdzono"
+  },
+  "options_update_check_now": {
+    "message": "Sprawdź teraz"
+  },
+  "options_update_download": {
+    "message": "Pobieranie z GitHub"
+  },
+  "options_update_no_download": {
+    "message": "Brak dostępnego pobrania"
+  },
+  "options_update_changelog_heading": {
+    "message": "Co nowego"
+  },
+  "options_update_changelog_empty": {
+    "message": "Podsumowanie zmian nie jest jeszcze dostępne."
+  },
+  "options_update_check_running": {
+    "message": "Sprawdzanie aktualizacji..."
+  },
+  "options_update_check_failed_format": {
+    "message": "Sprawdzanie aktualizacji nie powiodło się: $1"
+  },
+  "options_update_no_update": {
+    "message": "Używasz aktualnej wersji."
+  },
+  "options_update_available_status_format": {
+    "message": "Dostępna jest wersja $1."
+  },
+  "options_update_available_title": {
+    "message": "Dostępna aktualizacja NC Connector"
+  },
+  "options_update_available_message_format": {
+    "message": "Dostępny jest NC Connector $1.\n\n$2\n\nOtworzyć teraz pobieranie z GitHub?"
+  },
+  "options_update_changelog_added": {
+    "message": "Dodano"
+  },
+  "options_update_changelog_changed": {
+    "message": "Zmieniono"
+  },
+  "options_update_changelog_fixed": {
+    "message": "Naprawiono"
   }
 }

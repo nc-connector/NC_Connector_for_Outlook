@@ -461,6 +461,17 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TransportTlsEnable12", settings.TransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable13", settings.TransportTlsEnable13.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "LastKnownServerVersion", Safe(settings.LastKnownServerVersion));
+            AppendElement(document, root, "UpdateNotifyEnabled", settings.UpdateNotifyEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "UpdateInstallId", Safe(settings.UpdateInstallId));
+            AppendElement(document, root, "UpdateLastCheckedAtUtc", Safe(settings.UpdateLastCheckedAtUtc));
+            AppendElement(document, root, "UpdateLatestVersion", Safe(settings.UpdateLatestVersion));
+            AppendElement(document, root, "UpdateReleaseUrl", Safe(settings.UpdateReleaseUrl));
+            AppendElement(document, root, "UpdateDownloadUrl", Safe(settings.UpdateDownloadUrl));
+            AppendElement(document, root, "UpdatePublishedAt", Safe(settings.UpdatePublishedAt));
+            AppendElement(document, root, "UpdateChangelogTitle", Safe(settings.UpdateChangelogTitle));
+            AppendElement(document, root, "UpdateChangelogText", Safe(settings.UpdateChangelogText));
+            AppendElement(document, root, "UpdateLastNotifiedVersion", Safe(settings.UpdateLastNotifiedVersion));
+            AppendElement(document, root, "UpdateLastNotifiedDateUtc", Safe(settings.UpdateLastNotifiedDateUtc));
             AppendElement(document, root, "FileLinkBasePath", Safe(settings.FileLinkBasePath));
             AppendElement(document, root, "SharingDefaultShareName", Safe(settings.SharingDefaultShareName));
             AppendElement(document, root, "SharingDefaultPermCreate", settings.SharingDefaultPermCreate.ToString(CultureInfo.InvariantCulture));
@@ -591,6 +602,43 @@ namespace NcTalkOutlookAddIn.Settings
                     break;
                 case "LastKnownServerVersion":
                     settings.LastKnownServerVersion = value;
+                    break;
+                case "UpdateNotifyEnabled":
+                    bool updateNotifyEnabled;
+                    if (bool.TryParse(value, out updateNotifyEnabled))
+                    {
+                        settings.UpdateNotifyEnabled = updateNotifyEnabled;
+                    }
+                    break;
+                case "UpdateInstallId":
+                    settings.UpdateInstallId = value;
+                    break;
+                case "UpdateLastCheckedAtUtc":
+                    settings.UpdateLastCheckedAtUtc = value;
+                    break;
+                case "UpdateLatestVersion":
+                    settings.UpdateLatestVersion = value;
+                    break;
+                case "UpdateReleaseUrl":
+                    settings.UpdateReleaseUrl = value;
+                    break;
+                case "UpdateDownloadUrl":
+                    settings.UpdateDownloadUrl = value;
+                    break;
+                case "UpdatePublishedAt":
+                    settings.UpdatePublishedAt = value;
+                    break;
+                case "UpdateChangelogTitle":
+                    settings.UpdateChangelogTitle = value;
+                    break;
+                case "UpdateChangelogText":
+                    settings.UpdateChangelogText = value;
+                    break;
+                case "UpdateLastNotifiedVersion":
+                    settings.UpdateLastNotifiedVersion = value;
+                    break;
+                case "UpdateLastNotifiedDateUtc":
+                    settings.UpdateLastNotifiedDateUtc = value;
                     break;
                 case "FileLinkBasePath":
                     settings.FileLinkBasePath = value;

@@ -1447,5 +1447,65 @@
   },
   "sharing_password_delivery_unavailable_tooltip": {
     "message": "A Nextcloud Secrets nem érhető el. Egyszerű szöveg lesz használva."
+  },
+  "options_update_heading": {
+    "message": "Frissítések"
+  },
+  "options_update_notify_label": {
+    "message": "Értesítsen az új verziókról"
+  },
+  "options_update_installed_format": {
+    "message": "Telepített verzió: $1"
+  },
+  "options_update_latest_format": {
+    "message": "Legújabb verzió: $1"
+  },
+  "options_update_last_checked_format": {
+    "message": "Utolsó ellenőrzés: $1"
+  },
+  "options_update_not_checked": {
+    "message": "még nincs ellenőrizve"
+  },
+  "options_update_check_now": {
+    "message": "Ellenőrzés most"
+  },
+  "options_update_download": {
+    "message": "GitHub letöltés"
+  },
+  "options_update_no_download": {
+    "message": "Nincs elérhető letöltés"
+  },
+  "options_update_changelog_heading": {
+    "message": "Újdonságok"
+  },
+  "options_update_changelog_empty": {
+    "message": "Még nincs elérhető változásösszefoglaló."
+  },
+  "options_update_check_running": {
+    "message": "Frissítések keresése..."
+  },
+  "options_update_check_failed_format": {
+    "message": "A frissítésellenőrzés sikertelen: $1"
+  },
+  "options_update_no_update": {
+    "message": "A legújabb verziót használja."
+  },
+  "options_update_available_status_format": {
+    "message": "Elérhető a(z) $1 verzió."
+  },
+  "options_update_available_title": {
+    "message": "NC Connector frissítés érhető el"
+  },
+  "options_update_available_message_format": {
+    "message": "Elérhető az NC Connector $1.\n\n$2\n\nMegnyitja most a GitHub letöltést?"
+  },
+  "options_update_changelog_added": {
+    "message": "Hozzáadva"
+  },
+  "options_update_changelog_changed": {
+    "message": "Módosítva"
+  },
+  "options_update_changelog_fixed": {
+    "message": "Javítva"
   }
 }

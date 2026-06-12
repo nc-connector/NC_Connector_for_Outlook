@@ -1447,5 +1447,65 @@
   },
   "sharing_password_delivery_unavailable_tooltip": {
     "message": "Nextcloud Secrets 不可用。将使用纯文本。"
+  },
+  "options_update_heading": {
+    "message": "更新"
+  },
+  "options_update_notify_label": {
+    "message": "有新版本时通知我"
+  },
+  "options_update_installed_format": {
+    "message": "已安装版本：$1"
+  },
+  "options_update_latest_format": {
+    "message": "最新版本：$1"
+  },
+  "options_update_last_checked_format": {
+    "message": "上次检查：$1"
+  },
+  "options_update_not_checked": {
+    "message": "尚未检查"
+  },
+  "options_update_check_now": {
+    "message": "立即检查"
+  },
+  "options_update_download": {
+    "message": "GitHub 下载"
+  },
+  "options_update_no_download": {
+    "message": "没有可用下载"
+  },
+  "options_update_changelog_heading": {
+    "message": "更新内容"
+  },
+  "options_update_changelog_empty": {
+    "message": "暂时没有变更摘要。"
+  },
+  "options_update_check_running": {
+    "message": "正在检查更新..."
+  },
+  "options_update_check_failed_format": {
+    "message": "更新检查失败：$1"
+  },
+  "options_update_no_update": {
+    "message": "您正在使用当前版本。"
+  },
+  "options_update_available_status_format": {
+    "message": "版本 $1 可用。"
+  },
+  "options_update_available_title": {
+    "message": "NC Connector 有可用更新"
+  },
+  "options_update_available_message_format": {
+    "message": "NC Connector $1 可用。\n\n$2\n\n现在打开 GitHub 下载？"
+  },
+  "options_update_changelog_added": {
+    "message": "新增"
+  },
+  "options_update_changelog_changed": {
+    "message": "变更"
+  },
+  "options_update_changelog_fixed": {
+    "message": "修复"
   }
 }

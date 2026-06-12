@@ -119,6 +119,7 @@ Key code locations:
   - `Services/NcHttpClient.cs` is the shared request executor for auth headers, OCS headers, timeout/decompression, and optional fresh-connection mode.
   - All runtime HTTP calls (Talk, share/DAV, IFB, login flow, moderator avatar fetch) are routed through `NcHttpClient`.
   - `Services/EmailSignaturePolicyService.cs` resolves backend email-signature policy values against local settings and lock state.
+  - `Services/UpdateCheckService.cs` checks `nc-connector.de` once per day for Outlook release metadata and stores the cached result in profile settings.
 - `src/NcTalkOutlookAddIn/UI/` — WinForms dialogs and wizards
   - `UI/ScaledForm.cs` is the shared DPI-scaling base for forms that use logical pixel layout helpers.
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model + storage
@@ -170,6 +171,7 @@ Runtime rules:
   - `Services/FileLinkService.cs` uploads via WebDAV and creates shares via OCS.
   - `Services/FreeBusyServer.cs` hosts the local IFB HTTP endpoint.
   - `Services/FreeBusyManager.cs` updates Outlook registry keys to point to the local IFB endpoint.
+  - `Services/UpdateCheckService.cs` performs the homepage update check without blocking Outlook startup.
 - **UI**
   - `UI/SettingsForm.cs` configures base URL, authentication, sharing defaults, IFB, and debug logging.
   - `UI/TalkLinkForm.cs` is the Talk wizard.
@@ -307,6 +309,12 @@ IFB (DAV via proxy):
 - Local listener: `http://127.0.0.1:<ifb-port>/nc-ifb/...` (default `<ifb-port>=7777`)
 - The proxy talks to CalDAV and Addressbook endpoints under `remote.php/dav/...`
 
+Update check:
+
+- Homepage endpoint: `GET https://nc-connector.de/wp-json/ncc/v1/update-check`
+- Query values: `product=outlook`, installed version, channel, and a daily rotating client hash.
+- Downloads still point directly to GitHub release assets. The homepage only returns release metadata and counts one anonymous client per day.
+
 ## Localization (i18n)
 
 - Locale files:
@@ -433,6 +441,7 @@ Note: there is currently no automated test suite in this repository. Use the smo
 5. Mail: run the sharing wizard, upload 1–2 small files, insert the HTML block, and send to yourself.
 6. IFB: enable IFB, then verify the local endpoint responds:
    - `Invoke-WebRequest http://127.0.0.1:<ifb-port>/nc-ifb/ -UseBasicParsing`
+7. Settings -> Advanced: click `Check now` and verify that latest version, last check, download link, and changelog summary update without blocking Outlook.
 
 ## X-NCTALK-* property reference
 

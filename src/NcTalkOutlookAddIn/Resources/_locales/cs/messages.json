@@ -1447,5 +1447,65 @@
   },
   "sharing_password_delivery_unavailable_tooltip": {
     "message": "Nextcloud Secrets není k dispozici. Použije se prostý text."
+  },
+  "options_update_heading": {
+    "message": "Aktualizace"
+  },
+  "options_update_notify_label": {
+    "message": "Upozornit mě na nové verze"
+  },
+  "options_update_installed_format": {
+    "message": "Nainstalovaná verze: $1"
+  },
+  "options_update_latest_format": {
+    "message": "Nejnovější verze: $1"
+  },
+  "options_update_last_checked_format": {
+    "message": "Poslední kontrola: $1"
+  },
+  "options_update_not_checked": {
+    "message": "zatím nezkontrolováno"
+  },
+  "options_update_check_now": {
+    "message": "Zkontrolovat nyní"
+  },
+  "options_update_download": {
+    "message": "Stažení z GitHubu"
+  },
+  "options_update_no_download": {
+    "message": "Není dostupné žádné stažení"
+  },
+  "options_update_changelog_heading": {
+    "message": "Co je nového"
+  },
+  "options_update_changelog_empty": {
+    "message": "Souhrn změn zatím není k dispozici."
+  },
+  "options_update_check_running": {
+    "message": "Kontrolují se aktualizace..."
+  },
+  "options_update_check_failed_format": {
+    "message": "Kontrola aktualizací selhala: $1"
+  },
+  "options_update_no_update": {
+    "message": "Používáte aktuální verzi."
+  },
+  "options_update_available_status_format": {
+    "message": "Je dostupná verze $1."
+  },
+  "options_update_available_title": {
+    "message": "Je dostupná aktualizace NC Connector"
+  },
+  "options_update_available_message_format": {
+    "message": "Je dostupný NC Connector $1.\n\n$2\n\nOtevřít stažení z GitHubu nyní?"
+  },
+  "options_update_changelog_added": {
+    "message": "Přidáno"
+  },
+  "options_update_changelog_changed": {
+    "message": "Změněno"
+  },
+  "options_update_changelog_fixed": {
+    "message": "Opraveno"
   }
 }
