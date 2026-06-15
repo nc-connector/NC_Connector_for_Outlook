@@ -1869,33 +1869,40 @@ namespace NcTalkOutlookAddIn.UI
             string policyString;
 
             policyString = _backendPolicyStatus.GetPolicyString("share", "share_base_directory");
-            if (!string.IsNullOrWhiteSpace(policyString))
+            if (IsPolicyLocked("share", "share_base_directory")
+                && !string.IsNullOrWhiteSpace(policyString))
             {
                 _fileLinkBaseTextBox.Text = policyString;
             }
 
             policyString = _backendPolicyStatus.GetPolicyString("share", "share_name_template");
-            if (!string.IsNullOrWhiteSpace(policyString))
+            if (IsPolicyLocked("share", "share_name_template")
+                && !string.IsNullOrWhiteSpace(policyString))
             {
                 _sharingDefaultShareNameTextBox.Text = policyString;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
+            if (IsPolicyLocked("share", "share_permission_upload")
+                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
             {
                 _sharingDefaultPermCreateCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_edit", out policyBool))
+            if (IsPolicyLocked("share", "share_permission_edit")
+                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_edit", out policyBool))
             {
                 _sharingDefaultPermWriteCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_permission_delete", out policyBool))
+            if (IsPolicyLocked("share", "share_permission_delete")
+                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_delete", out policyBool))
             {
                 _sharingDefaultPermDeleteCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_set_password", out policyBool))
+            if (IsPolicyLocked("share", "share_set_password")
+                && _backendPolicyStatus.TryGetPolicyBool("share", "share_set_password", out policyBool))
             {
                 _sharingDefaultPasswordCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("share", "share_send_password_separately", out policyBool))
+            if (IsPolicyLocked("share", "share_send_password_separately")
+                && _backendPolicyStatus.TryGetPolicyBool("share", "share_send_password_separately", out policyBool))
             {
                 _sharingDefaultPasswordSeparateCheckBox.Checked = policyBool;
             }
@@ -1911,27 +1918,32 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _sharingDefaultPasswordSeparateCheckBox.Checked = false;
             }
-            if (_backendPolicyStatus.TryGetPolicyInt("share", "share_expire_days", out policyInt))
+            if (IsPolicyLocked("share", "share_expire_days")
+                && _backendPolicyStatus.TryGetPolicyInt("share", "share_expire_days", out policyInt))
             {
                 decimal clamped = Math.Max(_sharingDefaultExpireDaysUpDown.Minimum, Math.Min(_sharingDefaultExpireDaysUpDown.Maximum, policyInt));
                 _sharingDefaultExpireDaysUpDown.Value = clamped;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
+            if (IsPolicyLocked("share", "attachments_always_via_ncconnector")
+                && _backendPolicyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
             {
                 _sharingAttachmentsAlwaysCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
+            if (IsPolicyLocked("share", "attachments_min_size_mb"))
             {
-                int normalizedThreshold = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
-                decimal clampedThreshold = Math.Max(
-                    _sharingAttachmentsOfferAboveMbUpDown.Minimum,
-                    Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, normalizedThreshold));
-                _sharingAttachmentsOfferAboveMbUpDown.Value = clampedThreshold;
-                _sharingAttachmentsOfferAboveCheckBox.Checked = true;
-            }
-            else if (_backendPolicyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
-            {
-                _sharingAttachmentsOfferAboveCheckBox.Checked = false;
+                if (_backendPolicyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
+                {
+                    int normalizedThreshold = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
+                    decimal clampedThreshold = Math.Max(
+                        _sharingAttachmentsOfferAboveMbUpDown.Minimum,
+                        Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, normalizedThreshold));
+                    _sharingAttachmentsOfferAboveMbUpDown.Value = clampedThreshold;
+                    _sharingAttachmentsOfferAboveCheckBox.Checked = true;
+                }
+                else if (_backendPolicyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
+                {
+                    _sharingAttachmentsOfferAboveCheckBox.Checked = false;
+                }
             }
 
             policyString = _backendPolicyStatus.GetPolicyString("share", "language_share_html_block");
@@ -1940,27 +1952,33 @@ namespace NcTalkOutlookAddIn.UI
             {
                 SelectLanguageChoice(_shareBlockLangCombo, policyString);
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
+            if (IsPolicyLocked("talk", "talk_set_password")
+                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
             {
                 _talkDefaultPasswordCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_users", out policyBool))
+            if (IsPolicyLocked("talk", "talk_add_users")
+                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_users", out policyBool))
             {
                 _talkDefaultAddUsersCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_guests", out policyBool))
+            if (IsPolicyLocked("talk", "talk_add_guests")
+                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_guests", out policyBool))
             {
                 _talkDefaultAddGuestsCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_lobby_active", out policyBool))
+            if (IsPolicyLocked("talk", "talk_lobby_active")
+                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_lobby_active", out policyBool))
             {
                 _talkDefaultLobbyCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_show_in_search", out policyBool))
+            if (IsPolicyLocked("talk", "talk_show_in_search")
+                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_show_in_search", out policyBool))
             {
                 _talkDefaultSearchCheckBox.Checked = policyBool;
             }
-            if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyBool))
+            if (IsPolicyLocked("talk", "talk_delete_room_on_event_delete")
+                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyBool))
             {
                 _talkDeleteRoomOnEventDeleteCheckBox.Checked = policyBool;
             }
@@ -1984,7 +2002,8 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");
-            if (!string.IsNullOrWhiteSpace(policyString))
+            if (IsPolicyLocked("talk", "talk_room_type")
+                && !string.IsNullOrWhiteSpace(policyString))
             {
                 SelectTalkRoomType(
                     string.Equals(policyString.Trim(), "event", StringComparison.OrdinalIgnoreCase)
