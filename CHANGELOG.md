@@ -4,6 +4,26 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.2.0] - 2026-06-15
+
+### Added
+- Outlook update checks with release notes and a direct GitHub download link.
+- Nextcloud Secrets delivery for separate password mails.
+- Password delivery selection in sharing settings and the sharing wizard.
+- Managed Nextcloud URL setup for administrators.
+
+### Changed
+- Sharing settings layout was cleaned up.
+- Outlook runtime formatting and exception naming were made consistent.
+- README files were shortened and updated.
+
+### Fixed
+- Editable backend policy settings now stay local when the admin allows changes in the add-in.
+- Share blocks stay in the message body when the sender signature changes.
+- Attachment automation race conditions were fixed.
+- Ribbon prefetch no longer blocks the Outlook UI thread.
+- Ribbon callbacks and lobby timers now handle runtime errors without taking Outlook down.
+
 ## [3.1.0] - 2026-05-12
 
 ### Added
