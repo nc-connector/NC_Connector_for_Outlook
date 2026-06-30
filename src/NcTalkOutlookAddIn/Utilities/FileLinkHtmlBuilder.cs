@@ -710,14 +710,15 @@ namespace NcTalkOutlookAddIn.Utilities
                     segment => string.Equals(segment, "s", StringComparison.OrdinalIgnoreCase));
                 if (shareSegmentIndex >= 0 && shareSegmentIndex + 1 < segments.Length)
                 {
-                    token = segments[shareSegmentIndex + 1];
+                    string sharePath = "/" + string.Join("/", segments, 0, shareSegmentIndex + 2);
+                    return BuildAbsoluteUrlFromPath(shareUri, sharePath.TrimEnd('/') + "/download");
                 }
                 if (!string.IsNullOrWhiteSpace(token))
                 {
-                    return shareUri.GetLeftPart(UriPartial.Authority).TrimEnd('/')
-                        + "/s/"
-                        + Uri.EscapeDataString(token)
-                        + "/download";
+                    string basePath = shareUri.AbsolutePath.TrimEnd('/');
+                    return BuildAbsoluteUrlFromPath(
+                        shareUri,
+                        basePath + "/s/" + Uri.EscapeDataString(token) + "/download");
                 }
             }
             catch (Exception ex)
@@ -732,16 +733,26 @@ namespace NcTalkOutlookAddIn.Utilities
             try
             {
                 var shareUri = new Uri(shareUrl, UriKind.Absolute);
-                return shareUri.GetLeftPart(UriPartial.Authority).TrimEnd('/')
-                    + "/s/"
-                    + Uri.EscapeDataString(token)
-                    + "/download";
+                string basePath = shareUri.AbsolutePath.TrimEnd('/');
+                return BuildAbsoluteUrlFromPath(
+                    shareUri,
+                    basePath + "/s/" + Uri.EscapeDataString(token) + "/download");
             }
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to build attachment-mode ZIP download URL from token fallback.", ex);
                 return shareUrl;
             }
+        }
+
+        private static string BuildAbsoluteUrlFromPath(Uri uri, string absolutePath)
+        {
+            string path = absolutePath ?? string.Empty;
+            if (!path.StartsWith("/", StringComparison.Ordinal))
+            {
+                path = "/" + path;
+            }
+            return uri.GetLeftPart(UriPartial.Authority).TrimEnd('/') + path;
         }
 
                 // Renders the permissions badges (checkmarks / red crosses).
