@@ -4,6 +4,11 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.2.1] - 2026-06-30
+
+### Fixed
+- Attachment-mode share links now keep Nextcloud subpaths such as `/nc` in HTML and plain-text share blocks.
+
 ## [3.2.0] - 2026-06-15
 
 ### Added
