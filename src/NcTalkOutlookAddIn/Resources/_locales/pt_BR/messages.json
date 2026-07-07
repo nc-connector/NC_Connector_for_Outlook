@@ -1431,7 +1431,7 @@
     "message": "Se desativado, o NC Connector força as versões TLS selecionadas no runtime do suplemento."
   },
   "options_tls_apply_failed": {
-    "message": "Não foi possível aplicar as configurações TLS selecionadas: $1"
+    "message": "Não foi possível aplicar as configurações TLS selecionadas: {0}"
   },
   "options_tls_selection_required": {
     "message": "Quando a política TLS padrão do sistema operacional estiver desativada, ative pelo menos uma versão TLS (1.2 ou 1.3)."

@@ -1,0 +1,358 @@
+name: Outlook build checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  release-consistency:
+    name: Release consistency
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check release metadata
+        shell: pwsh
+        run: .\tools\ci\Check-ReleaseConsistency.ps1
+
+  locales:
+    name: Locale consistency
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check locale files
+        shell: pwsh
+        run: .\tools\ci\Check-Locales.ps1
+
+  locale-usage:
+    name: Locale usage
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check code-used locale keys
+        shell: pwsh
+        run: .\tools\ci\Check-LocaleUsage.ps1
+
+  vendor-package:
+    name: Vendor/package consistency
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check vendored dependencies and installer inputs
+        shell: pwsh
+        run: .\tools\ci\Check-VendorPackage.ps1
+
+  code-hygiene:
+    name: Code hygiene
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check runtime hygiene rules
+        shell: pwsh
+        run: .\tools\ci\Check-CodeHygiene.ps1
+
+  thread-blocking:
+    name: Thread blocking
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check UI-thread blocking patterns
+        shell: pwsh
+        run: .\tools\ci\Check-ThreadBlocking.ps1
+
+  outlook-event-hooks:
+    name: Outlook event hooks
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check hook/unhook symmetry
+        shell: pwsh
+        run: .\tools\ci\Check-OutlookEventHooks.ps1
+
+  ribbon-contract:
+    name: Ribbon callback contract
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check ribbon callback wiring
+        shell: pwsh
+        run: .\tools\ci\Check-RibbonCallbacks.ps1
+
+  settings-persistence:
+    name: Settings persistence
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check settings XML persistence mapping
+        shell: pwsh
+        run: .\tools\ci\Check-SettingsPersistence.ps1
+
+  policy-mapping:
+    name: Policy mapping
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run policy mapping tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookPolicyMappingTests.ps1
+
+  template-sanitizer:
+    name: Template sanitizer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run template sanitizer tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookTemplateSanitizerTests.ps1
+
+  filelink-rendering:
+    name: FileLink rendering
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run FileLink rendering tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookFileLinkRenderingTests.ps1
+
+  contract-fixtures:
+    name: API contract fixtures
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check update/backend/secrets contracts
+        shell: pwsh
+        run: .\tools\ci\Check-ContractFixtures.ps1
+
+  utility-unit-tests:
+    name: Utility unit tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run utility unit tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookUnitTests.ps1
+
+  addin-build:
+    name: Add-in builds
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Office extensibility reference
+        id: refs
+        shell: pwsh
+        run: |
+          $refPath = .\tools\ci\Resolve-OfficeExtensibilityReference.ps1
+          "reference_path=$refPath" >> $env:GITHUB_OUTPUT
+
+      - name: Build Outlook add-in
+        shell: pwsh
+        run: |
+          $msbuild = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe"
+          if (-not (Test-Path $msbuild)) {
+            throw "MSBuild.exe not found at $msbuild"
+          }
+
+          & $msbuild .\NcTalkOutlookAddIn.sln `
+            /m `
+            /t:Rebuild `
+            /p:Configuration=Release `
+            /p:ReferencePath="${{ steps.refs.outputs.reference_path }}"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+  msi-build-check:
+    name: MSI can be built
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Resolve Office extensibility reference
+        id: refs
+        shell: pwsh
+        run: |
+          $refPath = .\tools\ci\Resolve-OfficeExtensibilityReference.ps1
+          "reference_path=$refPath" >> $env:GITHUB_OUTPUT
+
+      - name: Build Outlook add-in
+        shell: pwsh
+        run: |
+          $msbuild = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe"
+          if (-not (Test-Path $msbuild)) {
+            throw "MSBuild.exe not found at $msbuild"
+          }
+
+          & $msbuild .\NcTalkOutlookAddIn.sln `
+            /m `
+            /t:Rebuild `
+            /p:Configuration=Release `
+            /p:ReferencePath="${{ steps.refs.outputs.reference_path }}"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build MSI without uploading artifact
+        shell: pwsh
+        run: |
+          $buildOutput = "src\NcTalkOutlookAddIn\bin\Release\"
+          $dll = Join-Path $buildOutput "NcTalkOutlookAddIn.dll"
+          if (-not (Test-Path $dll)) {
+            throw "Add-in DLL not found at $dll"
+          }
+
+          $assemblyVersion = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll).Path).Version
+          $productVersion = "{0}.{1}.{2}" -f $assemblyVersion.Major, $assemblyVersion.Minor, $assemblyVersion.Build
+
+          Write-Host "AssemblyVersion: $assemblyVersion"
+          Write-Host "ProductVersion: $productVersion"
+
+          dotnet build .\installer\NcConnectorOutlookInstaller.wixproj `
+            -c Release `
+            /p:BuildOutputDir="$((Resolve-Path $buildOutput).Path)\" `
+            /p:ProductVersion=$productVersion `
+            /p:AssemblyVersion=$assemblyVersion `
+            /p:SuppressValidation=true
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $msi = ".\installer\bin\Release\NCConnectorForOutlook.msi"
+          if (-not (Test-Path $msi)) {
+            throw "MSI build completed but output was not found at $msi"
+          }
+
+          Write-Host "MSI build check passed: $msi"
+          Write-Host "No artifact is uploaded by this workflow."
+
+  msi-package-layout:
+    name: MSI package layout
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Resolve Office extensibility reference
+        id: refs
+        shell: pwsh
+        run: |
+          $refPath = .\tools\ci\Resolve-OfficeExtensibilityReference.ps1
+          "reference_path=$refPath" >> $env:GITHUB_OUTPUT
+
+      - name: Build Outlook add-in
+        shell: pwsh
+        run: |
+          $msbuild = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe"
+          if (-not (Test-Path $msbuild)) {
+            throw "MSBuild.exe not found at $msbuild"
+          }
+
+          & $msbuild .\NcTalkOutlookAddIn.sln `
+            /m `
+            /t:Rebuild `
+            /p:Configuration=Release `
+            /p:ReferencePath="${{ steps.refs.outputs.reference_path }}"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build MSI for package inspection
+        shell: pwsh
+        run: |
+          $buildOutput = "src\NcTalkOutlookAddIn\bin\Release\"
+          $dll = Join-Path $buildOutput "NcTalkOutlookAddIn.dll"
+          if (-not (Test-Path $dll)) {
+            throw "Add-in DLL not found at $dll"
+          }
+
+          $assemblyVersion = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll).Path).Version
+          $productVersion = "{0}.{1}.{2}" -f $assemblyVersion.Major, $assemblyVersion.Minor, $assemblyVersion.Build
+
+          dotnet build .\installer\NcConnectorOutlookInstaller.wixproj `
+            -c Release `
+            /p:BuildOutputDir="$((Resolve-Path $buildOutput).Path)\" `
+            /p:ProductVersion=$productVersion `
+            /p:AssemblyVersion=$assemblyVersion `
+            /p:SuppressValidation=true
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Inspect MSI package layout
+        shell: pwsh
+        run: .\tools\ci\Check-MsiPackage.ps1
+
+  msi-upgrade-contract:
+    name: MSI upgrade contract
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check MSI upgrade and registration contract
+        shell: pwsh
+        run: .\tools\ci\Check-MsiUpgradeContract.ps1

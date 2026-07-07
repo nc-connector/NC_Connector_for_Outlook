@@ -1431,7 +1431,7 @@
     "message": "Als dit is uitgeschakeld, dwingt NC Connector de geselecteerde TLS-versies af tijdens de runtime van de invoegtoepassing."
   },
   "options_tls_apply_failed": {
-    "message": "De geselecteerde TLS-instellingen konden niet worden toegepast: $1"
+    "message": "De geselecteerde TLS-instellingen konden niet worden toegepast: {0}"
   },
   "options_tls_selection_required": {
     "message": "Wanneer het standaard TLS-beleid van het besturingssysteem is uitgeschakeld, schakel dan minimaal een TLS-versie in (1.2 of 1.3)."

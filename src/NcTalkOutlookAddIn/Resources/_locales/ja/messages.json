@@ -1431,7 +1431,7 @@
     "message": "無効の場合、NC Connector はアドイン実行時に選択した TLS バージョンを強制します。"
   },
   "options_tls_apply_failed": {
-    "message": "選択した TLS 設定を適用できませんでした: $1"
+    "message": "選択した TLS 設定を適用できませんでした: {0}"
   },
   "options_tls_selection_required": {
     "message": "OS 既定の TLS ポリシーを無効にする場合は、少なくとも 1 つの TLS バージョン（1.2 または 1.3）を有効にしてください。"

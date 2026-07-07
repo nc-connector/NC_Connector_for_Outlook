@@ -1431,7 +1431,7 @@
     "message": "若停用此選項，NC Connector 會在增益集執行階段強制使用所選 TLS 版本。"
   },
   "options_tls_apply_failed": {
-    "message": "無法套用所選 TLS 設定：$1"
+    "message": "無法套用所選 TLS 設定：{0}"
   },
   "options_tls_selection_required": {
     "message": "當作業系統預設 TLS 原則停用時，請至少啟用一個 TLS 版本（1.2 或 1.3）。"

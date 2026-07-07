@@ -1431,7 +1431,7 @@
     "message": "Ha ki van kapcsolva, az NC Connector a kijelölt TLS-verziókat a bővítmény futásidejében kényszeríti."
   },
   "options_tls_apply_failed": {
-    "message": "A kijelölt TLS-beállításokat nem sikerült alkalmazni: $1"
+    "message": "A kijelölt TLS-beállításokat nem sikerült alkalmazni: {0}"
   },
   "options_tls_selection_required": {
     "message": "Ha az operációs rendszer alapértelmezett TLS-házirendje ki van kapcsolva, engedélyezzen legalább egy TLS-verziót (1.2 vagy 1.3)."

@@ -1431,7 +1431,7 @@
     "message": "Se disattivato, NC Connector applica in runtime del componente aggiuntivo le versioni TLS selezionate."
   },
   "options_tls_apply_failed": {
-    "message": "Impossibile applicare le impostazioni TLS selezionate: $1"
+    "message": "Impossibile applicare le impostazioni TLS selezionate: {0}"
   },
   "options_tls_selection_required": {
     "message": "Quando il criterio TLS predefinito del sistema operativo è disattivato, abilita almeno una versione TLS (1.2 o 1.3)."

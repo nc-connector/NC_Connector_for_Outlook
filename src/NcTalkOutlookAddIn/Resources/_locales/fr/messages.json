@@ -1431,7 +1431,7 @@
     "message": "Si cette option est désactivée, NC Connector applique les versions TLS sélectionnées dans le runtime du complément."
   },
   "options_tls_apply_failed": {
-    "message": "Impossible d'appliquer les paramètres TLS sélectionnés : $1"
+    "message": "Impossible d'appliquer les paramètres TLS sélectionnés : {0}"
   },
   "options_tls_selection_required": {
     "message": "Lorsque la stratégie TLS par défaut du système d'exploitation est désactivée, activez au moins une version TLS (1.2 ou 1.3)."

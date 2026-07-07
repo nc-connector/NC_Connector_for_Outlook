@@ -1431,7 +1431,7 @@
     "message": "Jeśli wyłączone, NC Connector wymusza wybrane wersje TLS w czasie działania dodatku."
   },
   "options_tls_apply_failed": {
-    "message": "Nie udało się zastosować wybranych ustawień TLS: $1"
+    "message": "Nie udało się zastosować wybranych ustawień TLS: {0}"
   },
   "options_tls_selection_required": {
     "message": "Gdy domyślna polityka TLS systemu operacyjnego jest wyłączona, włącz co najmniej jedną wersję TLS (1.2 lub 1.3)."

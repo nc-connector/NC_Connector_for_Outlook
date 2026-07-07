@@ -1,0 +1,23 @@
+{
+  "latest_version": "3.2.2",
+  "update_available": true,
+  "release_url": "https://github.com/nc-connector/NC_Connector_for_Outlook/releases/tag/v3.2.2",
+  "download_url": "https://github.com/nc-connector/NC_Connector_for_Outlook/releases/download/v3.2.2/NCConnectorForOutlook-3.2.2.msi",
+  "published_at": "2026-07-01T08:00:00Z",
+  "message": "NC Connector for Outlook 3.2.2 is available.",
+  "counted": true,
+  "changelog": {
+    "title": "NC Connector for Outlook 3.2.2",
+    "sections": {
+      "added": [
+        "Example added item"
+      ],
+      "changed": [
+        "Example changed item"
+      ],
+      "fixed": [
+        "Example fixed item"
+      ]
+    }
+  }
+}

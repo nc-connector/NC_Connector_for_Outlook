@@ -1431,7 +1431,7 @@
     "message": "若禁用此项，NC Connector 将在加载项运行时强制使用所选 TLS 版本。"
   },
   "options_tls_apply_failed": {
-    "message": "无法应用所选 TLS 设置：$1"
+    "message": "无法应用所选 TLS 设置：{0}"
   },
   "options_tls_selection_required": {
     "message": "当禁用操作系统默认 TLS 策略时，请至少启用一个 TLS 版本（1.2 或 1.3）。"

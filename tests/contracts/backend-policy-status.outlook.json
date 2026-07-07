@@ -1,0 +1,45 @@
+{
+  "status": {
+    "mode": "policy",
+    "policy_active": true,
+    "seat_assigned": true,
+    "seat_state": "active",
+    "is_valid": true,
+    "warning": ""
+  },
+  "policy": {
+    "share": {
+      "share_base_directory": "NC Connector",
+      "share_set_password": true,
+      "share_expire_days": 14,
+      "share_send_password_mode": "secrets",
+      "share_secrets_expire_days": 7
+    },
+    "talk": {
+      "talk_default_lobby": true,
+      "talk_default_room_type": "event"
+    },
+    "email_signature": {
+      "signature_on_compose": true,
+      "signature_on_reply": true,
+      "signature_on_forward": true
+    }
+  },
+  "policy_editable": {
+    "share": {
+      "share_base_directory": false,
+      "share_set_password": false,
+      "share_expire_days": true,
+      "share_send_password_mode": true
+    },
+    "talk": {
+      "talk_default_lobby": true,
+      "talk_default_room_type": false
+    },
+    "email_signature": {
+      "signature_on_compose": false,
+      "signature_on_reply": false,
+      "signature_on_forward": false
+    }
+  }
+}
