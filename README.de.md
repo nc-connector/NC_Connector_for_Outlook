@@ -94,6 +94,10 @@ Für typische Setup-, IFB- und Backend-Policy-Probleme siehe das [Admin-Handbuch
 - [Entwicklerdoku](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.de.md)
 - [Drittanbieter-Lizenzen](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md)
 
+## Roadmap
+
+Geplante Arbeiten fuer Thunderbird, Outlook und Backend werden in der oeffentlichen [NC Connector Roadmap](https://github.com/orgs/nc-connector/projects/1) gepflegt.
+
 ## Screenshots
 
 <details>

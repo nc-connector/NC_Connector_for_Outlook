@@ -93,6 +93,10 @@ For common setup, IFB, and backend policy issues, see the [Admin Guide](https://
 - [Development Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md)
 - [Third-party licenses](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md)
 
+## Roadmap
+
+Planned work across Thunderbird, Outlook, and the Backend is tracked in the public [NC Connector Roadmap](https://github.com/orgs/nc-connector/projects/1).
+
 ## Screenshots
 
 <details>
