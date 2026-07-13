@@ -1,7 +1,7 @@
 name: "🚀 Feature request"
 description: Suggest an improvement for the Outlook add-in
-title: "[Feature]: "
-labels: ["enhancement", "roadmap", "product: outlook"]
+labels: ["product: outlook"]
+type: feature
 body:
   - type: markdown
     attributes:
