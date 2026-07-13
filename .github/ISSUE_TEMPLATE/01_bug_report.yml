@@ -1,0 +1,115 @@
+name: Bug report
+description: Report a reproducible Outlook add-in problem
+title: "[Bug]: "
+labels: ["bug", "product: outlook"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem.
+
+        Please keep this short and practical. Do not paste app passwords, tokens, private keys, or full customer data.
+
+        Admin documentation: https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md
+  - type: checkboxes
+    id: quick-checks
+    attributes:
+      label: Quick checks
+      options:
+        - label: I searched existing issues first.
+          required: true
+        - label: For setup or policy problems, I checked the admin documentation linked above.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the visible problem.
+      placeholder: The share wizard opens, but ...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Write the shortest path that triggers the problem.
+      placeholder: |
+        1. Open Outlook ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: I expected ...
+    validations:
+      required: true
+  - type: dropdown
+    id: outlook-product
+    attributes:
+      label: Outlook product
+      options:
+        - Microsoft 365 Apps
+        - Outlook 2021 / LTSC 2021
+        - Outlook 2024 / LTSC 2024
+        - Other Outlook Classic build
+    validations:
+      required: true
+  - type: input
+    id: outlook-version
+    attributes:
+      label: Outlook version and build
+      placeholder: Version 2606 Build 20131.20112
+    validations:
+      required: true
+  - type: input
+    id: addin-version
+    attributes:
+      label: NC Connector for Outlook version
+      placeholder: 3.2.1
+    validations:
+      required: true
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      placeholder: Windows 10 22H2, Windows 11 24H2, ...
+    validations:
+      required: true
+  - type: dropdown
+    id: backend-used
+    attributes:
+      label: NC Connector Backend used?
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: backend-version
+    attributes:
+      label: Backend version, if used
+      placeholder: 1.2.1
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Sharing / Filelink
+        - Talk / Calendar
+        - Email signatures
+        - Backend policies
+        - Setup / Login
+        - Installer / Update check
+        - UI / UX
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Add relevant logs or screenshots. Remove passwords, tokens, and private data.
+      render: text
