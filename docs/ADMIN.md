@@ -286,6 +286,14 @@ The debug tab also provides **Anonymize logs** (enabled by default).
 Log files (daily rotation):
 - `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
 
+How to collect useful logs for bug reports:
+1. Open **NC Connector -> Settings -> Debug**.
+2. Enable debug logging.
+3. Keep **Anonymize logs** enabled unless support explicitly asks for raw local context.
+4. Reproduce the problem.
+5. Open `%LOCALAPPDATA%\NC4OL\` and attach or paste the latest `addin-runtime.log_YYYYMMDD` entries for the affected time window.
+6. Remove app passwords, tokens, private links, customer data, and full mailbox contents before sharing logs.
+
 Logs are categorized (e.g. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) and help with support cases.
 When debug logging is enabled, runtime decision paths (including attachment pre-add gating and fallback reasons) are written to the same file; runtime exceptions are always written regardless of debug toggle state.
 When anonymization is enabled, sensitive values are redacted before writing:
