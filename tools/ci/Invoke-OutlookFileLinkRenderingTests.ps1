@@ -52,6 +52,7 @@ internal static class OutlookFileLinkRenderingTests
         TestAttachmentModeKeepsNextcloudSubpath();
         TestPlainTextKeepsNextcloudSubpath();
         TestCustomTemplateResolvesModeAwareLinkVariables();
+        TestOlderBackendModeAwareTemplateStillRenders();
         TestLegacyCustomTemplateStillRenders();
         TestSecretLinkLabelHidesLongUrlInHtml();
 
@@ -109,9 +110,11 @@ internal static class OutlookFileLinkRenderingTests
     private static void TestCustomTemplateResolvesModeAwareLinkVariables()
     {
         const string template = "<p>{LINK_INTRO}</p><p>{LINK_LABEL}: <a href=\"{URL}\">{URL}</a></p>";
-        BackendPolicyStatus policy = BuildCustomTemplatePolicy(template);
+        BackendPolicyStatus policy = BuildCustomTemplatePolicy("<p>Legacy template: {URL}</p>", template);
         FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", string.Empty);
 
+        string normalHtml = FileLinkHtmlBuilder.Build(result, new FileLinkRequest(), "custom", policy);
+        string zipHtml = FileLinkHtmlBuilder.Build(result, BuildAttachmentRequest(), "custom", policy);
         string normal = FileLinkHtmlBuilder.BuildPlainText(result, new FileLinkRequest(), "custom", policy);
         string zip = FileLinkHtmlBuilder.BuildPlainText(result, BuildAttachmentRequest(), "custom", policy);
 
@@ -119,6 +122,9 @@ internal static class OutlookFileLinkRenderingTests
         Check("Custom normal template resolves LINK_LABEL", normal.Contains("Nextcloud link: https://cloud.example.test/nc/s/AbCd1234"), normal);
         Check("Custom attachment template resolves ZIP LINK_INTRO", zip.Contains("Download the shared files as a ZIP archive"), zip);
         Check("Custom attachment template resolves ZIP LINK_LABEL", zip.Contains("ZIP download: https://cloud.example.test/nc/s/AbCd1234/download"), zip);
+        Check("Custom normal HTML uses the versioned template", normalHtml.Contains("Open the Nextcloud link below to view the share."), normalHtml);
+        Check("Custom attachment HTML resolves the versioned template in ZIP mode", zipHtml.Contains("ZIP download"), zipHtml);
+        Check("Versioned template takes precedence over compatibility template", !normal.Contains("Legacy template") && !normalHtml.Contains("Legacy template"), normal + normalHtml);
     }
 
     private static void TestLegacyCustomTemplateStillRenders()
@@ -129,6 +135,17 @@ internal static class OutlookFileLinkRenderingTests
 
         Check("Legacy custom template still resolves its existing URL variable", plainText.Contains("Legacy link: https://cloud.example.test/nc/s/AbCd1234"), plainText);
         Check("Legacy custom template is not forced to contain new variables", !plainText.Contains("LINK_INTRO") && !plainText.Contains("LINK_LABEL"), plainText);
+    }
+
+    private static void TestOlderBackendModeAwareTemplateStillRenders()
+    {
+        const string template = "<p>{LINK_INTRO}</p><p>{LINK_LABEL}: <a href=\"{URL}\">{URL}</a></p>";
+        BackendPolicyStatus policy = BuildCustomTemplatePolicy(template);
+        FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", string.Empty);
+        string plainText = FileLinkHtmlBuilder.BuildPlainText(result, new FileLinkRequest(), "custom", policy);
+
+        Check("Older backend template field still resolves LINK_INTRO", plainText.Contains("Open the Nextcloud link below to view the share."), plainText);
+        Check("Older backend template field still resolves LINK_LABEL", plainText.Contains("Nextcloud link: https://cloud.example.test/nc/s/AbCd1234"), plainText);
     }
 
     private static void TestSecretLinkLabelHidesLongUrlInHtml()
@@ -167,12 +184,16 @@ internal static class OutlookFileLinkRenderingTests
         };
     }
 
-    private static BackendPolicyStatus BuildCustomTemplatePolicy(string template)
+    private static BackendPolicyStatus BuildCustomTemplatePolicy(string template, string versionedTemplate = null)
     {
         var sharePolicy = new Dictionary<string, object>
         {
             { "share_html_block_template", template }
         };
+        if (!string.IsNullOrWhiteSpace(versionedTemplate))
+        {
+            sharePolicy.Add("share_html_block_template_v2", versionedTemplate);
+        }
         var empty = new Dictionary<string, object>();
         return new BackendPolicyStatus(
             true,

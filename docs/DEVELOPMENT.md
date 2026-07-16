@@ -233,6 +233,7 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
    - `{LINK_INTRO}` and `{LINK_LABEL}` are resolved in the existing renderer: normal shares describe and label the Nextcloud share page, while attachment mode describes and labels the `/download` URL as a ZIP download. Legacy templates without these placeholders keep their existing output.
+   - custom Share rendering prefers `policy.share.share_html_block_template_v2` and falls back to `policy.share.share_html_block_template`. This supports older backend releases while allowing current backends to keep the original response key placeholder-free for older clients.
    - plain-text compose keeps `MailItem.BodyFormat=olFormatPlain`; the share block is rendered as a framed text block with `#` separators and inserted through Outlook WordEditor. Inline replies/forwards keep two empty paragraphs above the block for the sender's own text. `MailItem.Body` is not rewritten.
 6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` / `InsertPlainTextIntoMail(...)` insert the rendered block into the message body (delegated to `Controllers/MailInteropController.cs`).
 

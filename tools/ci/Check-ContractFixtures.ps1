@@ -50,6 +50,10 @@ foreach ($domain in @("share", "talk", "email_signature")) {
     Assert-Check ($null -ne $policy.policy_editable.$domain) "Backend policy_editable domain missing: $domain"
 }
 Assert-Check ($policy.policy.share.share_send_password_mode -in @("plain", "secrets", $null)) "Share password mode contract must be plain, secrets or null."
+Assert-Check ($policy.policy.share.share_html_block_template_v2 -match '\{LINK_INTRO\}') "Versioned Share template contract must preserve LINK_INTRO."
+Assert-Check ($policy.policy.share.share_html_block_template_v2 -match '\{LINK_LABEL\}') "Versioned Share template contract must preserve LINK_LABEL."
+Assert-Check ($policy.policy.share.share_html_block_template -notmatch '\{LINK_(INTRO|LABEL)\}') "Compatibility Share template contract must not expose mode-aware placeholders."
+Assert-Check ($null -eq $policy.policy_editable.share.share_html_block_template_v2) "Versioned Share template must remain output-only."
 
 $secrets = Read-Json "secrets-create-response.json"
 Assert-Check ($secrets.ocs.data.uuid -match '^[A-Za-z0-9_-]+$') "Secrets response uuid must be URL-safe."

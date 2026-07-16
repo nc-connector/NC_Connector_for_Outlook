@@ -18,6 +18,8 @@ namespace NcTalkOutlookAddIn.Utilities
     internal static class FileLinkHtmlBuilder
     {
         private const string HomepageUrl = "https://nc-connector.de";
+        private const string ShareTemplateKey = "share_html_block_template";
+        private const string ShareTemplateV2Key = "share_html_block_template_v2";
         private static readonly Lazy<string> HeaderBase64 = new Lazy<string>(LoadHeaderBase64);
 
                 // Creates the HTML block including branding and share information.
@@ -384,8 +386,17 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
-            string key = passwordOnly ? "share_password_template" : "share_html_block_template";
-            string template = policyStatus.GetPolicyString("share", key);
+            if (passwordOnly)
+            {
+                return policyStatus.GetPolicyString("share", "share_password_template") ?? string.Empty;
+            }
+
+            // New backends keep the original key placeholder-free for clients that predate mode-aware link text.
+            string template = policyStatus.GetPolicyString("share", ShareTemplateV2Key);
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                template = policyStatus.GetPolicyString("share", ShareTemplateKey);
+            }
             return template ?? string.Empty;
         }
 

@@ -196,6 +196,7 @@ Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanit
 - Datei-Uploads groesser als 20 MB nutzen Nextcloud Chunked Upload v2. Damit vermeiden wir lange einzelne WebDAV-`PUT`-Requests durch Proxies oder Webserver, die sehr grosse Request-Bodies ablehnen.
 - Normale Freigaben benennen `/s/<token>` als Nextcloud-Link; nur der Attachment-Modus benennt `/s/<token>/download` als ZIP-Download.
 - Custom-Share-Templates koennen `{LINK_INTRO}` und `{LINK_LABEL}` verwenden. Outlook fuellt beide Werte passend zum Modus; bestehende Templates ohne diese Variablen bleiben unveraendert nutzbar.
+- Aktuelle Clients bevorzugen das versionierte Share-Template des Backends und fallen bei aelteren Backend-Versionen automatisch auf das bisherige Template-Feld zurueck. Eine Migration durch den Administrator ist nicht erforderlich.
 
 ### Separater Passwort-Follow-up-Versand
 - Ist `Passwort separat senden` aktiv, enthaelt der Haupt-HTML-Block kein Inline-Passwort.

@@ -155,6 +155,7 @@ Runtime behavior:
 - the `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
 - if `custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
 - custom share templates may use `{LINK_INTRO}` and `{LINK_LABEL}`; Outlook fills them with share-page wording for normal shares and ZIP-download wording for attachment mode
+- current clients prefer the backend's versioned Share template and automatically fall back to the original template field when connected to an older backend; no administrator migration is required
 - existing custom templates without these variables remain valid and keep their previous rendering
 - `policy.talk.event_description_type` may be `html` or `plain_text`; when `html` is active, Outlook sanitizes the Talk HTML template, applies an appointment-compat transform (legacy color/alignment fallbacks + Word-safe CSS stripping), and writes the block via HTML->RTF bridge for stable appointment rendering
 
