@@ -281,6 +281,8 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
 
 The add-in uses Nextcloud **OCS** and **WebDAV** endpoints.
 
+Authentication aliases and DAV identities are intentionally kept separate. Basic Auth uses the login entered by the user (which may be an email address), while `Services/NextcloudUserIdentityService.cs` resolves the canonical UID from `GET /ocs/v2.php/cloud/user?format=json`. User-scoped FileLink, CardDAV, and CalDAV paths use only `ocs.data.id`; a missing UID is treated as an error rather than silently substituting the login.
+
 Talk (OCS, selection):
 
 - Capabilities/version hint: `GET /ocs/v2.php/cloud/capabilities`
@@ -296,6 +298,7 @@ Talk (OCS, selection):
 
 Sharing:
 
+- Current canonical user ID: `GET /ocs/v2.php/cloud/user?format=json`
 - Create public share: `POST /ocs/v2.php/apps/files_sharing/api/v1/shares`
 - Upload/folder creation: `remote.php/dav/...` (WebDAV)
 - Large file upload: `MKCOL /remote.php/dav/uploads/<user>/<upload-id>`, chunk `PUT`s, then `MOVE /remote.php/dav/uploads/<user>/<upload-id>/.file` to the final file path

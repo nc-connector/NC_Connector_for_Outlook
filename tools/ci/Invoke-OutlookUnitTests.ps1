@@ -21,11 +21,14 @@ namespace NcTalkOutlookAddIn.Utilities
 {
     internal static class DiagnosticsLogger
     {
+        internal static void Log(string category, string message) { }
+        internal static void LogApi(string message) { }
         internal static void LogException(string category, string message, Exception ex) { }
     }
 
     internal static class LogCategories
     {
+        internal const string Api = "api";
         internal const string Core = "core";
     }
 }

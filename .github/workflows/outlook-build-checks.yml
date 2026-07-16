@@ -2,7 +2,6 @@ name: Outlook build checks
 
 on:
   push:
-    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -162,6 +161,18 @@ jobs:
       - name: Check update/backend/secrets contracts
         shell: pwsh
         run: .\tools\ci\Check-ContractFixtures.ps1
+
+  nextcloud-user-id-contract:
+    name: Nextcloud user ID contract
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Nextcloud user ID contract check
+        shell: pwsh
+        run: .\tools\ci\Check-NextcloudUserIdContract.ps1
 
   utility-unit-tests:
     name: Utility unit tests

@@ -292,7 +292,7 @@ namespace NcTalkOutlookAddIn.Services
             string addressBookUrl = string.Format(CultureInfo.InvariantCulture,
                 "{0}/remote.php/dav/addressbooks/users/{1}/z-server-generated--system?export",
                 baseUrl,
-                Uri.EscapeDataString(configuration.Username ?? string.Empty));
+                Uri.EscapeDataString(NextcloudUserIdentityService.ResolveCurrentUserId(configuration)));
 
             string responseText = null;
             var httpClient = new NcHttpClient(configuration);

@@ -1,0 +1,14 @@
+{
+  "ocs": {
+    "meta": {
+      "status": "ok",
+      "statuscode": 100,
+      "message": "OK"
+    },
+    "data": {
+      "id": "canonical-user",
+      "display-name": "Canonical User",
+      "email": "login@example.test"
+    }
+  }
+}

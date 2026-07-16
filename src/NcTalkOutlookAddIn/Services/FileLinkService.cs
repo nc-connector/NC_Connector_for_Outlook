@@ -82,7 +82,7 @@ namespace NcTalkOutlookAddIn.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
-            string username = _configuration.Username ?? string.Empty;
+            string userId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
             string basePath = NormalizeRelativePath(request.BasePath);
             string sanitizedShareName = SanitizeComponent(request.ShareName);
             if (string.IsNullOrWhiteSpace(sanitizedShareName))
@@ -97,13 +97,13 @@ namespace NcTalkOutlookAddIn.Services
 
             var context = new FileLinkUploadContext(
                 normalizedBaseUrl,
-                username,
+                userId,
                 sanitizedShareName,
                 folderName,
                 relativeFolderPath);
 
-            EnsureFolderExists(normalizedBaseUrl, username, basePath, cancellationToken, context.KnownFolderPaths);
-            EnsureFolderExists(normalizedBaseUrl, username, relativeFolderPath, cancellationToken, context.KnownFolderPaths);
+            EnsureFolderExists(normalizedBaseUrl, userId, basePath, cancellationToken, context.KnownFolderPaths);
+            EnsureFolderExists(normalizedBaseUrl, userId, relativeFolderPath, cancellationToken, context.KnownFolderPaths);
             context.KnownFolderPaths.Add(relativeFolderPath);
 
             return context;
@@ -114,11 +114,11 @@ namespace NcTalkOutlookAddIn.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
-            string username = _configuration.Username ?? string.Empty;
+            string userId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
             string normalizedBasePath = NormalizeRelativePath(basePath);
             string relativePath = CombineRelativePath(normalizedBasePath, folderName);
 
-            return FolderExistsInternal(normalizedBaseUrl, username, relativePath, cancellationToken);
+            return FolderExistsInternal(normalizedBaseUrl, userId, relativePath, cancellationToken);
         }
 
         internal void DeleteShareFolder(string relativeFolderPath, CancellationToken cancellationToken)
@@ -132,8 +132,8 @@ namespace NcTalkOutlookAddIn.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
-            string username = _configuration.Username ?? string.Empty;
-            string url = BuildDavUrl(normalizedBaseUrl, username, normalizedPath);
+            string userId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
+            string url = BuildDavUrl(normalizedBaseUrl, userId, normalizedPath);
             DiagnosticsLogger.LogApi("DELETE " + url);
 
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
@@ -227,7 +227,6 @@ namespace NcTalkOutlookAddIn.Services
             }
             var shareData = CreateShare(
                 context.NormalizedBaseUrl,
-                context.Username,
                 context.RelativeFolderPath,
                 context.SanitizedShareName,
                 request,
@@ -244,13 +243,13 @@ namespace NcTalkOutlookAddIn.Services
                 context.RelativeFolderPath);
         }
 
-        private bool FolderExistsInternal(string baseUrl, string username, string relativePath, CancellationToken cancellationToken)
+        private bool FolderExistsInternal(string baseUrl, string userId, string relativePath, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(relativePath))
             {
                 return false;
             }
-            string url = BuildDavUrl(baseUrl, username, relativePath);
+            string url = BuildDavUrl(baseUrl, userId, relativePath);
             cancellationToken.ThrowIfCancellationRequested();
 
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
@@ -377,7 +376,7 @@ namespace NcTalkOutlookAddIn.Services
 
             // For directory uploads we enforce MKCOL without relying on cache hints.
             // A stale known-folder cache can otherwise skip folder creation and the first PUT fails with 404.
-            EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteRoot, cancellationToken);
+            EnsureFolderExists(context.NormalizedBaseUrl, context.UserId, remoteRoot, cancellationToken);
             context.KnownFolderPaths.Add(remoteRoot);
 
             foreach (string directory in Directory.EnumerateDirectories(selection.LocalPath, "*", SearchOption.AllDirectories))
@@ -385,7 +384,7 @@ namespace NcTalkOutlookAddIn.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 string relativeSub = ConvertPath(GetRelativePath(selection.LocalPath, directory));
                 string remoteSub = CombineRelativePath(remoteRoot, relativeSub);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteSub, cancellationToken);
+                EnsureFolderExists(context.NormalizedBaseUrl, context.UserId, remoteSub, cancellationToken);
                 context.KnownFolderPaths.Add(remoteSub);
             }
             foreach (string file in Directory.EnumerateFiles(selection.LocalPath, "*", SearchOption.AllDirectories))
@@ -393,7 +392,7 @@ namespace NcTalkOutlookAddIn.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 string relativeFile = ConvertPath(GetRelativePath(selection.LocalPath, file));
                 string remoteFolder = GetRemoteFolder(remoteRoot, relativeFile);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.Username, remoteFolder, cancellationToken);
+                EnsureFolderExists(context.NormalizedBaseUrl, context.UserId, remoteFolder, cancellationToken);
                 context.KnownFolderPaths.Add(remoteFolder);
 
                 string remoteFileName = SanitizeComponent(Path.GetFileName(relativeFile));
@@ -422,7 +421,7 @@ namespace NcTalkOutlookAddIn.Services
             {
                 return;
             }
-            string targetUrl = BuildDavUrl(context.NormalizedBaseUrl, context.Username, remotePath);
+            string targetUrl = BuildDavUrl(context.NormalizedBaseUrl, context.UserId, remotePath);
             if (ShouldUseChunkedUpload(fileInfo))
             {
                 UploadFileContentChunked(context, targetUrl, fileInfo, tracker, progress, selection, cancellationToken);
@@ -503,7 +502,7 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException("File could not be uploaded: too many chunks.", false, 0, null);
             }
 
-            string uploadFolderUrl = BuildChunkUploadFolderUrl(context.NormalizedBaseUrl, context.Username);
+            string uploadFolderUrl = BuildChunkUploadFolderUrl(context.NormalizedBaseUrl, context.UserId);
             LogFileLink(
                 "Upload method selected (method=chunked-v2, file=\""
                 + fileInfo.Name
@@ -754,14 +753,14 @@ namespace NcTalkOutlookAddIn.Services
             return CombineRelativePath(root, folder);
         }
 
-        private void EnsureFolderExists(string baseUrl, string username, string relativePath, CancellationToken cancellationToken)
+        private void EnsureFolderExists(string baseUrl, string userId, string relativePath, CancellationToken cancellationToken)
         {
-            EnsureFolderExists(baseUrl, username, relativePath, cancellationToken, null);
+            EnsureFolderExists(baseUrl, userId, relativePath, cancellationToken, null);
         }
 
         private void EnsureFolderExists(
             string baseUrl,
-            string username,
+            string userId,
             string relativePath,
             CancellationToken cancellationToken,
             HashSet<string> knownFolderPaths)
@@ -781,7 +780,7 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     continue;
                 }
-                string url = BuildDavUrl(baseUrl, username, path);
+                string url = BuildDavUrl(baseUrl, userId, path);
                 DiagnosticsLogger.LogApi("MKCOL " + url);
                 NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
                 {
@@ -815,7 +814,7 @@ namespace NcTalkOutlookAddIn.Services
         }
 
                 // Create the public share through the documented OCS create endpoint and then update mutable metadata.
-        private ShareData CreateShare(string baseUrl, string username, string relativeFolderPath, string shareName, FileLinkRequest request, CancellationToken cancellationToken)
+        private ShareData CreateShare(string baseUrl, string relativeFolderPath, string shareName, FileLinkRequest request, CancellationToken cancellationToken)
         {
             string url = baseUrl.TrimEnd('/') + "/ocs/v2.php/apps/files_sharing/api/v1/shares";
             string payload = BuildShareCreatePayload(relativeFolderPath, shareName, request);
@@ -955,7 +954,7 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        private static string BuildDavUrl(string baseUrl, string username, string relativePath)
+        private static string BuildDavUrl(string baseUrl, string userId, string relativePath)
         {
             string[] segments = relativePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             string encoded = string.Join("/", segments.Select(Uri.EscapeDataString));
@@ -963,17 +962,17 @@ namespace NcTalkOutlookAddIn.Services
                 CultureInfo.InvariantCulture,
                 "{0}/remote.php/dav/files/{1}/{2}",
                 baseUrl.TrimEnd('/'),
-                Uri.EscapeDataString(username ?? string.Empty),
+                Uri.EscapeDataString(userId ?? string.Empty),
                 encoded);
         }
 
-        private static string BuildChunkUploadFolderUrl(string baseUrl, string username)
+        private static string BuildChunkUploadFolderUrl(string baseUrl, string userId)
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "{0}/remote.php/dav/uploads/{1}/{2}",
                 baseUrl.TrimEnd('/'),
-                Uri.EscapeDataString(username ?? string.Empty),
+                Uri.EscapeDataString(userId ?? string.Empty),
                 Uri.EscapeDataString(BuildChunkUploadId()));
         }
 
