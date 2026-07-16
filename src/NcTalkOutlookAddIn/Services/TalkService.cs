@@ -206,6 +206,16 @@ namespace NcTalkOutlookAddIn.Services
                 return false;
             }
 
+            try
+            {
+                NextcloudUserIdentityService.ResolveCurrentUserId(_configuration, true);
+            }
+            catch (TalkServiceException ex)
+            {
+                message = ex.Message;
+                return false;
+            }
+
             IDictionary<string, object> ocs = NcJson.GetDictionary(data, "ocs");
             IDictionary<string, object> meta = NcJson.GetDictionary(ocs, "meta");
             IDictionary<string, object> payload = NcJson.GetDictionary(ocs, "data");

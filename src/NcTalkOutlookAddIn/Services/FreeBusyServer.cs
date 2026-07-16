@@ -280,7 +280,8 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     DiagnosticsLogger.Log(LogCategory, "Starting fallback via scheduling for " + email + ".");
                     string originEmail;
-                    if (!_addressBookCache.TryGetPrimaryEmailForUid(_configuration, _cacheHours, _configuration.Username, out originEmail) ||
+                    string currentUserId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
+                    if (!_addressBookCache.TryGetPrimaryEmailForUid(_configuration, _cacheHours, currentUserId, out originEmail) ||
                         string.IsNullOrEmpty(originEmail))
                     {
                         DiagnosticsLogger.Log(LogCategory, "Own user account not found in address book.");
@@ -414,11 +415,12 @@ namespace NcTalkOutlookAddIn.Services
             DateTime endUtc = startUtc.AddDays(days);
 
             string baseUrl = _configuration.GetNormalizedBaseUrl();
+            string currentUserId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
             string outboxUrl = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0}/remote.php/dav/calendars/{1}/outbox/",
                 baseUrl,
-                Uri.EscapeDataString(_configuration.Username));
+                Uri.EscapeDataString(currentUserId));
 
             string uid = Guid.NewGuid().ToString();
             string payload = BuildVFreeBusyRequest(uid, originatorEmail, attendeeEmail, startUtc, endUtc);

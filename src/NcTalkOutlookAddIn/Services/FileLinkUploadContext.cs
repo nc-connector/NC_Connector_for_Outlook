@@ -13,7 +13,7 @@ namespace NcTalkOutlookAddIn.Services
     {
         internal FileLinkUploadContext(
             string normalizedBaseUrl,
-            string username,
+            string userId,
             string sanitizedShareName,
             string folderName,
             string relativeFolderPath)
@@ -24,7 +24,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             NormalizedBaseUrl = normalizedBaseUrl;
-            Username = username ?? string.Empty;
+            UserId = userId ?? string.Empty;
             SanitizedShareName = sanitizedShareName ?? string.Empty;
             FolderName = folderName ?? string.Empty;
             RelativeFolderPath = relativeFolderPath ?? string.Empty;
@@ -36,7 +36,7 @@ namespace NcTalkOutlookAddIn.Services
 
         internal string NormalizedBaseUrl { get; private set; }
 
-        internal string Username { get; private set; }
+        internal string UserId { get; private set; }
 
         internal string SanitizedShareName { get; private set; }
 

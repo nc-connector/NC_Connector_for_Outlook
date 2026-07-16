@@ -334,7 +334,8 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             var cache = new IfbAddressBookCache(_owner.SettingsStorage != null ? _owner.SettingsStorage.DataDirectory : null);
             string selfEmail;
-            cache.TryGetPrimaryEmailForUid(configuration, _owner.CurrentSettings.IfbCacheHours, _owner.CurrentSettings.Username, out selfEmail);
+            string currentUserId = NextcloudUserIdentityService.ResolveCurrentUserId(configuration);
+            cache.TryGetPrimaryEmailForUid(configuration, _owner.CurrentSettings.IfbCacheHours, currentUserId, out selfEmail);
 
             int userAdds = 0;
             int guestAdds = 0;
