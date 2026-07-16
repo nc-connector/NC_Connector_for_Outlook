@@ -20,6 +20,7 @@ namespace NcTalkOutlookAddIn.Utilities
         private const string HomepageUrl = "https://nc-connector.de";
         private const string ShareTemplateKey = "share_html_block_template";
         private const string ShareTemplateV2Key = "share_html_block_template_v2";
+        private const string ShareTemplateEffectiveLanguageKey = "share_html_block_effective_language";
         private static readonly Lazy<string> HeaderBase64 = new Lazy<string>(LoadHeaderBase64);
 
                 // Creates the HTML block including branding and share information.
@@ -33,9 +34,9 @@ namespace NcTalkOutlookAddIn.Utilities
             bool separatePassword = request != null
                 && request.PasswordSeparateEnabled
                 && !string.IsNullOrWhiteSpace(result.Password);
-            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
-
-            string policyTemplate = ResolvePolicyTemplate(policyStatus, false, effectiveLanguage);
+            string templateMode = ResolveEffectiveLanguage(languageOverride, policyStatus);
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, false, templateMode);
+            string effectiveLanguage = ResolveShareRenderLanguage(policyStatus, templateMode, policyTemplate);
             if (!string.IsNullOrWhiteSpace(policyTemplate))
             {
                 return RenderPolicyTemplate(
@@ -47,10 +48,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     separatePassword,
                     passwordOnly: false,
                     secretLink: false);
-            }
-            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveLanguage = "default";
             }
             string intro = GetShareLinkIntro(effectiveLanguage, attachmentMode, false);
 
@@ -151,8 +148,9 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 throw new ArgumentNullException("result");
             }
-            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
-            string policyTemplate = ResolvePolicyTemplate(policyStatus, true, effectiveLanguage);
+            string templateMode = ResolveEffectiveLanguage(languageOverride, policyStatus);
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, true, templateMode);
+            string effectiveLanguage = ResolveShareRenderLanguage(policyStatus, templateMode, policyTemplate);
             if (!string.IsNullOrWhiteSpace(policyTemplate))
             {
                 return RenderPolicyTemplate(
@@ -164,10 +162,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     separatePassword: false,
                     passwordOnly: true,
                     secretLink: secretLink);
-            }
-            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveLanguage = "default";
             }
             string intro = secretLink
                 ? Strings.GetInLanguage(
@@ -231,9 +225,9 @@ namespace NcTalkOutlookAddIn.Utilities
             bool separatePassword = request != null
                 && request.PasswordSeparateEnabled
                 && !string.IsNullOrWhiteSpace(result.Password);
-            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
-
-            string policyTemplate = ResolvePolicyTemplate(policyStatus, false, effectiveLanguage);
+            string templateMode = ResolveEffectiveLanguage(languageOverride, policyStatus);
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, false, templateMode);
+            string effectiveLanguage = ResolveShareRenderLanguage(policyStatus, templateMode, policyTemplate);
             if (!string.IsNullOrWhiteSpace(policyTemplate))
             {
                 return FramePlainTextBlock(RenderPolicyTemplatePlainText(
@@ -244,11 +238,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     attachmentMode,
                     separatePassword,
                     passwordOnly: false));
-            }
-
-            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveLanguage = "default";
             }
 
             string downloadUrl = attachmentMode
@@ -314,8 +303,9 @@ namespace NcTalkOutlookAddIn.Utilities
                 throw new ArgumentNullException("result");
             }
 
-            string effectiveLanguage = ResolveEffectiveLanguage(languageOverride, policyStatus);
-            string policyTemplate = ResolvePolicyTemplate(policyStatus, true, effectiveLanguage);
+            string templateMode = ResolveEffectiveLanguage(languageOverride, policyStatus);
+            string policyTemplate = ResolvePolicyTemplate(policyStatus, true, templateMode);
+            string effectiveLanguage = ResolveShareRenderLanguage(policyStatus, templateMode, policyTemplate);
             if (!string.IsNullOrWhiteSpace(policyTemplate))
             {
                 return FramePlainTextBlock(RenderPolicyTemplatePlainText(
@@ -326,11 +316,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     attachmentMode: false,
                     separatePassword: false,
                     passwordOnly: true));
-            }
-
-            if (string.Equals(effectiveLanguage, "custom", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveLanguage = "default";
             }
 
             var sections = new List<string>();
@@ -373,6 +358,29 @@ namespace NcTalkOutlookAddIn.Utilities
                 return "custom";
             }
             return normalized;
+        }
+
+        private static string ResolveShareRenderLanguage(BackendPolicyStatus policyStatus, string templateMode, string policyTemplate)
+        {
+            if (!string.Equals(templateMode, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return templateMode;
+            }
+            if (string.IsNullOrWhiteSpace(policyTemplate))
+            {
+                return "default";
+            }
+
+            // `custom` selects the backend template; generated labels use its separately reported language.
+            string backendLanguage = policyStatus == null
+                ? string.Empty
+                : policyStatus.GetPolicyString("share", ShareTemplateEffectiveLanguageKey);
+            if (string.IsNullOrWhiteSpace(backendLanguage)
+                || string.Equals(backendLanguage.Trim(), "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return templateMode;
+            }
+            return Strings.NormalizeLanguageOverride(backendLanguage);
         }
 
                 // Resolve custom policy template for normal or password-only mode.

@@ -54,6 +54,8 @@ Assert-Check ($policy.policy.share.share_html_block_template_v2 -match '\{LINK_I
 Assert-Check ($policy.policy.share.share_html_block_template_v2 -match '\{LINK_LABEL\}') "Versioned Share template contract must preserve LINK_LABEL."
 Assert-Check ($policy.policy.share.share_html_block_template -notmatch '\{LINK_(INTRO|LABEL)\}') "Compatibility Share template contract must not expose mode-aware placeholders."
 Assert-Check ($null -eq $policy.policy_editable.share.share_html_block_template_v2) "Versioned Share template must remain output-only."
+Assert-Check ($policy.policy.share.share_html_block_effective_language -match '^[a-z]{2,3}(?:_[a-z0-9]{2,8})*$') "Effective Share template language must be a normalized locale code."
+Assert-Check ($null -eq $policy.policy_editable.share.share_html_block_effective_language) "Effective Share template language must remain output-only."
 
 $secrets = Read-Json "secrets-create-response.json"
 Assert-Check ($secrets.ocs.data.uuid -match '^[A-Za-z0-9_-]+$') "Secrets response uuid must be URL-safe."

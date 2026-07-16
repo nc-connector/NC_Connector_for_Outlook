@@ -48,10 +48,12 @@ internal static class OutlookFileLinkRenderingTests
 
     public static int Main()
     {
+        Strings.SetPreferredUiLanguage("en");
         TestNormalModeUsesNextcloudLinkWording();
         TestAttachmentModeKeepsNextcloudSubpath();
         TestPlainTextKeepsNextcloudSubpath();
         TestCustomTemplateResolvesModeAwareLinkVariables();
+        TestBackendEffectiveLanguageLocalizesCustomTemplateCopy();
         TestOlderBackendModeAwareTemplateStillRenders();
         TestLegacyCustomTemplateStillRenders();
         TestSecretLinkLabelHidesLongUrlInHtml();
@@ -137,6 +139,29 @@ internal static class OutlookFileLinkRenderingTests
         Check("Legacy custom template is not forced to contain new variables", !plainText.Contains("LINK_INTRO") && !plainText.Contains("LINK_LABEL"), plainText);
     }
 
+    private static void TestBackendEffectiveLanguageLocalizesCustomTemplateCopy()
+    {
+        const string template = "<p>{LINK_INTRO}</p><p>{LINK_LABEL}: {URL}</p><p>{PASSWORD}</p><p>{RIGHTS}</p>";
+        BackendPolicyStatus policy = BuildCustomTemplatePolicy("<p>Legacy: {URL}</p>", template, "de");
+        FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", "Secret!");
+        var request = new FileLinkRequest
+        {
+            PasswordSeparateEnabled = true,
+            Permissions = FileLinkPermissionFlags.Read | FileLinkPermissionFlags.Create
+        };
+
+        string html = FileLinkHtmlBuilder.Build(result, request, "custom", policy);
+        string plainText = FileLinkHtmlBuilder.BuildPlainText(result, request, "custom", policy);
+
+        foreach (string output in new[] { html, plainText })
+        {
+            Check("Backend template language localizes LINK_INTRO", output.Contains("Öffnen Sie den untenstehenden Nextcloud-Link"), output);
+            Check("Backend template language localizes LINK_LABEL", output.Contains("Nextcloud-Link"), output);
+            Check("Backend template language localizes separate-password hint", output.Contains("Das Passwort wird in einer separaten E-Mail gesendet."), output);
+            Check("Backend template language localizes permission names", output.Contains("Lesen") && output.Contains("Hochladen") && output.Contains("Bearbeiten") && output.Contains("Löschen"), output);
+        }
+    }
+
     private static void TestOlderBackendModeAwareTemplateStillRenders()
     {
         const string template = "<p>{LINK_INTRO}</p><p>{LINK_LABEL}: <a href=\"{URL}\">{URL}</a></p>";
@@ -184,7 +209,7 @@ internal static class OutlookFileLinkRenderingTests
         };
     }
 
-    private static BackendPolicyStatus BuildCustomTemplatePolicy(string template, string versionedTemplate = null)
+    private static BackendPolicyStatus BuildCustomTemplatePolicy(string template, string versionedTemplate = null, string effectiveLanguage = null)
     {
         var sharePolicy = new Dictionary<string, object>
         {
@@ -193,6 +218,10 @@ internal static class OutlookFileLinkRenderingTests
         if (!string.IsNullOrWhiteSpace(versionedTemplate))
         {
             sharePolicy.Add("share_html_block_template_v2", versionedTemplate);
+        }
+        if (!string.IsNullOrWhiteSpace(effectiveLanguage))
+        {
+            sharePolicy.Add("share_html_block_effective_language", effectiveLanguage);
         }
         var empty = new Dictionary<string, object>();
         return new BackendPolicyStatus(
@@ -246,9 +275,13 @@ internal static class OutlookFileLinkRenderingTests
     Get-ChildItem -Path $vendorDir -Filter "*.dll" | ForEach-Object {
         $references += "/reference:$($_.FullName)"
     }
+    $resources = @(
+        "/resource:$((Resolve-Path (Join-Path $ProjectRoot 'src\NcTalkOutlookAddIn\Resources\_locales\en\messages.json')).Path),OutlookFileLinkRenderingTests.Resources._locales.en.messages.json",
+        "/resource:$((Resolve-Path (Join-Path $ProjectRoot 'src\NcTalkOutlookAddIn\Resources\_locales\de\messages.json')).Path),OutlookFileLinkRenderingTests.Resources._locales.de.messages.json"
+    )
 
     $exe = Join-Path $TempRoot "OutlookFileLinkRenderingTests.exe"
-    & $csc /nologo /nowarn:1702 /target:exe "/out:$exe" @references @sources
+    & $csc /nologo /nowarn:1702 /target:exe "/out:$exe" @references @resources @sources
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
