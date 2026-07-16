@@ -50,17 +50,14 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 effectiveLanguage = "default";
             }
-            string intro = Strings.GetInLanguage(
-                effectiveLanguage,
-                "sharing_html_intro",
-                "I would like to share files securely and protect your privacy. Click the link below to download your files.");
+            string intro = GetShareLinkIntro(effectiveLanguage, attachmentMode, false);
 
             string footerFormat = Strings.GetInLanguage(
                 effectiveLanguage,
                 "sharing_html_footer",
                 "{0} is a solution for secure email and file exchange.");
 
-            string downloadLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_download_label", "Download link");
+            string linkLabel = GetShareLinkLabel(effectiveLanguage, attachmentMode);
             string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
             string expireLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_expire_label", "Expiration date");
             string permissionsLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_permissions_label", "Your permissions");
@@ -109,7 +106,7 @@ namespace NcTalkOutlookAddIn.Utilities
             string downloadUrl = attachmentMode
                 ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
                 : (result.ShareUrl ?? string.Empty);
-            AppendRow(builder, downloadLabel, string.Format(
+            AppendRow(builder, linkLabel, string.Format(
                 CultureInfo.InvariantCulture,
                 "<a href=\"{0}\" style=\"color:{1};text-decoration:none;\">{0}</a>",
                 HttpUtility.HtmlEncode(downloadUrl),
@@ -263,13 +260,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 sections.Add(NormalizePlainTextBlock(request.Note));
             }
-            sections.Add(NormalizePlainTextBlock(Strings.GetInLanguage(
-                effectiveLanguage,
-                "sharing_html_intro_line",
-                "The files have been provided securely via Nextcloud. You can download them using the link below.")));
+            sections.Add(NormalizePlainTextBlock(GetShareLinkIntro(effectiveLanguage, attachmentMode, true)));
 
             var fields = new List<string>();
-            fields.Add(BuildPlainTextField(Strings.GetInLanguage(effectiveLanguage, "sharing_html_download_label", "Download link"), downloadUrl));
+            fields.Add(BuildPlainTextField(GetShareLinkLabel(effectiveLanguage, attachmentMode), downloadUrl));
             if (!string.IsNullOrWhiteSpace(result.Password) && !separatePassword)
             {
                 fields.Add(BuildPlainTextField(passwordLabel, result.Password));
@@ -419,6 +413,8 @@ namespace NcTalkOutlookAddIn.Utilities
             string downloadUrl = attachmentMode
                 ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
                 : (result.ShareUrl ?? string.Empty);
+            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, attachmentMode, false);
+            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, attachmentMode);
 
             string passwordValue = result.Password ?? string.Empty;
             if (!passwordOnly && separatePassword)
@@ -455,6 +451,8 @@ namespace NcTalkOutlookAddIn.Utilities
             html = html.Replace("{EXPIRATIONDATE}", HttpUtility.HtmlEncode(expireValue));
             html = html.Replace("{RIGHTS}", rightsValue);
             html = html.Replace("{NOTE}", HttpUtility.HtmlEncode(noteValue));
+            html = html.Replace("{LINK_INTRO}", HttpUtility.HtmlEncode(linkIntro));
+            html = html.Replace("{LINK_LABEL}", HttpUtility.HtmlEncode(linkLabel));
 
             string sanitized = HtmlTemplateSanitizer.SanitizeShareTemplateHtml(html);
             if (string.IsNullOrWhiteSpace(sanitized))
@@ -487,6 +485,8 @@ namespace NcTalkOutlookAddIn.Utilities
             string downloadUrl = attachmentMode
                 ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
                 : (result.ShareUrl ?? string.Empty);
+            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, attachmentMode, true);
+            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, attachmentMode);
 
             string passwordValue = result.Password ?? string.Empty;
             if (!passwordOnly && separatePassword)
@@ -516,6 +516,8 @@ namespace NcTalkOutlookAddIn.Utilities
             html = html.Replace("{EXPIRATIONDATE}", PlainTextToTemplateHtml(expireValue));
             html = html.Replace("{RIGHTS}", PlainTextToTemplateHtml(rightsValue));
             html = html.Replace("{NOTE}", PlainTextToTemplateHtml(noteValue));
+            html = html.Replace("{LINK_INTRO}", PlainTextToTemplateHtml(linkIntro));
+            html = html.Replace("{LINK_LABEL}", PlainTextToTemplateHtml(linkLabel));
 
             string sanitized = HtmlTemplateSanitizer.SanitizeShareTemplateHtml(html);
             if (string.IsNullOrWhiteSpace(sanitized))
@@ -530,6 +532,30 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             return plainText;
+        }
+
+        private static string GetShareLinkIntro(string effectiveLanguage, bool attachmentMode, bool plainText)
+        {
+            if (attachmentMode)
+            {
+                return Strings.GetInLanguage(
+                    effectiveLanguage,
+                    "sharing_html_zip_download_intro",
+                    "The files have been provided securely via Nextcloud. Download the shared files as a ZIP archive using the link below.");
+            }
+
+            return Strings.GetInLanguage(
+                effectiveLanguage,
+                plainText ? "sharing_html_intro_line" : "sharing_html_intro",
+                "The files have been provided securely via Nextcloud. Open the Nextcloud link below to view the share.");
+        }
+
+        private static string GetShareLinkLabel(string effectiveLanguage, bool attachmentMode)
+        {
+            return Strings.GetInLanguage(
+                effectiveLanguage,
+                attachmentMode ? "sharing_html_download_label" : "sharing_html_share_link_label",
+                attachmentMode ? "ZIP download" : "Nextcloud link");
         }
 
         private static string PlainTextToTemplateHtml(string value)
@@ -808,4 +834,3 @@ namespace NcTalkOutlookAddIn.Utilities
         }
     }
 }
-

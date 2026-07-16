@@ -194,6 +194,8 @@ Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanit
 - In Microsoft-365-/Exchange-Umgebungen mit serverseitigen Nachrichtengroessenlimits kann Outlook grosse Anhaenge bereits vor den Add-in-Events blockieren; in diesen Faellen kann die Automatisierung technisch nicht greifen und der Benutzer soll stattdessen den Button `Nextcloud Freigabe hinzufuegen` verwenden.
 - Im Datei-Schritt des Sharing-Wizards koennen Dateien und Ordner per Explorer-Drag-and-drop im gesamten Schrittbereich (Queue + Aktionsbereich) hinzugefuegt werden, nicht nur ueber die Add-Buttons.
 - Datei-Uploads groesser als 20 MB nutzen Nextcloud Chunked Upload v2. Damit vermeiden wir lange einzelne WebDAV-`PUT`-Requests durch Proxies oder Webserver, die sehr grosse Request-Bodies ablehnen.
+- Normale Freigaben benennen `/s/<token>` als Nextcloud-Link; nur der Attachment-Modus benennt `/s/<token>/download` als ZIP-Download.
+- Custom-Share-Templates koennen `{LINK_INTRO}` und `{LINK_LABEL}` verwenden. Outlook fuellt beide Werte passend zum Modus; bestehende Templates ohne diese Variablen bleiben unveraendert nutzbar.
 
 ### Separater Passwort-Follow-up-Versand
 - Ist `Passwort separat senden` aktiv, enthaelt der Haupt-HTML-Block kein Inline-Passwort.
@@ -330,6 +332,3 @@ netstat -ano | Select-String ":<ifb-port>"
 - App-Passwort gültig?
 - Talk installiert?
 - Password Policy App optional: bei fehlender App wird lokal generiert (Fallback)
-
-
-

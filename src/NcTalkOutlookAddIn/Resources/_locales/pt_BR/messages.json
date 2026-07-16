@@ -882,7 +882,10 @@
     "message": "Não foi possível inserir o compartilhamento na mensagem."
   },
   "sharing_html_intro": {
-    "message": "Os arquivos foram disponibilizados com segurança e em conformidade com a privacidade por meio do Nextcloud. O download está disponível pelo link abaixo."
+    "message": "Os arquivos foram disponibilizados com segurança e em conformidade com a privacidade por meio do Nextcloud. Abra o link do Nextcloud abaixo para visualizar o compartilhamento."
+  },
+  "sharing_html_zip_download_intro": {
+    "message": "Os arquivos foram disponibilizados com segurança e em conformidade com a privacidade por meio do Nextcloud. Baixe os arquivos compartilhados como um arquivo ZIP usando o link abaixo."
   },
   "sharing_html_password_label": {
     "message": "Senha"
@@ -894,7 +897,10 @@
     "message": "Suas permissões"
   },
   "sharing_html_download_label": {
-    "message": "Link de download"
+    "message": "Download ZIP"
+  },
+  "sharing_html_share_link_label": {
+    "message": "Link do Nextcloud"
   },
   "sharing_html_footer": {
     "message": "$1 é uma solução para e-mail seguro e troca de arquivos."
@@ -999,7 +1005,7 @@
     "message": "Envio cancelado porque nenhum nome de substituição foi fornecido."
   },
   "sharing_html_intro_line": {
-    "message": "Os arquivos foram disponibilizados com segurança e em conformidade com a privacidade por meio do Nextcloud. O download está disponível pelo link abaixo."
+    "message": "Os arquivos foram disponibilizados com segurança e em conformidade com a privacidade por meio do Nextcloud. Abra o link do Nextcloud abaixo para visualizar o compartilhamento."
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud é uma solução para e-mail seguro e troca de dados."

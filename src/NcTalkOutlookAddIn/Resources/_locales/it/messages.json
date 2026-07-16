@@ -882,7 +882,10 @@
     "message": "Impossibile inserire la condivisione nel messaggio."
   },
   "sharing_html_intro": {
-    "message": "I file sono stati forniti tramite Nextcloud in modo sicuro e conforme alla privacy. Il download è disponibile tramite il link sottostante."
+    "message": "I file sono stati forniti in modo sicuro e conforme alla protezione dei dati tramite Nextcloud. Apri il link Nextcloud qui sotto per visualizzare la condivisione."
+  },
+  "sharing_html_zip_download_intro": {
+    "message": "I file sono stati forniti in modo sicuro e conforme alla protezione dei dati tramite Nextcloud. Scarica i file condivisi come archivio ZIP tramite il link qui sotto."
   },
   "sharing_html_password_label": {
     "message": "Codice di accesso"
@@ -894,7 +897,10 @@
     "message": "I tuoi permessi"
   },
   "sharing_html_download_label": {
-    "message": "Link di download"
+    "message": "Download ZIP"
+  },
+  "sharing_html_share_link_label": {
+    "message": "Link Nextcloud"
   },
   "sharing_html_footer": {
     "message": "$1 è una soluzione per e-mail sicure e scambio di file."
@@ -999,7 +1005,7 @@
     "message": "Upload annullato perché non è stato fornito un nome sostitutivo."
   },
   "sharing_html_intro_line": {
-    "message": "I file sono stati forniti tramite Nextcloud in modo sicuro e conforme alla privacy. Il download è disponibile tramite il link sottostante."
+    "message": "I file sono stati forniti in modo sicuro e conforme alla protezione dei dati tramite Nextcloud. Apri il link Nextcloud qui sotto per visualizzare la condivisione."
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud è una soluzione per e-mail sicure e scambio di dati."
