@@ -232,6 +232,7 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
    - Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file` to the final DAV path.
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
+   - `{LINK_INTRO}` and `{LINK_LABEL}` are resolved in the existing renderer: normal shares describe and label the Nextcloud share page, while attachment mode describes and labels the `/download` URL as a ZIP download. Legacy templates without these placeholders keep their existing output.
    - plain-text compose keeps `MailItem.BodyFormat=olFormatPlain`; the share block is rendered as a framed text block with `#` separators and inserted through Outlook WordEditor. Inline replies/forwards keep two empty paragraphs above the block for the sender's own text. `MailItem.Body` is not rewritten.
 6. `NextcloudTalkAddIn.InsertHtmlIntoMail(...)` / `InsertPlainTextIntoMail(...)` insert the rendered block into the message body (delegated to `Controllers/MailInteropController.cs`).
 

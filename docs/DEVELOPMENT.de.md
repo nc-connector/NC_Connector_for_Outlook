@@ -255,6 +255,7 @@ Compose-Filelink-Paritaet (3.1.0):
   - vor Wizard-Finalize im Attachment-Modus.
 - `FileLinkHtmlBuilder` erzeugt im Attachment-Modus reduziertes HTML mit ZIP-Link `/s/<token>/download`.
 - Custom-Share-Templates aus dem Backend werden im `FileLinkHtmlBuilder` vor der Einfuegung ueber `HtmlTemplateSanitizer` bereinigt (fail-closed).
+- `{LINK_INTRO}` und `{LINK_LABEL}` werden im bestehenden Renderer modusabhaengig aufgeloest: normale Freigaben beschreiben und benennen die Nextcloud-Freigabeseite, der Attachment-Modus den `/download`-Link als ZIP-Download. Bestehende Templates ohne diese Platzhalter behalten ihre bisherige Ausgabe.
 - Plain-Text-Compose bleibt `MailItem.BodyFormat=olFormatPlain`; der Freigabeblock wird als Textblock mit `#`-Rahmen gerendert und ueber Outlook WordEditor eingefuegt. Inline-Antworten/-Weiterleitungen behalten zwei leere Absaetze ueber dem Block fuer eigenen Text. `MailItem.Body` wird nicht neu geschrieben.
 - `FileLinkWizardForm` akzeptiert im Datei-Schritt Explorer-Drag-and-drop fuer Dateien/Ordner ueber Queue und Aktionsbereich.
 - `FileLinkService` nutzt fuer Dateien bis 20 MB einen direkten WebDAV-`PUT`. Groessere Dateien laufen ueber Nextcloud Chunked Upload v2 unter `/remote.php/dav/uploads/<user>/<upload-id>` und werden danach per `MOVE .file` an den finalen DAV-Pfad zusammengesetzt.
@@ -305,4 +306,3 @@ Wichtig für Updates:
 4) MSI installieren/upgrade testen (alte Version → neue Version)
 5) Talk + Filelink + IFB Smoke-Test
 6) MSI ggf. signieren (falls in der Umgebung erforderlich)
-

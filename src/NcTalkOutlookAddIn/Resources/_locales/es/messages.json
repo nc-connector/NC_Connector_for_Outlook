@@ -882,7 +882,10 @@
     "message": "No se pudo insertar la compartición en el mensaje."
   },
   "sharing_html_intro": {
-    "message": "Los archivos se han proporcionado de forma segura y conforme a la protección de datos a través de Nextcloud. La descarga está disponible mediante el enlace de abajo."
+    "message": "Los archivos se han proporcionado de forma segura y conforme a la protección de datos a través de Nextcloud. Abra el enlace de Nextcloud que aparece a continuación para ver el recurso compartido."
+  },
+  "sharing_html_zip_download_intro": {
+    "message": "Los archivos se han proporcionado de forma segura y conforme a la protección de datos a través de Nextcloud. Descargue los archivos compartidos como un archivo ZIP mediante el enlace que aparece a continuación."
   },
   "sharing_html_password_label": {
     "message": "Contraseña"
@@ -894,7 +897,10 @@
     "message": "Tus permisos"
   },
   "sharing_html_download_label": {
-    "message": "Enlace de descarga"
+    "message": "Descarga ZIP"
+  },
+  "sharing_html_share_link_label": {
+    "message": "Enlace de Nextcloud"
   },
   "sharing_html_footer": {
     "message": "$1 es una solución para el correo seguro y el intercambio de archivos."
@@ -999,7 +1005,7 @@
     "message": "La subida se canceló porque no se proporcionó un nombre de reemplazo."
   },
   "sharing_html_intro_line": {
-    "message": "Los archivos se han proporcionado de forma segura y conforme a la protección de datos a través de Nextcloud. La descarga está disponible mediante el enlace de abajo."
+    "message": "Los archivos se han proporcionado de forma segura y conforme a la protección de datos a través de Nextcloud. Abra el enlace de Nextcloud que aparece a continuación para ver el recurso compartido."
   },
   "sharing_html_footer_line": {
     "message": "Nextcloud es una solución para el correo seguro y el intercambio de datos."

@@ -11,6 +11,7 @@ try {
     $testSource = Join-Path $TempRoot "OutlookFileLinkRenderingTests.cs"
     @'
 using System;
+using System.Collections.Generic;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
@@ -47,8 +48,11 @@ internal static class OutlookFileLinkRenderingTests
 
     public static int Main()
     {
+        TestNormalModeUsesNextcloudLinkWording();
         TestAttachmentModeKeepsNextcloudSubpath();
         TestPlainTextKeepsNextcloudSubpath();
+        TestCustomTemplateResolvesModeAwareLinkVariables();
+        TestLegacyCustomTemplateStillRenders();
         TestSecretLinkLabelHidesLongUrlInHtml();
 
         if (failures > 0)
@@ -60,6 +64,25 @@ internal static class OutlookFileLinkRenderingTests
         return 0;
     }
 
+    private static void TestNormalModeUsesNextcloudLinkWording()
+    {
+        FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", "Secret!");
+        FileLinkRequest request = new FileLinkRequest
+        {
+            ShareName = "Folder",
+            AttachmentMode = false,
+            PasswordSeparateEnabled = false,
+            NoteEnabled = false,
+            Permissions = FileLinkPermissionFlags.Read | FileLinkPermissionFlags.Create
+        };
+        string html = FileLinkHtmlBuilder.Build(result, request, "en");
+        string plainText = FileLinkHtmlBuilder.BuildPlainText(result, request, "en");
+
+        Check("Normal HTML labels the share page as a Nextcloud link", html.Contains(">Nextcloud link<"), html);
+        Check("Normal plain text labels the share page as a Nextcloud link", plainText.Contains("Nextcloud link: https://cloud.example.test/nc/s/AbCd1234"), plainText);
+        Check("Normal share URL does not gain a ZIP suffix", !html.Contains("/AbCd1234/download") && !plainText.Contains("/AbCd1234/download"));
+    }
+
     private static void TestAttachmentModeKeepsNextcloudSubpath()
     {
         FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", "Secret!");
@@ -68,6 +91,8 @@ internal static class OutlookFileLinkRenderingTests
 
         Check("Attachment ZIP URL keeps /nc subpath in HTML", html.Contains("https://cloud.example.test/nc/s/AbCd1234/download"), html);
         Check("Attachment ZIP URL does not drop /nc subpath in HTML", !html.Contains("https://cloud.example.test/s/AbCd1234/download"), html);
+        Check("Attachment HTML labels the link as ZIP download", html.Contains(">ZIP download<"), html);
+        Check("Attachment HTML explains ZIP download behavior", html.Contains("Download the shared files as a ZIP archive"), html);
     }
 
     private static void TestPlainTextKeepsNextcloudSubpath()
@@ -77,7 +102,33 @@ internal static class OutlookFileLinkRenderingTests
         string plainText = FileLinkHtmlBuilder.BuildPlainText(result, request, "en");
 
         Check("Attachment ZIP URL keeps /nc subpath in plain text", plainText.Contains("https://cloud.example.test/nc/s/AbCd1234/download"), plainText);
+        Check("Attachment plain text labels the link as ZIP download", plainText.Contains("ZIP download: https://cloud.example.test/nc/s/AbCd1234/download"), plainText);
         Check("Plain text stays plain", !plainText.Contains("<a "), plainText);
+    }
+
+    private static void TestCustomTemplateResolvesModeAwareLinkVariables()
+    {
+        const string template = "<p>{LINK_INTRO}</p><p>{LINK_LABEL}: <a href=\"{URL}\">{URL}</a></p>";
+        BackendPolicyStatus policy = BuildCustomTemplatePolicy(template);
+        FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", string.Empty);
+
+        string normal = FileLinkHtmlBuilder.BuildPlainText(result, new FileLinkRequest(), "custom", policy);
+        string zip = FileLinkHtmlBuilder.BuildPlainText(result, BuildAttachmentRequest(), "custom", policy);
+
+        Check("Custom normal template resolves LINK_INTRO", normal.Contains("Open the Nextcloud link below to view the share."), normal);
+        Check("Custom normal template resolves LINK_LABEL", normal.Contains("Nextcloud link: https://cloud.example.test/nc/s/AbCd1234"), normal);
+        Check("Custom attachment template resolves ZIP LINK_INTRO", zip.Contains("Download the shared files as a ZIP archive"), zip);
+        Check("Custom attachment template resolves ZIP LINK_LABEL", zip.Contains("ZIP download: https://cloud.example.test/nc/s/AbCd1234/download"), zip);
+    }
+
+    private static void TestLegacyCustomTemplateStillRenders()
+    {
+        BackendPolicyStatus policy = BuildCustomTemplatePolicy("<p>Legacy link: {URL}</p>");
+        FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", string.Empty);
+        string plainText = FileLinkHtmlBuilder.BuildPlainText(result, new FileLinkRequest(), "custom", policy);
+
+        Check("Legacy custom template still resolves its existing URL variable", plainText.Contains("Legacy link: https://cloud.example.test/nc/s/AbCd1234"), plainText);
+        Check("Legacy custom template is not forced to contain new variables", !plainText.Contains("LINK_INTRO") && !plainText.Contains("LINK_LABEL"), plainText);
     }
 
     private static void TestSecretLinkLabelHidesLongUrlInHtml()
@@ -114,6 +165,32 @@ internal static class OutlookFileLinkRenderingTests
             NoteEnabled = false,
             Permissions = FileLinkPermissionFlags.Read | FileLinkPermissionFlags.Create
         };
+    }
+
+    private static BackendPolicyStatus BuildCustomTemplatePolicy(string template)
+    {
+        var sharePolicy = new Dictionary<string, object>
+        {
+            { "share_html_block_template", template }
+        };
+        var empty = new Dictionary<string, object>();
+        return new BackendPolicyStatus(
+            true,
+            true,
+            true,
+            false,
+            string.Empty,
+            "policy",
+            string.Empty,
+            true,
+            true,
+            "active",
+            sharePolicy,
+            empty,
+            empty,
+            empty,
+            empty,
+            empty);
     }
 }
 '@ | Set-Content -Path $testSource -Encoding UTF8

@@ -882,7 +882,10 @@
     "message": "Nem sikerült beszúrni a megosztást az üzenetbe."
   },
   "sharing_html_intro": {
-    "message": "A fájlok biztonságosan és az adatvédelmi előírásoknak megfelelően kerültek megosztásra a Nextclouddal. A letöltés az alábbi linken érhető el."
+    "message": "A fájlok biztonságosan és az adatvédelemnek megfelelően, Nextcloudon keresztül kerültek megosztásra. A megosztás megtekintéséhez nyissa meg az alábbi Nextcloud-hivatkozást."
+  },
+  "sharing_html_zip_download_intro": {
+    "message": "A fájlok biztonságosan és az adatvédelemnek megfelelően, Nextcloudon keresztül kerültek megosztásra. Töltse le a megosztott fájlokat ZIP-archívumként az alábbi hivatkozás segítségével."
   },
   "sharing_html_password_label": {
     "message": "Jelszó"
@@ -894,7 +897,10 @@
     "message": "Az Ön jogosultságai"
   },
   "sharing_html_download_label": {
-    "message": "Letöltési hivatkozás"
+    "message": "ZIP-letöltés"
+  },
+  "sharing_html_share_link_label": {
+    "message": "Nextcloud-hivatkozás"
   },
   "sharing_html_footer": {
     "message": "$1 egy megoldás a biztonságos e-mail- és fájlmegosztásra."
@@ -999,7 +1005,7 @@
     "message": "A feltöltés megszakadt, mert nem adott meg új nevet."
   },
   "sharing_html_intro_line": {
-    "message": "A fájlok biztonságosan és az adatvédelmi előírásoknak megfelelően kerültek megosztásra a Nextclouddal. A letöltés az alábbi linken érhető el."
+    "message": "A fájlok biztonságosan és az adatvédelemnek megfelelően, Nextcloudon keresztül kerültek megosztásra. A megosztás megtekintéséhez nyissa meg az alábbi Nextcloud-hivatkozást."
   },
   "sharing_html_footer_line": {
     "message": "A Nextcloud megoldás a biztonságos e-mail és adatcsere számára."
