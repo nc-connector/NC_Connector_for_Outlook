@@ -24,11 +24,11 @@ namespace NcTalkOutlookAddIn
         public void OnConnection(object application, ext_ConnectMode connectMode, object addInInst, ref Array custom)
         {
             _outlookApplication = (Outlook.Application)application;
-            _uiSynchronizationContext = SynchronizationContext.Current;
             string outlookProfileName = ResolveCurrentOutlookProfileName();
             _settingsStorage = new NcTalkOutlookAddIn.Settings.SettingsStorage(outlookProfileName);
             _currentSettings = _settingsStorage.Load();
             ConfigureDiagnosticsLogger(_currentSettings);
+            InitializeOutlookUiSynchronizationContext();
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();
             LogCore("Add-in connected (Outlook version=" + (_outlookApplication != null ? _outlookApplication.Version : "unknown") + ").");
@@ -47,6 +47,25 @@ namespace NcTalkOutlookAddIn
             EnsureInspectorHook();
             ApplyIfbSettings();
             StartUpdateCheckIfDue();
+        }
+
+        private void InitializeOutlookUiSynchronizationContext()
+        {
+            try
+            {
+                _uiSynchronizationContext = new OutlookUiSynchronizationContext();
+                LogCore(
+                    "Outlook UI synchronization context initialized (threadId="
+                    + _uiSynchronizationContext.ThreadId.ToString(CultureInfo.InvariantCulture)
+                    + ", apartment="
+                    + Thread.CurrentThread.GetApartmentState()
+                    + ").");
+            }
+            catch (Exception ex)
+            {
+                _uiSynchronizationContext = null;
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to initialize Outlook UI synchronization context.", ex);
+            }
         }
 
         private void StartUpdateCheckIfDue()
@@ -273,7 +292,19 @@ namespace NcTalkOutlookAddIn
             }
 
             _ribbonUi = null;
+            OutlookUiSynchronizationContext uiSynchronizationContext = _uiSynchronizationContext;
             _uiSynchronizationContext = null;
+            if (uiSynchronizationContext != null)
+            {
+                try
+                {
+                    uiSynchronizationContext.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to dispose Outlook UI synchronization context.", ex);
+                }
+            }
             _deferredAppointmentEnsureState.ClearPendingKeys();
         }
     }

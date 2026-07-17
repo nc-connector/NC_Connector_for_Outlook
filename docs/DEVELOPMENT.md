@@ -166,6 +166,7 @@ Runtime rules:
   - `SettingsWorkflowController`, `FileLinkLaunchController`, and `TalkRibbonController` own ribbon-triggered UI/runtime workflows.
   - `NextcloudTalkAddIn.cs` remains the COM/ribbon/event composition root and delegates feature flows to controllers.
   - `TalkRibbonController` and `FileLinkLaunchController` prefetch backend policy + password policy in parallel before opening wizards, while still fetching fresh runtime policy data on every entry.
+  - FileLink prefetch completion is marshalled through `OutlookUiSynchronizationContext` before WinForms controls or Outlook COM objects are accessed. Outlook does not reliably provide a `SynchronizationContext` to COM callbacks, while WinForms drag-and-drop registration requires the Outlook STA thread.
   - Lifecycle, policy/template resolution, and deferred subscription ensure are split into dedicated partial files to keep the root orchestration class maintainable.
 - **Service layer**
   - `Services/TalkService.cs` calls the Talk OCS API.

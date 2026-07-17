@@ -56,7 +56,7 @@ namespace NcTalkOutlookAddIn
         private readonly MailInteropController _mailInteropController;
         private readonly UpdateCheckService _updateCheckService = new UpdateCheckService();
         private readonly DeferredAppointmentEnsureState _deferredAppointmentEnsureState = new DeferredAppointmentEnsureState();
-        private SynchronizationContext _uiSynchronizationContext;
+        private OutlookUiSynchronizationContext _uiSynchronizationContext;
         private IRibbonUI _ribbonUi;
         private const int ComposeAttachmentEvalDebounceMs = 250;
         private const int ComposeShareCleanupSendGraceMs = 15000;
@@ -291,6 +291,19 @@ namespace NcTalkOutlookAddIn
         internal Task<bool> RunFileLinkWizardForMailAsync(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
         {
             return _fileLinkLaunchController.RunFileLinkWizardForMailAsync(mail, launchOptions);
+        }
+
+        internal Task<T> RunOnOutlookUiThreadAsync<T>(Func<T> callback)
+        {
+            OutlookUiSynchronizationContext context = _uiSynchronizationContext;
+            if (context == null)
+            {
+                var completion = new TaskCompletionSource<T>();
+                completion.SetException(new InvalidOperationException("The Outlook UI synchronization context is unavailable."));
+                return completion.Task;
+            }
+
+            return context.InvokeAsync(callback);
         }
 
         internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null, bool isInlineResponse = false)

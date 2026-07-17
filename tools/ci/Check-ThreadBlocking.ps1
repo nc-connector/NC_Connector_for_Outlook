@@ -53,6 +53,23 @@ foreach ($file in $sourceFiles) {
     }
 }
 
+$fileLinkControllerPath = Join-Path $SourceRoot "Controllers\FileLinkLaunchController.cs"
+$fileLinkController = Get-Content -LiteralPath $fileLinkControllerPath -Raw
+$asyncFlowMatch = [regex]::Match(
+    $fileLinkController,
+    '(?s)internal async Task<bool> RunFileLinkWizardForMailAsync.*?(?=\s+private bool RunFileLinkWizardOnUiThread)')
+if (-not $asyncFlowMatch.Success) {
+    $failures.Add("Controllers\FileLinkLaunchController.cs does not expose the expected async/UI FileLink flow boundary.")
+}
+else {
+    if ($asyncFlowMatch.Value -notmatch '\.RunOnOutlookUiThreadAsync\s*\(') {
+        $failures.Add("Controllers\FileLinkLaunchController.cs does not marshal the FileLink wizard back to Outlook's UI thread.")
+    }
+    if ($asyncFlowMatch.Value -match 'new\s+FileLinkWizardForm\s*\(') {
+        $failures.Add("Controllers\FileLinkLaunchController.cs constructs the FileLink wizard before entering the Outlook UI-thread boundary.")
+    }
+}
+
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Error $_ }
     throw "Thread-blocking check failed with $($failures.Count) issue(s)."

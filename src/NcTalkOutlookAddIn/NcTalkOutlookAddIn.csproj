@@ -187,6 +187,7 @@
     <Compile Include="Utilities\AppDataPaths.cs" />
     <Compile Include="Utilities\ComInteropScope.cs" />
     <Compile Include="Utilities\NativeWindowOwner.cs" />
+    <Compile Include="Utilities\OutlookUiSynchronizationContext.cs" />
     <Compile Include="Utilities\WaitCursorScope.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UI\BrandedHeader.cs" />

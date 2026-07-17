@@ -14,6 +14,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
@@ -64,6 +67,7 @@ internal static class OutlookUtilityTests
         TestBackendPolicyStatus();
         TestHtmlToPlainText();
         TestSecretsCrypto();
+        TestOutlookUiSynchronizationContext();
 
         if (failures > 0)
         {
@@ -169,6 +173,73 @@ internal static class OutlookUtilityTests
         Equal("SecretsCrypto iv length", 12, iv.Length);
         Check("SecretsCrypto includes authentication tag", encrypted.Length > "secret".Length);
     }
+
+    private static void TestOutlookUiSynchronizationContext()
+    {
+        OutlookUiSynchronizationContext context = null;
+        Exception uiThreadException = null;
+        int uiThreadId = 0;
+        var ready = new ManualResetEventSlim(false);
+        var uiThread = new Thread(() =>
+        {
+            try
+            {
+                context = new OutlookUiSynchronizationContext();
+                uiThreadId = Thread.CurrentThread.ManagedThreadId;
+                ready.Set();
+                Application.Run();
+            }
+            catch (Exception ex)
+            {
+                uiThreadException = ex;
+                ready.Set();
+            }
+            finally
+            {
+                if (context != null)
+                {
+                    context.Dispose();
+                }
+            }
+        });
+        uiThread.IsBackground = true;
+        uiThread.SetApartmentState(ApartmentState.STA);
+        uiThread.Start();
+
+        Check("Outlook UI context becomes ready", ready.Wait(TimeSpan.FromSeconds(5)));
+        Check("Outlook UI context initializes on STA", context != null && uiThreadException == null, uiThreadException != null ? uiThreadException.ToString() : "");
+        if (context == null)
+        {
+            return;
+        }
+
+        Task<Tuple<int, ApartmentState>> dispatch = context.InvokeAsync(() =>
+        {
+            var result = Tuple.Create(Thread.CurrentThread.ManagedThreadId, Thread.CurrentThread.GetApartmentState());
+            Application.ExitThread();
+            return result;
+        });
+
+        bool dispatchCompleted = false;
+        try
+        {
+            dispatchCompleted = dispatch.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException ex)
+        {
+            Check("Outlook UI dispatch completes", false, ex.ToString());
+        }
+        if (!dispatch.IsFaulted)
+        {
+            Check("Outlook UI dispatch completes", dispatchCompleted);
+        }
+        if (dispatch.Status == TaskStatus.RanToCompletion)
+        {
+            Equal("Outlook UI dispatch returns to captured thread", uiThreadId, dispatch.Result.Item1);
+            Equal("Outlook UI dispatch runs in STA", ApartmentState.STA, dispatch.Result.Item2);
+        }
+        Check("Outlook UI test thread exits", uiThread.Join(TimeSpan.FromSeconds(5)));
+    }
 }
 '@ | Set-Content -Path $testSource -Encoding UTF8
 
@@ -187,13 +258,15 @@ internal static class OutlookUtilityTests
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NcJson.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\BackendPolicyStatus.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HtmlToPlainTextConverter.cs"),
-        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\SecretsCrypto.cs")
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\SecretsCrypto.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\OutlookUiSynchronizationContext.cs")
     )
 
     $exe = Join-Path $TempRoot "OutlookUtilityTests.exe"
     $references = @(
         "/reference:System.dll",
         "/reference:System.Core.dll",
+        "/reference:System.Windows.Forms.dll",
         "/reference:System.Web.Extensions.dll",
         ("/reference:" + (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\vendor\htmlsanitizer\AngleSharp.dll")),
         ("/reference:" + (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\vendor\htmlsanitizer\AngleSharp.Css.dll"))

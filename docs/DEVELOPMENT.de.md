@@ -146,6 +146,7 @@ Root:
 - `src/NcTalkOutlookAddIn/Controllers/TalkRibbonController.cs`
   Orchestrierung fuer Talk-Ribbon-Flow (Auth-Gate, Wizard, Room-Create/Replace).
 - `TalkRibbonController` und `FileLinkLaunchController` prefetchen Backend-Policy + Passwort-Policy parallel (`Task.WhenAll`) vor dem Wizard-Open; Policy-Daten bleiben dabei pro Einstiegspunkt immer frisch.
+- Nach dem FileLink-Prefetch wechselt `OutlookUiSynchronizationContext` vor jedem WinForms- oder Outlook-COM-Zugriff zurueck auf den Outlook-STA-Thread. Outlook stellt COM-Callbacks nicht verlaesslich einen `SynchronizationContext` bereit, WinForms-Drag-and-drop benoetigt jedoch den STA-Thread.
 
 Controller:
 

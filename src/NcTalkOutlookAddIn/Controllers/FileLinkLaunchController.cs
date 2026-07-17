@@ -72,14 +72,38 @@ namespace NcTalkOutlookAddIn.Controllers
                 settings.AppPassword);
             Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "sharing_wizard_open"));
             Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => _owner.FetchPasswordPolicyForFileLinkWizard(configuration));
-            await Task.WhenAll(policyStatusTask, passwordPolicyTask);
+            await Task.WhenAll(policyStatusTask, passwordPolicyTask).ConfigureAwait(false);
             BackendPolicyStatus policyStatus = policyStatusTask.Result;
+            PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
 
+            return await _owner.RunOnOutlookUiThreadAsync(
+                () => RunFileLinkWizardOnUiThread(
+                    mail,
+                    launchOptions,
+                    settings,
+                    configuration,
+                    policyStatus,
+                    passwordPolicy)).ConfigureAwait(false);
+        }
+
+        private bool RunFileLinkWizardOnUiThread(
+            Outlook.MailItem mail,
+            FileLinkWizardLaunchOptions launchOptions,
+            AddinSettings settings,
+            TalkServiceConfiguration configuration,
+            BackendPolicyStatus policyStatus,
+            PasswordPolicyInfo passwordPolicy)
+        {
             string basePath = string.IsNullOrWhiteSpace(settings.FileLinkBasePath)
                 ? AddinSettings.DefaultFileLinkBasePath
                 : settings.FileLinkBasePath;
 
-            PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
+            NextcloudTalkAddIn.LogFileLinkMessage(
+                "Sharing wizard UI ready (threadId="
+                + System.Threading.Thread.CurrentThread.ManagedThreadId.ToString(CultureInfo.InvariantCulture)
+                + ", apartment="
+                + System.Threading.Thread.CurrentThread.GetApartmentState()
+                + ").");
 
             using (var wizard = new FileLinkWizardForm(settings, configuration, passwordPolicy, policyStatus, basePath, launchOptions))
             {
