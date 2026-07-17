@@ -4,6 +4,21 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.2.2] - 2026-07-17
+
+### Added
+- Public roadmap links and structured GitHub issue forms make planned work, bug reports, feature requests, and support log guidance easier to find.
+- Automated Outlook checks now cover builds, locales, event hooks, settings persistence, backend response formats, template rendering, and MSI packaging.
+
+### Changed
+- Share blocks now use the backend template language for link text, field labels, permission names, and separate-password notices.
+- Current clients prefer versioned backend share templates while remaining compatible with older backend responses.
+
+### Fixed
+- Nextcloud accounts that authenticate with an email address or another login alias now use the canonical Nextcloud user ID for API and DAV paths.
+- Share links are described according to their actual target: a regular Nextcloud share page or a ZIP download in attachment mode, in both HTML and plain text.
+- FileLink, Talk, and settings dialogs return to Outlook's STA thread after asynchronous prefetch work, avoiding cross-thread UI failures.
+
 ## [3.2.1] - 2026-06-30
 
 ### Fixed
