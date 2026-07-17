@@ -13,7 +13,7 @@ using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace NcTalkOutlookAddIn.Controllers
 {
-        // Encapsulates the full settings dialog workflow (open, apply, revert on TLS failures, persist).
+    // Encapsulates the full settings dialog workflow (open, apply, revert on TLS failures, persist).
     // Keeps the add-in host focused on orchestration and COM lifecycle code.
     internal sealed class SettingsWorkflowController
     {
@@ -25,6 +25,7 @@ namespace NcTalkOutlookAddIn.Controllers
         private readonly Func<string, bool, bool> _applyTransportSecurityFromSettings;
         private readonly Action _applyIfbSettings;
         private readonly Action<AddinSettings> _persistSettings;
+        private readonly Func<Action, Task> _runOnOutlookUiThreadAsync;
         private readonly Action<string> _logSettings;
 
         internal SettingsWorkflowController(
@@ -36,6 +37,7 @@ namespace NcTalkOutlookAddIn.Controllers
             Func<string, bool, bool> applyTransportSecurityFromSettings,
             Action applyIfbSettings,
             Action<AddinSettings> persistSettings,
+            Func<Action, Task> runOnOutlookUiThreadAsync,
             Action<string> logSettings)
         {
             _outlookApplication = outlookApplication;
@@ -46,6 +48,7 @@ namespace NcTalkOutlookAddIn.Controllers
             _applyTransportSecurityFromSettings = applyTransportSecurityFromSettings;
             _applyIfbSettings = applyIfbSettings;
             _persistSettings = persistSettings;
+            _runOnOutlookUiThreadAsync = runOnOutlookUiThreadAsync;
             _logSettings = logSettings;
         }
 
@@ -70,9 +73,24 @@ namespace NcTalkOutlookAddIn.Controllers
             if (_fetchBackendPolicyStatus != null)
             {
                 initialPolicyStatus = await Task.Run(() =>
-                    _fetchBackendPolicyStatus(configuration, "settings_open_initial"));
+                    _fetchBackendPolicyStatus(configuration, "settings_open_initial")).ConfigureAwait(false);
             }
 
+            if (_runOnOutlookUiThreadAsync == null)
+            {
+                throw new InvalidOperationException("The Outlook UI-thread dispatcher is unavailable.");
+            }
+
+            await _runOnOutlookUiThreadAsync(
+                () => RunSettingsDialogOnUiThread(currentSettings, initialPolicyStatus)).ConfigureAwait(false);
+        }
+
+        private void RunSettingsDialogOnUiThread(
+            AddinSettings currentSettings,
+            BackendPolicyStatus initialPolicyStatus)
+        {
+            // SettingsForm owns Outlook COM references and async WinForms handlers, so its complete
+            // modal lifetime must begin on the Outlook STA thread captured during add-in startup.
             using (var form = new SettingsForm(currentSettings, _outlookApplication, initialPolicyStatus))
             {
                 if (form.ShowDialog() == DialogResult.OK)

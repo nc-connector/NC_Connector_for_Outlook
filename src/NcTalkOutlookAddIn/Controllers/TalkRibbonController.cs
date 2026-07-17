@@ -73,7 +73,7 @@ namespace NcTalkOutlookAddIn.Controllers
             var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
             Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "talk_wizard_open"));
             Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => _owner.FetchPasswordPolicyForTalkWizard(configuration));
-            await Task.WhenAll(policyStatusTask, passwordPolicyTask);
+            await Task.WhenAll(policyStatusTask, passwordPolicyTask).ConfigureAwait(false);
             BackendPolicyStatus policyStatus = policyStatusTask.Result;
             PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
 
@@ -82,7 +82,7 @@ namespace NcTalkOutlookAddIn.Controllers
             var talkClickAddressbookStatus = await Task.Run(() => addressbookCache.GetSystemAddressbookStatus(
                 configuration,
                 settings.IfbCacheHours,
-                true));
+                true)).ConfigureAwait(false);
             NextcloudTalkAddIn.LogTalkMessage(
                 "System address book status result (context=talk_click, available=" + talkClickAddressbookStatus.Available
                 + ", count=" + talkClickAddressbookStatus.Count
@@ -96,7 +96,7 @@ namespace NcTalkOutlookAddIn.Controllers
             try
             {
                 userDirectory = talkClickAddressbookStatus.Available
-                    ? await Task.Run(() => addressbookCache.GetUsers(configuration, settings.IfbCacheHours, false))
+                    ? await Task.Run(() => addressbookCache.GetUsers(configuration, settings.IfbCacheHours, false)).ConfigureAwait(false)
                     : new List<NextcloudUser>();
             }
             catch (Exception ex)
@@ -105,6 +105,34 @@ namespace NcTalkOutlookAddIn.Controllers
                 userDirectory = new List<NextcloudUser>();
             }
 
+            await _owner.RunOnOutlookUiThreadAsync(
+                () => RunTalkDialogOnUiThread(
+                    appointment,
+                    settings,
+                    configuration,
+                    passwordPolicy,
+                    policyStatus,
+                    userDirectory,
+                    talkClickAddressbookStatus,
+                    subject,
+                    start,
+                    end)).ConfigureAwait(false);
+        }
+
+        private bool RunTalkDialogOnUiThread(
+            Outlook.AppointmentItem appointment,
+            AddinSettings settings,
+            TalkServiceConfiguration configuration,
+            PasswordPolicyInfo passwordPolicy,
+            BackendPolicyStatus policyStatus,
+            List<NextcloudUser> userDirectory,
+            IfbAddressBookCache.SystemAddressbookStatus talkClickAddressbookStatus,
+            string subject,
+            DateTime start,
+            DateTime end)
+        {
+            // Outlook ribbon callbacks do not reliably install a SynchronizationContext. Keep the
+            // dialog, message boxes, and appointment COM access on the STA thread captured at startup.
             using (var dialog = new TalkLinkForm(
                 settings,
                 configuration,
@@ -119,7 +147,7 @@ namespace NcTalkOutlookAddIn.Controllers
                 if (dialog.ShowDialog() != DialogResult.OK)
                 {
                     NextcloudTalkAddIn.LogTalkMessage("Talk link dialog cancelled.");
-                    return;
+                    return false;
                 }
                 string descriptionLanguage = NextcloudTalkAddIn.ResolveTalkDescriptionLanguage(
                     policyStatus,
@@ -142,7 +170,7 @@ namespace NcTalkOutlookAddIn.Controllers
                         Strings.DialogTitle,
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
-                    return;
+                    return false;
                 }
                 var request = new TalkRoomRequest
                 {
@@ -177,7 +205,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     if (overwrite != DialogResult.Yes)
                     {
                         NextcloudTalkAddIn.LogTalkMessage("Replacement declined, operation ended.");
-                        return;
+                        return false;
                     }
                     var existingType = TalkAppointmentController.GetRoomType(appointment);
                     bool existingIsEvent = existingType.HasValue && existingType.Value == TalkRoomType.EventConversation;
@@ -186,7 +214,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     if (!_owner.TryDeleteRoom(existingToken, existingIsEvent))
                     {
                         NextcloudTalkAddIn.LogTalkMessage("Deleting existing room failed.");
-                        return;
+                        return false;
                     }
                 }
 
@@ -209,7 +237,7 @@ namespace NcTalkOutlookAddIn.Controllers
                         Strings.DialogTitle,
                         MessageBoxButtons.OK,
                         ex.IsAuthenticationError ? MessageBoxIcon.Warning : MessageBoxIcon.Error);
-                    return;
+                    return false;
                 }
                 catch (Exception ex)
                 {
@@ -219,7 +247,7 @@ namespace NcTalkOutlookAddIn.Controllers
                         Strings.DialogTitle,
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
-                    return;
+                    return false;
                 }
 
                 _owner.ApplyRoomToAppointment(appointment, request, result);
@@ -230,6 +258,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
+                return true;
             }
         }
 

@@ -22,6 +22,34 @@ function Is-TaskResultAfterWhenAll {
     return $context -match ('await\s+Task\.WhenAll\s*\([^;]*\b' + [regex]::Escape($TaskName) + '\b')
 }
 
+function Add-UiDialogBoundaryFailures {
+    Param(
+        [string]$ControllerRelativePath,
+        [string]$AsyncMethodPattern,
+        [string]$UiMethodPattern,
+        [string]$DispatcherPattern,
+        [string]$DialogType,
+        [string]$FlowName
+    )
+
+    $controllerPath = Join-Path $SourceRoot $ControllerRelativePath
+    $controller = Get-Content -LiteralPath $controllerPath -Raw
+    $asyncFlowMatch = [regex]::Match(
+        $controller,
+        ('(?s)' + $AsyncMethodPattern + '.*?(?=\s+' + $UiMethodPattern + ')'))
+    if (-not $asyncFlowMatch.Success) {
+        $failures.Add("$ControllerRelativePath does not expose the expected async/UI $FlowName flow boundary.")
+        return
+    }
+
+    if ($asyncFlowMatch.Value -notmatch $DispatcherPattern) {
+        $failures.Add("$ControllerRelativePath does not marshal the $FlowName dialog back to Outlook's UI thread.")
+    }
+    if ($asyncFlowMatch.Value -match ('new\s+' + [regex]::Escape($DialogType) + '\s*\(')) {
+        $failures.Add("$ControllerRelativePath constructs $DialogType before entering the Outlook UI-thread boundary.")
+    }
+}
+
 $allowedGetResult = @(
     "src\NcTalkOutlookAddIn\NextcloudTalkAddIn.MailComposeSubscription.AttachmentFlow.cs"
 )
@@ -53,22 +81,29 @@ foreach ($file in $sourceFiles) {
     }
 }
 
-$fileLinkControllerPath = Join-Path $SourceRoot "Controllers\FileLinkLaunchController.cs"
-$fileLinkController = Get-Content -LiteralPath $fileLinkControllerPath -Raw
-$asyncFlowMatch = [regex]::Match(
-    $fileLinkController,
-    '(?s)internal async Task<bool> RunFileLinkWizardForMailAsync.*?(?=\s+private bool RunFileLinkWizardOnUiThread)')
-if (-not $asyncFlowMatch.Success) {
-    $failures.Add("Controllers\FileLinkLaunchController.cs does not expose the expected async/UI FileLink flow boundary.")
-}
-else {
-    if ($asyncFlowMatch.Value -notmatch '\.RunOnOutlookUiThreadAsync\s*\(') {
-        $failures.Add("Controllers\FileLinkLaunchController.cs does not marshal the FileLink wizard back to Outlook's UI thread.")
-    }
-    if ($asyncFlowMatch.Value -match 'new\s+FileLinkWizardForm\s*\(') {
-        $failures.Add("Controllers\FileLinkLaunchController.cs constructs the FileLink wizard before entering the Outlook UI-thread boundary.")
-    }
-}
+Add-UiDialogBoundaryFailures `
+    -ControllerRelativePath "Controllers\FileLinkLaunchController.cs" `
+    -AsyncMethodPattern 'internal\s+async\s+Task<bool>\s+RunFileLinkWizardForMailAsync' `
+    -UiMethodPattern 'private\s+bool\s+RunFileLinkWizardOnUiThread' `
+    -DispatcherPattern '\.RunOnOutlookUiThreadAsync\s*\(' `
+    -DialogType "FileLinkWizardForm" `
+    -FlowName "FileLink"
+
+Add-UiDialogBoundaryFailures `
+    -ControllerRelativePath "Controllers\TalkRibbonController.cs" `
+    -AsyncMethodPattern 'internal\s+async\s+Task\s+OnTalkButtonPressedAsync' `
+    -UiMethodPattern 'private\s+bool\s+RunTalkDialogOnUiThread' `
+    -DispatcherPattern '\.RunOnOutlookUiThreadAsync\s*\(' `
+    -DialogType "TalkLinkForm" `
+    -FlowName "Talk"
+
+Add-UiDialogBoundaryFailures `
+    -ControllerRelativePath "Controllers\SettingsWorkflowController.cs" `
+    -AsyncMethodPattern 'internal\s+async\s+Task\s+RunAsync' `
+    -UiMethodPattern 'private\s+void\s+RunSettingsDialogOnUiThread' `
+    -DispatcherPattern '_runOnOutlookUiThreadAsync\s*\(' `
+    -DialogType "SettingsForm" `
+    -FlowName "settings"
 
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Error $_ }

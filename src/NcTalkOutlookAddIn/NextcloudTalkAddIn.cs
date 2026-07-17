@@ -254,6 +254,7 @@ namespace NcTalkOutlookAddIn
                         _settingsStorage.Save(settings);
                     }
                 },
+                callback => RunOnOutlookUiThreadAsync(callback),
                 message => LogSettings(message));
         }
 
@@ -304,6 +305,21 @@ namespace NcTalkOutlookAddIn
             }
 
             return context.InvokeAsync(callback);
+        }
+
+        internal Task RunOnOutlookUiThreadAsync(Action callback)
+        {
+            if (callback == null)
+            {
+                throw new ArgumentNullException("callback");
+            }
+
+            return RunOnOutlookUiThreadAsync(
+                () =>
+                {
+                    callback();
+                    return true;
+                });
         }
 
         internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null, bool isInlineResponse = false)
