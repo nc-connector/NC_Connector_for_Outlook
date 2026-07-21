@@ -1277,6 +1277,30 @@
   "options_sharing_attachments_heading": {
     "message": "Anhänge"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Linkziel für Anhänge"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Nextcloud-Freigabeseite"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "ZIP-Download"
+  },
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 Linkziel für Anhänge"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "ZIP-Download lädt die freigegebenen Dateien direkt als ZIP-Archiv herunter."
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "Nextcloud-Freigabeseite öffnet die Freigabe zunächst im Browser."
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "Die Auswahl gilt nur für den Anhangsmodus; manuelle Freigaben bleiben unverändert."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Der ZIP-Download-Link konnte nicht aus der Nextcloud-Freigabe-URL erstellt werden."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Öffne Thunderbird-Einstellungen > Verfassen > Anhänge."
   },

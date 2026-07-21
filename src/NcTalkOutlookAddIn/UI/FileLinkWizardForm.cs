@@ -137,6 +137,14 @@ namespace NcTalkOutlookAddIn.UI
             _request.ShareDate = _shareDate;
             _request.ShareDatePrefixFormat = _attachmentMode ? AttachmentShareDatePrefixFormat : "yyyyMMdd";
             ApplyPolicyDefaultsToSettings();
+            _request.AttachmentLinkTarget = AttachmentLinkTargetPolicy.Resolve(
+                _defaults.SharingAttachmentLinkTarget,
+                _backendPolicyStatus);
+            DiagnosticsLogger.Log(
+                LogCategories.FileLink,
+                "Attachment link target resolved to "
+                + AttachmentLinkTargetPolicy.ToStorageValue(_request.AttachmentLinkTarget)
+                + ".");
 
             Text = Strings.FileLinkWizardTitle;
             FormBorderStyle = FormBorderStyle.Sizable;
@@ -1395,6 +1403,7 @@ namespace NcTalkOutlookAddIn.UI
                 NoteEnabled = source.NoteEnabled,
                 Note = source.Note,
                 AttachmentMode = source.AttachmentMode,
+                AttachmentLinkTarget = source.AttachmentLinkTarget,
                 ShareDate = source.ShareDate,
                 ShareDatePrefixFormat = source.ShareDatePrefixFormat
             };

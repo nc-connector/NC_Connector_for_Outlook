@@ -254,9 +254,11 @@ Compose-Filelink-Paritaet (3.1.0):
   - vor Auswertung
   - vor Prompt-Aktionsverarbeitung
   - vor Wizard-Finalize im Attachment-Modus.
-- `FileLinkHtmlBuilder` erzeugt im Attachment-Modus reduziertes HTML mit ZIP-Link `/s/<token>/download`.
+- `Models/AttachmentLinkTargetPolicy.cs` loest `policy.share.attachment_link_target` (`zip_download` / `share_page`) gegen den nullable lokalen Wert auf. Ein ungueltiger gespeicherter lokaler Wert gilt als nicht gesetzt, sodass ein gueltiger editierbarer Backend-Wert ihn vorgeben kann. ZIP gilt nur ohne gueltigen lokalen oder nutzbaren Backend-Wert; ein gesperrter Backend-Wert gewinnt.
+- `AttachmentMode` steuert Read-only-Berechtigungen, das Ausblenden der Rechtezeile und Cleanup. Das explizite Linkziel steuert nur URL, `{LINK_INTRO}` und `{LINK_LABEL}`; manuelle Freigaben bleiben immer auf der Nextcloud-Freigabeseite. Im Wizard gibt es keinen Schalter pro Freigabe.
+- Die ZIP-URL-Ableitung ist fail-closed: Die absolute oeffentliche HTTP(S)-URL muss auf `/s/<token>` enden und zum OCS-Token passen. Ungueltige Eingaben brechen vor dem Einfuegen ab; es gibt keinen Fallback auf die Original-URL.
 - Custom-Share-Templates aus dem Backend werden im `FileLinkHtmlBuilder` vor der Einfuegung ueber `HtmlTemplateSanitizer` bereinigt (fail-closed).
-- `{LINK_INTRO}` und `{LINK_LABEL}` werden im bestehenden Renderer modusabhaengig aufgeloest: normale Freigaben beschreiben und benennen die Nextcloud-Freigabeseite, der Attachment-Modus den `/download`-Link als ZIP-Download. Bestehende Templates ohne diese Platzhalter behalten ihre bisherige Ausgabe.
+- `{LINK_INTRO}` und `{LINK_LABEL}` werden anhand des effektiven Linkziels aufgeloest. Bestehende Templates ohne diese Platzhalter behalten ihre bisherige Ausgabe.
 - Fuer Custom-Share-Templates bevorzugt Outlook `policy.share.share_html_block_template_v2` und faellt auf `policy.share.share_html_block_template` zurueck. Damit funktionieren aeltere Backend-Versionen weiter, waehrend aktuelle Backends den bisherigen Antwortschluessel fuer aeltere Clients platzhalterfrei halten koennen.
 - Aktuelle Backends liefern fuer Custom-Templates `policy.share.share_html_block_effective_language`. Outlook verwendet diese Sprache fuer erzeugte Linktexte, Feldbezeichnungen, Berechtigungsnamen und Passworthinweise; bei aelteren Backends ohne dieses Feld bleibt der bisherige Fallback auf die UI-Sprache erhalten.
 - Plain-Text-Compose bleibt `MailItem.BodyFormat=olFormatPlain`; der Freigabeblock wird als Textblock mit `#`-Rahmen gerendert und ueber Outlook WordEditor eingefuegt. Inline-Antworten/-Weiterleitungen behalten zwei leere Absaetze ueber dem Block fuer eigenen Text. `MailItem.Body` wird nicht neu geschrieben.

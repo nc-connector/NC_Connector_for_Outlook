@@ -98,6 +98,8 @@ namespace NcTalkOutlookAddIn.UI
         private readonly CheckBox _sharingAttachmentsOfferAboveCheckBox = new CheckBox();
         private readonly NumericUpDown _sharingAttachmentsOfferAboveMbUpDown = new NumericUpDown();
         private readonly Label _sharingAttachmentsOfferAboveUnitLabel = new Label();
+        private readonly Label _sharingAttachmentLinkTargetLabel = new Label();
+        private readonly ComboBox _sharingAttachmentLinkTargetCombo = new ComboBox();
         private readonly GroupBox _talkDefaultsGroup = new GroupBox();
         private readonly Label _talkDefaultRoomTypeLabel = new Label();
         private readonly ComboBox _talkDefaultRoomTypeCombo = new ComboBox();
@@ -1379,6 +1381,9 @@ namespace NcTalkOutlookAddIn.UI
                     _sharingAttachmentsOfferAboveMbUpDown.Minimum,
                     Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
                 _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
+                SelectAttachmentLinkTarget(AttachmentLinkTargetPolicy.Resolve(
+                    Result.SharingAttachmentLinkTarget,
+                    _backendPolicyStatus));
                 _talkDefaultPasswordCheckBox.Checked = Result.TalkDefaultPasswordEnabled;
                 _talkDefaultAddUsersCheckBox.Checked = Result.TalkDefaultAddUsers;
                 _talkDefaultAddGuestsCheckBox.Checked = Result.TalkDefaultAddGuests;
@@ -1411,8 +1416,13 @@ namespace NcTalkOutlookAddIn.UI
             bool requestedSignatureOnCompose = _emailSignatureOnComposeCheckBox.Checked;
             bool requestedSignatureOnReply = _emailSignatureOnReplyCheckBox.Checked;
             bool requestedSignatureOnForward = _emailSignatureOnForwardCheckBox.Checked;
+            AttachmentLinkTarget requestedAttachmentLinkTarget = GetSelectedAttachmentLinkTarget();
 
             RefreshBackendPolicyStatus("settings_save");
+            if (!IsPolicyLocked("share", AttachmentLinkTargetPolicy.Key))
+            {
+                SelectAttachmentLinkTarget(requestedAttachmentLinkTarget);
+            }
             if (IsEmailSignaturePolicyAvailable())
             {
                 if (!IsPolicyLocked("email_signature", "email_signature_on_compose"))
@@ -1471,6 +1481,7 @@ namespace NcTalkOutlookAddIn.UI
             Result.SharingAttachmentsAlwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
             Result.SharingAttachmentsOfferAboveEnabled = _sharingAttachmentsOfferAboveCheckBox.Checked;
             Result.SharingAttachmentsOfferAboveMb = (int)_sharingAttachmentsOfferAboveMbUpDown.Value;
+            Result.SharingAttachmentLinkTarget = GetSelectedAttachmentLinkTarget();
             Result.TalkDefaultPasswordEnabled = _talkDefaultPasswordCheckBox.Checked;
             Result.TalkDefaultAddUsers = _talkDefaultAddUsersCheckBox.Checked;
             Result.TalkDefaultAddGuests = _talkDefaultAddGuestsCheckBox.Checked;
@@ -1945,6 +1956,15 @@ namespace NcTalkOutlookAddIn.UI
                     _sharingAttachmentsOfferAboveCheckBox.Checked = false;
                 }
             }
+            if (_backendPolicyStatus.HasPolicyKey("share", AttachmentLinkTargetPolicy.Key)
+                && (IsPolicyLocked("share", AttachmentLinkTargetPolicy.Key)
+                    || Result == null
+                    || !Result.SharingAttachmentLinkTarget.HasValue))
+            {
+                SelectAttachmentLinkTarget(AttachmentLinkTargetPolicy.Resolve(
+                    Result == null ? (AttachmentLinkTarget?)null : Result.SharingAttachmentLinkTarget,
+                    _backendPolicyStatus));
+            }
 
             policyString = _backendPolicyStatus.GetPolicyString("share", "language_share_html_block");
             if (IsPolicyLocked("share", "language_share_html_block")
@@ -2043,6 +2063,7 @@ namespace NcTalkOutlookAddIn.UI
             bool lockActive = _sharingAttachmentLockActive;
             bool policyLockAlways = IsPolicyLocked("share", "attachments_always_via_ncconnector");
             bool policyLockThreshold = IsPolicyLocked("share", "attachments_min_size_mb");
+            bool policyLockLinkTarget = IsPolicyLocked("share", AttachmentLinkTargetPolicy.Key);
             bool uiBusy = _isBusy;
             bool effectiveAlwaysLock = lockActive || policyLockAlways;
             bool effectiveThresholdLock = lockActive || policyLockThreshold;
@@ -2105,7 +2126,16 @@ namespace NcTalkOutlookAddIn.UI
             {
                 contentBottom = Math.Max(contentBottom, _sharingAttachmentLockStepsLabel.Bottom);
             }
-            int requiredGroupHeight = Math.Max(ScaleLogical(110), contentBottom + innerPadding);
+            _sharingAttachmentLinkTargetLabel.Location = new Point(innerPadding, contentBottom + ScaleLogical(12));
+            _sharingAttachmentLinkTargetCombo.Location = new Point(
+                innerPadding,
+                _sharingAttachmentLinkTargetLabel.Bottom + ScaleLogical(6));
+            _sharingAttachmentLinkTargetCombo.Width = Math.Max(
+                ScaleLogical(240),
+                _sharingAttachmentAutomationGroup.ClientSize.Width - (innerPadding * 2));
+            contentBottom = _sharingAttachmentLinkTargetCombo.Bottom;
+
+            int requiredGroupHeight = Math.Max(ScaleLogical(150), contentBottom + innerPadding);
             if (_sharingAttachmentAutomationGroup.Height != requiredGroupHeight)
             {
                 _sharingAttachmentAutomationGroup.Height = requiredGroupHeight;
@@ -2117,6 +2147,7 @@ namespace NcTalkOutlookAddIn.UI
             bool thresholdInputEnabled = !effectiveThresholdLock && !alwaysConnector && _sharingAttachmentsOfferAboveCheckBox.Checked && !uiBusy;
             _sharingAttachmentsOfferAboveMbUpDown.Enabled = thresholdInputEnabled;
             _sharingAttachmentsOfferAboveUnitLabel.Enabled = !effectiveThresholdLock && !alwaysConnector && !uiBusy;
+            _sharingAttachmentLinkTargetCombo.Enabled = !policyLockLinkTarget && !uiBusy;
 
             _disabledTooltipHints.Apply(
                 _sharingAttachmentsAlwaysCheckBox,
@@ -2140,6 +2171,11 @@ namespace NcTalkOutlookAddIn.UI
                 effectiveThresholdLock ? Strings.PolicyAdminControlledTooltip : string.Empty,
                 false,
                 _sharingAttachmentsOfferAboveUnitLabel);
+            _disabledTooltipHints.Apply(
+                _sharingAttachmentLinkTargetCombo,
+                policyLockLinkTarget ? Strings.PolicyAdminControlledTooltip : Strings.SharingAttachmentLinkTargetTooltip,
+                policyLockLinkTarget,
+                _sharingAttachmentLinkTargetLabel);
         }
 
         private void RefreshTalkSystemAddressbookState(bool forceRefresh, string trigger)
@@ -2209,6 +2245,24 @@ namespace NcTalkOutlookAddIn.UI
             {
                 ApplyTalkDefaultsTabLayout();
             }
+        }
+
+        private void SelectAttachmentLinkTarget(AttachmentLinkTarget target)
+        {
+            if (_sharingAttachmentLinkTargetCombo.Items.Count == 0)
+            {
+                _sharingAttachmentLinkTargetCombo.Items.Add(Strings.SharingAttachmentLinkTargetZipDownload);
+                _sharingAttachmentLinkTargetCombo.Items.Add(Strings.SharingAttachmentLinkTargetSharePage);
+            }
+            _sharingAttachmentLinkTargetCombo.SelectedIndex =
+                target == AttachmentLinkTarget.SharePage ? 1 : 0;
+        }
+
+        private AttachmentLinkTarget GetSelectedAttachmentLinkTarget()
+        {
+            return _sharingAttachmentLinkTargetCombo.SelectedIndex == 1
+                ? AttachmentLinkTarget.SharePage
+                : AttachmentLinkTarget.ZipDownload;
         }
 
         private static void SelectComboValue(ComboBox combo, int value, int fallback)
@@ -2706,11 +2760,25 @@ namespace NcTalkOutlookAddIn.UI
             _sharingAttachmentsOfferAboveUnitLabel.AutoSize = true;
             _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentsOfferAboveUnitLabel);
 
+            _sharingAttachmentLinkTargetLabel.Text = Strings.SharingAttachmentLinkTargetLabel;
+            _sharingAttachmentLinkTargetLabel.Location = new Point(12, 82);
+            _sharingAttachmentLinkTargetLabel.AutoSize = true;
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentLinkTargetLabel);
+
+            _sharingAttachmentLinkTargetCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _sharingAttachmentLinkTargetCombo.IntegralHeight = false;
+            _sharingAttachmentLinkTargetCombo.Location = new Point(12, 104);
+            _sharingAttachmentLinkTargetCombo.Width = 448;
+            SelectAttachmentLinkTarget(AttachmentLinkTarget.ZipDownload);
+            _sharingAttachmentAutomationGroup.Controls.Add(_sharingAttachmentLinkTargetCombo);
+
             _toolTip.SetToolTip(_sharingDefaultPermissionsLabel, Strings.TooltipSharingPermissions);
             _toolTip.SetToolTip(_sharingDefaultPasswordSeparateCheckBox, string.Empty);
             _toolTip.SetToolTip(_sharingPasswordDeliveryModeCombo, string.Empty);
             _toolTip.SetToolTip(_sharingAttachmentsAlwaysCheckBox, Strings.TooltipSharingAttachmentsAlways);
             _toolTip.SetToolTip(_sharingAttachmentsOfferAboveCheckBox, Strings.TooltipSharingAttachmentsOffer);
+            _toolTip.SetToolTip(_sharingAttachmentLinkTargetLabel, Strings.SharingAttachmentLinkTargetTooltip);
+            _toolTip.SetToolTip(_sharingAttachmentLinkTargetCombo, Strings.SharingAttachmentLinkTargetTooltip);
         }
 
         private void UpdateKnownServerVersion(string candidate)

@@ -68,6 +68,10 @@ if (-not ($storage -match 'ProtectedData\.Protect') -or -not ($storage -match 'P
     $failures.Add("SettingsStorage must protect and unprotect AppPassword via DPAPI.")
 }
 
+if (-not ($storage -match 'case\s+"SharingAttachmentLinkTarget"[\s\S]{0,500}?AttachmentLinkTargetPolicy\.TryParse[\s\S]{0,500}?\(AttachmentLinkTarget\?\)null')) {
+    $failures.Add("An invalid SharingAttachmentLinkTarget value must load as an unset nullable value.")
+}
+
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Error $_ }
     throw "Settings persistence check failed with $($failures.Count) issue(s)."

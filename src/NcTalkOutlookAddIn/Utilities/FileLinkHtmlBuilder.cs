@@ -31,6 +31,8 @@ namespace NcTalkOutlookAddIn.Utilities
                 throw new ArgumentNullException("result");
             }
             bool attachmentMode = request != null && request.AttachmentMode;
+            bool zipDownloadLink = attachmentMode
+                && request.AttachmentLinkTarget == AttachmentLinkTarget.ZipDownload;
             bool separatePassword = request != null
                 && request.PasswordSeparateEnabled
                 && !string.IsNullOrWhiteSpace(result.Password);
@@ -45,18 +47,19 @@ namespace NcTalkOutlookAddIn.Utilities
                     request,
                     effectiveLanguage,
                     attachmentMode,
+                    zipDownloadLink,
                     separatePassword,
                     passwordOnly: false,
                     secretLink: false);
             }
-            string intro = GetShareLinkIntro(effectiveLanguage, attachmentMode, false);
+            string intro = GetShareLinkIntro(effectiveLanguage, zipDownloadLink, false);
 
             string footerFormat = Strings.GetInLanguage(
                 effectiveLanguage,
                 "sharing_html_footer",
                 "{0} is a solution for secure email and file exchange.");
 
-            string linkLabel = GetShareLinkLabel(effectiveLanguage, attachmentMode);
+            string linkLabel = GetShareLinkLabel(effectiveLanguage, zipDownloadLink);
             string passwordLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_label", "Password");
             string expireLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_expire_label", "Expiration date");
             string permissionsLabel = Strings.GetInLanguage(effectiveLanguage, "sharing_html_permissions_label", "Your permissions");
@@ -102,13 +105,13 @@ namespace NcTalkOutlookAddIn.Utilities
             builder.AppendLine("<p style=\"margin:0 0 14px 0;line-height:1.4;\">" + HttpUtility.HtmlEncode(intro) + "<br /></p>");
             builder.AppendLine("<table style=\"width:100%;border-collapse:collapse;margin-bottom:10px;\">");
 
-            string downloadUrl = attachmentMode
+            string linkUrl = zipDownloadLink
                 ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
                 : (result.ShareUrl ?? string.Empty);
             AppendRow(builder, linkLabel, string.Format(
                 CultureInfo.InvariantCulture,
                 "<a href=\"{0}\" style=\"color:{1};text-decoration:none;\">{0}</a>",
-                HttpUtility.HtmlEncode(downloadUrl),
+                HttpUtility.HtmlEncode(linkUrl),
                 brandBlue));
 
             if (!string.IsNullOrEmpty(result.Password) && !separatePassword)
@@ -159,6 +162,7 @@ namespace NcTalkOutlookAddIn.Utilities
                     request: null,
                     effectiveLanguage: effectiveLanguage,
                     attachmentMode: false,
+                    zipDownloadLink: false,
                     separatePassword: false,
                     passwordOnly: true,
                     secretLink: secretLink);
@@ -222,6 +226,8 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             bool attachmentMode = request != null && request.AttachmentMode;
+            bool zipDownloadLink = attachmentMode
+                && request.AttachmentLinkTarget == AttachmentLinkTarget.ZipDownload;
             bool separatePassword = request != null
                 && request.PasswordSeparateEnabled
                 && !string.IsNullOrWhiteSpace(result.Password);
@@ -236,11 +242,12 @@ namespace NcTalkOutlookAddIn.Utilities
                     request,
                     effectiveLanguage,
                     attachmentMode,
+                    zipDownloadLink,
                     separatePassword,
                     passwordOnly: false));
             }
 
-            string downloadUrl = attachmentMode
+            string linkUrl = zipDownloadLink
                 ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
                 : (result.ShareUrl ?? string.Empty);
 
@@ -251,10 +258,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 sections.Add(NormalizePlainTextBlock(request.Note));
             }
-            sections.Add(NormalizePlainTextBlock(GetShareLinkIntro(effectiveLanguage, attachmentMode, true)));
+            sections.Add(NormalizePlainTextBlock(GetShareLinkIntro(effectiveLanguage, zipDownloadLink, true)));
 
             var fields = new List<string>();
-            fields.Add(BuildPlainTextField(GetShareLinkLabel(effectiveLanguage, attachmentMode), downloadUrl));
+            fields.Add(BuildPlainTextField(GetShareLinkLabel(effectiveLanguage, zipDownloadLink), linkUrl));
             if (!string.IsNullOrWhiteSpace(result.Password) && !separatePassword)
             {
                 fields.Add(BuildPlainTextField(passwordLabel, result.Password));
@@ -314,6 +321,7 @@ namespace NcTalkOutlookAddIn.Utilities
                     request: null,
                     effectiveLanguage: effectiveLanguage,
                     attachmentMode: false,
+                    zipDownloadLink: false,
                     separatePassword: false,
                     passwordOnly: true));
             }
@@ -415,6 +423,7 @@ namespace NcTalkOutlookAddIn.Utilities
             FileLinkRequest request,
             string effectiveLanguage,
             bool attachmentMode,
+            bool zipDownloadLink,
             bool separatePassword,
             bool passwordOnly,
             bool secretLink)
@@ -429,11 +438,11 @@ namespace NcTalkOutlookAddIn.Utilities
             string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
             string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
 
-            string downloadUrl = attachmentMode
+            string linkUrl = zipDownloadLink
                 ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
                 : (result.ShareUrl ?? string.Empty);
-            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, attachmentMode, false);
-            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, attachmentMode);
+            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, zipDownloadLink, false);
+            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, zipDownloadLink);
 
             string passwordValue = result.Password ?? string.Empty;
             if (!passwordOnly && separatePassword)
@@ -458,7 +467,7 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 html = StripTemplateRow(html, "RIGHTS");
             }
-            html = html.Replace("{URL}", HttpUtility.HtmlEncode(downloadUrl ?? string.Empty));
+            html = html.Replace("{URL}", HttpUtility.HtmlEncode(linkUrl ?? string.Empty));
             html = html.Replace(
                 "{PASSWORD}",
                 passwordOnly && secretLink
@@ -487,6 +496,7 @@ namespace NcTalkOutlookAddIn.Utilities
             FileLinkRequest request,
             string effectiveLanguage,
             bool attachmentMode,
+            bool zipDownloadLink,
             bool separatePassword,
             bool passwordOnly)
         {
@@ -501,11 +511,11 @@ namespace NcTalkOutlookAddIn.Utilities
             string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
             string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
 
-            string downloadUrl = attachmentMode
+            string linkUrl = zipDownloadLink
                 ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
                 : (result.ShareUrl ?? string.Empty);
-            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, attachmentMode, true);
-            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, attachmentMode);
+            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, zipDownloadLink, true);
+            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, zipDownloadLink);
 
             string passwordValue = result.Password ?? string.Empty;
             if (!passwordOnly && separatePassword)
@@ -530,7 +540,7 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 html = StripTemplateRow(html, "RIGHTS");
             }
-            html = html.Replace("{URL}", PlainTextToTemplateHtml(downloadUrl ?? string.Empty));
+            html = html.Replace("{URL}", PlainTextToTemplateHtml(linkUrl ?? string.Empty));
             html = html.Replace("{PASSWORD}", PlainTextToTemplateHtml(passwordValue));
             html = html.Replace("{EXPIRATIONDATE}", PlainTextToTemplateHtml(expireValue));
             html = html.Replace("{RIGHTS}", PlainTextToTemplateHtml(rightsValue));
@@ -553,9 +563,9 @@ namespace NcTalkOutlookAddIn.Utilities
             return plainText;
         }
 
-        private static string GetShareLinkIntro(string effectiveLanguage, bool attachmentMode, bool plainText)
+        private static string GetShareLinkIntro(string effectiveLanguage, bool zipDownloadLink, bool plainText)
         {
-            if (attachmentMode)
+            if (zipDownloadLink)
             {
                 return Strings.GetInLanguage(
                     effectiveLanguage,
@@ -569,12 +579,12 @@ namespace NcTalkOutlookAddIn.Utilities
                 "The files have been provided securely via Nextcloud. Open the Nextcloud link below to view the share.");
         }
 
-        private static string GetShareLinkLabel(string effectiveLanguage, bool attachmentMode)
+        private static string GetShareLinkLabel(string effectiveLanguage, bool zipDownloadLink)
         {
             return Strings.GetInLanguage(
                 effectiveLanguage,
-                attachmentMode ? "sharing_html_download_label" : "sharing_html_share_link_label",
-                attachmentMode ? "ZIP download" : "Nextcloud link");
+                zipDownloadLink ? "sharing_html_download_label" : "sharing_html_share_link_label",
+                zipDownloadLink ? "ZIP download" : "Nextcloud link");
         }
 
         private static string PlainTextToTemplateHtml(string value)
@@ -743,51 +753,33 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             if (string.IsNullOrWhiteSpace(shareUrl))
             {
-                return string.Empty;
+                throw new InvalidOperationException(Strings.SharingAttachmentLinkTargetInvalidUrl);
             }
             string token = string.IsNullOrWhiteSpace(shareToken) ? string.Empty : shareToken.Trim();
-            try
+            Uri shareUri;
+            if (!Uri.TryCreate(shareUrl.Trim(), UriKind.Absolute, out shareUri)
+                || !(string.Equals(shareUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(shareUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)))
             {
-                var shareUri = new Uri(shareUrl, UriKind.Absolute);
-                string[] segments = shareUri.AbsolutePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-                int shareSegmentIndex = Array.FindLastIndex(
-                    segments,
-                    segment => string.Equals(segment, "s", StringComparison.OrdinalIgnoreCase));
-                if (shareSegmentIndex >= 0 && shareSegmentIndex + 1 < segments.Length)
-                {
-                    string sharePath = "/" + string.Join("/", segments, 0, shareSegmentIndex + 2);
-                    return BuildAbsoluteUrlFromPath(shareUri, sharePath.TrimEnd('/') + "/download");
-                }
-                if (!string.IsNullOrWhiteSpace(token))
-                {
-                    string basePath = shareUri.AbsolutePath.TrimEnd('/');
-                    return BuildAbsoluteUrlFromPath(
-                        shareUri,
-                        basePath + "/s/" + Uri.EscapeDataString(token) + "/download");
-                }
+                throw new InvalidOperationException(Strings.SharingAttachmentLinkTargetInvalidUrl);
             }
-            catch (Exception ex)
+
+            string[] segments = shareUri.AbsolutePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length < 2
+                || !string.Equals(segments[segments.Length - 2], "s", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(segments[segments.Length - 1]))
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to derive attachment-mode ZIP download URL from share URL.", ex);
+                throw new InvalidOperationException(Strings.SharingAttachmentLinkTargetInvalidUrl);
             }
-            if (string.IsNullOrEmpty(token))
+
+            string urlToken = Uri.UnescapeDataString(segments[segments.Length - 1]);
+            if (!string.IsNullOrEmpty(token)
+                && !string.Equals(urlToken, token, StringComparison.Ordinal))
             {
-                DiagnosticsLogger.Log(LogCategories.FileLink, "Attachment-mode ZIP download URL fallback used public share URL because no token was available.");
-                return shareUrl;
+                throw new InvalidOperationException(Strings.SharingAttachmentLinkTargetInvalidUrl);
             }
-            try
-            {
-                var shareUri = new Uri(shareUrl, UriKind.Absolute);
-                string basePath = shareUri.AbsolutePath.TrimEnd('/');
-                return BuildAbsoluteUrlFromPath(
-                    shareUri,
-                    basePath + "/s/" + Uri.EscapeDataString(token) + "/download");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to build attachment-mode ZIP download URL from token fallback.", ex);
-                return shareUrl;
-            }
+
+            return BuildAbsoluteUrlFromPath(shareUri, shareUri.AbsolutePath.TrimEnd('/') + "/download");
         }
 
         private static string BuildAbsoluteUrlFromPath(Uri uri, string absolutePath)

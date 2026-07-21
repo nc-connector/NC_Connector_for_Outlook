@@ -110,6 +110,7 @@
     <Compile Include="Models\FileLinkUploadStatus.cs" />
     <Compile Include="Models\FileLinkUploadItemProgress.cs" />
     <Compile Include="Models\BackendPolicyStatus.cs" />
+    <Compile Include="Models\AttachmentLinkTargetPolicy.cs" />
     <Compile Include="Models\EmailSignaturePolicy.cs" />
     <Compile Include="Models\SharePasswordDeliveryMode.cs" />
     <Compile Include="Models\SharePasswordDeliveryPolicy.cs" />

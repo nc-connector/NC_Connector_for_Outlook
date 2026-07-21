@@ -1256,6 +1256,30 @@
   "options_sharing_attachments_heading": {
     "message": "Załączniki"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Cel odnośnika do załączników"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Strona udostępniania Nextcloud"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "Pobieranie ZIP"
+  },
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 Cel odnośnika do załączników"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "Pobieranie ZIP pobiera udostępnione pliki bezpośrednio jako archiwum ZIP."
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "Strona udostępniania Nextcloud najpierw otwiera udostępnienie w przeglądarce."
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "Ten wybór dotyczy tylko trybu załączników; ręczne udostępnienia pozostają bez zmian."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Nie udało się utworzyć odnośnika pobierania ZIP z adresu URL udostępnienia Nextcloud."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Otwórz Ustawienia Thunderbirda > Redagowanie > Załączniki."
   },

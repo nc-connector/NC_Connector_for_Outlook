@@ -36,7 +36,7 @@ Key points:
 
 - available in compose windows, replies, forwards, and inline replies
 - optional expiration date and custom permissions per share
-- attachment automation for large attachments or always through NC Connector
+- attachment automation for large attachments or always through NC Connector, with a selectable `ZIP download` (default) or `Nextcloud share page` link target
 - separate password mails are sent only after the primary mail was sent successfully
 - if auto-send fails, NC Connector opens a prepared manual password mail
 

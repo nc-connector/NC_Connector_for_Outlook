@@ -50,6 +50,8 @@ foreach ($domain in @("share", "talk", "email_signature")) {
     Assert-Check ($null -ne $policy.policy_editable.$domain) "Backend policy_editable domain missing: $domain"
 }
 Assert-Check ($policy.policy.share.share_send_password_mode -in @("plain", "secrets", $null)) "Share password mode contract must be plain, secrets or null."
+Assert-Check ($policy.policy.share.attachment_link_target -in @("zip_download", "share_page")) "Attachment link target must be zip_download or share_page."
+Assert-Check ($policy.policy_editable.share.attachment_link_target -is [bool]) "Attachment link target editable flag must be boolean."
 Assert-Check ($policy.policy.share.share_html_block_template_v2 -match '\{LINK_INTRO\}') "Versioned Share template contract must preserve LINK_INTRO."
 Assert-Check ($policy.policy.share.share_html_block_template_v2 -match '\{LINK_LABEL\}') "Versioned Share template contract must preserve LINK_LABEL."
 Assert-Check ($policy.policy.share.share_html_block_template -notmatch '\{LINK_(INTRO|LABEL)\}') "Compatibility Share template contract must not expose mode-aware placeholders."

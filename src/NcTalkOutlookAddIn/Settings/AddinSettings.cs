@@ -57,6 +57,7 @@ namespace NcTalkOutlookAddIn.Settings
             SharingAttachmentsAlwaysConnector = false;
             SharingAttachmentsOfferAboveEnabled = true;
             SharingAttachmentsOfferAboveMb = 20;
+            SharingAttachmentLinkTarget = null;
             ShareBlockLang = "default";
             EventDescriptionLang = "default";
             TalkDefaultLobbyEnabled = true;
@@ -150,6 +151,8 @@ namespace NcTalkOutlookAddIn.Settings
         public bool SharingAttachmentsOfferAboveEnabled { get; set; }
 
         public int SharingAttachmentsOfferAboveMb { get; set; }
+
+        public AttachmentLinkTarget? SharingAttachmentLinkTarget { get; set; }
 
         public string ShareBlockLang { get; set; }
 

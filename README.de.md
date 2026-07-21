@@ -37,7 +37,7 @@ Weitere Punkte:
 
 - verfügbar in Compose-Fenstern, Antworten, Weiterleitungen und Inline-Antworten
 - optionales Ablaufdatum und eigene Berechtigungen pro Freigabe
-- Anhangsautomatisierung für große Anhänge oder immer über NC Connector
+- Anhangsautomatisierung für große Anhänge oder immer über NC Connector, mit wählbarem Linkziel `ZIP-Download` (Standard) oder `Nextcloud-Freigabeseite`
 - separate Passwortmails werden erst nach erfolgreichem Versand der Hauptmail verschickt
 - bei Auto-Send-Fehlern öffnet sich eine vorbereitete manuelle Passwortmail
 

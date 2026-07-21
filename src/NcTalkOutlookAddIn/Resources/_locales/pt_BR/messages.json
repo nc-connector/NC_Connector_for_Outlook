@@ -1256,6 +1256,30 @@
   "options_sharing_attachments_heading": {
     "message": "Anexos"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Destino do link de anexos"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Página de compartilhamento do Nextcloud"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "Download ZIP"
+  },
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 Destino do link de anexos"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "O download ZIP baixa os arquivos compartilhados diretamente como um arquivo ZIP."
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "A página de compartilhamento do Nextcloud abre primeiro o compartilhamento no navegador."
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "A seleção se aplica apenas ao modo de anexos; os compartilhamentos manuais permanecem inalterados."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Não foi possível criar o link de download ZIP a partir da URL de compartilhamento do Nextcloud."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Abra Configurações do Thunderbird > Redação > Anexos."
   },

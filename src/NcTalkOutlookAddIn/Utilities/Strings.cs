@@ -828,6 +828,21 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string SharingAttachmentsAlwaysConnectorLabel { get { return Get("options_sharing_attachments_always_label", "Always handle attachments via NC Connector"); } }
         internal static string SharingAttachmentsOfferAboveLabel { get { return Get("options_sharing_attachments_offer_label", "Offer upload above"); } }
         internal static string SharingAttachmentsOfferAboveUnit { get { return Get("options_sharing_attachments_offer_suffix", "MB"); } }
+        internal static string SharingAttachmentLinkTargetLabel { get { return Get("options_sharing_attachment_link_target_label", "Attachment link target"); } }
+        internal static string SharingAttachmentLinkTargetSharePage { get { return Get("options_sharing_attachment_link_target_share_page", "Nextcloud share page"); } }
+        internal static string SharingAttachmentLinkTargetZipDownload { get { return Get("options_sharing_attachment_link_target_zip_download", "ZIP download"); } }
+        internal static string SharingAttachmentLinkTargetTooltip
+        {
+            get
+            {
+                return BuildTooltip(
+                    Get("options_sharing_attachment_link_target_tooltip_title", "🔗 Attachment link target"),
+                    Get("options_sharing_attachment_link_target_tooltip_line1", "ZIP download downloads the shared files directly as a ZIP archive."),
+                    Get("options_sharing_attachment_link_target_tooltip_line2", "The Nextcloud share page opens the share in the browser first."),
+                    Get("options_sharing_attachment_link_target_tooltip_line3", "This selection applies only to attachment mode; manual shares remain unchanged."));
+            }
+        }
+        internal static string SharingAttachmentLinkTargetInvalidUrl { get { return Get("sharing_attachment_link_target_invalid_url", "The ZIP download link could not be created from the Nextcloud share URL."); } }
         internal static string SharingAttachmentsLockTitle { get { return Get("options_sharing_attachments_lock_title", "Attachment automation disabled"); } }
         internal static string SharingAttachmentsLockText { get { return Get("options_sharing_attachments_lock_text", "Outlook's large attachment upload setting is enabled ({0} MB). This conflicts with NC Connector attachment automation. The attachment options below are locked."); } }
         internal static string SharingAttachmentsLockStep1 { get { return Get("options_sharing_attachments_lock_step1", "Open Outlook File > Options > Mail."); } }

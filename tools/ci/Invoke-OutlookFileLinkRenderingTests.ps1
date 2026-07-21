@@ -52,6 +52,9 @@ internal static class OutlookFileLinkRenderingTests
         TestNormalModeUsesNextcloudLinkWording();
         TestAttachmentModeKeepsNextcloudSubpath();
         TestPlainTextKeepsNextcloudSubpath();
+        TestAttachmentSharePageTarget();
+        TestManualShareIgnoresAttachmentTarget();
+        TestInvalidZipUrlFailsVisibly();
         TestCustomTemplateResolvesModeAwareLinkVariables();
         TestBackendEffectiveLanguageLocalizesCustomTemplateCopy();
         TestOlderBackendModeAwareTemplateStillRenders();
@@ -109,6 +112,65 @@ internal static class OutlookFileLinkRenderingTests
         Check("Plain text stays plain", !plainText.Contains("<a "), plainText);
     }
 
+    private static void TestAttachmentSharePageTarget()
+    {
+        FileLinkResult result = BuildResult("https://cloud.example.test/index.php/s/AbCd1234", "AbCd1234", string.Empty);
+        FileLinkRequest request = BuildAttachmentRequest(AttachmentLinkTarget.SharePage);
+        string html = FileLinkHtmlBuilder.Build(result, request, "en");
+        string plainText = FileLinkHtmlBuilder.BuildPlainText(result, request, "en");
+
+        foreach (string output in new[] { html, plainText })
+        {
+            Check("Attachment share-page target keeps the OCS URL", output.Contains("https://cloud.example.test/index.php/s/AbCd1234"), output);
+            Check("Attachment share-page target does not add ZIP suffix", !output.Contains("/AbCd1234/download"), output);
+            Check("Attachment share-page target uses share-page wording", output.Contains("Nextcloud link"), output);
+            Check("Attachment mode still hides recipient rights", !output.Contains("Your permissions") && !output.Contains("Upload"), output);
+        }
+    }
+
+    private static void TestManualShareIgnoresAttachmentTarget()
+    {
+        FileLinkResult result = BuildResult("https://cloud.example.test/nc/s/AbCd1234", "AbCd1234", string.Empty);
+        var request = new FileLinkRequest
+        {
+            AttachmentMode = false,
+            AttachmentLinkTarget = AttachmentLinkTarget.ZipDownload,
+            Permissions = FileLinkPermissionFlags.Read | FileLinkPermissionFlags.Create
+        };
+        string plainText = FileLinkHtmlBuilder.BuildPlainText(result, request, "en");
+
+        Check("Manual share always keeps the share-page URL", plainText.Contains("Nextcloud link: https://cloud.example.test/nc/s/AbCd1234"), plainText);
+        Check("Manual share ignores ZIP target", !plainText.Contains("/AbCd1234/download"), plainText);
+        Check("Manual share keeps rights", plainText.Contains("Your permissions") && plainText.Contains("Upload"), plainText);
+    }
+
+    private static void TestInvalidZipUrlFailsVisibly()
+    {
+        FileLinkRequest request = BuildAttachmentRequest();
+        FileLinkResult invalidPath = BuildResult("https://cloud.example.test/index.php/apps/files/", "AbCd1234", string.Empty);
+        FileLinkResult tokenMismatch = BuildResult("https://cloud.example.test/s/OtherToken", "AbCd1234", string.Empty);
+        FileLinkResult invalidScheme = BuildResult("ftp://cloud.example.test/s/AbCd1234", "AbCd1234", string.Empty);
+        FileLinkResult trailingPath = BuildResult("https://cloud.example.test/s/AbCd1234/extra", "AbCd1234", string.Empty);
+
+        Check("ZIP mode rejects a URL without /s/<token>", ThrowsInvalidZipUrl(delegate { FileLinkHtmlBuilder.Build(invalidPath, request, "en"); }));
+        Check("ZIP mode rejects a share-token mismatch", ThrowsInvalidZipUrl(delegate { FileLinkHtmlBuilder.BuildPlainText(tokenMismatch, request, "en"); }));
+        Check("ZIP mode rejects a non-HTTP(S) URL", ThrowsInvalidZipUrl(delegate { FileLinkHtmlBuilder.Build(invalidScheme, request, "en"); }));
+        Check("ZIP mode rejects content after /s/<token>", ThrowsInvalidZipUrl(delegate { FileLinkHtmlBuilder.BuildPlainText(trailingPath, request, "en"); }));
+    }
+
+    private static bool ThrowsInvalidZipUrl(Action action)
+    {
+        try
+        {
+            action();
+            return false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message.Contains("ZIP download link could not be created");
+        }
+    }
+
     private static void TestCustomTemplateResolvesModeAwareLinkVariables()
     {
         const string template = "<p>{LINK_INTRO}</p><p>{LINK_LABEL}: <a href=\"{URL}\">{URL}</a></p>";
@@ -117,6 +179,7 @@ internal static class OutlookFileLinkRenderingTests
 
         string normalHtml = FileLinkHtmlBuilder.Build(result, new FileLinkRequest(), "custom", policy);
         string zipHtml = FileLinkHtmlBuilder.Build(result, BuildAttachmentRequest(), "custom", policy);
+        string sharePageHtml = FileLinkHtmlBuilder.Build(result, BuildAttachmentRequest(AttachmentLinkTarget.SharePage), "custom", policy);
         string normal = FileLinkHtmlBuilder.BuildPlainText(result, new FileLinkRequest(), "custom", policy);
         string zip = FileLinkHtmlBuilder.BuildPlainText(result, BuildAttachmentRequest(), "custom", policy);
 
@@ -126,6 +189,7 @@ internal static class OutlookFileLinkRenderingTests
         Check("Custom attachment template resolves ZIP LINK_LABEL", zip.Contains("ZIP download: https://cloud.example.test/nc/s/AbCd1234/download"), zip);
         Check("Custom normal HTML uses the versioned template", normalHtml.Contains("Open the Nextcloud link below to view the share."), normalHtml);
         Check("Custom attachment HTML resolves the versioned template in ZIP mode", zipHtml.Contains("ZIP download"), zipHtml);
+        Check("Custom attachment HTML resolves the versioned template in share-page mode", sharePageHtml.Contains("Nextcloud link") && !sharePageHtml.Contains("/download"), sharePageHtml);
         Check("Versioned template takes precedence over compatibility template", !normal.Contains("Legacy template") && !normalHtml.Contains("Legacy template"), normal + normalHtml);
     }
 
@@ -197,12 +261,13 @@ internal static class OutlookFileLinkRenderingTests
             "NC Connector/Folder");
     }
 
-    private static FileLinkRequest BuildAttachmentRequest()
+    private static FileLinkRequest BuildAttachmentRequest(AttachmentLinkTarget target = AttachmentLinkTarget.ZipDownload)
     {
         return new FileLinkRequest
         {
             ShareName = "Folder",
             AttachmentMode = true,
+            AttachmentLinkTarget = target,
             PasswordSeparateEnabled = false,
             NoteEnabled = false,
             Permissions = FileLinkPermissionFlags.Read | FileLinkPermissionFlags.Create
@@ -254,6 +319,7 @@ internal static class OutlookFileLinkRenderingTests
     $sources = @(
         $testSource,
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\BackendPolicyStatus.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\AttachmentLinkTargetPolicy.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\FileLinkPermissions.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\FileLinkSelection.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\FileLinkRequest.cs"),

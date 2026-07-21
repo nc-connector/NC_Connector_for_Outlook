@@ -97,6 +97,7 @@ Legacy migration on first start:
   <UpdateReleaseUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/tag/v3.1.1</UpdateReleaseUrl>
   <UpdateDownloadUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/download/v3.1.1/NCConnectorForOutlook-3.1.1.msi</UpdateDownloadUrl>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
+  <SharingAttachmentLinkTarget>zip_download</SharingAttachmentLinkTarget>
   <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
   <EmailSignatureOnCompose>true</EmailSignatureOnCompose>
   <EmailSignatureOnReply>true</EmailSignatureOnReply>
@@ -155,7 +156,7 @@ Runtime behavior:
 - backend custom templates stay inactive until the corresponding language override is set to `custom`
 - the `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
 - if `custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
-- custom share templates may use `{LINK_INTRO}` and `{LINK_LABEL}`; Outlook fills them with share-page wording for normal shares and ZIP-download wording for attachment mode
+- custom share templates may use `{LINK_INTRO}` and `{LINK_LABEL}`; Outlook fills them from the effective link target. Manual shares always use share-page wording, while attachment automation can use ZIP-download or share-page wording.
 - current clients prefer the backend's versioned Share template and automatically fall back to the original template field when connected to an older backend; no administrator migration is required
 - existing custom templates without these variables remain valid and keep their previous rendering
 - `policy.talk.event_description_type` may be `html` or `plain_text`; when `html` is active, Outlook sanitizes the Talk HTML template, applies an appointment-compat transform (legacy color/alignment fallbacks + Word-safe CSS stripping), and writes the block via HTML->RTF bridge for stable appointment rendering
@@ -164,6 +165,7 @@ Central policy can currently control:
 - Talk defaults and lock state
 - saved-event Talk room deletion opt-in (`talk_delete_room_on_event_delete`)
 - Sharing defaults and lock state
+- attachment link target through `policy.share.attachment_link_target` and `policy_editable.share.attachment_link_target`
 - share HTML/password templates
 - Talk description language / custom invitation template
 - central email signature defaults and lock state
@@ -323,6 +325,10 @@ Official Nextcloud references:
 - The `Insert Nextcloud share` button is also available in Outlook inline replies/forwards on the Message tab and uses the same wizard path as mail compose inspectors.
 - Inline replies/forwards write the share block through Outlook's active inline Word editor. HTML/RTF messages keep two empty lines above the share block; plain-text messages keep plain text and use the framed `#` block.
 - In compose attachment mode, created server artifacts are tracked immediately after share creation.
+- `Settings -> Sharing -> Attachments` selects the link target for attachment automation: `ZIP download` or `Nextcloud share page`. `ZIP download` is the default when neither a local value nor a usable backend value exists. The setting does not change manually created shares.
+- The backend uses `policy.share.attachment_link_target` with `zip_download` or `share_page`; `policy_editable.share.attachment_link_target=false` locks the setting. An editable backend value seeds profiles that have no local value, while an explicit local value wins.
+- Attachment mode remains read-only and keeps its existing cleanup behavior for both link targets. Only the inserted URL, `{LINK_INTRO}`, and `{LINK_LABEL}` change.
+- ZIP mode accepts only a public absolute HTTP(S) share URL ending in `/s/<token>` and derives `<share URL>/download`. If this cannot be verified, Outlook stops insertion and shows an error; it never inserts the original share URL with ZIP wording.
 - Cleanup tracking is cleared only after a confirmed successful primary mail send.
 - If a compose window is closed without a successful send, the add-in deletes the created share folder artifacts server-side (best effort, with send/close grace timer handling).
 - Attachment automation evaluates new files both pre-add (`BeforeAttachmentAdd`) and post-add; if pre-add can resolve a local file path, NC flow can best-effort cancel host add before Outlook post-add handling.

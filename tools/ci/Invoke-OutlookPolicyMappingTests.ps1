@@ -35,6 +35,8 @@ internal static class OutlookPolicyMappingTests
         TestSecretsExpireDays();
         TestLockedBackendValueWins();
         TestEditableBackendValueKeepsLocalChoice();
+        TestAttachmentLinkTargetMapping();
+        TestAttachmentLinkTargetPrecedence();
 
         if (failures > 0)
         {
@@ -77,6 +79,66 @@ internal static class OutlookPolicyMappingTests
         Check("Editable backend still supplies shared expire days", policy.SecretsExpireDays == 30, policy.SecretsExpireDays.ToString());
     }
 
+    private static void TestAttachmentLinkTargetMapping()
+    {
+        Check("Attachment target parses ZIP", AttachmentLinkTargetPolicy.Parse("zip_download") == AttachmentLinkTarget.ZipDownload);
+        Check("Attachment target parses share page", AttachmentLinkTargetPolicy.Parse("share_page") == AttachmentLinkTarget.SharePage);
+        Check("Attachment target defaults unknown values to ZIP", AttachmentLinkTargetPolicy.Parse("bad") == AttachmentLinkTarget.ZipDownload);
+        Check("Attachment target serializes ZIP", AttachmentLinkTargetPolicy.ToStorageValue(AttachmentLinkTarget.ZipDownload) == "zip_download");
+        Check("Attachment target serializes share page", AttachmentLinkTargetPolicy.ToStorageValue(AttachmentLinkTarget.SharePage) == "share_page");
+        Check("Missing attachment target defaults to ZIP", AttachmentLinkTargetPolicy.Resolve(null, null) == AttachmentLinkTarget.ZipDownload);
+
+        AttachmentLinkTarget parsedInvalid;
+        AttachmentLinkTarget? invalidLocalValue = AttachmentLinkTargetPolicy.TryParse("bad", out parsedInvalid)
+            ? parsedInvalid
+            : (AttachmentLinkTarget?)null;
+        Check("Invalid persisted attachment target stays unset", !invalidLocalValue.HasValue);
+        Check(
+            "Editable backend target seeds an invalid persisted value",
+            AttachmentLinkTargetPolicy.Resolve(invalidLocalValue, BuildAttachmentTargetStatus("share_page", true)) == AttachmentLinkTarget.SharePage);
+    }
+
+    private static void TestAttachmentLinkTargetPrecedence()
+    {
+        BackendPolicyStatus locked = BuildAttachmentTargetStatus("share_page", false);
+        BackendPolicyStatus editable = BuildAttachmentTargetStatus("share_page", true);
+        BackendPolicyStatus invalidLocked = BuildAttachmentTargetStatus("bad", false);
+
+        Check(
+            "Locked backend attachment target wins",
+            AttachmentLinkTargetPolicy.Resolve(AttachmentLinkTarget.ZipDownload, locked) == AttachmentLinkTarget.SharePage);
+        Check(
+            "Editable backend attachment target keeps explicit local choice",
+            AttachmentLinkTargetPolicy.Resolve(AttachmentLinkTarget.ZipDownload, editable) == AttachmentLinkTarget.ZipDownload);
+        Check(
+            "Editable backend attachment target seeds absent local choice",
+            AttachmentLinkTargetPolicy.Resolve(null, editable) == AttachmentLinkTarget.SharePage);
+        Check(
+            "Invalid locked backend attachment target fails safe to ZIP",
+            AttachmentLinkTargetPolicy.Resolve(AttachmentLinkTarget.SharePage, invalidLocked) == AttachmentLinkTarget.ZipDownload);
+    }
+
+    private static BackendPolicyStatus BuildAttachmentTargetStatus(string target, bool editable)
+    {
+        return new BackendPolicyStatus(
+            true,
+            true,
+            true,
+            false,
+            string.Empty,
+            "policy",
+            "policy_active",
+            true,
+            true,
+            "active",
+            new Dictionary<string, object> { { "attachment_link_target", target } },
+            new Dictionary<string, object>(),
+            new Dictionary<string, object>(),
+            new Dictionary<string, object> { { "attachment_link_target", editable } },
+            new Dictionary<string, object>(),
+            new Dictionary<string, object>());
+    }
+
     private static BackendPolicyStatus BuildStatus(string mode, bool editable, string expireDays)
     {
         return new BackendPolicyStatus(
@@ -116,6 +178,7 @@ internal static class OutlookPolicyMappingTests
     $sources = @(
         $testSource,
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\BackendPolicyStatus.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\AttachmentLinkTargetPolicy.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\SharePasswordDeliveryMode.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\SharePasswordDeliveryPolicy.cs")
     )

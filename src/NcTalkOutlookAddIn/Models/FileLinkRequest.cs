@@ -40,6 +40,8 @@ namespace NcTalkOutlookAddIn.Models
 
         internal bool AttachmentMode { get; set; }
 
+        internal AttachmentLinkTarget AttachmentLinkTarget { get; set; }
+
         internal DateTime? ShareDate { get; set; }
 
         internal string ShareDatePrefixFormat { get; set; }

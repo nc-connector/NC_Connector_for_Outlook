@@ -1256,6 +1256,30 @@
   "options_sharing_attachments_heading": {
     "message": "附件"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "附件連結目標"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Nextcloud 分享頁面"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "ZIP 下載"
+  },
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 附件連結目標"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "ZIP 下載會將分享的檔案直接下載為 ZIP 壓縮檔。"
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "Nextcloud 分享頁面會先在瀏覽器中開啟分享內容。"
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "此選擇僅適用於附件模式；手動分享維持不變。"
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "無法從 Nextcloud 分享 URL 建立 ZIP 下載連結。"
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "開啟 Thunderbird 設定 > 撰寫 > 附件。"
   },
