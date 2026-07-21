@@ -1286,8 +1286,17 @@
   "options_sharing_attachment_link_target_zip_download": {
     "message": "ZIP download"
   },
-  "options_sharing_attachment_link_target_tooltip": {
-    "message": "Select what happens when recipients open a link created from attachments."
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 Attachment link target"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "ZIP download downloads the shared files directly as a ZIP archive."
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "The Nextcloud share page opens the share in the browser first."
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "This selection applies only to attachment mode; manual shares remain unchanged."
   },
   "sharing_attachment_link_target_invalid_url": {
     "message": "The ZIP download link could not be created from the Nextcloud share URL."

@@ -1265,8 +1265,17 @@
   "options_sharing_attachment_link_target_zip_download": {
     "message": "ZIP-letöltés"
   },
-  "options_sharing_attachment_link_target_tooltip": {
-    "message": "Válassza ki, mi történjen, amikor a címzettek megnyitnak egy mellékletekből létrehozott hivatkozást."
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 Mellékletek hivatkozásának célja"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "A ZIP-letöltés közvetlenül ZIP-archívumként tölti le a megosztott fájlokat."
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "A Nextcloud megosztási oldal először a böngészőben nyitja meg a megosztást."
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "A választás csak a mellékletmódra vonatkozik; a kézi megosztások változatlanok maradnak."
   },
   "sharing_attachment_link_target_invalid_url": {
     "message": "A ZIP-letöltési hivatkozás nem hozható létre a Nextcloud megosztási URL-címéből."

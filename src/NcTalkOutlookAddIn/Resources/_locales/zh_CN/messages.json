@@ -1265,8 +1265,17 @@
   "options_sharing_attachment_link_target_zip_download": {
     "message": "ZIP 下载"
   },
-  "options_sharing_attachment_link_target_tooltip": {
-    "message": "选择收件人打开由附件创建的链接时执行的操作。"
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 附件链接目标"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "ZIP 下载会将共享文件直接下载为 ZIP 压缩包。"
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "Nextcloud 共享页面会先在浏览器中打开共享内容。"
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "此选择仅适用于附件模式；手动共享保持不变。"
   },
   "sharing_attachment_link_target_invalid_url": {
     "message": "无法从 Nextcloud 共享 URL 创建 ZIP 下载链接。"

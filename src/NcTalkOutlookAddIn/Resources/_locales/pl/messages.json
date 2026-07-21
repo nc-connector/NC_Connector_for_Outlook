@@ -1265,8 +1265,17 @@
   "options_sharing_attachment_link_target_zip_download": {
     "message": "Pobieranie ZIP"
   },
-  "options_sharing_attachment_link_target_tooltip": {
-    "message": "Wybierz, co ma się stać, gdy odbiorcy otworzą odnośnik utworzony z załączników."
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 Cel odnośnika do załączników"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "Pobieranie ZIP pobiera udostępnione pliki bezpośrednio jako archiwum ZIP."
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "Strona udostępniania Nextcloud najpierw otwiera udostępnienie w przeglądarce."
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "Ten wybór dotyczy tylko trybu załączników; ręczne udostępnienia pozostają bez zmian."
   },
   "sharing_attachment_link_target_invalid_url": {
     "message": "Nie udało się utworzyć odnośnika pobierania ZIP z adresu URL udostępnienia Nextcloud."

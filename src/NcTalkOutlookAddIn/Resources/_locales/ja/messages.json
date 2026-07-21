@@ -1265,8 +1265,17 @@
   "options_sharing_attachment_link_target_zip_download": {
     "message": "ZIP ダウンロード"
   },
-  "options_sharing_attachment_link_target_tooltip": {
-    "message": "受信者が添付ファイルから作成されたリンクを開いたときの動作を選択します。"
+  "options_sharing_attachment_link_target_tooltip_title": {
+    "message": "🔗 添付ファイルのリンク先"
+  },
+  "options_sharing_attachment_link_target_tooltip_line1": {
+    "message": "ZIP ダウンロードでは、共有ファイルが ZIP アーカイブとして直接ダウンロードされます。"
+  },
+  "options_sharing_attachment_link_target_tooltip_line2": {
+    "message": "Nextcloud 共有ページでは、まずブラウザーで共有が開きます。"
+  },
+  "options_sharing_attachment_link_target_tooltip_line3": {
+    "message": "この選択は添付ファイルモードにのみ適用され、手動による共有は変更されません。"
   },
   "sharing_attachment_link_target_invalid_url": {
     "message": "Nextcloud の共有 URL から ZIP ダウンロードリンクを作成できませんでした。"
