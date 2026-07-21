@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "添付ファイル"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "添付ファイルのリンク先"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Nextcloud 共有ページ"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "ZIP ダウンロード"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "受信者が添付ファイルから作成されたリンクを開いたときの動作を選択します。"
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Nextcloud の共有 URL から ZIP ダウンロードリンクを作成できませんでした。"
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Thunderbird の設定 > 作成 > 添付ファイル を開いてください。"
   },

@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "Bijlagen"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Linkdoel voor bijlagen"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Nextcloud-deelpagina"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "ZIP-download"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Selecteer wat er gebeurt wanneer ontvangers een link openen die van bijlagen is gemaakt."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "De ZIP-downloadlink kon niet worden gemaakt op basis van de Nextcloud-deel-URL."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Open Thunderbird-instellingen > Opstellen > Bijlagen."
   },

@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "Přílohy"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Cíl odkazu pro přílohy"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Stránka sdílení Nextcloud"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "Stažení ZIP"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Vyberte, co se stane, když příjemci otevřou odkaz vytvořený z příloh."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Odkaz pro stažení ZIP se nepodařilo vytvořit z adresy URL sdílení Nextcloud."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Otevřete Nastavení Thunderbirdu > Psaní > Přílohy."
   },

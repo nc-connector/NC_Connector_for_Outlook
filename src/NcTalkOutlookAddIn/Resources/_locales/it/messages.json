@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "Allegati"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Destinazione del link degli allegati"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Pagina di condivisione Nextcloud"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "Download ZIP"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Seleziona cosa accade quando i destinatari aprono un link creato dagli allegati."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Impossibile creare il link per il download ZIP dall’URL di condivisione Nextcloud."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Apri Impostazioni Thunderbird > Composizione > Allegati."
   },

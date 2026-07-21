@@ -1277,6 +1277,21 @@
   "options_sharing_attachments_heading": {
     "message": "Attachments"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Attachment link target"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Nextcloud share page"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "ZIP download"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Select what happens when recipients open a link created from attachments."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "The ZIP download link could not be created from the Nextcloud share URL."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Open Thunderbird Settings > Composition > Attachments."
   },

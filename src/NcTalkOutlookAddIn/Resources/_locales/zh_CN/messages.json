@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "附件"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "附件链接目标"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Nextcloud 共享页面"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "ZIP 下载"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "选择收件人打开由附件创建的链接时执行的操作。"
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "无法从 Nextcloud 共享 URL 创建 ZIP 下载链接。"
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "打开 Thunderbird 设置 > 撰写 > 附件。"
   },

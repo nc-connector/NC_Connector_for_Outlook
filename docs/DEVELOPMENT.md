@@ -233,7 +233,9 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
    - Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file` to the final DAV path.
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
-   - `{LINK_INTRO}` and `{LINK_LABEL}` are resolved in the existing renderer: normal shares describe and label the Nextcloud share page, while attachment mode describes and labels the `/download` URL as a ZIP download. Legacy templates without these placeholders keep their existing output.
+   - `Models/AttachmentLinkTargetPolicy.cs` resolves `policy.share.attachment_link_target` (`zip_download` / `share_page`) against the nullable local setting. An invalid stored local value is treated as unset, so a valid editable backend value can seed it. ZIP is used when no valid local or usable backend value exists; a locked backend value wins.
+   - `AttachmentMode` controls read-only permissions, rights-row suppression, and cleanup. The explicit attachment link target controls only the URL plus `{LINK_INTRO}` and `{LINK_LABEL}`. Manual shares always render the Nextcloud share page. Legacy templates without these placeholders keep their existing output.
+   - ZIP URL derivation is fail-closed: the public absolute HTTP(S) URL must end in `/s/<token>` and match the OCS token. Invalid input throws before insertion; there is no original-URL fallback.
    - custom Share rendering prefers `policy.share.share_html_block_template_v2` and falls back to `policy.share.share_html_block_template`. This supports older backend releases while allowing current backends to keep the original response key placeholder-free for older clients.
    - current backends expose `policy.share.share_html_block_effective_language` for custom templates. Outlook uses it for generated link wording, field labels, permission names, and password hints; older backends without the field keep the previous UI-language fallback.
    - plain-text compose keeps `MailItem.BodyFormat=olFormatPlain`; the share block is rendered as a framed text block with `#` separators and inserted through Outlook WordEditor. Inline replies/forwards keep two empty paragraphs above the block for the sender's own text. `MailItem.Body` is not rewritten.
@@ -259,6 +261,7 @@ Compose runtime parity additions in `NextcloudTalkAddIn.cs` (`MailComposeSubscri
   - removes selected compose attachments
   - queues files as initial wizard selections
   - opens directly in file-step-equivalent mode.
+  - copies the effective attachment link target into `FileLinkRequest`; no per-share target switch is exposed.
 - `UI/FileLinkWizardForm.cs` file-step queue accepts Explorer drag & drop for files/folders across queue and action-area controls.
 - Compose share cleanup lifecycle:
   - arm immediately after share creation

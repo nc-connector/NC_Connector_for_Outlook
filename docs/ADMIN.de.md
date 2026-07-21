@@ -112,6 +112,7 @@ Beispiel (Auszug):
   <UpdateReleaseUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/tag/v3.1.1</UpdateReleaseUrl>
   <UpdateDownloadUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/download/v3.1.1/NCConnectorForOutlook-3.1.1.msi</UpdateDownloadUrl>
   <FileLinkBasePath>NC Connector</FileLinkBasePath>
+  <SharingAttachmentLinkTarget>zip_download</SharingAttachmentLinkTarget>
   <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
   <EmailSignatureOnCompose>true</EmailSignatureOnCompose>
   <EmailSignatureOnReply>true</EmailSignatureOnReply>
@@ -188,13 +189,17 @@ Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanit
 - Der Button `Nextcloud Freigabe hinzufuegen` ist auch in Outlook-Inline-Antworten/-Weiterleitungen im Tab Nachricht verfuegbar und nutzt denselben Wizard-Pfad wie Mail-Compose-Inspectoren.
 - Inline-Antworten/-Weiterleitungen schreiben den Freigabeblock ueber Outlooks aktiven Inline-WordEditor. HTML/RTF-Mails behalten zwei leere Zeilen ueber dem Freigabeblock; Plain-Text-Mails bleiben Plain Text und verwenden den gerahmten `#`-Block.
 - Im Compose-Attachment-Modus werden serverseitige Artefakte direkt nach Share-Erstellung fuer Cleanup-Tracking registriert.
+- Unter `Einstellungen -> Freigaben -> Anhaenge` wird das Linkziel der Anhangsautomatisierung gewaehlt: `ZIP-Download` oder `Nextcloud-Freigabeseite`. Fehlt lokal und im Backend ein gueltiger Wert, ist `ZIP-Download` der Standard. Manuell erstellte Freigaben bleiben davon unberuehrt.
+- Das Backend verwendet `policy.share.attachment_link_target` mit `zip_download` oder `share_page`; `policy_editable.share.attachment_link_target=false` sperrt die Einstellung. Ein editierbarer Backend-Wert dient nur als Vorgabe, solange noch kein lokaler Wert gespeichert wurde.
+- Der Attachment-Modus bleibt bei beiden Linkzielen schreibgeschuetzt und behaelt seine bisherigen Cleanup-Regeln. Nur URL, `{LINK_INTRO}` und `{LINK_LABEL}` richten sich nach dem Linkziel.
+- Im ZIP-Modus muss die oeffentliche absolute HTTP(S)-Freigabe-URL auf `/s/<token>` enden. Kann Outlook daraus nicht sicher `<Freigabe-URL>/download` bilden, wird die Einfuegung mit sichtbarer Fehlermeldung abgebrochen; die Original-URL wird nie mit ZIP-Text eingefuegt.
 - Cleanup wird erst nach bestaetigtem erfolgreichem Hauptversand wieder entfernt.
 - Wird das Compose-Fenster ohne erfolgreichen Versand geschlossen, loescht das Add-in die erzeugten Share-Ordner-Artefakte serverseitig (best effort, mit Grace-Timer fuer Send/Close-Race).
 - Die Anhangsautomatisierung wertet neue Dateien sowohl pre-add (`BeforeAttachmentAdd`) als auch post-add aus; kann pre-add ein lokaler Dateipfad aufgeloest werden, kann der NC-Flow den Host-Add best effort vor der normalen Outlook-Post-Add-Verarbeitung abbrechen.
 - In Microsoft-365-/Exchange-Umgebungen mit serverseitigen Nachrichtengroessenlimits kann Outlook grosse Anhaenge bereits vor den Add-in-Events blockieren; in diesen Faellen kann die Automatisierung technisch nicht greifen und der Benutzer soll stattdessen den Button `Nextcloud Freigabe hinzufuegen` verwenden.
 - Im Datei-Schritt des Sharing-Wizards koennen Dateien und Ordner per Explorer-Drag-and-drop im gesamten Schrittbereich (Queue + Aktionsbereich) hinzugefuegt werden, nicht nur ueber die Add-Buttons.
 - Datei-Uploads groesser als 20 MB nutzen Nextcloud Chunked Upload v2. Damit vermeiden wir lange einzelne WebDAV-`PUT`-Requests durch Proxies oder Webserver, die sehr grosse Request-Bodies ablehnen.
-- Normale Freigaben benennen `/s/<token>` als Nextcloud-Link; nur der Attachment-Modus benennt `/s/<token>/download` als ZIP-Download.
+- Manuelle Freigaben verwenden immer die Nextcloud-Freigabeseite. Im Attachment-Modus entscheidet das konfigurierte Linkziel zwischen der Freigabeseite und `/s/<token>/download` als ZIP-Download.
 - Custom-Share-Templates koennen `{LINK_INTRO}` und `{LINK_LABEL}` verwenden. Outlook fuellt beide Werte passend zum Modus; bestehende Templates ohne diese Variablen bleiben unveraendert nutzbar.
 - Aktuelle Clients bevorzugen das versionierte Share-Template des Backends und fallen bei aelteren Backend-Versionen automatisch auf das bisherige Template-Feld zurueck. Eine Migration durch den Administrator ist nicht erforderlich.
 

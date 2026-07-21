@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "Вложения"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Целевой адрес ссылки для вложений"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Страница общего ресурса Nextcloud"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "Скачивание ZIP"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Выберите, что произойдет, когда получатели откроют ссылку, созданную из вложений."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Не удалось создать ссылку для скачивания ZIP из URL-адреса общего ресурса Nextcloud."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Откройте Настройки Thunderbird > Создание писем > Вложения."
   },

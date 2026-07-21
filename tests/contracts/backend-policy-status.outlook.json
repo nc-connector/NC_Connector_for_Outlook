@@ -12,6 +12,7 @@
       "share_base_directory": "NC Connector",
       "share_set_password": true,
       "share_expire_days": 14,
+      "attachment_link_target": "zip_download",
       "share_html_block_template": "<p>The files have been provided securely.</p><p>Download link: <a href=\"{URL}\">{URL}</a></p>",
       "share_html_block_template_v2": "<p>{LINK_INTRO}</p><p>{LINK_LABEL}: <a href=\"{URL}\">{URL}</a></p>",
       "share_html_block_effective_language": "en",
@@ -33,6 +34,7 @@
       "share_base_directory": false,
       "share_set_password": false,
       "share_expire_days": true,
+      "attachment_link_target": true,
       "share_html_block_template": false,
       "share_send_password_mode": true
     },

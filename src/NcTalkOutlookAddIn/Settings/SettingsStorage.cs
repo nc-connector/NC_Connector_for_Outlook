@@ -495,6 +495,14 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "SharingAttachmentsAlwaysConnector", settings.SharingAttachmentsAlwaysConnector.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "SharingAttachmentsOfferAboveEnabled", settings.SharingAttachmentsOfferAboveEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "SharingAttachmentsOfferAboveMb", Math.Max(1, settings.SharingAttachmentsOfferAboveMb).ToString(CultureInfo.InvariantCulture));
+            if (settings.SharingAttachmentLinkTarget.HasValue)
+            {
+                AppendElement(
+                    document,
+                    root,
+                    "SharingAttachmentLinkTarget",
+                    AttachmentLinkTargetPolicy.ToStorageValue(settings.SharingAttachmentLinkTarget.Value));
+            }
             AppendElement(document, root, "ShareBlockLang", Safe(settings.ShareBlockLang));
             AppendElement(document, root, "EventDescriptionLang", Safe(settings.EventDescriptionLang));
             AppendElement(document, root, "TalkDefaultLobbyEnabled", settings.TalkDefaultLobbyEnabled.ToString(CultureInfo.InvariantCulture));
@@ -722,6 +730,12 @@ namespace NcTalkOutlookAddIn.Settings
                     {
                         settings.SharingAttachmentsOfferAboveMb = Math.Max(1, attachmentsOfferAboveMb);
                     }
+                    break;
+                case "SharingAttachmentLinkTarget":
+                    AttachmentLinkTarget attachmentLinkTarget;
+                    settings.SharingAttachmentLinkTarget = AttachmentLinkTargetPolicy.TryParse(value, out attachmentLinkTarget)
+                        ? attachmentLinkTarget
+                        : (AttachmentLinkTarget?)null;
                     break;
                 case "ShareBlockLang":
                     settings.ShareBlockLang = string.IsNullOrWhiteSpace(value) ? "default" : value.Trim();

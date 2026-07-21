@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "Pièces jointes"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Cible du lien des pièces jointes"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Page de partage Nextcloud"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "Téléchargement ZIP"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Sélectionnez ce qui se passe lorsque les destinataires ouvrent un lien créé à partir de pièces jointes."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Impossible de créer le lien de téléchargement ZIP à partir de l’URL de partage Nextcloud."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Ouvrez Paramètres Thunderbird > Rédaction > Pièces jointes."
   },

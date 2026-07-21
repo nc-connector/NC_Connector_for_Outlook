@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "Anexos"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Destino da ligação dos anexos"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Página de partilha do Nextcloud"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "Transferência ZIP"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Selecione o que acontece quando os destinatários abrem uma ligação criada a partir de anexos."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "Não foi possível criar a ligação de transferência ZIP a partir do URL de partilha do Nextcloud."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Abra Definições do Thunderbird > Composição > Anexos."
   },

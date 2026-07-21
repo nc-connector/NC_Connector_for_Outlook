@@ -1256,6 +1256,21 @@
   "options_sharing_attachments_heading": {
     "message": "Mellékletek"
   },
+  "options_sharing_attachment_link_target_label": {
+    "message": "Mellékletek hivatkozásának célja"
+  },
+  "options_sharing_attachment_link_target_share_page": {
+    "message": "Nextcloud megosztási oldal"
+  },
+  "options_sharing_attachment_link_target_zip_download": {
+    "message": "ZIP-letöltés"
+  },
+  "options_sharing_attachment_link_target_tooltip": {
+    "message": "Válassza ki, mi történjen, amikor a címzettek megnyitnak egy mellékletekből létrehozott hivatkozást."
+  },
+  "sharing_attachment_link_target_invalid_url": {
+    "message": "A ZIP-letöltési hivatkozás nem hozható létre a Nextcloud megosztási URL-címéből."
+  },
   "options_sharing_attachments_lock_step1": {
     "message": "Nyisd meg: Thunderbird Beállítások > Levélírás > Mellékletek."
   },
