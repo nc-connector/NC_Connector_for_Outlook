@@ -570,7 +570,7 @@ namespace NcTalkOutlookAddIn.Utilities
         {
             get
             {
-                return "https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#system-address-book-required-for-user-search-and-moderator-selection";
+                return "https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#system-address-book";
             }
         }
         internal static string PolicyWarningTitle { get { return Get("policy_warning_title", "Backend policy is currently unavailable."); } }
