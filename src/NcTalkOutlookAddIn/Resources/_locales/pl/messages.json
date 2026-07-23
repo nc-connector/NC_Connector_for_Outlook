@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "Przesyłanie $3 ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "Skanowanie plików i folderów..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "Przygotowywanie folderów ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "Przesyłanie plików ($1 / $2) — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "Tworzenie publicznego linku..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "Przesyłanie nie powiodło się: $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "NC Connector wymaga Nextcloud 32 lub nowszego. Wykryta wersja: $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "Wybrany plik został zmieniony po skanowaniu. Rozpocznij przesyłanie ponownie."
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "Wybór zawiera dowiązanie symboliczne lub punkt połączenia (junction). Usuń połączony element i rozpocznij przesyłanie ponownie."
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "Nextcloud nie ma wystarczającej ilości wolnego miejsca na to przesyłanie."
   },
   "outlook_sharing_rename_folder_title": {
     "message": "Zmień nazwę folderu"

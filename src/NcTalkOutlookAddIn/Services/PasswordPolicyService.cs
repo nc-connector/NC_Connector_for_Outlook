@@ -11,7 +11,7 @@ using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
-        // Fetches password policy information and the generator endpoint from Nextcloud capabilities.
+    // Fetches password policy information and the generator endpoint from Nextcloud capabilities.
     internal sealed class PasswordPolicyService
     {
         private readonly TalkServiceConfiguration _configuration;
@@ -40,26 +40,10 @@ namespace NcTalkOutlookAddIn.Services
             using (DiagnosticsLogger.BeginOperation(LogCategories.Api, "PasswordPolicy.FetchPolicy"))
             {
                 string baseUrl = _configuration.GetNormalizedBaseUrl();
-                string url = baseUrl + "/ocs/v2.php/cloud/capabilities?format=json";
-                DiagnosticsLogger.LogApi("GET " + url);
-
-                IDictionary<string, object> root;
-                HttpStatusCode statusCode;
-                ExecuteJsonRequest("GET", url, null, out statusCode, out root);
-
-                if (statusCode != HttpStatusCode.OK)
-                {
-                    DiagnosticsLogger.LogApi("Password policy fetch returned HTTP " + (int)statusCode + ".");
-                    return new PasswordPolicyInfo(false, 0, string.Empty);
-                }
-                if (root == null)
-                {
-                    DiagnosticsLogger.LogApi("Password policy fetch returned no parsable JSON payload.");
-                    return new PasswordPolicyInfo(false, 0, string.Empty);
-                }
-                var ocs = NcJson.GetDictionary(root, "ocs");
-                var data = NcJson.GetDictionary(ocs, "data");
-                var caps = NcJson.GetDictionary(data, "capabilities");
+                NextcloudCapabilitiesSnapshot snapshot =
+                    new NextcloudCapabilitiesService(_configuration)
+                        .GetRequiredSnapshot(false, false);
+                IDictionary<string, object> caps = snapshot.Capabilities;
                 if (caps == null)
                 {
                     DiagnosticsLogger.LogApi("Password policy capabilities block missing.");

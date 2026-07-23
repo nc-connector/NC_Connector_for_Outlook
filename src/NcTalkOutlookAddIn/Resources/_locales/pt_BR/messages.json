@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "Enviando $3 ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "Analisando arquivos e pastas..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "Preparando pastas ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "Enviando arquivos ($1 / $2) — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "Criando link público..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "Falha no upload: $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "O NC Connector requer o Nextcloud 32 ou mais recente. Versão detectada: $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "Um arquivo selecionado foi alterado após a análise. Inicie o envio novamente."
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "A seleção contém um link simbólico ou uma junção. Remova o item vinculado e inicie o envio novamente."
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "O Nextcloud não tem espaço de armazenamento livre suficiente para este envio."
   },
   "outlook_sharing_rename_folder_title": {
     "message": "Renomear pasta"

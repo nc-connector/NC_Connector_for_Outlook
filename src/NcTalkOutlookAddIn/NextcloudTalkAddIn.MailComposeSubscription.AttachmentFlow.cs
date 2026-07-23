@@ -730,7 +730,7 @@ namespace NcTalkOutlookAddIn
                 {
                     return false;
                 }
-                string safeName = FileLinkService.SanitizeComponent(attachmentName);
+                string safeName = FileLinkPath.SanitizeComponent(attachmentName);
                 if (string.IsNullOrWhiteSpace(safeName))
                 {
                     safeName = "attachment.bin";
@@ -1141,7 +1141,7 @@ namespace NcTalkOutlookAddIn
                     localPath = pathName;
                     return true;
                 }
-                string safeName = FileLinkService.SanitizeComponent(attachmentName);
+                string safeName = FileLinkPath.SanitizeComponent(attachmentName);
                 if (string.IsNullOrWhiteSpace(safeName))
                 {
                     safeName = "attachment.bin";

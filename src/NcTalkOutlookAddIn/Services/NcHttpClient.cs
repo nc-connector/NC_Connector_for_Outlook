@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Threading;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
@@ -26,6 +27,8 @@ namespace NcTalkOutlookAddIn.Services
             EnableAutomaticDecompression = true;
             ParseJson = true;
             ContentLength = -1;
+            CancellationToken = CancellationToken.None;
+            AllowWriteStreamBuffering = true;
         }
 
         internal string Method { get; set; }
@@ -47,6 +50,10 @@ namespace NcTalkOutlookAddIn.Services
         internal bool ParseJson { get; set; }
         internal bool ForceFreshConnection { get; set; }
         internal bool ReadResponseAsBytes { get; set; }
+        internal CancellationToken CancellationToken { get; set; }
+        internal int ReadWriteTimeoutMs { get; set; }
+        internal int ConnectionLimit { get; set; }
+        internal bool AllowWriteStreamBuffering { get; set; }
     }
 
     internal sealed class NcHttpResponse
@@ -60,9 +67,10 @@ namespace NcTalkOutlookAddIn.Services
         internal WebException TransportException { get; set; }
         internal HttpFailureInfo FailureInfo { get; set; }
         internal Exception JsonParseException { get; set; }
+        internal IDictionary<string, string> Headers { get; set; }
     }
 
-        // Internal HTTP client wrapper that keeps auth/header/timeout behavior consistent.
+    // Internal HTTP client wrapper that keeps auth/header/timeout behavior consistent.
     internal sealed class NcHttpClient
     {
         private readonly string _username;
@@ -95,12 +103,15 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new ArgumentException("URL is required.", "options");
             }
+            options.CancellationToken.ThrowIfCancellationRequested();
             string method = string.IsNullOrWhiteSpace(options.Method) ? "GET" : options.Method.Trim().ToUpperInvariant();
             var result = new NcHttpResponse();
 
             HttpWebRequest request = null;
             HttpWebResponse response = null;
             string connectionGroupName = null;
+            CancellationTokenRegistration cancellationRegistration =
+                default(CancellationTokenRegistration);
 
             try
             {
@@ -110,6 +121,29 @@ namespace NcTalkOutlookAddIn.Services
                     ? "application/json, text/plain, */*"
                     : options.Accept;
                 request.Timeout = options.TimeoutMs > 0 ? options.TimeoutMs : 60000;
+                request.ReadWriteTimeout = options.ReadWriteTimeoutMs > 0
+                    ? options.ReadWriteTimeoutMs
+                    : request.Timeout;
+                request.AllowWriteStreamBuffering = options.AllowWriteStreamBuffering;
+                if (options.ConnectionLimit > 0
+                    && request.ServicePoint.ConnectionLimit < options.ConnectionLimit)
+                {
+                    request.ServicePoint.ConnectionLimit = options.ConnectionLimit;
+                }
+                if (options.CancellationToken.CanBeCanceled)
+                {
+                    cancellationRegistration = options.CancellationToken.Register(() =>
+                    {
+                        try
+                        {
+                            request.Abort();
+                        }
+                        catch
+                        {
+                            // Request cancellation can race with response disposal.
+                        }
+                    });
+                }
                 if (!string.IsNullOrWhiteSpace(options.UserAgent))
                 {
                     request.UserAgent = options.UserAgent;
@@ -152,7 +186,7 @@ namespace NcTalkOutlookAddIn.Services
                     request.ContentType = string.IsNullOrWhiteSpace(options.ContentType)
                         ? "application/json"
                         : options.ContentType;
-                        if (options.BodyWriter != null)
+                    if (options.BodyWriter != null)
                     {
                         if (options.ContentLength >= 0)
                         {
@@ -202,6 +236,7 @@ namespace NcTalkOutlookAddIn.Services
                 result.HasHttpResponse = true;
                 result.StatusCode = response.StatusCode;
                 result.ContentType = response.ContentType ?? string.Empty;
+                result.Headers = CopyHeaders(response.Headers);
 
                 using (Stream stream = response.GetResponseStream() ?? Stream.Null)
                 {
@@ -239,8 +274,29 @@ namespace NcTalkOutlookAddIn.Services
                     }
                 }
             }
+            catch (WebException ex)
+            {
+                result.HasHttpResponse = false;
+                result.TransportException = ex;
+                result.FailureInfo = HttpFailureDiagnostics.Analyze(ex);
+                return result;
+            }
+            catch (IOException ex)
+            {
+                WebException transport = FindWebException(ex);
+                if (transport == null)
+                {
+                    throw;
+                }
+
+                result.HasHttpResponse = false;
+                result.TransportException = transport;
+                result.FailureInfo = HttpFailureDiagnostics.Analyze(transport);
+                return result;
+            }
             finally
             {
+                cancellationRegistration.Dispose();
                 if (response != null)
                 {
                     response.Close();
@@ -257,6 +313,39 @@ namespace NcTalkOutlookAddIn.Services
                     {
                         // Best-effort connection group cleanup.
                     }
+                }
+            }
+            return result;
+        }
+
+        private static WebException FindWebException(Exception exception)
+        {
+            Exception current = exception;
+            while (current != null)
+            {
+                WebException webException = current as WebException;
+                if (webException != null)
+                {
+                    return webException;
+                }
+                current = current.InnerException;
+            }
+            return null;
+        }
+
+        private static IDictionary<string, string> CopyHeaders(WebHeaderCollection source)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (source == null)
+            {
+                return result;
+            }
+
+            foreach (string key in source.AllKeys)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    result[key] = source[key] ?? string.Empty;
                 }
             }
             return result;

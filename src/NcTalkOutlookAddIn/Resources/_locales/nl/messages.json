@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "Uploaden $3 ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "Bestanden en mappen scannen..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "Mappen voorbereiden ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "Bestanden uploaden ($1 / $2) — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "Openbare link aanmaken..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "Upload mislukt: $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "NC Connector vereist Nextcloud 32 of nieuwer. Gedetecteerde versie: $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "Een geselecteerd bestand is na het scannen gewijzigd. Start de upload opnieuw."
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "De selectie bevat een symbolische koppeling of junction. Verwijder het gekoppelde item en start de upload opnieuw."
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "Nextcloud heeft onvoldoende vrije opslagruimte voor deze upload."
   },
   "outlook_sharing_rename_folder_title": {
     "message": "Map hernoemen"

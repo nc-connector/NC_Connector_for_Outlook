@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "正在上传 $3（$1 / $2）..."
   },
+  "sharing_status_scanning": {
+    "message": "正在扫描文件和文件夹..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "正在准备文件夹（$1 / $2）..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "正在上传文件（$1 / $2）— $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "正在创建公开链接..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "上传失败：$1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "NC Connector 需要 Nextcloud 32 或更高版本。检测到的版本：$1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "所选文件在扫描后发生了更改。请重新开始上传。"
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "所选内容包含符号链接或目录联接。请移除该链接项，然后重新开始上传。"
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "Nextcloud 没有足够的可用存储空间来完成此次上传。"
   },
   "outlook_sharing_rename_folder_title": {
     "message": "重命名文件夹"

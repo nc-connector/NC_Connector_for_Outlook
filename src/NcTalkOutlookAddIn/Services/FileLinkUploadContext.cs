@@ -3,11 +3,9 @@
 // See LICENSE.txt for details.
 
 using System;
-using System.Collections.Generic;
-
 namespace NcTalkOutlookAddIn.Services
 {
-        // Carries precomputed paths/metadata from the upload setup into the actual upload process.
+    // Carries precomputed paths/metadata from upload setup into transfer.
     // Avoids duplicate directory creation and keeps user/path parameters centralized.
     internal sealed class FileLinkUploadContext
     {
@@ -16,11 +14,16 @@ namespace NcTalkOutlookAddIn.Services
             string userId,
             string sanitizedShareName,
             string folderName,
-            string relativeFolderPath)
+            string relativeFolderPath,
+            FileLinkUploadPlan plan)
         {
             if (string.IsNullOrWhiteSpace(normalizedBaseUrl))
             {
                 throw new ArgumentNullException("normalizedBaseUrl");
+            }
+            if (plan == null)
+            {
+                throw new ArgumentNullException("plan");
             }
 
             NormalizedBaseUrl = normalizedBaseUrl;
@@ -28,10 +31,7 @@ namespace NcTalkOutlookAddIn.Services
             SanitizedShareName = sanitizedShareName ?? string.Empty;
             FolderName = folderName ?? string.Empty;
             RelativeFolderPath = relativeFolderPath ?? string.Empty;
-            KnownFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            KnownFolderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            ReservedFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            ReservedFolderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            Plan = plan;
         }
 
         internal string NormalizedBaseUrl { get; private set; }
@@ -44,13 +44,6 @@ namespace NcTalkOutlookAddIn.Services
 
         internal string RelativeFolderPath { get; private set; }
 
-        internal HashSet<string> KnownFilePaths { get; private set; }
-
-        internal HashSet<string> KnownFolderPaths { get; private set; }
-
-        // Tracks names reserved for this upload run, independent from already created DAV paths.
-        internal HashSet<string> ReservedFilePaths { get; private set; }
-
-        internal HashSet<string> ReservedFolderPaths { get; private set; }
+        internal FileLinkUploadPlan Plan { get; private set; }
     }
 }

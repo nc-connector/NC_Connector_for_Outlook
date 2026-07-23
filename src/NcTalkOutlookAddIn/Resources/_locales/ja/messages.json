@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "$3 をアップロード中 ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "ファイルとフォルダーをスキャン中..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "フォルダーを準備中 ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "ファイルをアップロード中 ($1 / $2) — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "公開リンクを作成中..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "アップロードに失敗しました: $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "NC Connector には Nextcloud 32 以降が必要です。検出されたバージョン: $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "選択したファイルがスキャン後に変更されました。アップロードをもう一度開始してください。"
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "選択項目にシンボリック リンクまたはジャンクションが含まれています。リンクされた項目を削除して、アップロードをもう一度開始してください。"
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "このアップロードに必要な空き容量が Nextcloud にありません。"
   },
   "outlook_sharing_rename_folder_title": {
     "message": "フォルダー名を変更"

@@ -5,34 +5,32 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Net;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Services
 {
-        // Creates Nextcloud shares including uploading local files.
-    // Encapsulates the full workflow (create folder, upload, create share, return result).
+    // Coordinates planning, DAV transfer, and OCS share creation.
     internal sealed class FileLinkService
     {
-        private const int ShareTypePublicLink = 3;
-        private const long DirectUploadLimitBytes = 20L * 1024L * 1024L;
-        private const long ChunkUploadChunkSizeBytes = 20L * 1024L * 1024L;
-        private const long ChunkUploadMinChunkBytes = 5L * 1024L * 1024L;
-        private const int ChunkUploadMaxChunks = 10000;
+        private const int AttachmentShareNameCandidateLimit = 1000;
+
         private readonly TalkServiceConfiguration _configuration;
-        private readonly NcHttpClient _httpClient;
-        private static void LogFileLink(string message)
-        {
-            DiagnosticsLogger.Log(LogCategories.FileLink, message);
-        }
+        private readonly FileLinkDavClient _davClient;
+        private readonly FileLinkShareClient _shareClient;
+        private readonly FileLinkTransferService _transferService;
+        private NextcloudCapabilitiesSnapshot _capabilitiesSnapshot;
 
         internal FileLinkService(TalkServiceConfiguration configuration)
+            : this(configuration, null)
+        {
+        }
+
+        internal FileLinkService(
+            TalkServiceConfiguration configuration,
+            NextcloudCapabilitiesSnapshot capabilitiesSnapshot)
         {
             if (configuration == null)
             {
@@ -40,153 +38,160 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             _configuration = configuration;
-            _httpClient = new NcHttpClient(configuration);
+            var httpClient = new NcHttpClient(configuration);
+            _davClient = new FileLinkDavClient(httpClient);
+            _shareClient = new FileLinkShareClient(httpClient);
+            _transferService = new FileLinkTransferService(_davClient);
+            _capabilitiesSnapshot = capabilitiesSnapshot;
         }
 
-        internal FileLinkUploadContext PrepareUpload(FileLinkRequest request, CancellationToken cancellationToken)
+        internal FileLinkUploadContext PrepareUpload(
+            FileLinkRequest request,
+            IList<FileLinkSelection> selections,
+            Func<FileLinkDuplicateInfo, string> duplicateResolver,
+            IProgress<FileLinkUploadPhaseProgress> phaseProgress,
+            CancellationToken cancellationToken)
         {
             if (request == null)
             {
                 throw new ArgumentNullException("request");
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
-            string userId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
-            string basePath = NormalizeRelativePath(request.BasePath);
-            string sanitizedShareName = SanitizeComponent(request.ShareName);
-            if (string.IsNullOrWhiteSpace(sanitizedShareName))
+            if (selections == null)
             {
-                sanitizedShareName = "Share";
+                throw new ArgumentNullException("selections");
             }
 
-            DateTime shareDate = request.ShareDate.HasValue ? request.ShareDate.Value : DateTime.Now;
-            string prefixFormat = NormalizeShareDatePrefixFormat(request.ShareDatePrefixFormat);
-            string folderName = shareDate.ToString(prefixFormat, CultureInfo.InvariantCulture) + "_" + sanitizedShareName;
-            string relativeFolderPath = CombineRelativePath(basePath, folderName);
-
-            var context = new FileLinkUploadContext(
-                normalizedBaseUrl,
-                userId,
-                sanitizedShareName,
-                folderName,
-                relativeFolderPath);
-
-            EnsureFolderExists(normalizedBaseUrl, userId, basePath, cancellationToken, context.KnownFolderPaths);
-            EnsureFolderExists(normalizedBaseUrl, userId, relativeFolderPath, cancellationToken, context.KnownFolderPaths);
-            context.KnownFolderPaths.Add(relativeFolderPath);
-
-            return context;
-        }
-
-        internal bool FolderExists(string basePath, string folderName, CancellationToken cancellationToken)
-        {
             cancellationToken.ThrowIfCancellationRequested();
+            FileLinkUploadProgress.ReportPhase(
+                phaseProgress,
+                FileLinkUploadPhase.Scanning,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0);
 
-            string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
-            string userId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
-            string normalizedBasePath = NormalizeRelativePath(basePath);
-            string relativePath = CombineRelativePath(normalizedBasePath, folderName);
+            using (DiagnosticsLogger.BeginOperation(
+                LogCategories.FileLink,
+                "FileLink.UploadPrepare"))
+            {
+                NextcloudCapabilitiesSnapshot capabilities =
+                    ResolveRequiredCapabilities();
+                string normalizedBaseUrl =
+                    _configuration.GetNormalizedBaseUrl();
+                string userId =
+                    NextcloudUserIdentityService.ResolveCurrentUserId(
+                        _configuration);
+                string basePath = FileLinkPath.NormalizeRelativePath(
+                    request.BasePath);
+                string sanitizedShareName =
+                    FileLinkPath.SanitizeComponent(request.ShareName);
+                if (string.IsNullOrWhiteSpace(sanitizedShareName))
+                {
+                    sanitizedShareName =
+                        Strings.FileLinkWizardFallbackShareName;
+                }
 
-            return FolderExistsInternal(normalizedBaseUrl, userId, relativePath, cancellationToken);
+                DateTime shareDate = request.ShareDate.HasValue
+                    ? request.ShareDate.Value
+                    : DateTime.Now;
+                FileLinkUploadPlan plan = FileLinkUploadPlanBuilder.Build(
+                    selections,
+                    capabilities.BulkUploadSupported,
+                    FileLinkPath.GetDepth(basePath) + 1,
+                    duplicateResolver,
+                    cancellationToken);
+                _transferService.PrepareBulkChecksums(
+                    plan,
+                    cancellationToken);
+                LogUploadPlan(selections.Count, plan);
+
+                FileLinkUploadContext context = null;
+                bool shareRootCreated = false;
+                try
+                {
+                    _davClient.EnsureFolderPath(
+                        normalizedBaseUrl,
+                        userId,
+                        basePath,
+                        cancellationToken);
+
+                    context = CreateShareRoot(
+                        request,
+                        plan,
+                        normalizedBaseUrl,
+                        userId,
+                        basePath,
+                        sanitizedShareName,
+                        shareDate,
+                        cancellationToken);
+                    shareRootCreated = true;
+
+                    _davClient.CreatePlannedDirectories(
+                        context,
+                        plan,
+                        phaseProgress,
+                        cancellationToken);
+                    return context;
+                }
+                catch
+                {
+                    if (shareRootCreated && context != null)
+                    {
+                        _davClient.DeleteBestEffort(
+                            FileLinkDavClient.BuildFileUrl(
+                                context.NormalizedBaseUrl,
+                                context.UserId,
+                                context.RelativeFolderPath),
+                            "Prepared upload root cleanup failed");
+                    }
+                    throw;
+                }
+            }
         }
 
-        internal void DeleteShareFolder(string relativeFolderPath, CancellationToken cancellationToken)
+        internal void DeleteShareFolder(
+            string relativeFolderPath,
+            CancellationToken cancellationToken)
         {
-            string normalizedPath = NormalizeRelativePath(relativeFolderPath);
+            string normalizedPath = FileLinkPath.NormalizeRelativePath(
+                relativeFolderPath);
             if (string.IsNullOrWhiteSpace(normalizedPath))
             {
                 throw new ArgumentException("relativeFolderPath");
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-
-            string normalizedBaseUrl = _configuration.GetNormalizedBaseUrl();
-            string userId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
-            string url = BuildDavUrl(normalizedBaseUrl, userId, normalizedPath);
-            DiagnosticsLogger.LogApi("DELETE " + url);
-
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = "DELETE",
-                Url = url,
-                TimeoutMs = 90000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = false,
-                ParseJson = false
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                DiagnosticsLogger.LogException(LogCategories.Api, "Share folder delete failed (" + url + ").", transport);
-                throw new TalkServiceException("Share folder delete failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
-            }
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                LogFileLink("Share folder delete skipped (already removed): " + normalizedPath);
-                return;
-            }
-            if (response.StatusCode != HttpStatusCode.NoContent
-                && response.StatusCode != HttpStatusCode.OK
-                && response.StatusCode != HttpStatusCode.Accepted)
-            {
-                bool authError = response.StatusCode == HttpStatusCode.Unauthorized
-                                 || response.StatusCode == HttpStatusCode.Forbidden;
-                throw new TalkServiceException("Share folder could not be deleted: " + normalizedPath, authError, response.StatusCode, response.ResponseText);
-            }
-
-            DiagnosticsLogger.LogApi("DELETE " + url + " -> " + response.StatusCode);
+            string normalizedBaseUrl =
+                _configuration.GetNormalizedBaseUrl();
+            string userId =
+                NextcloudUserIdentityService.ResolveCurrentUserId(
+                    _configuration);
+            _davClient.DeleteShareFolder(
+                normalizedBaseUrl,
+                userId,
+                normalizedPath,
+                cancellationToken);
         }
 
         internal void UploadSelections(
             FileLinkUploadContext context,
-            IList<FileLinkSelection> selections,
-            IProgress<FileLinkUploadItemProgress> progress,
-            Func<FileLinkDuplicateInfo, string> duplicateResolver,
+            IProgress<FileLinkUploadItemProgress> itemProgress,
+            IProgress<FileLinkUploadPhaseProgress> phaseProgress,
             CancellationToken cancellationToken)
         {
-            if (context == null)
-            {
-                throw new ArgumentNullException("context");
-            }
-            if (selections == null)
-            {
-                throw new ArgumentNullException("selections");
-            }
-            foreach (var selection in selections)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                long totalBytes = CalculateSelectionSize(selection);
-                var tracker = new SelectionUploadTracker(totalBytes);
-
-                ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Uploading, null, 0);
-
-                try
-                {
-                    if (selection.SelectionType == FileLinkSelectionType.File)
-                    {
-                        UploadSingleFileSelection(context, selection, tracker, progress, duplicateResolver, cancellationToken);
-                    }
-                    else
-                    {
-                        UploadDirectorySelection(context, selection, tracker, progress, duplicateResolver, cancellationToken);
-                    }
-
-                    ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Completed, null, 0);
-                }
-                catch (Exception ex)
-                {
-                    ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Failed, ex.Message, 0);
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed for '" + (selection != null ? selection.LocalPath : string.Empty) + "'.", ex);
-                    throw;
-                }
-            }
+            _transferService.Upload(
+                context,
+                itemProgress,
+                phaseProgress,
+                cancellationToken);
         }
 
-        internal FileLinkResult FinalizeShare(FileLinkUploadContext context, FileLinkRequest request, CancellationToken cancellationToken)
+        internal FileLinkResult FinalizeShare(
+            FileLinkUploadContext context,
+            FileLinkRequest request,
+            CancellationToken cancellationToken)
         {
             if (context == null)
             {
@@ -196,13 +201,13 @@ namespace NcTalkOutlookAddIn.Services
             {
                 throw new ArgumentNullException("request");
             }
-            var shareData = CreateShare(
+
+            FileLinkShareData shareData = _shareClient.Create(
                 context.NormalizedBaseUrl,
                 context.RelativeFolderPath,
                 context.SanitizedShareName,
                 request,
                 cancellationToken);
-
             return new FileLinkResult(
                 shareData.Url,
                 shareData.Id,
@@ -214,906 +219,114 @@ namespace NcTalkOutlookAddIn.Services
                 context.RelativeFolderPath);
         }
 
-        private bool FolderExistsInternal(string baseUrl, string userId, string relativePath, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(relativePath))
-            {
-                return false;
-            }
-            string url = BuildDavUrl(baseUrl, userId, relativePath);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = "PROPFIND",
-                Url = url,
-                ContentType = "application/xml; charset=utf-8",
-                TimeoutMs = 60000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = false,
-                ParseJson = false,
-                Headers = new Dictionary<string, string> { { "Depth", "0" } }
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                DiagnosticsLogger.LogException(LogCategories.Api, "DAV folder check failed (" + url + ").", transport);
-                throw new TalkServiceException("Folder check failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
-            }
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                LogFileLink("DAV folder not found: " + url);
-                return false;
-            }
-            if (response.StatusCode == HttpStatusCode.Unauthorized
-                || response.StatusCode == HttpStatusCode.Forbidden)
-            {
-                throw new TalkServiceException("Folder check failed: HTTP " + (int)response.StatusCode, true, response.StatusCode, response.ResponseText);
-            }
-            return response.StatusCode == HttpStatusCode.OK
-                   || response.StatusCode == HttpStatusCode.NoContent
-                   || (int)response.StatusCode == 207;
-        }
-
-        private static void ReportProgress(
-            IProgress<FileLinkUploadItemProgress> progress,
-            FileLinkSelection selection,
-            SelectionUploadTracker tracker,
-            FileLinkUploadStatus status,
-            string message,
-            long deltaBytes)
-        {
-            if (progress == null)
-            {
-                return;
-            }
-
-            progress.Report(new FileLinkUploadItemProgress(
-                selection,
-                tracker.UploadedBytes,
-                tracker.TotalBytes,
-                status,
-                message,
-                deltaBytes));
-        }
-
-        private static long CalculateSelectionSize(FileLinkSelection selection)
-        {
-            if (selection == null)
-            {
-                return 0;
-            }
-            if (selection.SelectionType == FileLinkSelectionType.File)
-            {
-                var info = new FileInfo(selection.LocalPath);
-                return info.Exists ? info.Length : 0;
-            }
-
-            long total = 0;
-            if (Directory.Exists(selection.LocalPath))
-            {
-                foreach (string file in Directory.EnumerateFiles(selection.LocalPath, "*", SearchOption.AllDirectories))
-                {
-                    var info = new FileInfo(file);
-                    if (info.Exists)
-                    {
-                        total += info.Length;
-                    }
-                }
-            }
-            return total;
-        }
-
-        private void UploadSingleFileSelection(
-            FileLinkUploadContext context,
-            FileLinkSelection selection,
-            SelectionUploadTracker tracker,
-            IProgress<FileLinkUploadItemProgress> progress,
-            Func<FileLinkDuplicateInfo, string> duplicateResolver,
-            CancellationToken cancellationToken)
-        {
-            string remoteFolder = context.RelativeFolderPath;
-            string fileName = SanitizeComponent(Path.GetFileName(selection.LocalPath));
-            if (string.IsNullOrWhiteSpace(fileName))
-            {
-                throw new TalkServiceException("File has no valid name: " + selection.LocalPath, false, 0, null);
-            }
-            string uniqueName = EnsureUniqueName(context, remoteFolder, fileName, duplicateResolver, selection, false, cancellationToken);
-            string remotePath = CombineRelativePath(remoteFolder, uniqueName);
-
-            UploadFileContent(context, remotePath, selection.LocalPath, tracker, progress, selection, cancellationToken);
-        }
-
-        private void UploadDirectorySelection(
-            FileLinkUploadContext context,
-            FileLinkSelection selection,
-            SelectionUploadTracker tracker,
-            IProgress<FileLinkUploadItemProgress> progress,
-            Func<FileLinkDuplicateInfo, string> duplicateResolver,
-            CancellationToken cancellationToken)
-        {
-            if (!Directory.Exists(selection.LocalPath))
-            {
-                return;
-            }
-            string relativeRoot = SanitizeComponent(Path.GetFileName(selection.LocalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
-            if (string.IsNullOrWhiteSpace(relativeRoot))
-            {
-                relativeRoot = "Folder";
-            }
-            string uniqueRoot = EnsureUniqueName(context, context.RelativeFolderPath, relativeRoot, duplicateResolver, selection, true, cancellationToken);
-            string remoteRoot = CombineRelativePath(context.RelativeFolderPath, uniqueRoot);
-
-            // For directory uploads we enforce MKCOL without relying on cache hints.
-            // A stale known-folder cache can otherwise skip folder creation and the first PUT fails with 404.
-            EnsureFolderExists(context.NormalizedBaseUrl, context.UserId, remoteRoot, cancellationToken);
-            context.KnownFolderPaths.Add(remoteRoot);
-
-            foreach (string directory in Directory.EnumerateDirectories(selection.LocalPath, "*", SearchOption.AllDirectories))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string relativeSub = ConvertPath(GetRelativePath(selection.LocalPath, directory));
-                string remoteSub = CombineRelativePath(remoteRoot, relativeSub);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.UserId, remoteSub, cancellationToken);
-                context.KnownFolderPaths.Add(remoteSub);
-            }
-            foreach (string file in Directory.EnumerateFiles(selection.LocalPath, "*", SearchOption.AllDirectories))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string relativeFile = ConvertPath(GetRelativePath(selection.LocalPath, file));
-                string remoteFolder = GetRemoteFolder(remoteRoot, relativeFile);
-                EnsureFolderExists(context.NormalizedBaseUrl, context.UserId, remoteFolder, cancellationToken);
-                context.KnownFolderPaths.Add(remoteFolder);
-
-                string remoteFileName = SanitizeComponent(Path.GetFileName(relativeFile));
-                if (string.IsNullOrWhiteSpace(remoteFileName))
-                {
-                    remoteFileName = "File";
-                }
-                string uniqueName = EnsureUniqueName(context, remoteFolder, remoteFileName, duplicateResolver, selection, false, cancellationToken);
-                string remotePath = CombineRelativePath(remoteFolder, uniqueName);
-
-                UploadFileContent(context, remotePath, file, tracker, progress, selection, cancellationToken);
-            }
-        }
-
-        private void UploadFileContent(
-            FileLinkUploadContext context,
-            string remotePath,
-            string localPath,
-            SelectionUploadTracker tracker,
-            IProgress<FileLinkUploadItemProgress> progress,
-            FileLinkSelection selection,
-            CancellationToken cancellationToken)
-        {
-            var fileInfo = new FileInfo(localPath);
-            if (!fileInfo.Exists)
-            {
-                return;
-            }
-            string targetUrl = BuildDavUrl(context.NormalizedBaseUrl, context.UserId, remotePath);
-            if (ShouldUseChunkedUpload(fileInfo))
-            {
-                UploadFileContentChunked(context, targetUrl, fileInfo, tracker, progress, selection, cancellationToken);
-                return;
-            }
-
-            UploadFileContentDirect(targetUrl, localPath, fileInfo, tracker, progress, selection, cancellationToken);
-        }
-
-        private void UploadFileContentDirect(
-            string targetUrl,
-            string localPath,
-            FileInfo fileInfo,
-            SelectionUploadTracker tracker,
-            IProgress<FileLinkUploadItemProgress> progress,
-            FileLinkSelection selection,
-            CancellationToken cancellationToken)
-        {
-            DiagnosticsLogger.LogApi("PUT " + targetUrl);
-            LogFileLink("Upload method selected (method=put, file=\"" + fileInfo.Name + "\", bytes=" + fileInfo.Length.ToString(CultureInfo.InvariantCulture) + ").");
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = "PUT",
-                Url = targetUrl,
-                TimeoutMs = 120000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = false,
-                ParseJson = false,
-                ContentLength = fileInfo.Length,
-                ContentType = "application/octet-stream",
-                BodyWriter = requestStream =>
-                {
-                    using (FileStream fileStream = fileInfo.OpenRead())
-                    {
-                        byte[] buffer = new byte[81920];
-                        int bytesRead;
-                        while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            requestStream.Write(buffer, 0, bytesRead);
-                            tracker.AddBytes(bytesRead);
-                            ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Uploading, null, bytesRead);
-                        }
-                    }
-                }
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : localPath), false, 0, null);
-            }
-            if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.NoContent)
-            {
-                throw new TalkServiceException("File could not be uploaded: " + localPath, false, response.StatusCode, response.ResponseText);
-            }
-
-            DiagnosticsLogger.LogApi("PUT " + targetUrl + " -> " + response.StatusCode);
-        }
-
-        private void UploadFileContentChunked(
-            FileLinkUploadContext context,
-            string targetUrl,
-            FileInfo fileInfo,
-            SelectionUploadTracker tracker,
-            IProgress<FileLinkUploadItemProgress> progress,
-            FileLinkSelection selection,
-            CancellationToken cancellationToken)
-        {
-            long totalSize = fileInfo.Length;
-            long chunkSize = GetChunkSize(totalSize);
-            long chunkCount = (totalSize + chunkSize - 1) / chunkSize;
-            if (chunkCount > ChunkUploadMaxChunks)
-            {
-                throw new TalkServiceException("File could not be uploaded: too many chunks.", false, 0, null);
-            }
-
-            string uploadFolderUrl = BuildChunkUploadFolderUrl(context.NormalizedBaseUrl, context.UserId);
-            LogFileLink(
-                "Upload method selected (method=chunked-v2, file=\""
-                + fileInfo.Name
-                + "\", bytes="
-                + totalSize.ToString(CultureInfo.InvariantCulture)
-                + ", chunks="
-                + chunkCount.ToString(CultureInfo.InvariantCulture)
-                + ", chunkSize="
-                + chunkSize.ToString(CultureInfo.InvariantCulture)
-                + ").");
-
-            bool cleanupRequired = false;
-            CreateChunkUploadFolder(uploadFolderUrl, targetUrl, cancellationToken);
-            cleanupRequired = true;
-            try
-            {
-                using (FileStream fileStream = fileInfo.OpenRead())
-                {
-                    byte[] buffer = new byte[81920];
-                    for (long index = 0; index < chunkCount; index++)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        long offset = index * chunkSize;
-                        long length = Math.Min(chunkSize, totalSize - offset);
-                        string chunkName = (index + 1).ToString("00000", CultureInfo.InvariantCulture);
-                        string chunkUrl = uploadFolderUrl + "/" + chunkName;
-                        UploadChunk(chunkUrl, targetUrl, totalSize, fileStream, offset, length, buffer, tracker, progress, selection, cancellationToken);
-                    }
-                }
-
-                MoveChunkedUpload(uploadFolderUrl, targetUrl, totalSize, cancellationToken);
-                cleanupRequired = false;
-                LogFileLink("Chunked upload completed (file=\"" + fileInfo.Name + "\", bytes=" + totalSize.ToString(CultureInfo.InvariantCulture) + ").");
-            }
-            catch
-            {
-                if (cleanupRequired)
-                {
-                    CleanupChunkUploadFolder(uploadFolderUrl);
-                }
-                throw;
-            }
-        }
-
-        private void CreateChunkUploadFolder(string uploadFolderUrl, string targetUrl, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            DiagnosticsLogger.LogApi("MKCOL " + uploadFolderUrl);
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = "MKCOL",
-                Url = uploadFolderUrl,
-                TimeoutMs = 60000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = false,
-                ParseJson = false,
-                Headers = new Dictionary<string, string> { { "Destination", targetUrl } }
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
-            }
-            if (response.StatusCode != HttpStatusCode.Created)
-            {
-                throw new TalkServiceException("File could not be uploaded: chunk folder could not be created.", false, response.StatusCode, response.ResponseText);
-            }
-            DiagnosticsLogger.LogApi("MKCOL " + uploadFolderUrl + " -> " + response.StatusCode);
-        }
-
-        private void UploadChunk(
-            string chunkUrl,
-            string targetUrl,
-            long totalSize,
-            FileStream fileStream,
-            long offset,
-            long length,
-            byte[] buffer,
-            SelectionUploadTracker tracker,
-            IProgress<FileLinkUploadItemProgress> progress,
-            FileLinkSelection selection,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            DiagnosticsLogger.LogApi("PUT " + chunkUrl);
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = "PUT",
-                Url = chunkUrl,
-                TimeoutMs = 120000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = false,
-                ParseJson = false,
-                ContentLength = length,
-                ContentType = "application/octet-stream",
-                Headers = new Dictionary<string, string>
-                {
-                    { "Destination", targetUrl },
-                    { "OC-Total-Length", totalSize.ToString(CultureInfo.InvariantCulture) }
-                },
-                BodyWriter = requestStream =>
-                {
-                    fileStream.Seek(offset, SeekOrigin.Begin);
-                    long remaining = length;
-                    while (remaining > 0)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        int toRead = (int)Math.Min(buffer.Length, remaining);
-                        int bytesRead = fileStream.Read(buffer, 0, toRead);
-                        if (bytesRead <= 0)
-                        {
-                            throw new EndOfStreamException("Unexpected end of file during chunked upload.");
-                        }
-                        requestStream.Write(buffer, 0, bytesRead);
-                        remaining -= bytesRead;
-                        tracker.AddBytes(bytesRead);
-                        ReportProgress(progress, selection, tracker, FileLinkUploadStatus.Uploading, null, bytesRead);
-                    }
-                }
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
-            }
-            if (!IsSuccessStatus(response.StatusCode))
-            {
-                throw new TalkServiceException("File could not be uploaded: chunk upload failed.", false, response.StatusCode, response.ResponseText);
-            }
-            DiagnosticsLogger.LogApi("PUT " + chunkUrl + " -> " + response.StatusCode);
-        }
-
-        private void MoveChunkedUpload(string uploadFolderUrl, string targetUrl, long totalSize, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            string sourceUrl = uploadFolderUrl + "/.file";
-            DiagnosticsLogger.LogApi("MOVE " + sourceUrl);
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = "MOVE",
-                Url = sourceUrl,
-                TimeoutMs = 120000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = false,
-                ParseJson = false,
-                Headers = new Dictionary<string, string>
-                {
-                    { "Destination", targetUrl },
-                    { "OC-Total-Length", totalSize.ToString(CultureInfo.InvariantCulture) }
-                }
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                throw new TalkServiceException("File could not be uploaded: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
-            }
-            if (!IsSuccessStatus(response.StatusCode))
-            {
-                throw new TalkServiceException("File could not be uploaded: chunk assembly failed.", false, response.StatusCode, response.ResponseText);
-            }
-            DiagnosticsLogger.LogApi("MOVE " + sourceUrl + " -> " + response.StatusCode);
-        }
-
-        private void CleanupChunkUploadFolder(string uploadFolderUrl)
-        {
-            try
-            {
-                DiagnosticsLogger.LogApi("DELETE " + uploadFolderUrl);
-                NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-                {
-                    Method = "DELETE",
-                    Url = uploadFolderUrl,
-                    TimeoutMs = 60000,
-                    IncludeAuthHeader = true,
-                    IncludeOcsApiHeader = false,
-                    ParseJson = false
-                });
-                if (response.HasHttpResponse && (IsSuccessStatus(response.StatusCode) || response.StatusCode == HttpStatusCode.NotFound))
-                {
-                    DiagnosticsLogger.LogApi("DELETE " + uploadFolderUrl + " -> " + response.StatusCode);
-                    return;
-                }
-                LogFileLink("Chunked upload cleanup failed (status=" + (response.HasHttpResponse ? ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture) : "n/a") + ").");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Chunked upload cleanup failed.", ex);
-            }
-        }
-
-        private string EnsureUniqueName(
-            FileLinkUploadContext context,
-            string remoteFolder,
-            string sanitizedName,
-            Func<FileLinkDuplicateInfo, string> duplicateResolver,
-            FileLinkSelection selection,
-            bool isDirectory,
-            CancellationToken cancellationToken)
-        {
-            string folderKey = remoteFolder ?? string.Empty;
-            string fullPath = CombineRelativePath(folderKey, sanitizedName);
-            HashSet<string> primaryKnownSet = isDirectory ? context.KnownFolderPaths : context.KnownFilePaths;
-            HashSet<string> secondaryKnownSet = isDirectory ? context.KnownFilePaths : context.KnownFolderPaths;
-            HashSet<string> primaryReservedSet = isDirectory ? context.ReservedFolderPaths : context.ReservedFilePaths;
-            HashSet<string> secondaryReservedSet = isDirectory ? context.ReservedFilePaths : context.ReservedFolderPaths;
-
-            while (primaryKnownSet.Contains(fullPath)
-                || secondaryKnownSet.Contains(fullPath)
-                || primaryReservedSet.Contains(fullPath)
-                || secondaryReservedSet.Contains(fullPath))
-            {
-                if (duplicateResolver == null)
-                {
-                    throw new TalkServiceException("Duplicate name in target directory: " + sanitizedName, false, 0, null);
-                }
-                string newName = duplicateResolver(new FileLinkDuplicateInfo(selection, remoteFolder, sanitizedName, isDirectory));
-                if (string.IsNullOrWhiteSpace(newName))
-                {
-                    throw new OperationCanceledException("Upload cancelled: no unique name available.");
-                }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-                sanitizedName = SanitizeComponent(newName);
-                if (string.IsNullOrWhiteSpace(sanitizedName))
-                {
-                    throw new TalkServiceException("Invalid name after rename.", false, 0, null);
-                }
-
-                fullPath = CombineRelativePath(folderKey, sanitizedName);
-            }
-
-            primaryReservedSet.Add(fullPath);
-            return sanitizedName;
-        }
-
-        private static string GetRemoteFolder(string root, string relativeFile)
-        {
-            int index = relativeFile.LastIndexOf('/');
-            if (index < 0)
-            {
-                return root;
-            }
-            string folder = relativeFile.Substring(0, index);
-            return CombineRelativePath(root, folder);
-        }
-
-        private void EnsureFolderExists(string baseUrl, string userId, string relativePath, CancellationToken cancellationToken)
-        {
-            EnsureFolderExists(baseUrl, userId, relativePath, cancellationToken, null);
-        }
-
-        private void EnsureFolderExists(
-            string baseUrl,
+        private FileLinkUploadContext CreateShareRoot(
+            FileLinkRequest request,
+            FileLinkUploadPlan plan,
+            string normalizedBaseUrl,
             string userId,
-            string relativePath,
-            CancellationToken cancellationToken,
-            HashSet<string> knownFolderPaths)
+            string basePath,
+            string sanitizedShareName,
+            DateTime shareDate,
+            CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(relativePath))
-            {
-                return;
-            }
-            string[] segments = relativePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            var current = new List<string>();
-            foreach (string segment in segments)
+            string resolvedShareName = sanitizedShareName;
+            string resolvedFolderName = string.Empty;
+            int candidateLimit = request.AttachmentMode
+                ? AttachmentShareNameCandidateLimit
+                : 1;
+
+            for (int suffix = 0; suffix < candidateLimit; suffix++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                current.Add(segment);
-                string path = string.Join("/", current.ToArray());
-                if (knownFolderPaths != null && knownFolderPaths.Contains(path))
+                resolvedShareName = suffix == 0
+                    ? sanitizedShareName
+                    : sanitizedShareName
+                      + "_"
+                      + suffix.ToString(CultureInfo.InvariantCulture);
+                resolvedFolderName = FileLinkPath.BuildShareFolderName(
+                    shareDate,
+                    resolvedShareName);
+                string resolvedFolderPath = FileLinkPath.Combine(
+                    basePath,
+                    resolvedFolderName);
+                if (!_davClient.TryCreateShareRoot(
+                    normalizedBaseUrl,
+                    userId,
+                    resolvedFolderPath,
+                    cancellationToken))
                 {
                     continue;
                 }
-                string url = BuildDavUrl(baseUrl, userId, path);
-                DiagnosticsLogger.LogApi("MKCOL " + url);
-                NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-                {
-                    Method = "MKCOL",
-                    Url = url,
-                    TimeoutMs = 60000,
-                    IncludeAuthHeader = true,
-                    IncludeOcsApiHeader = false,
-                    ParseJson = false
-                });
 
-                if (!response.HasHttpResponse)
+                if (suffix > 0)
                 {
-                    Exception transport = response.TransportException;
-                    DiagnosticsLogger.LogException(LogCategories.Api, "MKCOL failed (" + url + ").", transport);
-                    throw new TalkServiceException("Directory could not be created: " + (transport != null ? transport.Message : path), false, 0, null);
+                    DiagnosticsLogger.Log(
+                        LogCategories.FileLink,
+                        "Attachment share root selected after "
+                        + suffix.ToString(CultureInfo.InvariantCulture)
+                        + " name collision(s).");
                 }
-                if (response.StatusCode != HttpStatusCode.Created
-                    && response.StatusCode != HttpStatusCode.MethodNotAllowed
-                    && response.StatusCode != HttpStatusCode.Conflict)
-                {
-                    throw new TalkServiceException("Directory could not be created: " + path, false, response.StatusCode, response.ResponseText);
-                }
-                if (knownFolderPaths != null)
-                {
-                    knownFolderPaths.Add(path);
-                }
-
-                DiagnosticsLogger.LogApi("MKCOL " + url + " -> " + response.StatusCode);
+                return new FileLinkUploadContext(
+                    normalizedBaseUrl,
+                    userId,
+                    resolvedShareName,
+                    resolvedFolderName,
+                    resolvedFolderPath,
+                    plan);
             }
+
+            throw new TalkServiceException(
+                string.Format(
+                    CultureInfo.CurrentCulture,
+                    Strings.FileLinkWizardFolderExistsFormat,
+                    resolvedFolderName),
+                false,
+                HttpStatusCode.MethodNotAllowed,
+                null);
         }
 
-                // Create the public share through the documented OCS create endpoint and then update mutable metadata.
-        private ShareData CreateShare(string baseUrl, string relativeFolderPath, string shareName, FileLinkRequest request, CancellationToken cancellationToken)
+        private NextcloudCapabilitiesSnapshot ResolveRequiredCapabilities()
         {
-            string url = baseUrl.TrimEnd('/') + "/ocs/v2.php/apps/files_sharing/api/v1/shares";
-            string payload = BuildShareCreatePayload(relativeFolderPath, shareName, request);
-            ShareData shareData = ExecuteShareCreateRequest(url, payload, cancellationToken);
-            UpdateShareMetadata(baseUrl, shareData, request, cancellationToken);
-            return shareData;
+            if (_capabilitiesSnapshot != null)
+            {
+                NextcloudCapabilitiesService.RequireSupportedSnapshot(
+                    _capabilitiesSnapshot);
+                return _capabilitiesSnapshot;
+            }
+
+            _capabilitiesSnapshot = new NextcloudCapabilitiesService(
+                _configuration).GetRequiredSnapshot(false, false);
+            return _capabilitiesSnapshot;
         }
 
-                // Build the documented form-encoded create payload for OCS public-link shares.
-        private string BuildShareCreatePayload(string relativeFolderPath, string shareName, FileLinkRequest request)
+        private static void LogUploadPlan(
+            int selectionCount,
+            FileLinkUploadPlan plan)
         {
-            var builder = new StringBuilder();
-            builder.Append("path=").Append(Uri.EscapeDataString("/" + relativeFolderPath));
-            builder.Append("&shareType=").Append(ShareTypePublicLink.ToString(CultureInfo.InvariantCulture));
-            builder.Append("&permissions=").Append(CalculatePermissionValue(request.Permissions).ToString(CultureInfo.InvariantCulture));
-
-            if (request.PasswordEnabled && !string.IsNullOrEmpty(request.Password))
-            {
-                builder.Append("&password=").Append(Uri.EscapeDataString(request.Password));
-            }
-            if (request.ExpireEnabled && request.ExpireDate.HasValue)
-            {
-                builder.Append("&expireDate=").Append(Uri.EscapeDataString(request.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
-            }
-            if (!string.IsNullOrWhiteSpace(shareName))
-            {
-                builder.Append("&label=").Append(Uri.EscapeDataString(shareName));
-            }
-            if ((request.Permissions & FileLinkPermissionFlags.Create) == FileLinkPermissionFlags.Create)
-            {
-                builder.Append("&publicUpload=true");
-            }
-            return builder.ToString();
+            DiagnosticsLogger.Log(
+                LogCategories.FileLink,
+                "Upload plan ready (selections="
+                + selectionCount.ToString(CultureInfo.InvariantCulture)
+                + ", files="
+                + plan.Files.Count.ToString(CultureInfo.InvariantCulture)
+                + ", foldersToCreate="
+                + plan.DirectoriesToCreate.Count.ToString(
+                    CultureInfo.InvariantCulture)
+                + ", bytes="
+                + plan.TotalBytes.ToString(CultureInfo.InvariantCulture)
+                + ", direct="
+                + plan.DirectFileCount.ToString(
+                    CultureInfo.InvariantCulture)
+                + ", chunked="
+                + plan.ChunkedFileCount.ToString(
+                    CultureInfo.InvariantCulture)
+                + ", bulkFiles="
+                + plan.BulkFiles.Count.ToString(
+                    CultureInfo.InvariantCulture)
+                + ", bulkBatches="
+                + plan.BulkBatches.Count.ToString(
+                    CultureInfo.InvariantCulture)
+                + ").");
         }
-
-                // Update mutable share metadata through the documented OCS update endpoint.
-        private void UpdateShareMetadata(string baseUrl, ShareData shareData, FileLinkRequest request, CancellationToken cancellationToken)
-        {
-            if (shareData == null || string.IsNullOrWhiteSpace(shareData.Id))
-            {
-                return;
-            }
-            string url = baseUrl.TrimEnd('/') + "/ocs/v2.php/apps/files_sharing/api/v1/shares/" + Uri.EscapeDataString(shareData.Id);
-            var payload = new StringBuilder();
-            payload.Append("permissions=").Append(Uri.EscapeDataString(CalculatePermissionValue(request.Permissions).ToString(CultureInfo.InvariantCulture)));
-            payload.Append("&publicUpload=").Append((request.Permissions & FileLinkPermissionFlags.Create) == FileLinkPermissionFlags.Create ? "true" : "false");
-            payload.Append("&note=").Append(Uri.EscapeDataString(request.NoteEnabled ? (request.Note ?? string.Empty) : string.Empty));
-            payload.Append("&attributes=").Append(Uri.EscapeDataString("[]"));
-            if (request.ExpireEnabled && request.ExpireDate.HasValue)
-            {
-                payload.Append("&expireDate=").Append(Uri.EscapeDataString(request.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
-            }
-            if (request.PasswordEnabled && !string.IsNullOrEmpty(request.Password))
-            {
-                payload.Append("&password=").Append(Uri.EscapeDataString(request.Password));
-            }
-
-            ExecuteShareMetadataUpdateRequest(url, payload.ToString(), cancellationToken);
-        }
-
-        private ShareData ExecuteShareCreateRequest(string url, string formPayload, CancellationToken cancellationToken)
-        {
-            NcHttpResponse response = ExecuteShareRequest(
-                "POST",
-                url,
-                formPayload,
-                "Share create failed",
-                "Share creation failed",
-                cancellationToken);
-            return ParseShareData(response.ParsedJson, response.ResponseText);
-        }
-
-        private void ExecuteShareMetadataUpdateRequest(string url, string formPayload, CancellationToken cancellationToken)
-        {
-            ExecuteShareRequest(
-                "PUT",
-                url,
-                formPayload,
-                "Share metadata update failed",
-                "Share metadata update failed",
-                cancellationToken);
-        }
-
-        private NcHttpResponse ExecuteShareRequest(
-            string method,
-            string url,
-            string formPayload,
-            string transportLogMessage,
-            string failureMessage,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            DiagnosticsLogger.LogApi(method + " " + url);
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = method,
-                Url = url,
-                Payload = formPayload ?? string.Empty,
-                Accept = "application/json",
-                ContentType = "application/x-www-form-urlencoded",
-                TimeoutMs = 90000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = true,
-                ParseJson = true
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                DiagnosticsLogger.LogException(LogCategories.Api, transportLogMessage + " (" + url + ").", transport);
-                throw new TalkServiceException(failureMessage + ": " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
-            }
-
-            DiagnosticsLogger.LogApi(method + " " + url + " -> " + response.StatusCode);
-            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
-            {
-                string detail = NcJson.ExtractOcsErrorMessage(response.ParsedJson);
-                if (string.IsNullOrWhiteSpace(detail))
-                {
-                    detail = "HTTP " + (int)response.StatusCode;
-                }
-                bool authError = response.StatusCode == HttpStatusCode.Unauthorized
-                                 || response.StatusCode == HttpStatusCode.Forbidden;
-                throw new TalkServiceException(failureMessage + ": " + detail, authError, response.StatusCode, response.ResponseText);
-            }
-            return response;
-        }
-
-        private static string BuildDavUrl(string baseUrl, string userId, string relativePath)
-        {
-            string[] segments = relativePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            string encoded = string.Join("/", segments.Select(Uri.EscapeDataString));
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}/remote.php/dav/files/{1}/{2}",
-                baseUrl.TrimEnd('/'),
-                Uri.EscapeDataString(userId ?? string.Empty),
-                encoded);
-        }
-
-        private static string BuildChunkUploadFolderUrl(string baseUrl, string userId)
-        {
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}/remote.php/dav/uploads/{1}/{2}",
-                baseUrl.TrimEnd('/'),
-                Uri.EscapeDataString(userId ?? string.Empty),
-                Uri.EscapeDataString(BuildChunkUploadId()));
-        }
-
-        private static string BuildChunkUploadId()
-        {
-            return "ncconnector-" + Guid.NewGuid().ToString("N");
-        }
-
-        private static bool ShouldUseChunkedUpload(FileInfo fileInfo)
-        {
-            return fileInfo != null && fileInfo.Length > DirectUploadLimitBytes;
-        }
-
-        private static long GetChunkSize(long fileSize)
-        {
-            long minimumForChunkLimit = (long)Math.Ceiling((double)Math.Max(0, fileSize) / ChunkUploadMaxChunks);
-            return Math.Max(ChunkUploadChunkSizeBytes, Math.Max(ChunkUploadMinChunkBytes, minimumForChunkLimit));
-        }
-
-        private static bool IsSuccessStatus(HttpStatusCode statusCode)
-        {
-            int status = (int)statusCode;
-            return status >= 200 && status < 300;
-        }
-
-        private static ShareData ParseShareData(IDictionary<string, object> parsedJson, string responseText)
-        {
-            if (parsedJson == null)
-            {
-                throw new TalkServiceException("Share creation failed: invalid response.", false, 0, responseText);
-            }
-
-            IDictionary<string, object> data = NcJson.GetOcsData(parsedJson);
-            var result = new ShareData
-            {
-                Id = NcJson.GetTrimmedString(data, "id"),
-                Url = NcJson.GetTrimmedString(data, "url"),
-                Token = NcJson.GetTrimmedString(data, "token")
-            };
-
-            if (string.IsNullOrWhiteSpace(result.Id) || string.IsNullOrWhiteSpace(result.Url))
-            {
-                throw new TalkServiceException("Share creation failed: incomplete response.", false, 0, responseText);
-            }
-            return result;
-        }
-
-        internal static string NormalizeRelativePath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return string.Empty;
-            }
-            return string.Join("/", path.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries).Select(SanitizeComponent));
-        }
-
-        internal static string CombineRelativePath(string basePath, string component)
-        {
-            if (string.IsNullOrEmpty(basePath))
-            {
-                return component ?? string.Empty;
-            }
-            if (string.IsNullOrEmpty(component))
-            {
-                return basePath;
-            }
-            return basePath.TrimEnd('/') + "/" + component.TrimStart('/');
-        }
-
-        internal static string SanitizeComponent(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                return string.Empty;
-            }
-            var invalid = Path.GetInvalidFileNameChars();
-            var builder = new StringBuilder(value.Length);
-            foreach (char c in value)
-            {
-                builder.Append(invalid.Contains(c) ? '_' : c);
-            }
-            return builder.ToString().Trim();
-        }
-
-        internal static string NormalizeShareDatePrefixFormat(string value)
-        {
-            return "yyyyMMdd";
-        }
-
-        private static string ConvertPath(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return string.Empty;
-            }
-            return string.Join("/", path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Select(SanitizeComponent));
-        }
-
-        private static string GetRelativePath(string root, string fullPath)
-        {
-            if (string.IsNullOrEmpty(root))
-            {
-                return fullPath;
-            }
-            var rootUri = new Uri(AppendDirectorySeparator(root));
-            var fullUri = new Uri(fullPath);
-            string relative = Uri.UnescapeDataString(rootUri.MakeRelativeUri(fullUri).ToString());
-            return relative.Replace('/', Path.DirectorySeparatorChar);
-        }
-
-        private static string AppendDirectorySeparator(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return path;
-            }
-            if (!path.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
-            {
-                return path + Path.DirectorySeparatorChar;
-            }
-            return path;
-        }
-
-        private static int CalculatePermissionValue(FileLinkPermissionFlags permissions)
-        {
-            int value = 0;
-            if ((permissions & FileLinkPermissionFlags.Read) == FileLinkPermissionFlags.Read)
-            {
-                value |= 1;
-            }
-            if ((permissions & FileLinkPermissionFlags.Write) == FileLinkPermissionFlags.Write)
-            {
-                value |= 2;
-            }
-            if ((permissions & FileLinkPermissionFlags.Create) == FileLinkPermissionFlags.Create)
-            {
-                value |= 4;
-            }
-            if ((permissions & FileLinkPermissionFlags.Delete) == FileLinkPermissionFlags.Delete)
-            {
-                value |= 8;
-            }
-            return value;
-        }
-
-        private sealed class SelectionUploadTracker
-        {
-            internal SelectionUploadTracker(long totalBytes)
-            {
-                TotalBytes = totalBytes < 0 ? 0 : totalBytes;
-            }
-
-            internal long TotalBytes { get; private set; }
-
-            internal long UploadedBytes { get; private set; }
-
-            internal void AddBytes(long bytes)
-            {
-                if (bytes <= 0)
-                {
-                    return;
-                }
-
-                UploadedBytes += bytes;
-                if (TotalBytes > 0 && UploadedBytes > TotalBytes)
-                {
-                    UploadedBytes = TotalBytes;
-                }
-            }
-        }
-
-        private sealed class ShareData
-        {
-            internal string Id { get; set; }
-
-            internal string Url { get; set; }
-
-            internal string Token { get; set; }
-        }
-
     }
 }
-

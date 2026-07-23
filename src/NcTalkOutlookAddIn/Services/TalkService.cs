@@ -175,18 +175,19 @@ namespace NcTalkOutlookAddIn.Services
         {
             EnsureConfiguration();
 
-            string baseUrl = _configuration.GetNormalizedBaseUrl();
-            string url = baseUrl + "/ocs/v2.php/cloud/capabilities";
-
-            HttpStatusCode statusCode;
-            IDictionary<string, object> data;
             // Force a fresh connection for connectivity diagnostics so TLS mode changes
             // are validated against a new handshake and not masked by pooled keep-alive sockets.
-            ExecuteJsonRequest("GET", url, (string)null, out statusCode, out data, true);
-
-            if (!IsSuccessStatus(statusCode))
+            NextcloudCapabilitiesSnapshot snapshot =
+                new NextcloudCapabilitiesService(_configuration)
+                    .GetSnapshot(true, true);
+            try
             {
-                message = "HTTP " + (int)statusCode;
+                NextcloudCapabilitiesService.RequireSupportedSnapshot(
+                    snapshot);
+            }
+            catch (TalkServiceException ex)
+            {
+                message = ex.Message;
                 return false;
             }
 
@@ -200,24 +201,9 @@ namespace NcTalkOutlookAddIn.Services
                 return false;
             }
 
-            IDictionary<string, object> ocs = NcJson.GetDictionary(data, "ocs");
-            IDictionary<string, object> meta = NcJson.GetDictionary(ocs, "meta");
-            IDictionary<string, object> payload = NcJson.GetDictionary(ocs, "data");
-
-            string version = ExtractVersion(payload);
-            string status = NcJson.GetString(meta, "status");
-            if (!string.IsNullOrEmpty(version))
-            {
-                message = version;
-            }
-            else if (!string.IsNullOrEmpty(status))
-            {
-                message = status;
-            }
-            else
-            {
-                message = "OK";
-            }
+            message = string.IsNullOrWhiteSpace(snapshot.ServerVersionText)
+                ? snapshot.ServerVersion.ToString()
+                : snapshot.ServerVersionText;
             return true;
         }
 

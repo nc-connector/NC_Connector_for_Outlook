@@ -12,12 +12,17 @@ try {
     @'
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Utilities
@@ -33,6 +38,15 @@ namespace NcTalkOutlookAddIn.Utilities
     {
         internal const string Api = "api";
         internal const string Core = "core";
+    }
+
+    internal static class Strings
+    {
+        internal static string FileLinkUploadSourceChanged { get { return "source changed"; } }
+        internal static string FileLinkUploadLinkedItemUnsupported { get { return "linked item unsupported"; } }
+        internal static string FileLinkWizardUploadCancelledMessage { get { return "upload cancelled"; } }
+        internal static string FileLinkWizardUploadFailed { get { return "upload failed"; } }
+        internal static string ErrorCredentialsNotVerified { get { return "credentials not verified"; } }
     }
 }
 
@@ -61,6 +75,11 @@ internal static class OutlookUtilityTests
         TestPasswordGenerator();
         TestSizeFormatting();
         TestVersionParsing();
+        TestCapabilitiesOcsStatus();
+        TestFileLinkUploadPolicy();
+        TestFileLinkPath();
+        TestFileLinkSelectionScanner();
+        TestFileLinkUploadPlanner();
         TestPlainTextUtilities();
         TestBasicAuth();
         TestNcJson();
@@ -90,6 +109,9 @@ internal static class OutlookUtilityTests
     {
         Equal("SizeFormatting 1 MiB", "1.0 MB", SizeFormatting.FormatMegabytes(1024 * 1024, CultureInfo.InvariantCulture));
         Equal("SizeFormatting clamps negative values", "0.0 MB", SizeFormatting.FormatMegabytes(-12, CultureInfo.InvariantCulture));
+        Equal("SizeFormatting bytes", "512 B", SizeFormatting.FormatBytes(512, CultureInfo.InvariantCulture));
+        Equal("SizeFormatting scales KiB", "1.5 KB", SizeFormatting.FormatBytes(1536, CultureInfo.InvariantCulture));
+        Equal("SizeFormatting bytes per second", "1.5 KB/s", SizeFormatting.FormatBytesPerSecond(1536, CultureInfo.InvariantCulture));
     }
 
     private static void TestVersionParsing()
@@ -99,7 +121,581 @@ internal static class OutlookUtilityTests
         Equal("NextcloudVersionHelper parsed edition version", new Version(31, 0, 4), version);
         Check("NextcloudVersionHelper parses pre-release prefix", NextcloudVersionHelper.TryParse("32.0.0-beta1", out version));
         Equal("NextcloudVersionHelper parsed pre-release prefix", new Version(32, 0, 0), version);
+        Check("NextcloudVersionHelper parses product-prefixed version", NextcloudVersionHelper.TryParse("Nextcloud 34.0.1", out version));
+        Equal("NextcloudVersionHelper parsed product-prefixed version", new Version(34, 0, 1), version);
         Check("NextcloudVersionHelper rejects empty", !NextcloudVersionHelper.TryParse(" ", out version));
+
+        IDictionary<string, object> capabilities = NcJson.DeserializeObject(
+            "{\"ocs\":{\"data\":{\"version\":{\"major\":32,\"minor\":1,\"micro\":4}}}}");
+        string versionText;
+        Check(
+            "NextcloudVersionHelper extracts structured OCS version",
+            NextcloudVersionHelper.TryExtractFromCapabilities(capabilities, out version, out versionText));
+        Equal("NextcloudVersionHelper structured OCS version", new Version(32, 1, 4), version);
+        Equal("NextcloudVersionHelper structured OCS version text", "32.1.4", versionText);
+
+        Equal("Nextcloud minimum supported major version", 32, NextcloudVersionHelper.MinimumSupportedMajorVersion);
+        Check("Nextcloud 31 is rejected", !NextcloudVersionHelper.IsSupported(new Version(31, 0, 9)));
+        Check("Nextcloud 32 is supported", NextcloudVersionHelper.IsSupported(new Version(32, 0, 0)));
+        Check("Missing Nextcloud version is rejected", !NextcloudVersionHelper.IsSupported(null));
+    }
+
+    private static void TestCapabilitiesOcsStatus()
+    {
+        IDictionary<string, object> success = NcJson.DeserializeObject(
+            "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":200,\"message\":\"OK\"},\"data\":{}}}");
+        string detail;
+        Check(
+            "Nextcloud capabilities accepts OCS statuscode 200",
+            NcJson.IsOcsSuccess(success, out detail),
+            detail);
+
+        IDictionary<string, object> legacySuccess = NcJson.DeserializeObject(
+            "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":100},\"data\":{}}}");
+        Check(
+            "Nextcloud capabilities accepts OCS statuscode 100",
+            NcJson.IsOcsSuccess(legacySuccess, out detail),
+            detail);
+
+        IDictionary<string, object> zeroSuccess = NcJson.DeserializeObject(
+            "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":0},\"data\":{}}}");
+        Check(
+            "Nextcloud capabilities accepts OCS statuscode 0",
+            NcJson.IsOcsSuccess(zeroSuccess, out detail),
+            detail);
+
+        IDictionary<string, object> failure = NcJson.DeserializeObject(
+            "{\"ocs\":{\"meta\":{\"status\":\"failure\",\"statuscode\":997,\"message\":\"Denied\"},\"data\":{}}}");
+        Check(
+            "Nextcloud capabilities rejects OCS failure code",
+            !NcJson.IsOcsSuccess(failure, out detail));
+        Equal(
+            "Nextcloud capabilities exposes OCS failure detail",
+            "Denied",
+            detail);
+
+        IDictionary<string, object> incomplete = NcJson.DeserializeObject(
+            "{\"ocs\":{\"meta\":{},\"data\":{}}}");
+        Check(
+            "Nextcloud capabilities rejects empty OCS metadata",
+            !NcJson.IsOcsSuccess(incomplete, out detail));
+    }
+
+    private static void TestFileLinkUploadPolicy()
+    {
+        Equal(
+            "FileLink uses the NC32 server AutoMkcol header",
+            "X-NC-WebDAV-Auto-Mkcol",
+            FileLinkUploadPolicy.AutoMkcolHeaderName);
+        Equal(
+            "FileLink direct upload limit is 20 MiB",
+            20L * 1024L * 1024L,
+            FileLinkUploadPolicy.DirectUploadLimitBytes);
+        Equal(
+            "FileLink chunk minimum is 5 MiB",
+            5L * 1024L * 1024L,
+            FileLinkUploadPolicy.ChunkUploadMinimumChunkSizeBytes);
+        Equal(
+            "FileLink standard chunk size is 20 MiB",
+            20L * 1024L * 1024L,
+            FileLinkUploadPolicy.ChunkUploadChunkSizeBytes);
+        Equal(
+            "FileLink chunk maximum is 5 GiB",
+            5L * 1024L * 1024L * 1024L,
+            FileLinkUploadPolicy.ChunkUploadMaximumChunkSizeBytes);
+        Equal(
+            "FileLink chunk count maximum is 10000",
+            10000,
+            FileLinkUploadPolicy.ChunkUploadMaxChunks);
+        Equal(
+            "FileLink maximum file size follows chunk limits",
+            FileLinkUploadPolicy.ChunkUploadMaximumChunkSizeBytes
+                * FileLinkUploadPolicy.ChunkUploadMaxChunks,
+            FileLinkUploadPolicy.ChunkUploadMaximumFileSizeBytes);
+        Equal(
+            "FileLink bulk candidate limit is 8 MiB",
+            8L * 1024L * 1024L,
+            FileLinkUploadPolicy.BulkCandidateLimitBytes);
+        Equal(
+            "FileLink bulk batch byte limit is 20 MiB",
+            20L * 1024L * 1024L,
+            FileLinkUploadPolicy.BulkBatchLimitBytes);
+        Equal("FileLink bulk batch file limit", 100, FileLinkUploadPolicy.BulkBatchFileLimit);
+        Equal("FileLink bulk minimum file count", 20, FileLinkUploadPolicy.BulkMinimumFileCount);
+        Equal("FileLink maximum parallel requests", 3, FileLinkUploadPolicy.MaxParallelRequests);
+        Equal("FileLink maximum request attempts", 3, FileLinkUploadPolicy.MaxRequestAttempts);
+
+        Check(
+            "FileLink direct upload includes exact 20 MiB boundary",
+            !FileLinkUploadPolicy.ShouldUseChunkedUpload(FileLinkUploadPolicy.DirectUploadLimitBytes));
+        Check(
+            "FileLink chunked upload starts above 20 MiB",
+            FileLinkUploadPolicy.ShouldUseChunkedUpload(FileLinkUploadPolicy.DirectUploadLimitBytes + 1));
+        Equal(
+            "FileLink direct upload uses one transfer request",
+            1,
+            FileLinkUploadPolicy.GetTransferRequestCount(
+                FileLinkUploadPolicy.DirectUploadLimitBytes));
+        Equal(
+            "FileLink chunked upload counts folder chunks and move",
+            4,
+            FileLinkUploadPolicy.GetTransferRequestCount(
+                FileLinkUploadPolicy.DirectUploadLimitBytes + 1));
+        Equal(
+            "FileLink chunk count stays within server limit",
+            FileLinkUploadPolicy.ChunkUploadMaxChunks,
+            (int)(((FileLinkUploadPolicy.ChunkUploadMaximumFileSizeBytes - 1)
+                / FileLinkUploadPolicy.GetChunkUploadChunkSize(
+                    FileLinkUploadPolicy.ChunkUploadMaximumFileSizeBytes))
+                + 1));
+        Equal(
+            "FileLink maximum file uses the maximum chunk size",
+            FileLinkUploadPolicy.ChunkUploadMaximumChunkSizeBytes,
+            FileLinkUploadPolicy.GetChunkUploadChunkSize(
+                FileLinkUploadPolicy.ChunkUploadMaximumFileSizeBytes));
+        Check(
+            "FileLink accepts the exact maximum file size",
+            FileLinkUploadPolicy.IsSupportedFileSize(
+                FileLinkUploadPolicy.ChunkUploadMaximumFileSizeBytes));
+        Check(
+            "FileLink rejects a file above the maximum size",
+            !FileLinkUploadPolicy.IsSupportedFileSize(
+                FileLinkUploadPolicy.ChunkUploadMaximumFileSizeBytes + 1));
+        bool oversizedFileRejected = false;
+        try
+        {
+            FileLinkUploadPolicy.GetTransferRequestCount(
+                FileLinkUploadPolicy.ChunkUploadMaximumFileSizeBytes + 1);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            oversizedFileRejected = true;
+        }
+        Check(
+            "FileLink rejects oversized files before request planning",
+            oversizedFileRejected);
+        Check(
+            "FileLink bulk candidate includes exact 8 MiB boundary",
+            FileLinkUploadPolicy.IsBulkCandidate(FileLinkUploadPolicy.BulkCandidateLimitBytes));
+        Check(
+            "FileLink bulk candidate rejects files above 8 MiB",
+            !FileLinkUploadPolicy.IsBulkCandidate(FileLinkUploadPolicy.BulkCandidateLimitBytes + 1));
+        Check("FileLink bulk candidate rejects negative size", !FileLinkUploadPolicy.IsBulkCandidate(-1));
+
+        Check(
+            "FileLink bulk upload requires server capability",
+            !FileLinkUploadPolicy.ShouldUseBulkUpload(
+                false,
+                20,
+                20,
+                0,
+                0,
+                1));
+        Check(
+            "FileLink bulk upload requires minimum file count",
+            !FileLinkUploadPolicy.ShouldUseBulkUpload(
+                true,
+                19,
+                19,
+                0,
+                0,
+                1));
+        Check(
+            "FileLink bulk upload requires a batch request",
+            !FileLinkUploadPolicy.ShouldUseBulkUpload(
+                true,
+                20,
+                20,
+                0,
+                0,
+                0));
+        Check(
+            "FileLink bulk upload accepts exact request-saving threshold",
+            FileLinkUploadPolicy.ShouldUseBulkUpload(
+                true,
+                20,
+                20,
+                75,
+                75,
+                1));
+        Check(
+            "FileLink bulk upload rejects insufficient request savings",
+            !FileLinkUploadPolicy.ShouldUseBulkUpload(
+                true,
+                20,
+                20,
+                76,
+                76,
+                1));
+        Check(
+            "FileLink bulk upload includes non-bulk requests in saving threshold",
+            !FileLinkUploadPolicy.ShouldUseBulkUpload(
+                true,
+                20,
+                100,
+                0,
+                0,
+                1));
+        Check(
+            "FileLink bulk upload counts extra bulk parent requests",
+            !FileLinkUploadPolicy.ShouldUseBulkUpload(
+                true,
+                20,
+                20,
+                0,
+                20,
+                1));
+
+        int[] retryable = { 408, 423, 429, 502, 503, 504 };
+        foreach (int statusCode in retryable)
+        {
+            Check(
+                "FileLink retryable HTTP " + statusCode,
+                FileLinkUploadPolicy.IsRetryableStatusCode(statusCode));
+        }
+        Check(
+            "FileLink HTTP 502 result can be indeterminate",
+            FileLinkUploadPolicy.IsIndeterminateStatusCode(502));
+        Check(
+            "FileLink HTTP 429 result is not indeterminate",
+            !FileLinkUploadPolicy.IsIndeterminateStatusCode(429));
+
+        int[] nonRetryable = { 400, 401, 404, 409, 500, 507 };
+        foreach (int statusCode in nonRetryable)
+        {
+            Check(
+                "FileLink non-retryable HTTP " + statusCode,
+                !FileLinkUploadPolicy.IsRetryableStatusCode(statusCode));
+        }
+    }
+
+    private static void TestFileLinkPath()
+    {
+        Equal(
+            "FileLink path normalizes separators",
+            "one/two/three",
+            FileLinkPath.NormalizeRelativePath(
+                "one\\two//three"));
+        Equal(
+            "FileLink path removes empty sanitized segments",
+            "one/two",
+            FileLinkPath.NormalizeRelativePath(
+                "one/   /two"));
+        Equal(
+            "FileLink path neutralizes current-directory segments",
+            "one/_/two",
+            FileLinkPath.NormalizeRelativePath(
+                "one/./two"));
+        Equal(
+            "FileLink path neutralizes parent-directory segments",
+            "one/__/two",
+            FileLinkPath.NormalizeRelativePath(
+                "one/../two"));
+        Equal(
+            "FileLink share folder date is stable",
+            "20260723_share",
+            FileLinkPath.BuildShareFolderName(
+                new DateTime(2026, 7, 23),
+                "share"));
+    }
+
+    private static void TestFileLinkUploadPlanner()
+    {
+        string fixtureRoot = Path.Combine(
+            Path.GetTempPath(),
+            "nc4ol-plan-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(fixtureRoot);
+        try
+        {
+            string bulkRoot = Path.Combine(fixtureRoot, "bulk");
+            Directory.CreateDirectory(bulkRoot);
+            Directory.CreateDirectory(Path.Combine(bulkRoot, "empty"));
+            for (int index = 0; index < 20; index++)
+            {
+                File.WriteAllText(
+                    Path.Combine(bulkRoot, "file-" + index.ToString("00", CultureInfo.InvariantCulture) + ".txt"),
+                    "x");
+            }
+
+            var bulkSelection = new FileLinkSelection(
+                FileLinkSelectionType.Directory,
+                bulkRoot);
+            var bulkPlan = FileLinkUploadPlanBuilder.Build(
+                new List<FileLinkSelection> { bulkSelection },
+                true,
+                1,
+                null,
+                CancellationToken.None);
+            Equal("FileLink planner scans 20 files", 20, bulkPlan.Files.Count);
+            Equal("FileLink planner classifies bulk-capable files", 20, bulkPlan.BulkFiles.Count);
+            Equal("FileLink planner creates one bulk batch", 1, bulkPlan.BulkBatches.Count);
+            Equal(
+                "FileLink planner leaves no direct files with bulk capability",
+                0,
+                bulkPlan.DirectFileCount);
+            Check(
+                "FileLink planner preserves an empty directory",
+                bulkPlan.DirectoriesToCreate.Any(path => path.EndsWith("/empty", StringComparison.OrdinalIgnoreCase)));
+
+            var directPlan = FileLinkUploadPlanBuilder.Build(
+                new List<FileLinkSelection> { bulkSelection },
+                false,
+                1,
+                null,
+                CancellationToken.None);
+            Equal(
+                "FileLink planner keeps files direct without bulk capability",
+                20,
+                directPlan.DirectFileCount);
+            Equal("FileLink planner creates no bulk files without capability", 0, directPlan.BulkFiles.Count);
+            Equal("FileLink planner creates no bulk batches without capability", 0, directPlan.BulkBatches.Count);
+
+            string directOnlyRoot = Path.Combine(
+                fixtureRoot,
+                "direct-only");
+            Directory.CreateDirectory(directOnlyRoot);
+            File.WriteAllText(
+                Path.Combine(directOnlyRoot, "file.txt"),
+                "direct");
+            var directOnlyPlan = FileLinkUploadPlanBuilder.Build(
+                new List<FileLinkSelection>
+                {
+                    new FileLinkSelection(
+                        FileLinkSelectionType.Directory,
+                        directOnlyRoot)
+                },
+                false,
+                1,
+                null,
+                CancellationToken.None);
+            Equal(
+                "FileLink planner lets AutoMkcol create direct-only parents",
+                0,
+                directOnlyPlan.DirectoriesToCreate.Count);
+
+            string sharedDirectRoot = Path.Combine(
+                fixtureRoot,
+                "shared-direct");
+            string sharedDirectLeft = Path.Combine(
+                sharedDirectRoot,
+                "left");
+            string sharedDirectRight = Path.Combine(
+                sharedDirectRoot,
+                "right");
+            Directory.CreateDirectory(sharedDirectLeft);
+            Directory.CreateDirectory(sharedDirectRight);
+            File.WriteAllText(
+                Path.Combine(sharedDirectLeft, "left.txt"),
+                "left");
+            File.WriteAllText(
+                Path.Combine(sharedDirectRight, "right.txt"),
+                "right");
+            var sharedDirectPlan = FileLinkUploadPlanBuilder.Build(
+                new List<FileLinkSelection>
+                {
+                    new FileLinkSelection(
+                        FileLinkSelectionType.Directory,
+                        sharedDirectRoot)
+                },
+                false,
+                1,
+                null,
+                CancellationToken.None);
+            Equal(
+                "FileLink planner creates one shared direct parent",
+                1,
+                sharedDirectPlan.DirectoriesToCreate.Count);
+            Check(
+                "FileLink planner leaves single-file child paths to AutoMkcol",
+                sharedDirectPlan.DirectoriesToCreate[0].EndsWith(
+                    "shared-direct",
+                    StringComparison.OrdinalIgnoreCase));
+
+        }
+        finally
+        {
+            if (Directory.Exists(fixtureRoot))
+            {
+                Directory.Delete(fixtureRoot, true);
+            }
+        }
+    }
+
+    private static void TestFileLinkSelectionScanner()
+    {
+        string fixtureRoot = Path.Combine(
+            Path.GetTempPath(),
+            "nc4ol-scan-tests-" + Guid.NewGuid().ToString("N"));
+        string junctionPath = string.Empty;
+        Directory.CreateDirectory(fixtureRoot);
+        try
+        {
+            string selectionRoot = Path.Combine(
+                fixtureRoot,
+                "selection");
+            string nestedRoot = Path.Combine(
+                selectionRoot,
+                "nested");
+            Directory.CreateDirectory(nestedRoot);
+            Directory.CreateDirectory(
+                Path.Combine(selectionRoot, "empty"));
+            File.WriteAllText(
+                Path.Combine(nestedRoot, "a.txt"),
+                "one");
+            File.WriteAllText(
+                Path.Combine(nestedRoot, " a.txt"),
+                "two");
+
+            int resolverCalls = 0;
+            var selection = new FileLinkSelection(
+                FileLinkSelectionType.Directory,
+                selectionRoot);
+            FileLinkSelectionScanResult scan =
+                FileLinkSelectionScanner.Scan(
+                    new List<FileLinkSelection> { selection },
+                    info =>
+                    {
+                        resolverCalls++;
+                        return "renamed-"
+                            + resolverCalls.ToString(
+                                CultureInfo.InvariantCulture)
+                            + ".txt";
+                    },
+                    CancellationToken.None);
+
+            Equal(
+                "FileLink scanner invokes resolver for a sanitized collision",
+                1,
+                resolverCalls);
+            Equal(
+                "FileLink scanner keeps collision paths unique",
+                2,
+                scan.Files
+                    .Select(file => file.RemotePath)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count());
+            Check(
+                "FileLink scanner applies the collision rename",
+                scan.Files.Any(
+                    file => file.RemotePath.EndsWith(
+                        "/renamed-1.txt",
+                        StringComparison.OrdinalIgnoreCase)));
+            Check(
+                "FileLink scanner records an empty directory",
+                scan.Directories.Any(
+                    path => path.EndsWith(
+                        "/empty",
+                        StringComparison.OrdinalIgnoreCase)));
+            Equal(
+                "FileLink scanner tracks selection file count",
+                2,
+                scan.SelectionFileCounts[selection]);
+            Equal(
+                "FileLink scanner tracks total bytes",
+                6L,
+                scan.TotalBytes);
+
+            string reparseRoot = Path.Combine(
+                fixtureRoot,
+                "reparse-selection");
+            string reparseTarget = Path.Combine(
+                fixtureRoot,
+                "reparse-target");
+            junctionPath = Path.Combine(
+                reparseRoot,
+                "linked");
+            Directory.CreateDirectory(reparseRoot);
+            Directory.CreateDirectory(reparseTarget);
+            File.WriteAllText(
+                Path.Combine(reparseTarget, "outside.txt"),
+                "outside");
+
+            bool junctionCreated = TryCreateDirectoryJunction(
+                junctionPath,
+                reparseTarget);
+            Check(
+                "FileLink scanner test creates a directory junction",
+                junctionCreated);
+            if (junctionCreated)
+            {
+                bool linkedItemRejected = false;
+                try
+                {
+                    FileLinkSelectionScanner.Scan(
+                        new List<FileLinkSelection>
+                        {
+                            new FileLinkSelection(
+                                FileLinkSelectionType.Directory,
+                                reparseRoot)
+                        },
+                        null,
+                        CancellationToken.None);
+                }
+                catch (TalkServiceException ex)
+                {
+                    linkedItemRejected = string.Equals(
+                        ex.Message,
+                        "linked item unsupported",
+                        StringComparison.Ordinal);
+                }
+                Check(
+                    "FileLink scanner rejects a nested directory junction",
+                    linkedItemRejected);
+            }
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(junctionPath)
+                && Directory.Exists(junctionPath))
+            {
+                Directory.Delete(junctionPath);
+            }
+            if (Directory.Exists(fixtureRoot))
+            {
+                Directory.Delete(fixtureRoot, true);
+            }
+        }
+    }
+
+    private static bool TryCreateDirectoryJunction(
+        string junctionPath,
+        string targetPath)
+    {
+        string commandProcessor =
+            Environment.GetEnvironmentVariable("ComSpec");
+        if (string.IsNullOrWhiteSpace(commandProcessor))
+        {
+            commandProcessor = "cmd.exe";
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = commandProcessor,
+            Arguments = "/d /c mklink /J \""
+                + junctionPath
+                + "\" \""
+                + targetPath
+                + "\"",
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        using (Process process = Process.Start(startInfo))
+        {
+            if (process == null)
+            {
+                return false;
+            }
+            process.StandardOutput.ReadToEnd();
+            process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            return process.ExitCode == 0
+                && Directory.Exists(junctionPath)
+                && (new DirectoryInfo(junctionPath).Attributes
+                    & FileAttributes.ReparsePoint)
+                    == FileAttributes.ReparsePoint;
+        }
     }
 
     private static void TestPlainTextUtilities()
@@ -303,9 +899,17 @@ internal static class OutlookUtilityTests
 
     $sources = @(
         $testSource,
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\FileLinkSelection.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkDuplicateInfo.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkUploadPlan.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkSelectionScanner.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkUploadPlanner.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceException.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\PasswordGenerator.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\SizeFormatting.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NextcloudVersionHelper.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\FileLinkPath.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\FileLinkUploadPolicy.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\PlainTextUtilities.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpAuthUtilities.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NcJson.cs"),

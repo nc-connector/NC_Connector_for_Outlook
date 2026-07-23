@@ -45,7 +45,7 @@ try {
 
     Assert-Check ($identitySource.Contains('/ocs/v2.php/cloud/user?format=json')) "Canonical UID resolver uses the documented current-user endpoint"
     Assert-Check ($identitySource.Contains('NcJson.GetOcsData(payload), "id"')) "Canonical UID resolver reads ocs.data.id"
-    Assert-Check ($fileLinkSource.Contains('NextcloudUserIdentityService.ResolveCurrentUserId(_configuration)')) "FileLink resolves the canonical UID"
+    Assert-Check ([regex]::IsMatch($fileLinkSource, 'NextcloudUserIdentityService\.ResolveCurrentUserId\(\s*_configuration\s*\)')) "FileLink resolves the canonical UID"
     Assert-Check (-not $fileLinkSource.Contains('string username = _configuration.Username')) "FileLink does not use the authentication login as DAV UID"
     Assert-Check ($addressBookSource.Contains('NextcloudUserIdentityService.ResolveCurrentUserId(configuration)')) "CardDAV resolves the canonical UID"
     Assert-Check ($freeBusySource.Contains('NextcloudUserIdentityService.ResolveCurrentUserId(_configuration)')) "CalDAV resolves the canonical UID"

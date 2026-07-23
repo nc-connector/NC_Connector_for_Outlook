@@ -3,19 +3,12 @@
 // See LICENSE.txt for details.
 
 using System;
-using System.Collections.Generic;
 
 namespace NcTalkOutlookAddIn.Models
 {
-        // Aggregates all inputs from the sharing wizard (base path, permissions, expiration,
-    // optional note, and the selected files). Used as a parameter object for the service layer.
+    // Carries the share settings selected in the wizard.
     internal sealed class FileLinkRequest
     {
-        internal FileLinkRequest()
-        {
-            Items = new List<FileLinkSelection>();
-        }
-
         internal string BasePath { get; set; }
 
         internal string ShareName { get; set; }
@@ -43,9 +36,5 @@ namespace NcTalkOutlookAddIn.Models
         internal AttachmentLinkTarget AttachmentLinkTarget { get; set; }
 
         internal DateTime? ShareDate { get; set; }
-
-        internal string ShareDatePrefixFormat { get; set; }
-
-        internal IList<FileLinkSelection> Items { get; private set; }
     }
 }

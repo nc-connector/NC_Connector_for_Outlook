@@ -1531,24 +1531,30 @@ namespace NcTalkOutlookAddIn.UI
                 _usernameTextBox.Text = credentials.LoginName ?? string.Empty;
                 _appPasswordTextBox.Text = credentials.AppPassword ?? string.Empty;
                 _loginFlowRadio.Checked = true;
-                try
+                var verificationService = new TalkService(new TalkServiceConfiguration(
+                    normalizedUrl,
+                    _usernameTextBox.Text,
+                    _appPasswordTextBox.Text));
+                string versionResponse = string.Empty;
+                bool verified = await Task.Run(() => verificationService.VerifyConnection(out versionResponse));
+                if (!verified)
                 {
-                    var verificationService = new TalkService(new TalkServiceConfiguration(
-                        normalizedUrl,
-                        _usernameTextBox.Text,
-                        _appPasswordTextBox.Text));
-                    string versionResponse = string.Empty;
-                    bool ok = await Task.Run(() => verificationService.VerifyConnection(out versionResponse));
-                    if (ok)
-                    {
-                        UpdateKnownServerVersion(versionResponse);
-                    }
+                    string failureMessage = string.IsNullOrWhiteSpace(versionResponse)
+                        ? Strings.ErrorCredentialsNotVerified
+                        : versionResponse;
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Login flow credential verification failed: "
+                        + failureMessage);
+                    SetStatus(
+                        string.Format(
+                            CultureInfo.CurrentCulture,
+                            Strings.StatusLoginFlowFailure,
+                            failureMessage),
+                        true);
+                    return;
                 }
-                catch (Exception ex)
-                {
-                    // Ignore errors when fetching the optional version hint.
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to fetch optional server version hint.", ex);
-                }
+
                 SetStatus(Strings.StatusLoginFlowSuccess, false);
             }
             catch (TalkServiceException ex)

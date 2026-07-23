@@ -875,6 +875,15 @@
   "sharing_status_uploading": {
     "message": "Lade $3 hoch ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "Dateien und Ordner werden erfasst..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "Ordner werden vorbereitet ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "$1 / $2 Dateien werden hochgeladen — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "Öffentlichen Link erstellen..."
   },
@@ -1246,6 +1255,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "Upload fehlgeschlagen: $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "NC Connector erfordert Nextcloud 32 oder neuer. Erkannte Version: $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "Eine ausgewählte Datei wurde nach dem Einlesen geändert. Starten Sie den Upload erneut."
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "Die Auswahl enthält einen symbolischen Link oder eine Junction. Entfernen Sie das verknüpfte Element und starten Sie den Upload erneut."
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "Nextcloud verfügt nicht über genügend freien Speicherplatz für diesen Upload."
   },
   "outlook_sharing_rename_folder_title": {
     "message": "Ordner umbenennen"

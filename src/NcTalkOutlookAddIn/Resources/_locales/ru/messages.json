@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "Загрузка $3 ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "Сканирование файлов и папок..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "Подготовка папок ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "Загрузка файлов ($1 / $2) — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "Создание публичной ссылки..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "Загрузка не удалась: $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "Для NC Connector требуется Nextcloud 32 или новее. Обнаруженная версия: $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "Выбранный файл был изменён после сканирования. Запустите загрузку снова."
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "Выбранные элементы содержат символическую ссылку или точку соединения (junction). Удалите связанный элемент и запустите загрузку снова."
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "В Nextcloud недостаточно свободного места для этой загрузки."
   },
   "outlook_sharing_rename_folder_title": {
     "message": "Переименовать папку"

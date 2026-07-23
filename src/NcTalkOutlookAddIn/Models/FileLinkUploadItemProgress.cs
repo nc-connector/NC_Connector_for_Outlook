@@ -4,23 +4,19 @@
 
 namespace NcTalkOutlookAddIn.Models
 {
-        // Detailed progress for a single upload item; used for UI display in the wizard.
+    // Reports the current state of one top-level wizard selection.
     internal sealed class FileLinkUploadItemProgress
     {
         internal FileLinkUploadItemProgress(
             FileLinkSelection selection,
             long uploadedBytes,
             long totalBytes,
-            FileLinkUploadStatus status,
-            string message,
-            long deltaBytes)
+            FileLinkUploadStatus status)
         {
             Selection = selection;
             UploadedBytes = uploadedBytes;
             TotalBytes = totalBytes;
             Status = status;
-            Message = message;
-            DeltaBytes = deltaBytes;
         }
 
         internal FileLinkSelection Selection { get; private set; }
@@ -30,9 +26,5 @@ namespace NcTalkOutlookAddIn.Models
         internal long TotalBytes { get; private set; }
 
         internal FileLinkUploadStatus Status { get; private set; }
-
-        internal string Message { get; private set; }
-
-        internal long DeltaBytes { get; private set; }
     }
 }

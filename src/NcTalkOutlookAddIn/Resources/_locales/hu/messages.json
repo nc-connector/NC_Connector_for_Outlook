@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "Feltöltés: $3 ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "Fájlok és mappák vizsgálata..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "Mappák előkészítése ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "Fájlok feltöltése ($1 / $2) — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "Nyilvános hivatkozás létrehozása..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "Feltöltés sikertelen: $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "Az NC Connector használatához Nextcloud 32 vagy újabb verzió szükséges. Észlelt verzió: $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "Egy kiválasztott fájl megváltozott a vizsgálat után. Indítsa újra a feltöltést."
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "A kijelölés szimbolikus hivatkozást vagy könyvtár-csatlakozást (junction) tartalmaz. Távolítsa el a hivatkozott elemet, majd indítsa újra a feltöltést."
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "A Nextcloudon nincs elegendő szabad tárhely ehhez a feltöltéshez."
   },
   "outlook_sharing_rename_folder_title": {
     "message": "Mappa átnevezése"

@@ -956,10 +956,17 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardStatusSuccess { get { return Get("sharing_status_done_row", "Done"); } }
         internal static string FileLinkWizardStatusError { get { return Get("sharing_status_error_row", "Error"); } }
         internal static string FileLinkWizardStatusCancelled { get { return Get("outlook_sharing_status_cancelled", "Cancelled"); } }
+        internal static string FileLinkWizardStatusScanning { get { return Get("sharing_status_scanning", "Scanning files and folders..."); } }
+        internal static string FileLinkWizardStatusPreparingFoldersFormat { get { return Get("sharing_status_preparing_folders", "Preparing folders ({0} / {1})..."); } }
+        internal static string FileLinkWizardStatusUploadingSummaryFormat { get { return Get("sharing_status_uploading_summary", "Uploading files ({0} / {1}) — {2} / {3} — {4}"); } }
         internal static string FileLinkWizardStatusSpeedKbpsFormat { get { return Get("sharing_status_speed_kbps", "$1 KB/s"); } }
         internal static string FileLinkWizardUploadCancelledMessage { get { return Get("outlook_sharing_upload_cancelled", "Upload was cancelled."); } }
         internal static string FileLinkWizardUploadFailed { get { return Get("outlook_sharing_upload_failed", "Upload failed."); } }
         internal static string FileLinkWizardUploadFailedFormat { get { return Get("outlook_sharing_upload_failed_format", "Upload failed: {0}"); } }
+        internal static string FileLinkUploadSourceChanged { get { return Get("outlook_sharing_source_changed", "A selected file changed after scanning. Start the upload again."); } }
+        internal static string FileLinkUploadLinkedItemUnsupported { get { return Get("outlook_sharing_linked_item_unsupported", "The selection contains a symbolic link or junction. Remove the linked item and start the upload again."); } }
+        internal static string FileLinkUploadInsufficientStorage { get { return Get("outlook_sharing_insufficient_storage", "Nextcloud does not have enough free storage for this upload."); } }
+        internal static string NextcloudMinimumVersionRequiredFormat { get { return Get("outlook_nextcloud_minimum_version_required", "NC Connector requires Nextcloud 32 or newer. Detected version: {0}"); } }
         internal static string FileLinkWizardRenameFolderTitle { get { return Get("outlook_sharing_rename_folder_title", "Rename folder"); } }
         internal static string FileLinkWizardRenameFileTitle { get { return Get("outlook_sharing_rename_file_title", "Rename file"); } }
         internal static string FileLinkWizardRenameFolderPrompt { get { return Get("outlook_sharing_rename_folder_prompt", "Please enter a new folder name:"); } }

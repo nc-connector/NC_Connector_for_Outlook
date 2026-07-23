@@ -854,6 +854,15 @@
   "sharing_status_uploading": {
     "message": "Téléversement de $3 ($1 / $2)..."
   },
+  "sharing_status_scanning": {
+    "message": "Analyse des fichiers et dossiers..."
+  },
+  "sharing_status_preparing_folders": {
+    "message": "Préparation des dossiers ($1 / $2)..."
+  },
+  "sharing_status_uploading_summary": {
+    "message": "Téléversement des fichiers ($1 / $2) — $3 / $4 — $5"
+  },
   "sharing_status_creating": {
     "message": "Création du lien public..."
   },
@@ -1225,6 +1234,18 @@
   },
   "outlook_sharing_upload_failed_format": {
     "message": "Échec du téléversement : $1"
+  },
+  "outlook_nextcloud_minimum_version_required": {
+    "message": "NC Connector nécessite Nextcloud 32 ou une version plus récente. Version détectée : $1"
+  },
+  "outlook_sharing_source_changed": {
+    "message": "Un fichier sélectionné a été modifié après l’analyse. Relancez le téléversement."
+  },
+  "outlook_sharing_linked_item_unsupported": {
+    "message": "La sélection contient un lien symbolique ou une jonction. Supprimez l’élément lié et relancez le téléversement."
+  },
+  "outlook_sharing_insufficient_storage": {
+    "message": "Nextcloud ne dispose pas de suffisamment d’espace de stockage libre pour ce téléversement."
   },
   "outlook_sharing_rename_folder_title": {
     "message": "Renommer le dossier"
