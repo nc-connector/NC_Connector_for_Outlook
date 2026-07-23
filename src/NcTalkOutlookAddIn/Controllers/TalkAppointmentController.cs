@@ -639,7 +639,7 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 var service = _owner.CreateTalkService();
                 NextcloudTalkAddIn.LogTalkMessage("Updating room description (token=" + roomToken + ", event=" + isEventConversation + ", textLength=" + description.Length + ").");
-                service.UpdateDescription(roomToken, description, isEventConversation);
+                service.UpdateDescription(roomToken, description);
                 NextcloudTalkAddIn.LogTalkMessage("Room description updated (token=" + roomToken + ").");
                 return true;
             }

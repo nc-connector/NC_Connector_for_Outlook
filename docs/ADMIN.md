@@ -22,7 +22,7 @@ This document describes installation, rollout and operation of **NC Connector fo
 Silent install example:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.1.0.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-<version>.msi" /qn /norestart
 ```
 
 Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).

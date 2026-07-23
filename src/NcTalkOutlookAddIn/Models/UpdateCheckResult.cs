@@ -30,8 +30,6 @@ namespace NcTalkOutlookAddIn.Models
 
         internal DateTime CheckedAtUtc { get; set; }
 
-        internal bool FromCache { get; set; }
-
         internal UpdateCheckResult()
         {
             CurrentVersion = string.Empty;

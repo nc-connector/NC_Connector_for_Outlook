@@ -45,15 +45,15 @@ This release expands Outlook compose support and central backend signatures:
 - Outlook classic (x64 or x86)
 - **.NET Framework 4.7.2** (target framework)
 - MSBuild (e.g. Visual Studio Build Tools)
-- **.NET SDK** (used by WiX v4 build via `dotnet`)
+- **.NET SDK** (used by WiX v6 build via `dotnet`)
 
 ### Build MSI (recommended)
 
 ```powershell
-cd "C:\\path\\to\\nc4ol-3.1.0"
+cd "C:\\path\\to\\nc4ol"
 
 # Optional: reference assemblies (only if needed)
-nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
+nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages -ExcludeVersion
 $env:FrameworkPathOverride = "$PWD\\packages\\Microsoft.NETFramework.ReferenceAssemblies.net472\\build\\.NETFramework\\v4.7.2"
 
 .\build.ps1 -Configuration Release
@@ -85,7 +85,7 @@ Output:
 Top-level:
 
 - `src/` — the COM add-in (WinForms UI + service layer)
-- `installer/` — WiX v4 MSI project (files + registry + URLACL)
+- `installer/` — WiX v6 MSI project (files + registry + URLACL)
 - `docs/` — admin/development documentation
 - `VENDOR.md` — bundled third-party sanitizer/runtime dependency notices and licenses
 - `assets/` — branding images used in README/screenshots
@@ -419,7 +419,7 @@ Detection logic (best-effort):
 
 1. Builds the COM add-in (`NcTalkOutlookAddIn.sln`) via MSBuild
 2. Reads the assembly version from `NcTalkOutlookAddIn.dll`
-3. Builds the WiX v4 installer (`installer/NcConnectorOutlookInstaller.wixproj`)
+3. Builds the WiX v6 installer (`installer/NcConnectorOutlookInstaller.wixproj`)
 4. Copies the MSI into `dist/`
 
 ### Versioning
@@ -441,9 +441,10 @@ Detection logic (best-effort):
 
 ## Local testing
 
-Suggested smoke test sequence:
+Run the automated checks from `tools/ci/` through the jobs defined in
+`.github/workflows/outlook-build-checks.yml`, then use the smoke tests below for Outlook COM behavior.
 
-Note: there is currently no automated test suite in this repository. Use the smoke tests below to validate changes.
+Suggested smoke test sequence:
 
 1. Enable debug logging in Settings.
 2. Calendar: create a new appointment, insert a Talk link, save the appointment, then change start time and save again (lobby update).

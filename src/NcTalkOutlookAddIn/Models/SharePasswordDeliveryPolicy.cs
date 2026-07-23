@@ -26,16 +26,6 @@ namespace NcTalkOutlookAddIn.Models
 
         internal int SecretsExpireDays { get; private set; }
 
-        internal bool UseSecrets
-        {
-            get { return Mode == SharePasswordDeliveryMode.Secrets; }
-        }
-
-        internal static SharePasswordDeliveryPolicy Resolve(BackendPolicyStatus status)
-        {
-            return Resolve(status, SharePasswordDeliveryMode.Plain);
-        }
-
         internal static SharePasswordDeliveryPolicy Resolve(BackendPolicyStatus status, SharePasswordDeliveryMode localMode)
         {
             int expireDays = DefaultSecretsExpireDays;

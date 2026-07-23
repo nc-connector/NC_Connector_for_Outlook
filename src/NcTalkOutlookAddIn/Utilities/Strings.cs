@@ -843,7 +843,6 @@ namespace NcTalkOutlookAddIn.Utilities
             }
         }
         internal static string SharingAttachmentLinkTargetInvalidUrl { get { return Get("sharing_attachment_link_target_invalid_url", "The ZIP download link could not be created from the Nextcloud share URL."); } }
-        internal static string SharingAttachmentsLockTitle { get { return Get("options_sharing_attachments_lock_title", "Attachment automation disabled"); } }
         internal static string SharingAttachmentsLockText { get { return Get("options_sharing_attachments_lock_text", "Outlook's large attachment upload setting is enabled ({0} MB). This conflicts with NC Connector attachment automation. The attachment options below are locked."); } }
         internal static string SharingAttachmentsLockStep1 { get { return Get("options_sharing_attachments_lock_step1", "Open Outlook File > Options > Mail."); } }
         internal static string SharingAttachmentsLockStep2 { get { return Get("options_sharing_attachments_lock_step2", "Disable Outlook's large attachment upload option."); } }
@@ -964,7 +963,6 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardRenameFolderTitle { get { return Get("outlook_sharing_rename_folder_title", "Rename folder"); } }
         internal static string FileLinkWizardRenameFileTitle { get { return Get("outlook_sharing_rename_file_title", "Rename file"); } }
         internal static string FileLinkWizardRenameFolderPrompt { get { return Get("outlook_sharing_rename_folder_prompt", "Please enter a new folder name:"); } }
-        internal static string FileLinkWizardRenameFilePrompt { get { return Get("outlook_sharing_rename_file_prompt", "Please enter a new file name:"); } }
         internal static string FileLinkWizardRenameDuplicatePrompt { get { return Get("sharing_prompt_rename_duplicate", "The file \"$1\" already exists in the queue. Please enter a new name."); } }
         internal static string FileLinkWizardAttachmentModeReasonThreshold { get { return Get("sharing_attachment_mode_reason_threshold", "Attachment threshold exceeded: {0} > {1}. Last added: \"{2}\" ({3}). These attachments will be shared with NC Connector."); } }
         internal static string FileLinkWizardAttachmentModeReasonAlways { get { return Get("sharing_attachment_mode_reason_always", "Attachment mode is active. Selected attachments will be shared with NC Connector."); } }
@@ -975,10 +973,6 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string AttachmentPromptRemoveLast { get { return Get("sharing_attachment_prompt_remove_last", "Remove last selected attachments"); } }
         internal static string AttachmentPromptLastUnknown { get { return Get("sharing_attachment_prompt_last_unknown", "Unknown attachment"); } }
 
-        internal static string SharingHtmlPasswordSeparateHint { get { return Get("sharing_html_password_separate_hint", "The password will be sent in a separate email."); } }
-        internal static string SharingHtmlPasswordMailIntro { get { return Get("sharing_html_password_mail_intro", "Here is your password for the shared link."); } }
-        internal static string SharingHtmlSecretMailIntro { get { return Get("sharing_html_secret_mail_intro", "Open this one-time secret link to view the password for the shared link."); } }
-        internal static string SharingHtmlSecretLinkLabel { get { return Get("sharing_html_secret_link_label", "Secret link"); } }
         internal static string SharingPasswordMailSubject { get { return Get("sharing_password_mail_subject", "Password for shared link"); } }
         internal static string SharingPasswordMailSubjectWithLabel { get { return Get("sharing_password_mail_subject_with_label", "Password for shared link: {0}"); } }
         internal static string SharingPasswordMailNotificationTitle { get { return Get("sharing_password_mail_notify_title", "NC Connector"); } }

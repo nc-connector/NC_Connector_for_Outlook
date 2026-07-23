@@ -432,55 +432,32 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
-            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
-            string permissionRead = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read");
-            string permissionCreate = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload");
-            string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
-            string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
-
-            string linkUrl = zipDownloadLink
-                ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
-                : (result.ShareUrl ?? string.Empty);
-            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, zipDownloadLink, false);
-            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, zipDownloadLink);
-
-            string passwordValue = result.Password ?? string.Empty;
-            if (!passwordOnly && separatePassword)
-            {
-                passwordValue = passwordSeparateHint;
-            }
-            string noteValue = string.Empty;
-            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
-            {
-                noteValue = request.Note.Trim();
-            }
-            string rightsValue = attachmentMode
-                ? string.Empty
-                : BuildPermissions(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete);
-
-            string expireValue = result.ExpireDate.HasValue
-                ? result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                : string.Empty;
-
-            string html = template;
-            if (attachmentMode)
-            {
-                html = StripTemplateRow(html, "RIGHTS");
-            }
-            html = html.Replace("{URL}", HttpUtility.HtmlEncode(linkUrl ?? string.Empty));
-            html = html.Replace(
-                "{PASSWORD}",
+            PolicyTemplateValues values = BuildPolicyTemplateValues(
+                result,
+                request,
+                effectiveLanguage,
+                attachmentMode,
+                zipDownloadLink,
+                separatePassword,
+                passwordOnly,
+                plainText: false);
+            string passwordReplacement =
                 passwordOnly && secretLink
                     ? BuildSecretLinkValueHtml(
-                        passwordValue,
+                        values.Password,
                         Strings.GetInLanguage(effectiveLanguage, "sharing_html_secret_link_label", "Secret link"),
                         BrandingAssets.BrandBlueHex)
-                    : HttpUtility.HtmlEncode(passwordValue));
-            html = html.Replace("{EXPIRATIONDATE}", HttpUtility.HtmlEncode(expireValue));
-            html = html.Replace("{RIGHTS}", rightsValue);
-            html = html.Replace("{NOTE}", HttpUtility.HtmlEncode(noteValue));
-            html = html.Replace("{LINK_INTRO}", HttpUtility.HtmlEncode(linkIntro));
-            html = html.Replace("{LINK_LABEL}", HttpUtility.HtmlEncode(linkLabel));
+                    : HttpUtility.HtmlEncode(values.Password);
+            string html = ReplacePolicyTemplatePlaceholders(
+                template,
+                attachmentMode,
+                HttpUtility.HtmlEncode(values.LinkUrl ?? string.Empty),
+                passwordReplacement,
+                HttpUtility.HtmlEncode(values.ExpirationDate),
+                values.Rights,
+                HttpUtility.HtmlEncode(values.Note),
+                HttpUtility.HtmlEncode(values.LinkIntro),
+                HttpUtility.HtmlEncode(values.LinkLabel));
 
             string sanitized = HtmlTemplateSanitizer.SanitizeShareTemplateHtml(html);
             if (string.IsNullOrWhiteSpace(sanitized))
@@ -505,48 +482,25 @@ namespace NcTalkOutlookAddIn.Utilities
                 return string.Empty;
             }
 
-            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
-            string permissionRead = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read");
-            string permissionCreate = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload");
-            string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
-            string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
-
-            string linkUrl = zipDownloadLink
-                ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
-                : (result.ShareUrl ?? string.Empty);
-            string linkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, zipDownloadLink, true);
-            string linkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, zipDownloadLink);
-
-            string passwordValue = result.Password ?? string.Empty;
-            if (!passwordOnly && separatePassword)
-            {
-                passwordValue = passwordSeparateHint;
-            }
-            string noteValue = string.Empty;
-            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
-            {
-                noteValue = request.Note.Trim();
-            }
-            string rightsValue = attachmentMode
-                ? string.Empty
-                : BuildPermissionsPlainTextDisplay(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete);
-
-            string expireValue = result.ExpireDate.HasValue
-                ? result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                : string.Empty;
-
-            string html = template;
-            if (attachmentMode)
-            {
-                html = StripTemplateRow(html, "RIGHTS");
-            }
-            html = html.Replace("{URL}", PlainTextToTemplateHtml(linkUrl ?? string.Empty));
-            html = html.Replace("{PASSWORD}", PlainTextToTemplateHtml(passwordValue));
-            html = html.Replace("{EXPIRATIONDATE}", PlainTextToTemplateHtml(expireValue));
-            html = html.Replace("{RIGHTS}", PlainTextToTemplateHtml(rightsValue));
-            html = html.Replace("{NOTE}", PlainTextToTemplateHtml(noteValue));
-            html = html.Replace("{LINK_INTRO}", PlainTextToTemplateHtml(linkIntro));
-            html = html.Replace("{LINK_LABEL}", PlainTextToTemplateHtml(linkLabel));
+            PolicyTemplateValues values = BuildPolicyTemplateValues(
+                result,
+                request,
+                effectiveLanguage,
+                attachmentMode,
+                zipDownloadLink,
+                separatePassword,
+                passwordOnly,
+                plainText: true);
+            string html = ReplacePolicyTemplatePlaceholders(
+                template,
+                attachmentMode,
+                PlainTextToTemplateHtml(values.LinkUrl ?? string.Empty),
+                PlainTextToTemplateHtml(values.Password),
+                PlainTextToTemplateHtml(values.ExpirationDate),
+                PlainTextToTemplateHtml(values.Rights),
+                PlainTextToTemplateHtml(values.Note),
+                PlainTextToTemplateHtml(values.LinkIntro),
+                PlainTextToTemplateHtml(values.LinkLabel));
 
             string sanitized = HtmlTemplateSanitizer.SanitizeShareTemplateHtml(html);
             if (string.IsNullOrWhiteSpace(sanitized))
@@ -561,6 +515,82 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             return plainText;
+        }
+
+        private static PolicyTemplateValues BuildPolicyTemplateValues(
+            FileLinkResult result,
+            FileLinkRequest request,
+            string effectiveLanguage,
+            bool attachmentMode,
+            bool zipDownloadLink,
+            bool separatePassword,
+            bool passwordOnly,
+            bool plainText)
+        {
+            string passwordSeparateHint = Strings.GetInLanguage(effectiveLanguage, "sharing_html_password_separate_hint", "The password will be sent in a separate email.");
+            string permissionRead = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_read", "Read");
+            string permissionCreate = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_create", "Upload");
+            string permissionWrite = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_write", "Modify");
+            string permissionDelete = Strings.GetInLanguage(effectiveLanguage, "sharing_permission_delete", "Delete");
+
+            string password = result.Password ?? string.Empty;
+            if (!passwordOnly && separatePassword)
+            {
+                password = passwordSeparateHint;
+            }
+
+            string note = string.Empty;
+            if (request != null && request.NoteEnabled && !string.IsNullOrWhiteSpace(request.Note))
+            {
+                note = request.Note.Trim();
+            }
+
+            string rights = string.Empty;
+            if (!attachmentMode)
+            {
+                rights = plainText
+                    ? BuildPermissionsPlainTextDisplay(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete)
+                    : BuildPermissions(result.Permissions, permissionRead, permissionCreate, permissionWrite, permissionDelete);
+            }
+
+            return new PolicyTemplateValues
+            {
+                LinkUrl = zipDownloadLink
+                    ? BuildAttachmentZipDownloadUrl(result.ShareUrl, result.ShareToken)
+                    : (result.ShareUrl ?? string.Empty),
+                Password = password,
+                ExpirationDate = result.ExpireDate.HasValue
+                    ? result.ExpireDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    : string.Empty,
+                Rights = rights,
+                Note = note,
+                LinkIntro = passwordOnly ? string.Empty : GetShareLinkIntro(effectiveLanguage, zipDownloadLink, plainText),
+                LinkLabel = passwordOnly ? string.Empty : GetShareLinkLabel(effectiveLanguage, zipDownloadLink)
+            };
+        }
+
+        private static string ReplacePolicyTemplatePlaceholders(
+            string template,
+            bool attachmentMode,
+            string url,
+            string password,
+            string expirationDate,
+            string rights,
+            string note,
+            string linkIntro,
+            string linkLabel)
+        {
+            string output = attachmentMode
+                ? StripTemplateRow(template, "RIGHTS")
+                : template;
+            output = output.Replace("{URL}", url);
+            output = output.Replace("{PASSWORD}", password);
+            output = output.Replace("{EXPIRATIONDATE}", expirationDate);
+            output = output.Replace("{RIGHTS}", rights);
+            output = output.Replace("{NOTE}", note);
+            output = output.Replace("{LINK_INTRO}", linkIntro);
+            output = output.Replace("{LINK_LABEL}", linkLabel);
+            return output;
         }
 
         private static string GetShareLinkIntro(string effectiveLanguage, bool zipDownloadLink, bool plainText)
@@ -657,6 +687,23 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             return normalized.Replace("\n", "\r\n").Trim();
+        }
+
+        private sealed class PolicyTemplateValues
+        {
+            internal string LinkUrl { get; set; }
+
+            internal string Password { get; set; }
+
+            internal string ExpirationDate { get; set; }
+
+            internal string Rights { get; set; }
+
+            internal string Note { get; set; }
+
+            internal string LinkIntro { get; set; }
+
+            internal string LinkLabel { get; set; }
         }
 
                 // Remove one placeholder row from backend-provided HTML templates.

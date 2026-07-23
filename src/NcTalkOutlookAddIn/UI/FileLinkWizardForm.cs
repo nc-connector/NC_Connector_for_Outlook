@@ -116,11 +116,6 @@ namespace NcTalkOutlookAddIn.UI
         private Panel _expirationStepPanel;
         private Panel _noteStepPanel;
 
-        internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, BackendPolicyStatus policyStatus, string basePath)
-            : this(defaults, configuration, passwordPolicy, policyStatus, basePath, null)
-        {
-        }
-
         internal FileLinkWizardForm(AddinSettings defaults, TalkServiceConfiguration configuration, PasswordPolicyInfo passwordPolicy, BackendPolicyStatus policyStatus, string basePath, FileLinkWizardLaunchOptions launchOptions)
         {
             _defaults = (defaults ?? new AddinSettings()).Clone();
@@ -256,11 +251,10 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyPolicyWarningUi()
         {
-            bool visible = _backendPolicyStatus != null
-                           && _backendPolicyStatus.WarningVisible
-                           && !string.IsNullOrWhiteSpace(_backendPolicyStatus.WarningMessage);
-            _policyWarningPanel.Visible = visible;
-            _policyWarningTextLabel.Text = visible ? _backendPolicyStatus.WarningMessage : string.Empty;
+            PolicyUiHelper.ApplyPolicyWarningState(
+                _backendPolicyStatus,
+                _policyWarningPanel,
+                _policyWarningTextLabel);
             LayoutPolicyWarningPanel();
             UpdateStepHostBounds();
             LayoutCurrentStep();
@@ -395,35 +389,13 @@ namespace NcTalkOutlookAddIn.UI
 
         private void InitializePolicyWarningPanel()
         {
-            _policyWarningPanel.Visible = false;
-            _policyWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
-            _policyWarningPanel.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(
-                    e.Graphics,
-                    _policyWarningPanel.ClientRectangle,
-                    Color.FromArgb(176, 0, 32),
-                    ButtonBorderStyle.Solid);
-            };
+            PolicyUiHelper.InitializePolicyWarningPanel(
+                _policyWarningPanel,
+                _policyWarningTitleLabel,
+                _policyWarningTextLabel,
+                _policyWarningLinkLabel);
             Controls.Add(_policyWarningPanel);
-
-            _policyWarningTitleLabel.AutoSize = true;
-            _policyWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
-            _policyWarningTitleLabel.Font = new Font(_policyWarningTitleLabel.Font, FontStyle.Bold);
-            _policyWarningTitleLabel.Text = "\u26a0 " + Strings.PolicyWarningTitle;
-            _policyWarningPanel.Controls.Add(_policyWarningTitleLabel);
-
-            _policyWarningTextLabel.AutoSize = true;
-            _policyWarningTextLabel.Text = string.Empty;
-            _policyWarningPanel.Controls.Add(_policyWarningTextLabel);
-
-            _policyWarningLinkLabel.AutoSize = true;
-            _policyWarningLinkLabel.Text = Strings.PolicyWarningAdminLinkLabel;
-            _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
-            _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
-            _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
             _policyWarningLinkLabel.LinkClicked += (s, e) => OpenPolicyAdminGuide();
-            _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
         }
 
         private void InitializeWizardLayout()
@@ -1654,21 +1626,6 @@ namespace NcTalkOutlookAddIn.UI
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Attachment mode finalize guard check failed.", ex);
                 return false;
             }
-        }
-
-        private void UpdateProgress(FileLinkProgress progress)
-        {
-            if (InvokeRequired)
-            {
-                BeginInvoke(new Action<FileLinkProgress>(UpdateProgress), progress);
-                return;
-            }
-            if (progress.TotalBytes > 0)
-            {
-                double percent = (double)progress.UploadedBytes / progress.TotalBytes;
-                _progressBar.Value = Math.Min(_progressBar.Maximum, (int)(percent * _progressBar.Maximum));
-            }
-            _progressLabel.Text = Path.GetFileName(progress.CurrentItem ?? string.Empty);
         }
 
         private void UpdatePasswordState()

@@ -383,22 +383,29 @@ namespace NcTalkOutlookAddIn.Controllers
 
         private static string RenderTalkInvitationTemplate(string template, string meetingUrl, string password)
         {
-            if (string.IsNullOrWhiteSpace(template))
-            {
-                return string.Empty;
-            }
-            string rendered = template
-                .Replace("{MEETING_URL}", HttpUtility.HtmlEncode(meetingUrl ?? string.Empty))
-                .Replace("{PASSWORD}", HttpUtility.HtmlEncode(password ?? string.Empty));
-            string sanitized = HtmlTemplateSanitizer.SanitizeTalkTemplateHtml(rendered);
-            if (string.IsNullOrWhiteSpace(sanitized))
-            {
-                throw new InvalidOperationException("Talk invitation template sanitized to empty output.");
-            }
+            string sanitized = RenderSanitizedTalkInvitationTemplate(
+                template,
+                meetingUrl,
+                password,
+                "Talk invitation template sanitized to empty output.");
             return ConvertHtmlTemplateToPlainText(sanitized);
         }
 
         private static string RenderTalkInvitationTemplateHtml(string template, string meetingUrl, string password)
+        {
+            string sanitized = RenderSanitizedTalkInvitationTemplate(
+                template,
+                meetingUrl,
+                password,
+                "Talk invitation HTML template sanitized to empty output.");
+            return sanitized.Trim();
+        }
+
+        private static string RenderSanitizedTalkInvitationTemplate(
+            string template,
+            string meetingUrl,
+            string password,
+            string emptyOutputMessage)
         {
             if (string.IsNullOrWhiteSpace(template))
             {
@@ -410,9 +417,9 @@ namespace NcTalkOutlookAddIn.Controllers
             string sanitized = HtmlTemplateSanitizer.SanitizeTalkTemplateHtml(rendered);
             if (string.IsNullOrWhiteSpace(sanitized))
             {
-                throw new InvalidOperationException("Talk invitation HTML template sanitized to empty output.");
+                throw new InvalidOperationException(emptyOutputMessage);
             }
-            return sanitized.Trim();
+            return sanitized;
         }
 
         private static string NormalizeTalkBlockLine(string line)

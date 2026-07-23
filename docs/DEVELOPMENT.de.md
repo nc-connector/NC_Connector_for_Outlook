@@ -38,7 +38,7 @@ Diese Release-Linie erweitert Compose-Unterstuetzung und zentrale Backend-Signat
 - Outlook classic (typischerweise x64)
 - **.NET Framework 4.7.2** (Target)
 - MSBuild (z.B. Visual Studio Build Tools)
-- **.NET SDK** (für WiX v4 Build via `dotnet`)
+- **.NET SDK** (für den WiX-v6-Build via `dotnet`)
 
 ### Reference Assemblies (FrameworkPathOverride)
 
@@ -47,10 +47,10 @@ Auf manchen Build-Systemen fehlen die .NET Framework Reference Assemblies für 4
 Beispiel:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.1.0"
+cd "C:\Pfad\zum\nc4ol"
 
 # Optional: Reference Assemblies lokal holen (nur wenn nötig)
-nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages
+nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -OutputDirectory packages -ExcludeVersion
 
 $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2"
 ```
@@ -60,7 +60,7 @@ $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAsse
 Der empfohlene Build läuft immer über `build.ps1`:
 
 ```powershell
-cd "C:\Users\Bastian\VS-Code\NC-E-T_new\nc4ol-3.1.0"
+cd "C:\Pfad\zum\nc4ol"
 $env:FrameworkPathOverride = "$PWD\packages\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2"
 .\build.ps1 -Configuration Release
 ```
@@ -79,10 +79,13 @@ Was das Script macht:
 
 1) Build des COM Add-ins (`NcTalkOutlookAddIn.sln`) via MSBuild
 2) Ermittelt die Assembly-Version aus `NcTalkOutlookAddIn.dll`
-3) Build des WiX v4 Installers (`installer/NcConnectorOutlookInstaller.wixproj`)
+3) Build des WiX-v6-Installers (`installer/NcConnectorOutlookInstaller.wixproj`)
 4) Kopiert das MSI in `dist/`
 
 ## Lokales Testen
+
+Die automatisierten Prüfungen unter `tools/ci/` laufen über die Jobs in
+`.github/workflows/outlook-build-checks.yml`. Anschließend decken die folgenden Smoke-Tests das Outlook-COM-Verhalten ab:
 
 1) MSI installieren (als Admin):
    - `msiexec /i dist\NCConnectorForOutlook-<version>.msi`
@@ -282,7 +285,7 @@ Damit Backend-Talk-Templates in Outlook-Terminen stabil gerendert werden (Word/R
 
 Installer:
 
-- `installer/NcConnectorOutlookInstaller.wixproj` (WiX v4 SDK Projekt)
+- `installer/NcConnectorOutlookInstaller.wixproj` (WiX-v6-SDK-Projekt)
 - `installer/Product.wxs` (MSI Definition: Dateien + Registry + URLACL)
 - `VENDOR.md` (Lizenzhinweise fuer gebuendelte Drittanbieter-Abhaengigkeiten)
 

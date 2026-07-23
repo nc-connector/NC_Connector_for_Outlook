@@ -147,17 +147,12 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             return SanitizeTemplateHtml(html, "email_signature");
         }
 
-                // Appointment-specific compatibility transform for Talk HTML before the
+        // Appointment-specific compatibility transform for Talk HTML before the
         // HTML->RTF bridge. Keeps this behavior explicit and isolated from other
         // template rendering paths.
         internal static string PrepareTalkAppointmentHtmlForOutlookRtfBridge(string html)
         {
             return NormalizeForOutlookRtfBridge(html, "talk", true);
-        }
-
-        internal static string NormalizeForOutlookRtfBridge(string html, string templateType)
-        {
-            return NormalizeForOutlookRtfBridge(html, templateType, false);
         }
 
         private static string NormalizeForOutlookRtfBridge(string html, string templateType, bool appointmentCompatMode)

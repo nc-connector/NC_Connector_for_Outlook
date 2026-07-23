@@ -21,22 +21,12 @@ namespace NcTalkOutlookAddIn.UI
             }
 
             control.AllowDrop = true;
-            control.DragEnter += HandleFileListViewDragEnter;
-            control.DragOver += HandleFileListViewDragOver;
+            control.DragEnter += HandleFileListViewDragEffect;
+            control.DragOver += HandleFileListViewDragEffect;
             control.DragDrop += HandleFileListViewDragDrop;
         }
 
-        private void HandleFileListViewDragEnter(object sender, DragEventArgs e)
-        {
-            if (e == null)
-            {
-                return;
-            }
-
-            e.Effect = ResolveFileDropEffect(e);
-        }
-
-        private void HandleFileListViewDragOver(object sender, DragEventArgs e)
+        private void HandleFileListViewDragEffect(object sender, DragEventArgs e)
         {
             if (e == null)
             {

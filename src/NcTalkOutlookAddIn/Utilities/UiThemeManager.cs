@@ -78,7 +78,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 LinkText = Color.FromArgb(0, 130, 201); // brand blue
                 SuccessText = Color.FromArgb(110, 200, 110);
                 ErrorText = Color.FromArgb(230, 120, 120);
-                WarningText = Color.FromArgb(230, 200, 120);
                 SelectionText = Text;
                 DisabledText = Color.FromArgb(160, 160, 160);
                 AvatarPlaceholderFill = Color.FromArgb(70, 70, 70);
@@ -96,7 +95,6 @@ namespace NcTalkOutlookAddIn.Utilities
                 LinkText = Color.FromArgb(0, 130, 201);
                 SuccessText = Color.DarkGreen;
                 ErrorText = Color.DarkRed;
-                WarningText = Color.DarkGoldenrod;
                 SelectionBackground = SystemColors.Highlight;
                 SelectionText = SystemColors.HighlightText;
                 DisabledText = SystemColors.GrayText;
@@ -129,8 +127,6 @@ namespace NcTalkOutlookAddIn.Utilities
         internal Color SuccessText { get; private set; }
 
         internal Color ErrorText { get; private set; }
-
-        internal Color WarningText { get; private set; }
 
         internal Color SelectionBackground { get; private set; }
 

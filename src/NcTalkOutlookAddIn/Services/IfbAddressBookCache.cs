@@ -171,11 +171,6 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        internal List<NextcloudUser> GetUsers(TalkServiceConfiguration configuration, int cacheHours)
-        {
-            return GetUsers(configuration, cacheHours, false);
-        }
-
         internal List<NextcloudUser> GetUsers(TalkServiceConfiguration configuration, int cacheHours, bool forceRefresh)
         {
             var users = new List<NextcloudUser>();

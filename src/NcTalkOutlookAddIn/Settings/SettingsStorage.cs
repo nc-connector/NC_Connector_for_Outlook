@@ -47,11 +47,6 @@ namespace NcTalkOutlookAddIn.Settings
             get { return _dataDirectory; }
         }
 
-        internal SettingsStorage()
-            : this(null)
-        {
-        }
-
         internal SettingsStorage(string outlookProfileName)
         {
             _profileName = NormalizeProfileName(outlookProfileName);

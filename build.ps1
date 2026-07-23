@@ -3,6 +3,7 @@ Param(
     [string]$Configuration = "Release",
     [string]$SolutionPath = "",
     [string]$MsbuildPath = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\MSBuild.exe",
+    [string]$ReferencePath = "",
     [string]$OutputDir = "",
     [switch]$SkipIceValidation
 )
@@ -25,7 +26,16 @@ if (-not (Test-Path $SolutionPath)) {
 }
 
 Write-Host "Building solution using $MsbuildPath ($Configuration)..."
-& $MsbuildPath $SolutionPath "/m" "/t:Rebuild" "/p:Configuration=$Configuration" | Out-Host
+$msbuildArgs = @(
+    $SolutionPath,
+    "/m",
+    "/t:Rebuild",
+    "/p:Configuration=$Configuration"
+)
+if (-not [string]::IsNullOrWhiteSpace($ReferencePath)) {
+    $msbuildArgs += "/p:ReferencePath=$ReferencePath"
+}
+& $MsbuildPath @msbuildArgs | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "MSBuild exited with code $LASTEXITCODE."
 }
@@ -46,12 +56,13 @@ if (-not (Test-Path $wixProject)) {
     throw "WiX project not found at $wixProject."
 }
 
-Write-Host "Building MSI via WiX v4 SDK (dotnet build)..."
+Write-Host "Building MSI via WiX v6 SDK (dotnet build)..."
 $wixArgs = @(
     "build",
     $wixProject,
     "-c",
     $Configuration,
+    "--no-incremental",
     "/p:BuildOutputDir=$buildOutputDir\\",
     "/p:ProductVersion=$assemblyVersionShort",
     "/p:AssemblyVersion=$assemblyVersionFull"

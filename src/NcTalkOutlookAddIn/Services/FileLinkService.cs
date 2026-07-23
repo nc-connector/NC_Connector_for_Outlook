@@ -43,35 +43,6 @@ namespace NcTalkOutlookAddIn.Services
             _httpClient = new NcHttpClient(configuration);
         }
 
-        internal FileLinkResult CreateFileShare(FileLinkRequest request, IProgress<FileLinkProgress> progress, CancellationToken cancellationToken)
-        {
-            if (request == null)
-            {
-                throw new ArgumentNullException("request");
-            }
-            var uploadContext = PrepareUpload(request, cancellationToken);
-
-            long totalBytes = CalculateTotalSize(request.Items);
-            var progressState = new ProgressState(totalBytes, progress);
-
-            UploadSelections(
-                uploadContext,
-                request.Items,
-                new Progress<FileLinkUploadItemProgress>(p =>
-                {
-                    if (p != null && p.Status == FileLinkUploadStatus.Uploading && p.DeltaBytes > 0)
-                    {
-                        progressState.AddBytes(p.DeltaBytes, p.Selection != null ? p.Selection.LocalPath : null);
-                    }
-                }),
-                null,
-                cancellationToken);
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            return FinalizeShare(uploadContext, request, cancellationToken);
-        }
-
         internal FileLinkUploadContext PrepareUpload(FileLinkRequest request, CancellationToken cancellationToken)
         {
             if (request == null)
@@ -877,52 +848,41 @@ namespace NcTalkOutlookAddIn.Services
 
         private ShareData ExecuteShareCreateRequest(string url, string formPayload, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            DiagnosticsLogger.LogApi("POST " + url);
-            NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
-            {
-                Method = "POST",
-                Url = url,
-                Payload = formPayload ?? string.Empty,
-                Accept = "application/json",
-                ContentType = "application/x-www-form-urlencoded",
-                TimeoutMs = 90000,
-                IncludeAuthHeader = true,
-                IncludeOcsApiHeader = true,
-                ParseJson = true
-            });
-
-            if (!response.HasHttpResponse)
-            {
-                Exception transport = response.TransportException;
-                DiagnosticsLogger.LogException(LogCategories.Api, "Share create failed (" + url + ").", transport);
-                throw new TalkServiceException("Share creation failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
-            }
-
-            DiagnosticsLogger.LogApi("POST " + url + " -> " + response.StatusCode);
-            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
-            {
-                string detail = NcJson.ExtractOcsErrorMessage(response.ParsedJson);
-                if (string.IsNullOrWhiteSpace(detail))
-                {
-                    detail = "HTTP " + (int)response.StatusCode;
-                }
-                bool authError = response.StatusCode == HttpStatusCode.Unauthorized
-                                 || response.StatusCode == HttpStatusCode.Forbidden;
-                throw new TalkServiceException("Share creation failed: " + detail, authError, response.StatusCode, response.ResponseText);
-            }
+            NcHttpResponse response = ExecuteShareRequest(
+                "POST",
+                url,
+                formPayload,
+                "Share create failed",
+                "Share creation failed",
+                cancellationToken);
             return ParseShareData(response.ParsedJson, response.ResponseText);
         }
 
         private void ExecuteShareMetadataUpdateRequest(string url, string formPayload, CancellationToken cancellationToken)
         {
+            ExecuteShareRequest(
+                "PUT",
+                url,
+                formPayload,
+                "Share metadata update failed",
+                "Share metadata update failed",
+                cancellationToken);
+        }
+
+        private NcHttpResponse ExecuteShareRequest(
+            string method,
+            string url,
+            string formPayload,
+            string transportLogMessage,
+            string failureMessage,
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
 
-            DiagnosticsLogger.LogApi("PUT " + url);
+            DiagnosticsLogger.LogApi(method + " " + url);
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
-                Method = "PUT",
+                Method = method,
                 Url = url,
                 Payload = formPayload ?? string.Empty,
                 Accept = "application/json",
@@ -936,11 +896,11 @@ namespace NcTalkOutlookAddIn.Services
             if (!response.HasHttpResponse)
             {
                 Exception transport = response.TransportException;
-                DiagnosticsLogger.LogException(LogCategories.Api, "Share metadata update failed (" + url + ").", transport);
-                throw new TalkServiceException("Share metadata update failed: " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
+                DiagnosticsLogger.LogException(LogCategories.Api, transportLogMessage + " (" + url + ").", transport);
+                throw new TalkServiceException(failureMessage + ": " + (transport != null ? transport.Message : "no HTTP response"), false, 0, null);
             }
 
-            DiagnosticsLogger.LogApi("PUT " + url + " -> " + response.StatusCode);
+            DiagnosticsLogger.LogApi(method + " " + url + " -> " + response.StatusCode);
             if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
                 string detail = NcJson.ExtractOcsErrorMessage(response.ParsedJson);
@@ -950,8 +910,9 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 bool authError = response.StatusCode == HttpStatusCode.Unauthorized
                                  || response.StatusCode == HttpStatusCode.Forbidden;
-                throw new TalkServiceException("Share metadata update failed: " + detail, authError, response.StatusCode, response.ResponseText);
+                throw new TalkServiceException(failureMessage + ": " + detail, authError, response.StatusCode, response.ResponseText);
             }
+            return response;
         }
 
         private static string BuildDavUrl(string baseUrl, string userId, string relativePath)
@@ -1118,34 +1079,6 @@ namespace NcTalkOutlookAddIn.Services
             return value;
         }
 
-        private static long CalculateTotalSize(IEnumerable<FileLinkSelection> items)
-        {
-            long total = 0;
-            foreach (var item in items)
-            {
-                if (item.SelectionType == FileLinkSelectionType.File)
-                {
-                    var info = new FileInfo(item.LocalPath);
-                    if (info.Exists)
-                    {
-                        total += info.Length;
-                    }
-                }
-                else if (Directory.Exists(item.LocalPath))
-                {
-                    foreach (string file in Directory.EnumerateFiles(item.LocalPath, "*", SearchOption.AllDirectories))
-                    {
-                        var info = new FileInfo(file);
-                        if (info.Exists)
-                        {
-                            total += info.Length;
-                        }
-                    }
-                }
-            }
-            return total;
-        }
-
         private sealed class SelectionUploadTracker
         {
             internal SelectionUploadTracker(long totalBytes)
@@ -1169,30 +1102,6 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     UploadedBytes = TotalBytes;
                 }
-            }
-        }
-
-        private sealed class ProgressState
-        {
-            private readonly IProgress<FileLinkProgress> _progress;
-            private readonly long _totalBytes;
-            private long _uploadedBytes;
-
-            internal ProgressState(long totalBytes, IProgress<FileLinkProgress> progress)
-            {
-                _totalBytes = totalBytes;
-                _progress = progress;
-            }
-
-            internal void AddBytes(long bytes, string item)
-            {
-                if (_totalBytes <= 0 || _progress == null)
-                {
-                    return;
-                }
-
-                _uploadedBytes += bytes;
-                _progress.Report(new FileLinkProgress(_totalBytes, _uploadedBytes, item));
             }
         }
 

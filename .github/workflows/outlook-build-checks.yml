@@ -219,78 +219,6 @@ jobs:
             exit $LASTEXITCODE
           }
 
-  msi-build-check:
-    name: MSI can be built
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Resolve Office extensibility reference
-        id: refs
-        shell: pwsh
-        run: |
-          $refPath = .\tools\ci\Resolve-OfficeExtensibilityReference.ps1
-          "reference_path=$refPath" >> $env:GITHUB_OUTPUT
-
-      - name: Build Outlook add-in
-        shell: pwsh
-        run: |
-          $msbuild = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe"
-          if (-not (Test-Path $msbuild)) {
-            throw "MSBuild.exe not found at $msbuild"
-          }
-
-          & $msbuild .\NcTalkOutlookAddIn.sln `
-            /m `
-            /t:Rebuild `
-            /p:Configuration=Release `
-            /p:ReferencePath="${{ steps.refs.outputs.reference_path }}"
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Build MSI without uploading artifact
-        shell: pwsh
-        run: |
-          $buildOutput = "src\NcTalkOutlookAddIn\bin\Release\"
-          $dll = Join-Path $buildOutput "NcTalkOutlookAddIn.dll"
-          if (-not (Test-Path $dll)) {
-            throw "Add-in DLL not found at $dll"
-          }
-
-          $assemblyVersion = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll).Path).Version
-          $productVersion = "{0}.{1}.{2}" -f $assemblyVersion.Major, $assemblyVersion.Minor, $assemblyVersion.Build
-
-          Write-Host "AssemblyVersion: $assemblyVersion"
-          Write-Host "ProductVersion: $productVersion"
-
-          dotnet build .\installer\NcConnectorOutlookInstaller.wixproj `
-            -c Release `
-            /p:BuildOutputDir="$((Resolve-Path $buildOutput).Path)\" `
-            /p:ProductVersion=$productVersion `
-            /p:AssemblyVersion=$assemblyVersion `
-            /p:SuppressValidation=true
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          $msi = ".\installer\bin\Release\NCConnectorForOutlook.msi"
-          if (-not (Test-Path $msi)) {
-            throw "MSI build completed but output was not found at $msi"
-          }
-
-          Write-Host "MSI build check passed: $msi"
-          Write-Host "No artifact is uploaded by this workflow."
-
   msi-package-layout:
     name: MSI package layout
     runs-on: windows-latest
@@ -311,46 +239,14 @@ jobs:
           $refPath = .\tools\ci\Resolve-OfficeExtensibilityReference.ps1
           "reference_path=$refPath" >> $env:GITHUB_OUTPUT
 
-      - name: Build Outlook add-in
-        shell: pwsh
-        run: |
-          $msbuild = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe"
-          if (-not (Test-Path $msbuild)) {
-            throw "MSBuild.exe not found at $msbuild"
-          }
-
-          & $msbuild .\NcTalkOutlookAddIn.sln `
-            /m `
-            /t:Rebuild `
-            /p:Configuration=Release `
-            /p:ReferencePath="${{ steps.refs.outputs.reference_path }}"
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
       - name: Build MSI for package inspection
         shell: pwsh
         run: |
-          $buildOutput = "src\NcTalkOutlookAddIn\bin\Release\"
-          $dll = Join-Path $buildOutput "NcTalkOutlookAddIn.dll"
-          if (-not (Test-Path $dll)) {
-            throw "Add-in DLL not found at $dll"
-          }
-
-          $assemblyVersion = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $dll).Path).Version
-          $productVersion = "{0}.{1}.{2}" -f $assemblyVersion.Major, $assemblyVersion.Minor, $assemblyVersion.Build
-
-          dotnet build .\installer\NcConnectorOutlookInstaller.wixproj `
-            -c Release `
-            /p:BuildOutputDir="$((Resolve-Path $buildOutput).Path)\" `
-            /p:ProductVersion=$productVersion `
-            /p:AssemblyVersion=$assemblyVersion `
-            /p:SuppressValidation=true
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          .\build.ps1 `
+            -Configuration Release `
+            -MsbuildPath "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe" `
+            -ReferencePath "${{ steps.refs.outputs.reference_path }}" `
+            -SkipIceValidation
 
       - name: Inspect MSI package layout
         shell: pwsh

@@ -118,7 +118,6 @@ namespace NcTalkOutlookAddIn.Services
             var result = new UpdateCheckResult();
             if (settings == null)
             {
-                result.FromCache = true;
                 return result;
             }
 
@@ -131,7 +130,6 @@ namespace NcTalkOutlookAddIn.Services
             result.ChangelogText = settings.UpdateChangelogText ?? string.Empty;
             result.CheckedAtUtc = ParseUtc(settings.UpdateLastCheckedAtUtc) ?? DateTime.MinValue;
             result.UpdateAvailable = IsNewerVersion(result.LatestVersion, result.CurrentVersion);
-            result.FromCache = true;
             return result;
         }
 

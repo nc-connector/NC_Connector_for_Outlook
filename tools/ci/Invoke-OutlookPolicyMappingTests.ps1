@@ -68,7 +68,7 @@ internal static class OutlookPolicyMappingTests
         SharePasswordDeliveryPolicy policy = SharePasswordDeliveryPolicy.Resolve(status, SharePasswordDeliveryMode.Plain);
         Check("Locked backend delivery mode wins", policy.Mode == SharePasswordDeliveryMode.Secrets, policy.Mode.ToString());
         Check("Locked backend expire days are used", policy.SecretsExpireDays == 14, policy.SecretsExpireDays.ToString());
-        Check("Locked backend policy uses secrets", policy.UseSecrets);
+        Check("Locked backend policy uses secrets", policy.Mode == SharePasswordDeliveryMode.Secrets);
     }
 
     private static void TestEditableBackendValueKeepsLocalChoice()
@@ -81,9 +81,19 @@ internal static class OutlookPolicyMappingTests
 
     private static void TestAttachmentLinkTargetMapping()
     {
-        Check("Attachment target parses ZIP", AttachmentLinkTargetPolicy.Parse("zip_download") == AttachmentLinkTarget.ZipDownload);
-        Check("Attachment target parses share page", AttachmentLinkTargetPolicy.Parse("share_page") == AttachmentLinkTarget.SharePage);
-        Check("Attachment target defaults unknown values to ZIP", AttachmentLinkTargetPolicy.Parse("bad") == AttachmentLinkTarget.ZipDownload);
+        AttachmentLinkTarget parsedTarget;
+        Check(
+            "Attachment target parses ZIP",
+            AttachmentLinkTargetPolicy.TryParse("zip_download", out parsedTarget)
+            && parsedTarget == AttachmentLinkTarget.ZipDownload);
+        Check(
+            "Attachment target parses share page",
+            AttachmentLinkTargetPolicy.TryParse("share_page", out parsedTarget)
+            && parsedTarget == AttachmentLinkTarget.SharePage);
+        Check(
+            "Attachment target rejects unknown values and initializes ZIP",
+            !AttachmentLinkTargetPolicy.TryParse("bad", out parsedTarget)
+            && parsedTarget == AttachmentLinkTarget.ZipDownload);
         Check("Attachment target serializes ZIP", AttachmentLinkTargetPolicy.ToStorageValue(AttachmentLinkTarget.ZipDownload) == "zip_download");
         Check("Attachment target serializes share page", AttachmentLinkTargetPolicy.ToStorageValue(AttachmentLinkTarget.SharePage) == "share_page");
         Check("Missing attachment target defaults to ZIP", AttachmentLinkTargetPolicy.Resolve(null, null) == AttachmentLinkTarget.ZipDownload);

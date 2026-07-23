@@ -38,12 +38,6 @@ namespace NcTalkOutlookAddIn.Models
             return hasBackendValue ? backendValue : AttachmentLinkTarget.ZipDownload;
         }
 
-        internal static AttachmentLinkTarget Parse(string value)
-        {
-            AttachmentLinkTarget parsed;
-            return TryParse(value, out parsed) ? parsed : AttachmentLinkTarget.ZipDownload;
-        }
-
         internal static bool TryParse(string value, out AttachmentLinkTarget target)
         {
             target = AttachmentLinkTarget.ZipDownload;

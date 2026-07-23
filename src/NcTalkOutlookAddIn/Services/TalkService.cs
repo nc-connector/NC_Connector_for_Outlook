@@ -95,23 +95,7 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 else
                 {
-                    try
-                    {
-                        TryUpdateDescription(token, request.Description, includeEvent, baseUrl);
-                    }
-                    catch (TalkServiceException ex)
-                    {
-                        if (includeEvent && IsEventConversationDescriptionLockError(ex))
-                        {
-                            // Event conversations may reject direct room description updates with a generic
-                            // "event" BadRequest. Keep the event conversation and continue without room-type fallback.
-                            LogTalk("CreateRoom description update skipped for event conversation: " + ex.Message);
-                        }
-                        else
-                        {
-                            throw;
-                        }
-                    }
+                    TryUpdateDescription(token, request.Description, baseUrl);
                 }
                 return new TalkRoomCreationResult(token, roomUrl, includeEvent, request.LobbyEnabled, request.SearchVisible);
             }
@@ -349,37 +333,37 @@ namespace NcTalkOutlookAddIn.Services
 
         private void TryClearActiveParticipants(string token, string baseUrl)
         {
-            try
-            {
-                HttpStatusCode statusCode;
-                IDictionary<string, object> parsed;
-                ExecuteJsonRequest("DELETE",
-                                   baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + "/participants/active",
-                                   (string)null,
-                                   out statusCode,
-                                   out parsed);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to clear active participants (best-effort cleanup).", ex);
-            }
+            TryDeleteRoomResource(
+                token,
+                baseUrl,
+                "/participants/active",
+                "Failed to clear active participants (best-effort cleanup).");
         }
 
         private void TryDetachEventBinding(string token, string baseUrl)
+        {
+            TryDeleteRoomResource(
+                token,
+                baseUrl,
+                "/object/event",
+                "Failed to detach event binding (best-effort cleanup).");
+        }
+
+        private void TryDeleteRoomResource(string token, string baseUrl, string resourcePath, string failureMessage)
         {
             try
             {
                 HttpStatusCode statusCode;
                 IDictionary<string, object> parsed;
                 ExecuteJsonRequest("DELETE",
-                                   baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + "/object/event",
+                                   baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + resourcePath,
                                    (string)null,
                                    out statusCode,
                                    out parsed);
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to detach event binding (best-effort cleanup).", ex);
+                DiagnosticsLogger.LogException(LogCategories.Talk, failureMessage, ex);
             }
         }
 
@@ -397,7 +381,7 @@ namespace NcTalkOutlookAddIn.Services
                                out parsed);
         }
 
-        internal void UpdateDescription(string token, string description, bool isEventConversation)
+        internal void UpdateDescription(string token, string description)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -406,7 +390,7 @@ namespace NcTalkOutlookAddIn.Services
 
             EnsureConfiguration();
             string baseUrl = _configuration.GetNormalizedBaseUrl();
-            TryUpdateDescription(token, description, isEventConversation, baseUrl);
+            TryUpdateDescription(token, description, baseUrl);
         }
 
         internal void UpdateRoomName(string token, string roomName)
@@ -574,28 +558,13 @@ namespace NcTalkOutlookAddIn.Services
             return IsSuccessStatus(statusCode) || statusCode == HttpStatusCode.NotFound;
         }
 
-        private void TryUpdateDescription(string token, string description, bool isEventConversation, string baseUrl)
+        private void TryUpdateDescription(string token, string description, string baseUrl)
         {
             if (description == null)
             {
                 return;
             }
-
-            Dictionary<string, object> payload = new Dictionary<string, object>();
-            payload["description"] = description.Trim();
-
-            HttpStatusCode statusCode;
-            IDictionary<string, object> parsed;
-            string responseText = ExecuteJsonRequest("PUT",
-                                                     baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + "/description",
-                                                     payload,
-                                                     out statusCode,
-                                                     out parsed);
-
-            if (!IsSuccessStatus(statusCode))
-            {
-                ThrowServiceError(statusCode, responseText, parsed);
-            }
+            UpdateRoomProperty(token, baseUrl, "/description", "description", description.Trim());
         }
 
         private void TryUpdateRoomName(string token, string roomName, string baseUrl)
@@ -605,13 +574,18 @@ namespace NcTalkOutlookAddIn.Services
                 return;
             }
 
+            UpdateRoomProperty(token, baseUrl, string.Empty, "roomName", roomName.Trim());
+        }
+
+        private void UpdateRoomProperty(string token, string baseUrl, string resourcePath, string propertyName, string propertyValue)
+        {
             Dictionary<string, object> payload = new Dictionary<string, object>();
-            payload["roomName"] = roomName.Trim();
+            payload[propertyName] = propertyValue;
 
             HttpStatusCode statusCode;
             IDictionary<string, object> parsed;
             string responseText = ExecuteJsonRequest("PUT",
-                                                     baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token),
+                                                     baseUrl + "/ocs/v2.php/apps/spreed/api/v4/room/" + Uri.EscapeDataString(token) + resourcePath,
                                                      payload,
                                                      out statusCode,
                                                      out parsed);
@@ -835,20 +809,6 @@ namespace NcTalkOutlookAddIn.Services
             }
             bool authError = statusCode == HttpStatusCode.Unauthorized || statusCode == HttpStatusCode.Forbidden;
             throw new TalkServiceException(builder.ToString(), authError, statusCode, responseText);
-        }
-
-        private static bool IsEventConversationDescriptionLockError(TalkServiceException ex)
-        {
-            if (ex == null || ex.StatusCode != HttpStatusCode.BadRequest)
-            {
-                return false;
-            }
-            if (string.IsNullOrWhiteSpace(ex.Message))
-            {
-                return false;
-            }
-            string normalized = ex.Message.ToLowerInvariant();
-            return normalized.IndexOf("event", StringComparison.Ordinal) >= 0;
         }
 
         private static string BuildEventObjectId(TalkRoomRequest request)

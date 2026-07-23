@@ -24,7 +24,7 @@ Dieses Dokument beschreibt Installation, Rollout und Betrieb des **NC Connector 
 Beispiel (silent):
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-3.1.0.msi" /qn /norestart
+msiexec /i "NCConnectorForOutlook-<version>.msi" /qn /norestart
 ```
 
 Danach Outlook starten. Im Ribbon erscheint der Tab **NC Connector** (Kalender/Termin + E-Mail).

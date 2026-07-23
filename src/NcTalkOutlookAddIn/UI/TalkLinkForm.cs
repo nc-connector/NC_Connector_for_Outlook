@@ -314,40 +314,16 @@ namespace NcTalkOutlookAddIn.UI
                 _eventSupportHintLabel.Text = string.Format(Strings.TalkEventHint, versionInfo);
             }
 
-            _policyWarningPanel.Visible = false;
-            _policyWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
-            _policyWarningPanel.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(
-                    e.Graphics,
-                    _policyWarningPanel.ClientRectangle,
-                    Color.FromArgb(176, 0, 32),
-                    ButtonBorderStyle.Solid);
-            };
-
-            _policyWarningTitleLabel.AutoSize = true;
-            _policyWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
-            _policyWarningTitleLabel.Font = new Font(
-                _policyWarningTitleLabel.Font,
-                FontStyle.Bold);
-            _policyWarningTitleLabel.Text = "\u26a0 " + Strings.PolicyWarningTitle;
-            _policyWarningPanel.Controls.Add(_policyWarningTitleLabel);
-
-            _policyWarningTextLabel.AutoSize = true;
-            _policyWarningTextLabel.Text = string.Empty;
-            _policyWarningPanel.Controls.Add(_policyWarningTextLabel);
-
-            _policyWarningLinkLabel.AutoSize = true;
-            _policyWarningLinkLabel.Text = Strings.PolicyWarningAdminLinkLabel;
-            _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
-            _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
-            _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
+            PolicyUiHelper.InitializePolicyWarningPanel(
+                _policyWarningPanel,
+                _policyWarningTitleLabel,
+                _policyWarningTextLabel,
+                _policyWarningLinkLabel);
             _policyWarningLinkLabel.LinkClicked += (s, e) =>
                 BrowserLauncher.OpenUrl(
                     Strings.PolicyAdminGuideUrl,
                     LogCategories.Talk,
                     "Failed to open policy admin guide URL.");
-            _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
 
             _okButton.Text = Strings.DialogOk;
             _okButton.AutoSize = false;
@@ -731,11 +707,10 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyPolicyWarningUi()
         {
-            bool visible = _backendPolicyStatus != null
-                           && _backendPolicyStatus.WarningVisible
-                           && !string.IsNullOrWhiteSpace(_backendPolicyStatus.WarningMessage);
-            _policyWarningPanel.Visible = visible;
-            _policyWarningTextLabel.Text = visible ? _backendPolicyStatus.WarningMessage : string.Empty;
+            PolicyUiHelper.ApplyPolicyWarningState(
+                _backendPolicyStatus,
+                _policyWarningPanel,
+                _policyWarningTextLabel);
         }
 
         private void ApplyPolicyLockState()
