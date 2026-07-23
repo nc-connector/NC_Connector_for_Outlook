@@ -2,6 +2,8 @@
 
 Dieses Dokument richtet sich an Entwickler und beschreibt Aufbau, Build und Release-Prozess des **NC Connector for Outlook** (Outlook classic COM Add-in).
 
+Rollout, Konfiguration, Betriebsprüfungen und Störungs-Runbooks für Administratoren stehen in [ADMIN.de.md](ADMIN.de.md).
+
 ## Inhalt
 
 - [Projekt-Überblick](#projekt-überblick)
@@ -39,6 +41,7 @@ Diese Release-Linie erweitert Compose-Unterstuetzung und zentrale Backend-Signat
 - **.NET Framework 4.7.2** (Target)
 - MSBuild (z.B. Visual Studio Build Tools)
 - **.NET SDK** (für den WiX-v6-Build via `dotnet`)
+- **Nextcloud 32 oder neuer** (Laufzeit-Server)
 
 ### Reference Assemblies (FrameworkPathOverride)
 
@@ -116,6 +119,8 @@ Kategorien (Beispiele):
 - `FILELINK` (Upload/Share)
 - `IFB` (Requests, Cache, Outlook Registry)
 
+FileLink-Uploadpfade protokollieren Uploadplan, Wiederholungen, periodischen Gesamtfortschritt und Abschlusszusammenfassung, aber nicht jeden erfolgreichen Datei-Request.
+
 ## Code-Struktur
 
 Root:
@@ -148,7 +153,7 @@ Root:
   Orchestrierung fuer FileLink-Ribbon-Start und Wizard-Flow.
 - `src/NcTalkOutlookAddIn/Controllers/TalkRibbonController.cs`
   Orchestrierung fuer Talk-Ribbon-Flow (Auth-Gate, Wizard, Room-Create/Replace).
-- `TalkRibbonController` und `FileLinkLaunchController` prefetchen Backend-Policy + Passwort-Policy parallel (`Task.WhenAll`) vor dem Wizard-Open; Policy-Daten bleiben dabei pro Einstiegspunkt immer frisch.
+- `TalkRibbonController` lädt Backend-Policy und Passwort-Policy vor dem Wizard. `FileLinkLaunchController` lädt zusätzlich den erforderlichen Capability-Snapshot und übergibt ihn an den Freigabe-Wizard. Policy-Daten bleiben pro Einstiegspunkt frisch.
 - Nach dem FileLink-, Talk- oder Settings-Prefetch wechselt `OutlookUiSynchronizationContext` vor jedem WinForms- oder Outlook-COM-Zugriff zurueck auf den beim Add-in-Start erfassten Outlook-STA-Thread. Outlook stellt COM-Callbacks nicht verlaesslich einen `SynchronizationContext` bereit; modale Dialoge und Outlook-Interop werden deshalb explizit zurueckgeschaltet.
 
 Controller:
@@ -165,7 +170,15 @@ Controller:
 Services:
 
 - `src/NcTalkOutlookAddIn/Services/TalkService.cs` (Talk API Calls)
-- `src/NcTalkOutlookAddIn/Services/FileLinkService.cs` (DAV/Share Flow)
+- `src/NcTalkOutlookAddIn/Services/FileLinkService.cs` (Orchestrierung von Uploadplan, Freigabe-Stammordner, Transfer und Share-Erstellung)
+- `src/NcTalkOutlookAddIn/Services/NextcloudCapabilitiesService.cs` (globale Nextcloud-32-Prüfung und typisierter OCS-Capabilities-Snapshot mit fünf Minuten Cache)
+- `src/NcTalkOutlookAddIn/Services/FileLinkSelectionScanner.cs` (einmaliger lokaler Scan und Pfade relativ zum Freigabe-Stammordner)
+- `src/NcTalkOutlookAddIn/Services/FileLinkUploadPlanner.cs` (Auswahl von Direct, Chunked oder optionalem Bulk vor der ersten serverseitigen Änderung)
+- `src/NcTalkOutlookAddIn/Services/FileLinkUploadPlan.cs` (Modelle des fertigen Uploadplans)
+- `src/NcTalkOutlookAddIn/Services/FileLinkDavClient.cs` mit `Probes`- und `Requests`-Partials (DAV-Verzeichnis-Lebenszyklus, exakte Ressourcenprüfungen, Löschung, Wiederholungen, Fehlerabbildung und URL-Aufbau)
+- `src/NcTalkOutlookAddIn/Services/FileLinkTransferService.cs` mit `FileLinkBulkUploader`, `FileLinkDirectUploader`, `FileLinkChunkUploader` und `FileLinkSourceFile` (Transferkoordination, Protokollpfade und Prüfung der lokalen Quelldatei)
+- `src/NcTalkOutlookAddIn/Services/FileLinkShareClient.cs` mit `Recovery`-Partial (öffentliche Freigabe mit einem OCS-Request und Prüfung unklarer Erstellergebnisse)
+- `src/NcTalkOutlookAddIn/Services/FileLinkUploadProgress.cs` (aggregierter Phasen- und Transferfortschritt mit Begrenzung der Aktualisierungsrate)
 - `src/NcTalkOutlookAddIn/Services/FreeBusyServer.cs` + `FreeBusyManager.cs` (IFB; Port ueber Settings konfigurierbar, Standard `7777`)
 - `src/NcTalkOutlookAddIn/Services/PasswordPolicyService.cs` (Nextcloud Password Policy + Fallback)
 - `src/NcTalkOutlookAddIn/Services/NcHttpClient.cs` (zentraler Request-Executor fuer Auth-Header, OCS-Header, Timeout/Decompression und optionalen Fresh-Connection-Mode)
@@ -194,11 +207,19 @@ Utilities:
 - `src/NcTalkOutlookAddIn/Utilities/SizeFormatting.cs` (zentrale MB-Formatierung fuer UI-Texte)
 - `src/NcTalkOutlookAddIn/Utilities/ComInteropScope.cs` (zentrale COM-Release-/FinalRelease-Helfer)
 - `src/NcTalkOutlookAddIn/Utilities/PasswordGenerationHelper.cs` (zentralisiert Min-Length-Aufloesung, Server-Fallback-Generierung und gemeinsame Min-Length-Validierung fuer Talk/FileLink-Formulare)
+- `src/NcTalkOutlookAddIn/Utilities/FileLinkPath.cs` (zentrale Normalisierung, Kombination, Benennung, Bereinigung und Tiefenberechnung für FileLink-Pfade)
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` (zentraler Sanitizer fuer Backend-HTML-Templates bei Share/Talk, fail-closed)
 - `src/NcTalkOutlookAddIn/Utilities/HtmlToPlainTextConverter.cs` (DOM-basierte HTML-zu-Plain-Text-Ausgabe fuer Plain-Text-E-Mail-Signaturen)
 - `src/NcTalkOutlookAddIn/Utilities/NcJson.cs` (zentrale JSON-Normalisierung inkl. `PrepareJsonPayload`, Dictionary-/String-/Int-Helfer und OCS-Fehlerextraktion)
 - `src/NcTalkOutlookAddIn/Utilities/DeferredAppointmentEnsureState.cs` (gekapselter Laufzeitzustand fuer Pending-Keys und Restriction-Log-Throttling)
 - `src/NcTalkOutlookAddIn/Utilities/PictureConverter.cs` (gemeinsamer Image->IPictureDisp-Helfer fuer Ribbon-Icons)
+
+### Laufzeitkonfiguration und Policy-Verarbeitung
+
+- `Settings/SettingsStorage.cs` wählt eine profilspezifische XML-Datei unter `%LOCALAPPDATA%\NC4OL`, setzt Standardwerte für fehlende Einträge und schützt das App-Passwort mit Windows-DPAPI im `CurrentUser`-Kontext. Die Migration überträgt alte INI-Werte in Profildateien und entfernt Altdaten erst, wenn alle Zieldateien geschrieben wurden.
+- `Settings/ManagedSetupPolicy.cs` liest `HKLM` vor `HKCU` und unter 64-Bit-Windows die 64-Bit- vor der 32-Bit-Registry-Ansicht. Eine nicht gesperrte URL füllt ein leeres Profil; eine gesperrte URL überschreibt den Profilwert.
+- `Services/BackendPolicyService.cs` liest den optionalen Backend-Status für Einstellungen, Talk, FileLink, verwaltete Signaturen und die Raumlöschung gespeicherter Termine. Freigabe und Talk können bei fehlendem Backend oder Seat lokale Werte verwenden. Das Send-Gate für verwaltete Signaturen nutzt den strengeren Policy-Zustand aus dem nachfolgenden Signaturablauf.
+- Die TLS-Einstellung wird über `ServicePointManager.SecurityProtocol` angewendet. Verbindungstest und Login-Flow-Diagnose fordern über `NcHttpClient` eine neue Verbindung an, damit ein geänderter TLS-Modus mit einem neuen Handshake statt über eine vorhandene gepoolte Verbindung geprüft wird. Andere Laufzeit-HTTP-Aufrufe verwenden weiterhin den gemeinsamen Request-Executor.
 
 ### Zentrale E-Mail-Signatur im Compose-Fenster
 
@@ -270,7 +291,20 @@ Compose-Filelink-Paritaet (3.1.0):
 - Aktuelle Backends liefern fuer Custom-Templates `policy.share.share_html_block_effective_language`. Outlook verwendet diese Sprache fuer erzeugte Linktexte, Feldbezeichnungen, Berechtigungsnamen und Passworthinweise; bei aelteren Backends ohne dieses Feld bleibt der bisherige Fallback auf die UI-Sprache erhalten.
 - Plain-Text-Compose bleibt `MailItem.BodyFormat=olFormatPlain`; der Freigabeblock wird als Textblock mit `#`-Rahmen gerendert und ueber Outlook WordEditor eingefuegt. Inline-Antworten/-Weiterleitungen behalten zwei leere Absaetze ueber dem Block fuer eigenen Text. `MailItem.Body` wird nicht neu geschrieben.
 - `FileLinkWizardForm` akzeptiert im Datei-Schritt Explorer-Drag-and-drop fuer Dateien/Ordner ueber Queue und Aktionsbereich.
-- `FileLinkService` nutzt fuer Dateien bis 20 MB einen direkten WebDAV-`PUT`. Groessere Dateien laufen ueber Nextcloud Chunked Upload v2 unter `/remote.php/dav/uploads/<user>/<upload-id>` und werden danach per `MOVE .file` an den finalen DAV-Pfad zusammengesetzt.
+- `FileLinkTransferService` nutzt fuer Dateien bis 20 MiB einen direkten WebDAV-`PUT`. Groessere Dateien laufen ueber Nextcloud Chunked Upload v2 unter `/remote.php/dav/uploads/<user>/<upload-id>` und werden danach per `MOVE .file` an den finalen DAV-Pfad zusammengesetzt.
+
+### Filelink-Upload-Architektur
+
+- Alle Funktionen setzen Nextcloud 32 oder neuer voraus. `NextcloudCapabilitiesService` validiert die strukturierte Version der authentifizierten OCS-Capabilities-Antwort und speichert den typisierten Snapshot fünf Minuten pro Server/Benutzer zwischen. Verbindungsprüfungen aktualisieren ihn; Funktionseinstiege lehnen ältere Server oder Antworten ohne auswertbare Version ab.
+- `FileLinkService` orchestriert die fachlich getrennten Komponenten für Planung, DAV-Verzeichnisse, Transfer, Share-Erstellung und Fortschritt.
+- `FileLinkSelectionScanner` scannt die lokale Auswahl vor der ersten serverseitigen Änderung einmal. Das relativ zum Freigabe-Stammordner aufgebaute Ergebnis bewahrt leere Verzeichnisse, lehnt symbolische Links und Junctions ab und speichert Dateigröße sowie Änderungszeit. `FileLinkUploadPlanner` weist anschließend die Transferarten zu, ohne den Server zu verändern.
+- `FileLinkDavClient` legt den Freigabe-Stammordner mit einem atomaren `MKCOL` an. Eine Kollision bricht eine manuelle Freigabe ab; die Anhangsautomatisierung probiert nummerierte Freigabenamen ohne vorherigen `PROPFIND`. Leere Verzeichnisse, für Bulk oder Chunked benötigte Elternpfade und von mehreren Direct-Dateien gemeinsam genutzte Eltern werden einmal, Eltern vor Kindern, mit maximal drei parallelen Requests pro Ebene angelegt. Direct-Pfadketten mit nur einer Datei legt `X-NC-WebDAV-Auto-Mkcol` an.
+- `FileLinkTransferService` koordiniert getrennte Bulk-, Direct- und Chunked-Uploader. Dateien außerhalb von Bulk bis 20 MiB werden mit dem serverseitig ausgewerteten Header `X-NC-WebDAV-Auto-Mkcol: 1` über direkte `PUT`-Requests hochgeladen. Dateien über 20 MiB verwenden Chunked Upload v2. Direct- und Chunked-Dateien teilen sich das Limit von maximal drei parallelen Transfers.
+- Nur wenn `ocs.data.capabilities.dav.bulkupload` exakt `"1.0"` meldet, kommen mindestens 20 Kandidaten mit höchstens 8 MiB pro Datei für DAV-Bulk infrage. Sequentielle Multipart-Batches sind auf 100 Dateien und ungefähr 20 MiB begrenzt. Der Planner wählt Bulk nur, wenn mindestens 20 Prozent aller Upload-Requests entfallen. Die Berechnung umfasst Basispfad, Freigabe-Stammordner, geplante Verzeichnisse, direkte Dateien sowie jeden Chunk-Ordner, Chunk-`PUT` und abschließenden `MOVE`.
+- Nach Abschluss aller Transfers sendet `FileLinkShareClient` genau einen OCS-Create-Share-`POST` mit Pfad, expliziten Berechtigungen, Passwort, Ablaufdatum, Label und Notiz. Der veraltete Parameter `publicUpload` entfällt, weil Nextcloud damit die explizite Berechtigungsmaske ersetzen würde. Ein nachträglicher Metadaten-`PUT` findet nicht statt.
+- Bei ausbleibender Antwort, einer temporären Gateway-/Service-Antwort ohne OCS-Ergebnis oder einer erfolgreichen Antwort ohne verwertbare Freigabedaten ist das Ergebnis des Erstellaufrufs unklar. `FileLinkShareClient` merkt sich den Pfad und führt vor einem weiteren Erstellaufruf eine OCS-Abfrage für exakt diesen Pfad ohne untergeordnete Freigaben aus. Eine passende öffentliche Freigabe wird übernommen; ein neuer Versuch erfolgt nur nach einem bestätigten leeren Ergebnis. Solange die Abfrage selbst unklar bleibt, wird kein zweiter Erstellaufruf gesendet.
+- Wiederholbare `MKCOL`-, direkte `PUT`-, Chunk-`PUT`- und Bulk-`POST`-Operationen erhalten bei Transportfehlern und ausgewählten temporären HTTP-Antworten maximal zwei Wiederholungen. Jeder Bulk-Versuch baut denselben Request-Body aus dem unveränderten lokalen Plan neu auf. Ein abschließendes Chunk-`MOVE` wird nie blind ein zweites Mal gesendet: Nach einem unklaren Transportergebnis wird das exakte Ziel mit einem DAV-Depth-0-Request geprüft und nur als erfolgreich gewertet, wenn es keine Collection ist und die erwartete Länge besitzt.
+- `FileLinkUploadProgress` begrenzt den Phasen-Fortschritt auf maximal zehn Meldungen pro Sekunde. Der Wizard zeigt Scan, Ordnervorbereitung sowie aggregierte Dateien, Bytes und Transferrate; das Debug-Log schreibt Plan, Wiederholungen, aggregierten Fortschritt im Fünf-Sekunden-Takt und Abschluss.
 
 ### Appointment-sicheres HTML-Subset fuer Talk-Templates
 

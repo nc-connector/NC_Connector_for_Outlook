@@ -198,6 +198,30 @@ jobs:
         shell: pwsh
         run: .\tools\ci\Invoke-OutlookUnitTests.ps1
 
+  filelink-protocol-tests:
+    name: FileLink protocol tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run FileLink protocol tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookFileLinkProtocolTests.ps1
+
+  filelink-transfer-tests:
+    name: FileLink transfer tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run FileLink transfer tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookFileLinkTransferTests.ps1
+
   addin-build:
     name: Add-in builds
     runs-on: windows-latest

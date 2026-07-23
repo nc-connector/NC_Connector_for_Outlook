@@ -38,6 +38,8 @@ Weitere Punkte:
 - verfügbar in Compose-Fenstern, Antworten, Weiterleitungen und Inline-Antworten
 - optionales Ablaufdatum und eigene Berechtigungen pro Freigabe
 - Anhangsautomatisierung für große Anhänge oder immer über NC Connector, mit wählbarem Linkziel `ZIP-Download` (Standard) oder `Nextcloud-Freigabeseite`
+- ein lokaler Scan erstellt einen relativ zum Freigabeordner aufgebauten Uploadplan; der Zielordner wird atomar angelegt und die Anhangsautomatisierung probiert bei einer Kollision nummerierte Namen ohne vorherige Server-Abfrage
+- Ordner werden einmal vorbereitet; bis zu drei direkte Transfers laufen parallel, Dateien über 20 MiB verwenden Chunked Upload v2 und Gruppen kleiner Dateien nutzen DAV-Bulk nur bei Capability-Version `1.0` und mindestens 20 Prozent weniger Requests im vollständigen Plan
 - separate Passwortmails werden erst nach erfolgreichem Versand der Hauptmail verschickt
 - bei Auto-Send-Fehlern öffnet sich eine vorbereitete manuelle Passwortmail
 
@@ -67,6 +69,7 @@ Updates werden durch Installation der neuen MSI über die bestehende Version ein
 - Windows 10 oder Windows 11
 - Outlook classic 2019 oder neuer
 - .NET Framework 4.7.2
+- Nextcloud 32 oder neuer
 - Nextcloud mit Files Sharing
 - für Talk-Funktionen: Nextcloud Talk
 - für Secret-Link-Passwortzustellung: Nextcloud Secrets und NC Connector Backend

@@ -1,251 +1,329 @@
-# Admin Guide — NC Connector for Outlook
+# Operations Guide — NC Connector for Outlook
 
-This document describes installation, rollout and operation of **NC Connector for Outlook** (Outlook classic COM add-in).
+This guide is for administrators and operations teams that deploy and run **NC Connector for Outlook**. It covers prerequisites, rollout, managed configuration, server preparation, operating checks, logging, and incident handling.
+
+Source layout, internal processing, protocol implementation, builds, and developer tests are documented in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Contents
-- [Installation (MSI)](#installation-msi)
-- [Updates / upgrade behavior](#updates--upgrade-behavior)
-- [Files & registry](#files--registry)
-- [Settings (profile XML)](#settings-profile-xml)
-- [Managed Nextcloud URL (Registry/GPO)](#managed-nextcloud-url-registrygpo)
-- [Nextcloud Pretty URLs](#nextcloud-pretty-urls)
-- [Compose sharing lifecycle (3.1.0)](#compose-sharing-lifecycle-310)
+
+- [Scope and responsibilities](#scope-and-responsibilities)
+- [Requirements and rollout planning](#requirements-and-rollout-planning)
+- [Deployment and application lifecycle](#deployment-and-application-lifecycle)
+- [Managed configuration and user data](#managed-configuration-and-user-data)
+- [Nextcloud server preparation](#nextcloud-server-preparation)
+- [Optional NC Connector Backend](#optional-nc-connector-backend)
+- [Feature operation](#feature-operation)
 - [Internet Free/Busy Gateway (IFB)](#internet-freebusy-gateway-ifb)
-- [System address book required for user search and moderator selection](#system-address-book-required-for-user-search-and-moderator-selection)
-- [Logging / support](#logging--support)
-- [Troubleshooting](#troubleshooting)
+- [Security and data handling](#security-and-data-handling)
+- [Monitoring and support](#monitoring-and-support)
+- [Troubleshooting runbooks](#troubleshooting-runbooks)
 
-## Installation (MSI)
-1. Close Outlook.
-2. Install the MSI (administrator rights required).
+## Scope and responsibilities
 
-Silent install example:
+NC Connector adds these functions to Outlook classic:
+
+- Nextcloud file and folder shares from new mails, replies, and forwards
+- attachment routing through Nextcloud
+- Talk room creation and maintenance from Outlook appointments
+- optional centrally managed email signatures
+- optional Internet Free/Busy (IFB) through a local Nextcloud proxy
+
+The usual division of responsibility is:
+
+- **Windows/Outlook administration:** MSI rollout, add-in registration, managed registry values, client proxy and certificate trust, IFB URL reservations, and client logs
+- **Nextcloud administration:** supported server version, required apps, public routing, Files Sharing, Talk, system address book, storage, and reverse-proxy limits
+- **NC Connector Backend administration:** seat assignment, centrally managed defaults and locks, templates, signature assignments, and separate password delivery
+
+## Requirements and rollout planning
+
+### Client requirements
+
+- 64-bit Windows 10 or Windows 11
+- Outlook classic 2019 or newer; the new Outlook is not supported
+- .NET Framework 4.7.2
+- administrator rights for MSI installation
+
+The MSI registers both 64-bit and 32-bit Outlook views. A 32-bit Outlook installation on 64-bit Windows is supported.
+
+### Nextcloud requirements
+
+- Nextcloud 32 or newer for every add-in function
+- Files Sharing for uploads and public shares
+- Talk for meeting functions
+- Nextcloud Secrets plus NC Connector Backend for one-time Secret-link password delivery
+- the Nextcloud system address book for user search, participant defaults, and moderator selection
+
+The optional NC Connector Backend is not required for local sharing, Talk, or IFB. It is required for central policies, managed signatures, and separate password delivery.
+
+The Nextcloud Password Policy app is optional. When available, NC Connector reads its password requirements; otherwise it creates passwords with its local generator.
+
+### Network requirements
+
+Clients need HTTPS access to the configured public Nextcloud base URL, including its OCS and WebDAV paths. Preserve a public subpath such as `/nextcloud`, but do not add `/index.php` to the URL configured in NC Connector.
+
+Optional outbound destinations:
+
+- `https://nc-connector.de/wp-json/ncc/v1/update-check` for daily release metadata
+- GitHub release assets when an administrator or user opens a download link
+
+IFB listens only on `127.0.0.1` and does not require an inbound firewall rule from other computers.
+
+### Pre-deployment checklist
+
+Before a broad rollout:
+
+1. Record the intended Nextcloud base URL and whether it contains a subpath.
+2. Verify Nextcloud 32 or newer and Files Sharing.
+3. Verify the public certificate chain, DNS, proxy path, and TLS inspection policy from a representative workstation.
+4. Complete the [Pretty URL test](#nextcloud-pretty-urls).
+5. Enable Talk, Secrets, the system address book, and NC Connector Backend only where the corresponding functions are planned.
+6. Assign a backend seat to a pilot user before testing centrally managed functions.
+7. Keep the current and previous MSI available for rollout and recovery.
+8. Define a pilot acceptance test covering installation, connection, one share, one Talk meeting, and every optional function in use.
+
+## Deployment and application lifecycle
+
+### Install
+
+1. Close Outlook and wait until no `OUTLOOK.EXE` process remains.
+2. Install the MSI with administrator rights.
+3. Start Outlook.
+4. Open **NC Connector -> Settings**, configure the Nextcloud connection, run the connection test, and save.
+
+Interactive installation:
 
 ```powershell
-msiexec /i "NCConnectorForOutlook-<version>.msi" /qn /norestart
+msiexec.exe /i "NCConnectorForOutlook-<version>.msi"
 ```
 
-Afterwards, start Outlook. The **NC Connector** tab/group appears in the ribbon (Calendar/Appointment and Mail compose).
+Silent installation with an MSI log:
 
-## Updates / upgrade behavior
-- Updates/reinstalls are performed by installing an MSI package over the existing installation (same, older, or newer version).
-- The MSI is configured as a **major upgrade** (stable `UpgradeCode`) so an existing installation is replaced automatically.
-- User settings are kept because they are stored in the user profile.
-- Outlook checks `nc-connector.de` once per day for release metadata. Downloads open GitHub release assets directly; the MSI is not downloaded through the homepage.
-- The startup popup is opt-in (`Settings -> Advanced -> Inform me about new versions`). The Advanced tab still shows the cached latest version, download link, and changelog summary.
-- The update request sends product, installed version, channel, and a daily anonymous client hash. It does not send Nextcloud URLs, email addresses, usernames, passwords, license keys, or tenant data.
-
-## Files & registry
-
-### Installation path
-Default (x64):
-- `C:\Program Files\NC4OL\`
-
-Important files:
-- `NcTalkOutlookAddIn.dll` (COM add-in)
-- `NcTalkOutlookAddIn.dll.config` (binding redirects)
-- `LICENSE.txt`
-
-### Outlook add-in registration (HKLM)
-The MSI registers the add-in, e.g.:
-- `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn`
-
-Common values:
-- `LoadBehavior=3`
-- `FriendlyName="NC Connector for Outlook"`
-- `Description="Nextcloud Talk & Files integrated into Outlook"`
-
-COM registration is handled via `HKLM\Software\Classes\CLSID\{...}` including `CodeBase` pointing to the installed DLL.
-
-Installer marker key for the IFB URL reservation:
-- `HKLM\Software\NC4OL\HttpUrl`
-
-## Settings (profile XML)
-
-### Location
-Settings are stored per user and per Outlook profile:
-- `%LOCALAPPDATA%\NC4OL\settings_<OutlookProfile>.xml`
-- Fallback profile file (when no profile name is available): `%LOCALAPPDATA%\NC4OL\settings_default.xml`
-
-Password handling:
-- `AppPasswordProtected` is stored encrypted via Windows DPAPI (`CurrentUser` scope).
-- Plaintext `AppPassword` is not persisted in the new format.
-
-Legacy migration on first start:
-- `%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\settings.ini`
-- `%LOCALAPPDATA%\NextcloudTalkOutlookAddIn\settings.ini`
-- Legacy INI files are removed after successful migration.
-
-### Important keys (excerpt)
-
-```xml
-<Settings SchemaVersion="1" Profile="Outlook">
-  <ServerUrl>https://cloud.example.com</ServerUrl>
-  <Username>max</Username>
-  <AppPasswordProtected>BASE64_DPAPI_BLOB</AppPasswordProtected>
-  <AuthMode>LoginFlow</AuthMode>
-  <IfbEnabled>true</IfbEnabled>
-  <IfbDays>30</IfbDays>
-  <IfbPort>7777</IfbPort>
-  <IfbCacheHours>24</IfbCacheHours>
-  <DebugLoggingEnabled>false</DebugLoggingEnabled>
-  <LogAnonymizationEnabled>true</LogAnonymizationEnabled>
-  <UpdateNotifyEnabled>false</UpdateNotifyEnabled>
-  <UpdateInstallId>LOCAL_RANDOM_ID</UpdateInstallId>
-  <UpdateLastCheckedAtUtc>2026-06-12T08:00:00.0000000Z</UpdateLastCheckedAtUtc>
-  <UpdateLatestVersion>3.1.1</UpdateLatestVersion>
-  <UpdateReleaseUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/tag/v3.1.1</UpdateReleaseUrl>
-  <UpdateDownloadUrl>https://github.com/nc-connector/NC_Connector_for_Outlook/releases/download/v3.1.1/NCConnectorForOutlook-3.1.1.msi</UpdateDownloadUrl>
-  <FileLinkBasePath>NC Connector</FileLinkBasePath>
-  <SharingAttachmentLinkTarget>zip_download</SharingAttachmentLinkTarget>
-  <TalkDeleteRoomOnEventDelete>false</TalkDeleteRoomOnEventDelete>
-  <EmailSignatureOnCompose>true</EmailSignatureOnCompose>
-  <EmailSignatureOnReply>true</EmailSignatureOnReply>
-  <EmailSignatureOnForward>true</EmailSignatureOnForward>
-</Settings>
+```powershell
+msiexec.exe /i "NCConnectorForOutlook-<version>.msi" /qn /norestart /L*v "$env:TEMP\NCConnectorForOutlook-install.log"
 ```
 
-### Rollout / pre-seed
-Because profile XML settings live in the user profile, common rollout approaches are:
-- **Login Script / Intune / SCCM**: copy a prepared `settings_<OutlookProfile>.xml` to `%LOCALAPPDATA%\NC4OL\` (only if not present).
-- **Group Policy Preferences**: distribute the file into the user profile.
+Expected result:
 
-Recommendation:
-- Pre-seed only base URL and defaults.
-- Let users fetch credentials via Login Flow v2 or enter them manually (recommended for DPAPI compatibility).
+- **NC Connector** appears in Outlook appointment and mail compose ribbons.
+- `C:\Program Files\NC4OL\` exists.
+- The add-in is listed under **File -> Options -> Add-ins -> COM Add-ins**.
 
-## Managed Nextcloud URL (Registry/GPO)
+If any check fails, use [Add-in does not load](#add-in-does-not-load).
 
-Outlook can read the Nextcloud URL from Windows policy registry keys:
+### Pilot acceptance test
 
-- `HKLM\Software\Policies\NC Connector`
-- `HKCU\Software\Policies\NC Connector`
+Run this test with a normal user account:
+
+1. In **Settings**, test and save the Nextcloud connection.
+2. Create a new mail and insert a small Nextcloud share.
+3. Create a new appointment and insert a Talk link when Talk is in scope.
+4. Test a reply or forward when sharing or managed signatures are in scope.
+5. Test IFB from [the local endpoint](#internet-freebusy-gateway-ifb) when enabled.
+6. Close and reopen Outlook, then repeat the connection test.
+
+Record the add-in version, Outlook bitness, Nextcloud version, and result of each step.
+
+### Upgrade or return to an older version
+
+The MSI replaces an installed newer, equal, or older release. Per-user settings remain in the user profile.
+
+The add-in reports release metadata but does not install updates. **Settings -> Advanced -> Inform me about new versions** controls the popup; the daily metadata check still runs when the popup is disabled. MSI approval and deployment remain administrator tasks.
+
+1. Close Outlook.
+2. Back up `%LOCALAPPDATA%\NC4OL\settings_*.xml`.
+3. Install the target MSI over the existing installation.
+4. Start Outlook and repeat the pilot acceptance test for the functions in use.
+
+To return to the previous add-in release, repeat the same procedure with the previous MSI. If settings must also be restored, close Outlook first and restore only the files belonging to the same Windows user. A protected app password copied to another Windows account or computer may not be readable; authenticate again in that case.
+
+### Uninstall
+
+1. While Outlook is still installed, open **NC Connector -> Settings -> IFB**.
+2. Disable IFB and save. This restores the previously recorded Outlook Free/Busy path.
+3. Close Outlook and wait until no `OUTLOOK.EXE` process remains.
+4. Use **Windows Settings -> Apps -> Installed apps** or:
+
+```powershell
+msiexec.exe /x "NCConnectorForOutlook-<version>.msi" /qn /norestart
+```
+
+The MSI removes installed files, add-in registration, and the default IFB URL reservation. Per-user settings, caches, and logs under `%LOCALAPPDATA%\NC4OL\` remain so that reinstalling does not erase user configuration.
+
+Delete that profile directory only when its settings and logs are no longer needed. A URL reservation created manually for a custom IFB port is not owned by the MSI; remove it separately as described under [Custom IFB port](#custom-ifb-port).
+
+### Installed paths and registration checks
+
+Default installation directory:
+
+```text
+C:\Program Files\NC4OL\
+```
+
+Primary add-in registration:
+
+```text
+HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn
+```
+
+32-bit Outlook on 64-bit Windows reads:
+
+```text
+HKLM\Software\Wow6432Node\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn
+```
+
+`LoadBehavior` should be `3`. The MSI also writes `HKLM\Software\NC4OL\HttpUrl` as an installation marker for the default IFB reservation.
+
+## Managed configuration and user data
+
+### Profile data
+
+Settings are stored per Windows user and Outlook profile:
+
+```text
+%LOCALAPPDATA%\NC4OL\settings_<OutlookProfile>.xml
+```
+
+If Outlook does not expose a profile name, the add-in uses:
+
+```text
+%LOCALAPPDATA%\NC4OL\settings_default.xml
+```
+
+The app password is stored as `AppPasswordProtected` with Windows Data Protection for the current user. It is not a portable credential.
+
+Older `settings.ini` files below these directories are migrated on first start and removed only after a successful migration:
+
+```text
+%LOCALAPPDATA%\NextcloudTalkOutlookAddInData\
+%LOCALAPPDATA%\NextcloudTalkOutlookAddIn\
+```
+
+### Backup and restore
+
+To back up a client profile:
+
+1. Close Outlook.
+2. Copy `settings_*.xml` from `%LOCALAPPDATA%\NC4OL\`.
+3. Record the Windows user and Outlook profile name.
+
+To restore it:
+
+1. Close Outlook.
+2. Restore the matching profile file for the same Windows user.
+3. Start Outlook and run the connection test.
+4. If authentication fails, use the Nextcloud login flow again.
+
+Logs and the IFB address-book cache are operating data, not required for configuration recovery.
+
+### Rollout and pre-seeding
+
+Use the managed registry policy below for the Nextcloud URL. Use the optional backend for central feature defaults and locks.
+
+If a profile XML must be pre-seeded:
+
+- deploy it only when no profile file exists
+- use a file created by the same add-in release as the template
+- include only stable defaults needed by the organization
+- remove `AppPasswordProtected` before distribution
+- let each user authenticate through the Nextcloud login flow
+- validate the result against every Outlook profile naming pattern in the rollout
+
+Do not copy a protected app password between users or computers.
+
+### Managed Nextcloud URL
+
+Supported policy locations:
+
+```text
+HKLM\Software\Policies\NC Connector
+HKCU\Software\Policies\NC Connector
+```
 
 Values:
 
-- `NextcloudUrl` (`REG_SZ`): full Nextcloud URL, for example `https://cloud.example.com`
-- `NextcloudUrlLocked` (`REG_DWORD` or string, optional): `1` / `true` locks the URL field in Settings
+- `NextcloudUrl` (`REG_SZ`): full public Nextcloud URL
+- `NextcloudUrlLocked` (`REG_DWORD` or string, optional): `1` or `true` locks the field
 
-Priority:
+Example for a machine policy:
 
-- `HKLM` wins over `HKCU`
-- both 64-bit and 32-bit registry views are read
-- if the value is not locked, it only pre-fills empty profiles
-- if the value is locked, Outlook always uses the registry URL and disables the URL field
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name NextcloudUrl -PropertyType String -Value "https://cloud.example.com" -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name NextcloudUrlLocked -PropertyType DWord -Value 1 -Force | Out-Null
+```
 
-Credentials are still user-specific. Users fetch an app password through the login flow or enter it manually.
+Priority and result:
 
-### Optional NC Connector backend policies
+- `HKLM` takes priority over `HKCU`.
+- Both 64-bit and 32-bit registry views are read.
+- An unlocked value fills only an empty profile.
+- A locked value is used for every profile and disables the URL field.
+- Credentials remain user-specific.
 
-If the optional Nextcloud backend app `ncc_backend_4mc` is installed, Outlook also evaluates:
-- `/apps/ncc_backend_4mc/api/v1/status`
+After policy deployment, restart Outlook and verify the URL and lock state in **NC Connector -> Settings**.
 
-Runtime behavior:
-- checked when Talk wizard opens
-- checked when Sharing wizard opens
-- checked when Settings open or are saved
-- checked when deleting a saved Talk appointment would remove the remote Talk room
-- valid active seat => backend policy values apply and `policy_editable=false` fields are locked in the UI
-- missing backend / no seat / invalid seat => local Outlook settings remain active
-- if the backend is unreachable, Share/Talk use their locally saved add-in settings; the central-signature send check follows the stricter behavior described below
-- if the backend is reachable but the license/seat state is no longer usable, Outlook also falls back to the locally saved add-in settings
-- invalid seat states remain visible in the UI so users can contact their administrator
-- separate password delivery is only available when the backend endpoint exists and the current user has an active assigned seat
-- central email signatures are only available when the backend endpoint exists, the current user has an active assigned seat, and the backend returns a complete `policy.email_signature` payload
-- if Share/Talk policy is available but `policy.email_signature` is missing, Outlook treats only the central signature domain as unsupported and shows a backend update hint
-- backend custom templates stay inactive until the corresponding language override is set to `custom`
-- the `custom` option is only shown when the backend endpoint exists and stays disabled unless the effective backend policy for that domain is actually `custom` and provides a template
-- if `custom` is selected but the backend template is empty or unavailable, Outlook falls back to the local UI-default text block
-- custom share templates may use `{LINK_INTRO}` and `{LINK_LABEL}`; Outlook fills them from the effective link target. Manual shares always use share-page wording, while attachment automation can use ZIP-download or share-page wording.
-- current clients prefer the backend's versioned Share template and automatically fall back to the original template field when connected to an older backend; no administrator migration is required
-- existing custom templates without these variables remain valid and keep their previous rendering
-- `policy.talk.event_description_type` may be `html` or `plain_text`; when `html` is active, Outlook sanitizes the Talk HTML template, applies an appointment-compat transform (legacy color/alignment fallbacks + Word-safe CSS stripping), and writes the block via HTML->RTF bridge for stable appointment rendering
+## Nextcloud server preparation
 
-Central policy can currently control:
-- Talk defaults and lock state
-- saved-event Talk room deletion opt-in (`talk_delete_room_on_event_delete`)
-- Sharing defaults and lock state
-- attachment link target through `policy.share.attachment_link_target` and `policy_editable.share.attachment_link_target`
-- share HTML/password templates
-- Talk description language / custom invitation template
-- central email signature defaults and lock state
+### Base service checks
 
-### Central email signature behavior
+For a pilot user:
 
-The backend can provide one central HTML email signature for the assigned seat user. Outlook applies it only when all of these conditions are true:
+1. Open **NC Connector -> Settings**.
+2. Enter the public Nextcloud URL.
+3. Authenticate through the login flow or with an app password.
+4. Run the connection test.
 
-- the backend endpoint is reachable and the current account has an active assigned seat
-- the backend status contains `policy.email_signature` and `policy_editable.email_signature`
-- the effective `email_signature_on_compose` value is `true`
-- `policy.email_signature.email_signature_template` contains HTML
-- `policy.email_signature.user_email` contains the Nextcloud user's email address
-- the effective Outlook sender identity matches that email address. If Outlook uses a `SentOnBehalfOfName`/From override for a shared mailbox or delegated Exchange identity, that override must resolve to the same SMTP address; otherwise no backend signature is inserted.
+The test must report a supported Nextcloud version. An older server or a response without a usable version is rejected.
 
-The backend values for compose, reply, and forward are defaults while the matching `policy_editable.email_signature.<key>` value is `true`. A user may therefore enable a locally saved option even when its editable backend default is `false`. If the backend marks a value non-editable, that backend value always wins; a locked `false` stays disabled.
+Verify the optional functions separately:
 
-If an older backend already returns Share/Talk policy but does not expose the `policy.email_signature` domain yet, only central email signatures remain disabled. Settings then shows a backend update hint; Share and Talk stay controlled by their own policy domains.
+- create a public share for Files Sharing
+- create a Talk room for Talk
+- search for a user after enabling the system address book
+- open backend-managed settings with an assigned seat
 
-New mail, reply, and forward use their own effective option. Outlook first uses its operation metadata to distinguish reply and forward. If an inline response remains ambiguous and the two options differ, NC Connector does not guess: background processing leaves the message unchanged and the final send check asks the user to retry instead of sending with an uncertain signature state. If both options have the same value, that common value applies.
+### Nextcloud Pretty URLs
 
-HTML, plain text, and RTF use Outlook WordEditor in both normal Inspector windows and inline responses. Plain text remains plain text, RTF remains RTF, and NC Connector does not rewrite `MailItem.Body` or `MailItem.HTMLBody`. Popping an inline response into its own window switches processing to that Inspector.
+Pretty URLs are a server-wide Nextcloud routing requirement. They affect authentication, files, apps, Talk, and other routes; they are not a Talk-only or add-in setting.
 
-The add-in replaces only Outlook's exact `_MailAutoSig` slot or its own `NcConnectorSignature` bookmark. If neither exists, a new-mail signature is placed after all text written by the user. A reply/forward signature is placed after the user's response and before Outlook's `_MailOriginal` bookmark or a Word paragraph-border quote separator. The current cursor, the start of the body, and localized headers such as `From:` or `Von:` are not fallbacks. If no safe reply/forward boundary exists, authored and quoted content remain unchanged.
-
-Every inserted backend signature receives the `NcConnectorSignature` Word bookmark in all three formats. This keeps sender changes, format changes, and later updates limited to the exact managed range. Switching from a non-matching to the matching sender therefore places the signature below existing new-mail text instead of above it. Switching away from the matching sender removes only the managed bookmark range.
-
-The backend HTML passes through the fail-closed template sanitizer. Formatted insertion is staged and bookmarked before the previous signature is removed; failure does not trigger a body-wide replacement. Word selection is restored through a temporary bookmark, and Inspector and inline response use the same spacing rules.
-
-Outlook performs a final synchronous policy, sender, format, compose-type, and bookmark check before send. With complete backend connection settings, it cancels sending if no successful policy snapshot is available or if a required signature apply/clear operation cannot complete safely. The message stays open for correction and another send attempt. An incomplete setup creates no signature requirement and only attempts best-effort removal of an exact NC Connector bookmark. An unsupported signature domain also disables insertion; with otherwise complete backend settings, however, the final check still refuses to send if an existing managed range cannot be reconciled safely.
-
-If policy is inactive, incomplete, or the sender does not match, NC Connector does not remove an Outlook or third-party signature belonging to that identity. When compose policy is active for the matching sender but reply or forward insertion is disabled, it may clear an exact Outlook signature slot for that response without inserting the backend signature.
-
-### Talk appointment-safe HTML subset (backend templates)
-
-Saved appointment deletion is conservative by default: Outlook only queues remote Talk room deletion when `TalkDeleteRoomOnEventDelete` is enabled locally or locked/enabled by backend policy, and only when the appointment carries NC Connector `X-NCTALK-TOKEN` metadata. Generic Talk links in `Location` or URL fields are ignored. Cleanup for newly created appointments that are discarded before saving remains active.
-
-If backend policy/template delivery is enabled for Talk appointment descriptions (`event_description_type=html`), use this subset for robust Outlook rendering:
-
-- Prefer table-based markup for layout (`table`, `tbody`, `tr`, `td`).
-- Keep inline styles simple; avoid modern layout features (`flex`, `grid`) and advanced visual effects (`border-radius`, `overflow`, `object-fit`, `user-select`).
-- Keep links explicit with full `https://` URLs.
-- NC Connector adds legacy fallbacks automatically during appointment insert (`font color`, `bgcolor`, `align`, `valign`) and hardens anchor color rendering.
-
-## Nextcloud Pretty URLs
-
-NC Connector uses Nextcloud for file sharing, uploads, authentication, Talk meetings, and optional services. Pretty URLs are a server-wide Nextcloud routing feature; they are not a setting for any one NC Connector function. One visible symptom of a broken rewrite is the public Talk link written to a calendar entry. For that link, NC Connector combines the configured public Nextcloud base URL with `/call/<TOKEN>`:
+NC Connector creates a public Talk URL in this form:
 
 ```text
 https://cloud.example.com/call/<TOKEN>
 ```
 
-If the same room works only with `/index.php/`, for example
-`https://cloud.example.com/index.php/call/<TOKEN>`, the Nextcloud front-controller rewrite is missing or misconfigured. This is a web-server or reverse-proxy problem, not a Talk or NC Connector setting. Fix the public route instead of adding `/index.php` to the Nextcloud URL configured in NC Connector.
+If the room works only as `https://cloud.example.com/index.php/call/<TOKEN>`, the web server or reverse proxy does not route Pretty URLs correctly. Fix the public route; do not add `/index.php` to the URL configured in NC Connector.
 
-If Nextcloud is publicly available below a path such as `/nextcloud`, that path is part of the base URL. The expected room URL is then `https://cloud.example.com/nextcloud/call/<TOKEN>`.
+For a Nextcloud installation below `/nextcloud`, the expected URL is:
 
-### Quick check
+```text
+https://cloud.example.com/nextcloud/call/<TOKEN>
+```
 
-For an installation at the web root, open both URLs in a browser:
+#### Quick test
+
+At the web root, open:
 
 ```text
 https://cloud.example.com/index.php/login
 https://cloud.example.com/login
 ```
 
-For an installation below `/nextcloud`, use:
+Below `/nextcloud`, open:
 
 ```text
 https://cloud.example.com/nextcloud/index.php/login
 https://cloud.example.com/nextcloud/login
 ```
 
-The first URL is the baseline. The second URL must also reach Nextcloud or redirect to its login page instead of returning a web-server 404. If only the first URL works, Pretty URL rewriting is not working and `/call/<TOKEN>` links will fail for the same reason.
+The URL without `/index.php` must reach Nextcloud or redirect to its login page. A web-server 404 means that the rewrite is not active.
 
-### Nginx
+#### Nginx
 
-Use Nextcloud's complete Nginx configuration as the baseline. The following blocks are only the relevant excerpts; merge them into the matching existing `server` and PHP/FastCGI locations rather than creating duplicate locations.
+Use the complete Nextcloud Nginx configuration as the baseline. The following snippets belong in the matching existing `server` and PHP/FastCGI locations; do not create duplicate locations.
 
-For Nextcloud at the web root, the request fallback must reach `index.php`:
+At the web root:
 
 ```nginx
 location / {
@@ -253,13 +331,13 @@ location / {
 }
 ```
 
-The PHP/FastCGI location also needs:
+In the PHP/FastCGI location:
 
 ```nginx
 fastcgi_param front_controller_active true;
 ```
 
-For Nextcloud below `/nextcloud`, the fallback inside Nextcloud's outer `location ^~ /nextcloud` block must include that path:
+Below `/nextcloud`, the fallback must retain that path:
 
 ```nginx
 location /nextcloud {
@@ -267,25 +345,25 @@ location /nextcloud {
 }
 ```
 
-Validate and reload Nginx after changing its configuration:
+Validate and reload:
 
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Apache
+#### Apache
 
-Apache must load `mod_rewrite` and `mod_env`, and the `<Directory>` block for the Nextcloud installation must permit its `.htaccess` rules with `AllowOverride All`. On Debian or Ubuntu:
+Apache must load `mod_rewrite` and `mod_env`. The HTTP user must be able to write Nextcloud's `.htaccess`, and the matching `<Directory>` block must allow those rules with `AllowOverride All`.
+
+On Debian or Ubuntu:
 
 ```bash
 sudo a2enmod rewrite env
 sudo systemctl reload apache2
 ```
 
-Set the public CLI URL and the rewrite base in Nextcloud's `config/config.php`.
-
-For Nextcloud at the web root:
+For Nextcloud at the web root, set in `config/config.php`:
 
 ```php
 'overwrite.cli.url' => 'https://cloud.example.com/',
@@ -299,9 +377,9 @@ For Nextcloud below `/nextcloud`:
 'htaccess.RewriteBase' => '/nextcloud',
 ```
 
-Behind a reverse proxy, `htaccess.RewriteBase` is the path relative to the backend Apache `DocumentRoot`, after the proxy mapping. If the public proxy exposes `/nextcloud` but strips that prefix before forwarding to Apache, use `/`, not `/nextcloud`.
+Behind a reverse proxy, `htaccess.RewriteBase` is relative to the backend Apache `DocumentRoot` after proxy mapping. If the proxy removes `/nextcloud` before forwarding, use `/`.
 
-Regenerate Nextcloud's `.htaccess` as the web-server user, using the real installation path if it differs:
+Regenerate `.htaccess` with the real installation path:
 
 ```bash
 cd /var/www/nextcloud
@@ -309,167 +387,392 @@ sudo -E -u www-data php occ maintenance:update:htaccess
 sudo systemctl reload apache2
 ```
 
-Only if rewriting still fails after checking `mod_rewrite`, `AllowOverride All`, the rewrite base, and the regenerated `.htaccess`, add this fallback to `config/config.php`:
+Only after checking the modules, `AllowOverride`, rewrite base, and regenerated `.htaccess`, the following Nextcloud fallback can be tested:
 
 ```php
 'htaccess.IgnoreFrontController' => true,
 ```
 
-Then run `maintenance:update:htaccess` again and reload Apache.
+Run `maintenance:update:htaccess` again and reload Apache.
 
-After the change, repeat the `/login` test and open a newly generated `/call/<TOKEN>` link from a client outside the server network. On managed hosting or appliances, apply the equivalent setting through the provider's supported web-server or reverse-proxy configuration.
+Repeat the login test and open a newly created `/call/<TOKEN>` link from a client outside the server network.
 
 Official Nextcloud references:
 
-- [Nginx configuration](https://docs.nextcloud.com/server/stable/admin_manual/installation/nginx.html)
-- [Apache installation and Pretty URLs](https://docs.nextcloud.com/server/stable/admin_manual/installation/source_installation.html#pretty-urls)
-- [`maintenance:update:htaccess`](https://docs.nextcloud.com/server/stable/admin_manual/occ_system.html#maintenance-commands)
+- [Nginx configuration](https://docs.nextcloud.com/server/32/admin_manual/installation/nginx.html)
+- [Apache installation and Pretty URLs](https://docs.nextcloud.com/server/32/admin_manual/installation/source_installation.html#pretty-urls)
+- [`maintenance:update:htaccess`](https://docs.nextcloud.com/server/32/admin_manual/occ_command.html#maintenance-commands)
 
-## Compose sharing lifecycle (3.1.0)
+### System address book
 
-### Attachment automation and cleanup rules
-- The `Insert Nextcloud share` button is also available in Outlook inline replies/forwards on the Message tab and uses the same wizard path as mail compose inspectors.
-- Inline replies/forwards write the share block through Outlook's active inline Word editor. HTML/RTF messages keep two empty lines above the share block; plain-text messages keep plain text and use the framed `#` block.
-- In compose attachment mode, created server artifacts are tracked immediately after share creation.
-- `Settings -> Sharing -> Attachments` selects the link target for attachment automation: `ZIP download` or `Nextcloud share page`. `ZIP download` is the default when neither a local value nor a usable backend value exists. The setting does not change manually created shares.
-- The backend uses `policy.share.attachment_link_target` with `zip_download` or `share_page`; `policy_editable.share.attachment_link_target=false` locks the setting. An editable backend value seeds profiles that have no local value, while an explicit local value wins.
-- Attachment mode remains read-only and keeps its existing cleanup behavior for both link targets. Only the inserted URL, `{LINK_INTRO}`, and `{LINK_LABEL}` change.
-- ZIP mode accepts only a public absolute HTTP(S) share URL ending in `/s/<token>` and derives `<share URL>/download`. If this cannot be verified, Outlook stops insertion and shows an error; it never inserts the original share URL with ZIP wording.
-- Cleanup tracking is cleared only after a confirmed successful primary mail send.
-- If a compose window is closed without a successful send, the add-in deletes the created share folder artifacts server-side (best effort, with send/close grace timer handling).
-- Attachment automation evaluates new files both pre-add (`BeforeAttachmentAdd`) and post-add; if pre-add can resolve a local file path, NC flow can best-effort cancel host add before Outlook post-add handling.
-- In Microsoft 365 / Exchange environments with server-side message-size limits, Outlook can block large attachments before add-in events fire; in those cases automation cannot intercept and users should use the `Insert Nextcloud share` button instead.
-- In sharing wizard file-step, admins/users can add files and folders via Explorer drag & drop across the full step area (queue and action area), not only via explicit add buttons.
-- File uploads larger than 20 MB use Nextcloud chunked upload v2. This avoids long single WebDAV `PUT` requests through proxies or web servers that reject very large request bodies.
+The system address book is required for:
 
-### Separate password follow-up mail
-- If `Send password separately` is enabled, the main HTML block does not contain inline password text.
-- This feature is only available when the NC Connector backend endpoint exists and the current user has an active assigned seat.
-- Follow-up password mail dispatch runs only after the primary mail send is confirmed.
-- The successful policy snapshot already verified for the primary send is sanitized once and reused for all follow-up recipients and for a possible manual fallback draft.
-- Outlook applies and reads back the original compose sender identity. Automatic send runs only when the effective follow-up sender exactly matches the sender captured from the successful primary mail; otherwise Outlook opens the manual fallback draft.
-- When that effective sender also matches `policy.email_signature.user_email`, the follow-up contains the backend signature. Plain primary mail produces a plain follow-up signature; HTML/RTF primary mail produces an HTML follow-up. A missing policy, identity mismatch, or sanitizer failure omits the signature rather than using unverified content.
-- If backend policy selects Nextcloud Secrets, Outlook creates one encrypted one-time Secrets link per final recipient.
-- If Secrets creation fails, Outlook falls back to the existing plain follow-up mail and shows a warning.
-- Dispatch strategy:
-  - first try automatic send
-  - if automatic send fails, open a prefilled manual fallback draft.
+- moderator selection in the Talk wizard
+- the **Add users** default
+- the **Add guests** default
+- IFB address resolution
+
+Enable it in **Nextcloud Administration settings -> Groupware -> System Address Book**. Also enable username autocompletion or system address-book access under **Administration settings -> Sharing**.
+
+If the administration page shows it as enabled but clients still cannot use it:
+
+```bash
+sudo -E -u www-data php occ config:app:delete dav system_addressbook_exposed
+sudo -E -u www-data php occ config:app:set dav system_addressbook_exposed --value="yes"
+sudo -E -u www-data php occ dav:sync-system-addressbook
+```
+
+Then verify the generated address book for a test user:
+
+```text
+https://<cloud>/remote.php/dav/addressbooks/users/<user>/z-server-generated--system?export
+```
+
+Expected result: user search and moderator controls become available after Outlook reconnects. If the endpoint is unavailable, those controls remain disabled and display a setup notice.
+
+Official Nextcloud references:
+
+- [System address book](https://docs.nextcloud.com/server/32/admin_manual/groupware/contacts.html#system-address-book)
+- [`dav:sync-system-addressbook`](https://docs.nextcloud.com/server/32/admin_manual/occ_command.html#sync-system-address-book)
+
+## Optional NC Connector Backend
+
+### Prerequisites and operating states
+
+Backend-managed functions require:
+
+- the `ncc_backend_4mc` app installed and enabled
+- client access to `/apps/ncc_backend_4mc/api/v1/status`
+- an active seat assigned to the current Nextcloud user
+- a policy domain supported by the installed backend version
+
+Observed behavior by state:
+
+- **No backend configuration:** Sharing, Talk, and IFB use local settings. Central signatures and separate password delivery are unavailable.
+- **Reachable backend with active seat:** Backend defaults apply. Fields marked as locked cannot be changed in Outlook.
+- **Reachable backend without a usable seat:** Sharing and Talk use local settings; Outlook displays the seat or license state. Central signatures and separate password delivery are unavailable.
+- **Backend temporarily unreachable:** Sharing and Talk use saved local settings. A matching message that requires a central signature can remain open and unsent until the signature policy can be checked.
+- **Backend lacks the signature domain:** Share and Talk policies continue to work. Central signatures stay disabled and Outlook displays an update notice.
+
+### Policy rollout
+
+The backend can manage:
+
+- Talk defaults and saved-appointment room deletion
+- sharing defaults, password rules, and attachment link target
+- share, password-mail, and Talk invitation templates
+- separate password delivery and optional Secret links
+- central signature assignment and separate switches for new mail, reply, and forward
+
+Use editable values as organization defaults. Lock only settings that users must not change. Test both a user with an active seat and a user without one before broad rollout.
+
+### Template authoring
+
+For custom share templates:
+
+- use `{LINK_INTRO}` and `{LINK_LABEL}` where wording must follow the effective link target
+- manual shares always use share-page wording
+- attachment automation can use ZIP-download or share-page wording
+- templates without these variables keep their existing wording
+- use absolute `https://` links
+
+For Talk appointment HTML:
+
+- use tables (`table`, `tbody`, `tr`, `td`) for layout
+- use simple inline styles
+- avoid `flex`, `grid`, `border-radius`, `overflow`, `object-fit`, and `user-select`
+- use explicit full `https://` links
+
+Unsupported or unsafe HTML can be removed or the template can be rejected. Test templates in HTML/RTF Outlook appointments and in every supported Office theme.
+
+### Managed signature acceptance test
+
+A central signature is applied only when the effective Outlook **From** address matches the email address assigned by the backend. A shared mailbox or delegated **From** address must resolve to the same SMTP address.
+
+Test this matrix before rollout:
+
+1. New HTML mail with the matching identity.
+2. New plain-text mail with the matching identity.
+3. Reply and forward with the matching identity selected from the start.
+4. Reply and forward after changing from a non-matching identity to the matching identity.
+5. A non-matching identity.
+6. A shared or delegated mailbox, if used.
+7. A separate password follow-up mail.
+
+Expected result:
+
+- new mail places the signature after user-written text
+- replies and forwards place it above the quoted message
+- switching away from the matching identity removes only the managed signature
+- a non-matching identity and its own signature remain unchanged
+- separate new-mail, reply, and forward policy switches are followed
+- a locked backend value cannot be changed in Outlook
+- the follow-up password mail receives the signature only when its effective sender also matches
+
+If a required final signature check cannot complete, Outlook keeps the message open instead of sending it with an unverified signature state.
+
+## Feature operation
+
+### Sharing and uploads
+
+The sharing wizard accepts files and folders. It automatically selects an upload method supported by the server and selected files, then reports scan, folder preparation, files, bytes, and transfer rate. Implementation details are in [DEVELOPMENT.md](DEVELOPMENT.md#sharing-flow-mail-compose).
+
+Operating limits and error behavior:
+
+- symbolic links and junctions are rejected
+- a source file changed after the initial scan stops the upload
+- an existing manual share-root name stops that share; attachment automation can select a numbered name
+- HTTP `507` means that Nextcloud has insufficient storage
+- proxy timeouts and request-size limits can affect uploads even when the client and Nextcloud are otherwise healthy
+
+For a large-folder incident, collect the selected item count, total size, timestamp, displayed phase, Nextcloud storage state, reverse-proxy limits, and `FILELINK` log entries.
+
+### Attachment automation
+
+In **Settings -> Sharing -> Attachments**, administrators or backend policy can select:
+
+- always route attachments through NC Connector
+- offer NC Connector above a size threshold
+- `ZIP download` or `Nextcloud share page` as the attachment link target
+
+`ZIP download` is the default when neither a local value nor a backend value is available. The link-target setting applies only to attachment automation; manually created shares always link to the Nextcloud share page.
+
+Both attachment targets remain read-only shares. If a valid ZIP-download URL cannot be derived from the public share, insertion stops with an error. NC Connector does not label a normal share-page URL as a ZIP download.
+
+Outlook or Exchange can reject a large attachment before an add-in event runs. In that case, users must select **Insert Nextcloud share** and add the file directly in the sharing wizard.
+
+### Cleanup after an unsent mail
+
+An attachment share created for a compose window is tracked until the primary mail is sent successfully.
+
+- successful primary send: cleanup tracking is cleared and the share remains
+- compose window closed without successful send: the created server folder is deleted after a short send/close grace period
+- deletion failure: the mail remains closed, the failure is written to `FILELINK`, and an administrator may need to remove the orphaned share manually
+
+### Separate password delivery
+
+Separate password delivery requires NC Connector Backend and an active seat.
+
+- The primary mail contains no plain password.
+- The follow-up starts only after Outlook confirms successful sending of the primary mail.
+- Automatic sending is attempted with the same effective sender.
+- If sender verification or automatic sending fails, Outlook opens a prepared draft for manual sending.
+- With the Secrets mode, one one-time Secret link is created per final recipient.
+- If Secrets creation fails, Outlook uses the plain password follow-up and displays a warning.
+- A matching backend signature is included only when the follow-up sender matches the assigned signature address.
+
+### Talk room lifecycle
+
+Deleting a saved Outlook appointment removes its remote Talk room only when the setting is explicitly enabled and the appointment contains NC Connector room metadata. The setting is disabled by default. A Talk URL copied into a location or body is not sufficient for remote deletion.
+
+The cleanup of a newly created room from an unsaved, discarded appointment remains active.
+
+Before enabling saved-appointment room deletion across an organization:
+
+1. Test deletion from every device type used by the pilot account.
+2. Confirm that deleting one synchronized appointment is expected to remove the shared room for all devices.
+3. Document room recovery or recreation procedures for users.
 
 ## Internet Free/Busy Gateway (IFB)
 
-### Purpose
-IFB provides a local HTTP endpoint that Outlook can use to retrieve free/busy information from Nextcloud.
+### Purpose and activation
 
-Endpoint:
-- Configurable in `Settings -> IFB -> Local IFB port` (default `7777`).
-- Default endpoint: `http://127.0.0.1:7777/nc-ifb/`
+IFB lets Outlook request Nextcloud free/busy data through a local HTTP endpoint.
 
-### URLACL (HTTP.SYS reservation)
-The MSI reserves the URL namespace so the listener can run without administrative rights.
+1. Verify the Nextcloud system address book.
+2. Open **NC Connector -> Settings -> IFB**.
+3. Enable IFB and select the number of days, cache duration, and local port. Defaults are 30 days, 24 cache hours, and port `7777`.
+4. Save and restart Outlook.
 
-Check default reservation:
+Default listener:
 
-```powershell
-netsh http show urlacl | Select-String -Pattern "7777/nc-ifb"
+```text
+http://127.0.0.1:7777/nc-ifb/
 ```
 
-If you use a custom IFB port, add URLACL for that port (administrator shell):
+The MSI reserves the default URL namespace for authenticated Windows users. Enabling IFB updates Outlook's per-user Free/Busy path. Disabling IFB restores the previously recorded path.
+
+The listener runs only while Outlook is running, IFB is enabled, and the stored Nextcloud credentials are complete.
+
+### Verify the default reservation
 
 ```powershell
-netsh http add urlacl url=http://127.0.0.1:<ifb-port>/nc-ifb/ user="S-1-1-0"
+netsh http show urlacl | Select-String -Pattern "127.0.0.1:7777/nc-ifb"
+Test-NetConnection 127.0.0.1 -Port 7777
+$ifbAddress = [Uri]::EscapeDataString("pilot@example.com")
+Invoke-WebRequest "http://127.0.0.1:7777/nc-ifb/freebusy/${ifbAddress}.vfb" -UseBasicParsing
 ```
 
-### Outlook registry (per user)
-When enabling IFB, the add-in sets Outlook-specific registry values (HKCU) so Outlook uses the local free/busy URL.
+Use an address that exists in the Nextcloud system address book. Expected result: the reservation exists, the TCP test succeeds, and the Free/Busy request returns calendar data or `204 No Content`.
 
-Notes:
-- IFB is optional (toggle in Settings).
-- Without IFB, the add-in still works for Talk + Sharing.
+### Custom IFB port
 
-## System address book required for user search and moderator selection
+Valid configured ports are `1024` through `49151`. The MSI creates a reservation only for port `7777`. For another port, open an elevated PowerShell window and add a reservation for authenticated users:
 
-The following features require a reachable **Nextcloud system address book**:
-- Moderator selection in the Talk wizard
-- `Add users` default in add-in settings
-- `Add guests` default in add-in settings
+```powershell
+netsh http add urlacl url=http://127.0.0.1:<ifb-port>/nc-ifb/ sddl="D:(A;;GX;;;AU)"
+```
 
-If the system address book is unavailable, these controls are disabled in the UI and show a warning with a setup link.
+Verify it:
 
-Nextcloud 31 activation:
-- `sudo -E -u www-data php occ config:app:set dav system_addressbook_exposed --value="yes"`
+```powershell
+netsh http show urlacl url=http://127.0.0.1:<ifb-port>/nc-ifb/
+```
 
-Nextcloud >= 32 activation:
-- Nextcloud -> Admin Settings -> Groupware -> System Address Book (enable it)
+If the port is changed again or the add-in is removed, delete the manually created reservation:
 
-Required in both versions:
-- Nextcloud Admin Settings -> Sharing: enable username autocompletion / system address book access.
+```powershell
+netsh http delete urlacl url=http://127.0.0.1:<ifb-port>/nc-ifb/
+```
 
-Repair hint (if Admin UI shows enabled but the system address book is still unavailable):
-1. Reset + re-enable:
-   - `sudo -E -u www-data php occ config:app:delete dav system_addressbook_exposed`
-   - `sudo -E -u www-data php occ config:app:set dav system_addressbook_exposed --value="yes"`
-2. Rebuild the generated address book:
-   - `sudo -E -u www-data php occ dav:sync-system-addressbook`
-3. Verify endpoint:
-   - `https://<cloud>/remote.php/dav/addressbooks/users/<user>/z-server-generated--system/?export`
+Do not grant the reservation to `Everyone` (`S-1-1-0`).
 
-## Logging / support
-Enable debug logging in Settings → **Debug**.
-The debug tab also provides **Anonymize logs** (enabled by default).
+## Security and data handling
 
-Log files (daily rotation):
-- `%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
+- Use HTTPS for the Nextcloud base URL.
+- Keep the workstation certificate store, proxy trust, and Windows TLS policy current.
+- App passwords are protected for the current Windows user; never distribute protected credential blobs.
+- Backend templates are treated as managed content. Review them before rollout and limit edit rights in Nextcloud.
+- Secret-link keys remain in the URL fragment. Treat a full Secret link as confidential.
+- IFB binds to loopback only. A custom URL reservation grants execute rights to authenticated local users, not to anonymous or remote users.
+- Attachment cleanup can delete server data created for an unsent mail. It does not treat arbitrary public URLs as deletion targets.
+- Log anonymization is enabled by default. Review every log before sharing it outside the organization.
 
-How to collect useful logs for bug reports:
-1. Open **NC Connector -> Settings -> Debug**.
-2. Enable debug logging.
-3. Keep **Anonymize logs** enabled unless support explicitly asks for raw local context.
-4. Reproduce the problem.
-5. Open `%LOCALAPPDATA%\NC4OL\` and attach or paste the latest `addin-runtime.log_YYYYMMDD` entries for the affected time window.
-6. Remove app passwords, tokens, private links, customer data, and full mailbox contents before sharing logs.
+The daily update request sends product, installed version, channel, and a rotating anonymous client hash. It does not send the Nextcloud URL, email address, username, app password, license key, or tenant content. Downloads link directly to GitHub release assets.
 
-Logs are categorized (e.g. `CORE`, `API`, `TALK`, `FILELINK`, `IFB`) and help with support cases.
-When debug logging is enabled, runtime decision paths (including attachment pre-add gating and fallback reasons) are written to the same file; runtime exceptions are always written regardless of debug toggle state.
-When anonymization is enabled, sensitive values are redacted before writing:
-- configured Nextcloud URL/base host
-- tokens and secrets in URLs/query strings/JSON payload fragments
-- `Authorization` header credentials
-- email addresses and user identifiers in common log field formats
-- local user path segments (for example `C:\\Users\\<USER>\\...`)
-Retention behavior:
-- keep the latest 7 daily log files
-- additionally remove log files older than 30 days (best effort cleanup)
+## Monitoring and support
 
-## Troubleshooting
+### Routine operating checks
 
-### Add-in not loading
-1. In Outlook: `File → Options → Add-ins`
-2. Check “COM Add-ins”: `NcTalkOutlook.AddIn`
-3. Check “Disabled Items” (Outlook may disable add-ins after crashes)
+After an add-in, Outlook, proxy, certificate, or Nextcloud update:
 
-Notes:
-- If you run **32-bit Outlook** on **64-bit Windows**, Outlook reads COM add-in registration from the 32-bit registry view (`Wow6432Node`).
-- Verify `LoadBehavior=3` exists in the correct registry view:
-  - 64-bit: `HKLM\Software\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn`
-  - 32-bit: `HKLM\Software\Wow6432Node\Microsoft\Office\Outlook\Addins\NcTalkOutlook.AddIn`
+1. Run the Settings connection test.
+2. Create and open a small share.
+3. Create and open a Talk link when Talk is enabled.
+4. Test user search when the system address book is used.
+5. Test every locked backend setting with a seat-assigned user.
+6. Run the signature acceptance cases in use.
+7. Test the local IFB endpoint when enabled.
+8. Open **Settings -> Advanced -> Check now** and review the displayed release metadata.
 
-### IFB not responding
-- Check which IFB port is configured in `Settings -> IFB` (default `7777`).
-- Check if the configured port is bound:
+### Logs
+
+Enable logging under **NC Connector -> Settings -> Debug**. Keep **Anonymize logs** enabled unless support specifically requests other data.
+
+Daily files:
+
+```text
+%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD
+```
+
+Common categories:
+
+- `CORE`: startup, settings, and registration
+- `API`: Nextcloud requests and status codes
+- `TALK`: room and appointment operations
+- `FILELINK`: scan, upload, share, cleanup, and password follow-up
+- `IFB`: listener, cache, and Free/Busy requests
+
+Runtime errors are written even when debug logging is disabled. With debug logging active, the file also contains operating decisions and periodic upload progress. Logs retain the latest seven daily files and also remove files older than 30 days when possible.
+
+### Support package
+
+For a reproducible incident:
+
+1. Enable debug logging.
+2. Record local time, add-in version, Outlook version and bitness, Windows version, Nextcloud version, and relevant app versions.
+3. Reproduce the problem once.
+4. Copy only the affected time window from the latest log.
+5. Include the user-visible message, HTTP status if shown, and exact operating step.
+6. Remove app passwords, authorization values, private links, full message bodies, recipient lists, and customer data before sharing.
+
+## Troubleshooting runbooks
+
+### Add-in does not load
+
+1. Open **Outlook -> File -> Options -> Add-ins**.
+2. Check **COM Add-ins** for `NcTalkOutlook.AddIn`.
+3. Check **Disabled Items** and re-enable the add-in if Outlook disabled it after a crash.
+4. Verify `LoadBehavior=3` in the registry path matching Outlook bitness.
+5. Verify `C:\Program Files\NC4OL\NcTalkOutlookAddIn.dll` exists.
+6. Close Outlook and repair or reinstall the MSI.
+
+If the add-in still does not load, collect the MSI log, Windows Event Viewer entries for Outlook/.NET, and the matching registry path.
+
+### Connection or TLS test fails
+
+1. Open the configured base URL from the affected workstation.
+2. Check DNS, system time, certificate trust, proxy authentication, and TLS inspection.
+3. Confirm that the URL contains the public subpath but not `/index.php`.
+4. In **Settings -> Advanced -> Transport security (TLS)**, test the organization-approved mode.
+5. Run the connection test again.
+6. Compare the result from a workstation outside the affected proxy segment.
+
+Do not apply machine-wide TLS registry changes until the certificate, proxy, and Windows Schannel policies have been reviewed.
+
+### Pretty URL or Talk link returns 404
+
+Run the [`/login` comparison](#quick-test). If only the `/index.php/login` URL works, repair the Nginx, Apache, or reverse-proxy rewrite and test again from outside the server network.
+
+### Upload remains at zero or fails
+
+1. Note whether the wizard displays scanning, folder preparation, or upload.
+2. Wait for the local scan to finish before judging network throughput; a large source tree can spend time in the scan phase.
+3. Check for symbolic links, junctions, inaccessible files, or files being modified during upload.
+4. Check Nextcloud free storage; HTTP `507` means insufficient storage.
+5. Review proxy request-body limits, timeouts, and WebDAV handling.
+6. Reproduce with one small file, one large file, and then the original folder.
+7. Collect `FILELINK` entries for the affected time window.
+
+### Attachment automation does not start
+
+1. Verify the configured **Attachments** mode and threshold.
+2. Check whether Outlook or Exchange rejected the file before it appeared in the compose window.
+3. Check for another Outlook add-in that handles large attachments.
+4. Use **Insert Nextcloud share** as the supported path when the host blocks the attachment before NC Connector receives it.
+
+### Backend policy or seat is not applied
+
+1. Confirm that `ncc_backend_4mc` is installed and enabled.
+2. Confirm that the affected Nextcloud user has an active assigned seat.
+3. Check client access to `/apps/ncc_backend_4mc/api/v1/status`.
+4. Open Settings and review the displayed backend or seat state.
+5. Confirm whether the setting is a default or a locked value.
+6. Compare with another seat-assigned pilot user.
+
+Share and Talk can use local settings during a backend outage. Managed signatures and separate password delivery require a valid backend state.
+
+### Managed signature is missing or misplaced
+
+1. Confirm the backend seat and signature assignment.
+2. Compare the effective Outlook **From** SMTP address with the assigned backend email address.
+3. Check the separate switches for new mail, reply, and forward.
+4. Repeat the matching cases in the [signature acceptance test](#managed-signature-acceptance-test).
+5. Test once with Outlook's own signature enabled and once without it.
+6. Collect `CORE` and relevant compose log entries without sharing the signature HTML.
+
+Do not work around a blocked final signature check by copying unknown HTML into the message. Restore backend access or correct the sender/policy assignment.
+
+### User search or moderator selection is disabled
+
+1. Verify the system address-book and sharing/autocomplete settings.
+2. Run `occ dav:sync-system-addressbook`.
+3. Test the generated address-book URL for the affected user.
+4. Restart Outlook and run the connection test.
+
+### IFB does not respond
+
+1. Confirm that IFB is enabled and credentials are complete.
+2. Check the configured port.
+3. Check the matching URL reservation.
+4. Check whether another process owns the port:
 
 ```powershell
 netstat -ano | Select-String ":<ifb-port>"
 ```
 
-- Check URLACL (see above)
-- Enable debug logging and inspect `IFB` entries
+5. Run `Test-NetConnection 127.0.0.1 -Port <ifb-port>`.
+6. Request `http://127.0.0.1:<ifb-port>/nc-ifb/freebusy/<known-address>.vfb` with an address from the Nextcloud system address book.
+7. Review `IFB` log entries.
 
-### Network / Nextcloud
-- Server reachable, TLS ok?
-- TLS behavior can now be switched in `Settings -> Advanced -> Transport security (TLS)` (`OS default` or forced TLS versions such as 1.2/1.3).
-- NC Connector applies the selected policy at runtime via `ServicePointManager.SecurityProtocol`.
-- Connection diagnostics operations (settings connection test and login flow) now enforce fresh HTTP/TLS handshakes, so TLS-mode switching is validated deterministically instead of reusing pooled keep-alive sockets.
-- If secure-channel errors still occur, check certificate trust, DNS, proxy/TLS inspection, and machine TLS/Schannel policy before considering machine-wide registry/GPO overrides.
-- App password valid?
-- Talk installed/enabled?
-- Password Policy app optional: if missing, passwords are generated locally (fallback)
+If a custom reservation has the wrong principal, delete it and recreate it with `D:(A;;GX;;;AU)`.

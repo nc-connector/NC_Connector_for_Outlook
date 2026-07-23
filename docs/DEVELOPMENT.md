@@ -2,6 +2,8 @@
 
 This document is a newcomer-friendly guide for building, debugging, and extending **NC Connector for Outlook** (Outlook classic COM add-in).
 
+Administrator rollout, configuration, operating checks, and incident runbooks are documented in [ADMIN.md](ADMIN.md).
+
 ## Contents
 
 - [Project purpose](#project-purpose)
@@ -46,6 +48,7 @@ This release expands Outlook compose support and central backend signatures:
 - **.NET Framework 4.7.2** (target framework)
 - MSBuild (e.g. Visual Studio Build Tools)
 - **.NET SDK** (used by WiX v6 build via `dotnet`)
+- **Nextcloud 32 or newer** (runtime server)
 
 ### Build MSI (recommended)
 
@@ -168,12 +171,18 @@ Runtime rules:
 - **Workflow controllers**
   - `SettingsWorkflowController`, `FileLinkLaunchController`, and `TalkRibbonController` own ribbon-triggered UI/runtime workflows.
   - `NextcloudTalkAddIn.cs` remains the COM/ribbon/event composition root and delegates feature flows to controllers.
-  - `TalkRibbonController` and `FileLinkLaunchController` prefetch backend policy + password policy in parallel before opening wizards, while still fetching fresh runtime policy data on every entry.
+  - `TalkRibbonController` prefetches backend policy + password policy before opening its wizard. `FileLinkLaunchController` also loads the required capability snapshot and passes it into the sharing wizard. Runtime policy data remains fresh on every entry.
   - FileLink, Talk, and settings prefetch completion is marshalled through `OutlookUiSynchronizationContext` before WinForms controls or Outlook COM objects are accessed. Outlook does not reliably provide a `SynchronizationContext` to COM callbacks; modal dialogs and Outlook interop must therefore return explicitly to the STA thread captured during add-in startup.
   - Lifecycle, policy/template resolution, and deferred subscription ensure are split into dedicated partial files to keep the root orchestration class maintainable.
 - **Service layer**
   - `Services/TalkService.cs` calls the Talk OCS API.
-  - `Services/FileLinkService.cs` uploads via WebDAV and creates shares via OCS.
+  - `Services/FileLinkService.cs` orchestrates FileLink planning, remote root creation, transfer, and share creation.
+  - `Services/NextcloudCapabilitiesService.cs` validates the global Nextcloud 32 requirement and caches the typed OCS capability snapshot shared by connection and feature flows.
+  - `Services/FileLinkSelectionScanner.cs` scans local selections once and produces root-relative paths. `Services/FileLinkUploadPlanner.cs` assigns direct, chunked, or optional bulk transfer modes before remote mutation; `Services/FileLinkUploadPlan.cs` contains the resulting plan models.
+  - `Services/FileLinkDavClient.cs` owns DAV collection lifecycle operations. Its `Probes` and `Requests` partials isolate exact resource checks, retry handling, failure mapping, and DAV URL construction.
+  - `Services/FileLinkTransferService.cs` coordinates `FileLinkBulkUploader`, `FileLinkDirectUploader`, and `FileLinkChunkUploader`; `FileLinkSourceFile` validates the scanned source metadata around each transfer.
+  - `Services/FileLinkShareClient.cs` creates the public share with one OCS request. Its `Recovery` partial resolves ambiguous create results through an exact-path lookup.
+  - `Services/FileLinkUploadProgress.cs` aggregates phase and transfer progress and applies the update rate limit.
   - `Services/FreeBusyServer.cs` hosts the local IFB HTTP endpoint.
   - `Services/FreeBusyManager.cs` updates Outlook registry keys to point to the local IFB endpoint.
   - `Services/UpdateCheckService.cs` performs the homepage update check without blocking Outlook startup.
@@ -185,10 +194,18 @@ Runtime rules:
   - `UI/ScaledForm.cs` centralizes `ScaleLogical(...)` so form-level DPI wrappers are not duplicated.
 - **Shared utilities**
   - `Utilities/BrowserLauncher.cs` centralizes shell target starts (URLs, files, directories).
-  - `Utilities/SizeFormatting.cs` centralizes MB display formatting.
+  - `Utilities/SizeFormatting.cs` centralizes adaptive byte, transfer-rate, and MB display formatting.
   - `Utilities/ComInteropScope.cs` centralizes COM release/final-release patterns.
   - `Utilities/PasswordGenerationHelper.cs` centralizes password-policy min-length resolution, server-policy generation fallback, and shared minimum-length validation for Talk/FileLink forms.
+  - `Utilities/FileLinkPath.cs` centralizes FileLink path normalization, combination, naming, sanitization, and depth calculation.
   - `Utilities/HtmlTemplateSanitizer.cs` applies a Thunderbird-aligned HTML policy for backend templates and fails closed if sanitization cannot be applied.
+
+### Runtime configuration and policy processing
+
+- `Settings/SettingsStorage.cs` selects a profile-specific XML file below `%LOCALAPPDATA%\NC4OL`, applies defaults for missing values, and protects the app password with Windows DPAPI in `CurrentUser` scope. Its migration path copies legacy INI values into the profile files and removes legacy files only after every target write succeeds.
+- `Settings/ManagedSetupPolicy.cs` reads `HKLM` before `HKCU` and, on 64-bit Windows, the 64-bit registry view before the 32-bit view. An unlocked URL fills an empty profile; a locked URL overrides the profile value.
+- `Services/BackendPolicyService.cs` reads the optional backend status for Settings, Talk, FileLink, managed-signature, and saved-appointment deletion flows. Share and Talk can resolve to local values when the backend or seat is unavailable. The managed-signature send gate uses the stricter policy state described in the signature flow above.
+- The TLS setting is applied through `ServicePointManager.SecurityProtocol`. Connection tests and login-flow diagnostics request a fresh connection through `NcHttpClient`, so a changed TLS mode is tested with a new handshake instead of an existing pooled connection. Other runtime HTTP calls continue to use the shared request executor.
 
 ### End-to-end flows
 
@@ -230,10 +247,16 @@ For stable rendering in Outlook appointment bodies (Word/RTF pipeline), backend 
 
 1. User clicks **Insert Nextcloud share** while composing an email.
 2. `UI/FileLinkWizardForm.cs` collects sharing settings and the file/folder selection.
-3. `Controllers/FileLinkLaunchController.cs` prefetches backend policy status and password policy in parallel (`Task.WhenAll`) before opening the wizard.
-4. `Services/FileLinkService.cs` performs WebDAV upload, creates the public share via OCS (`label` on create), then updates mutable metadata like `note` via the documented OCS update arguments.
-   - Files up to 20 MB use a direct WebDAV `PUT`.
-   - Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file` to the final DAV path.
+3. `Controllers/FileLinkLaunchController.cs` loads the required capability snapshot, backend policy status, and password policy in parallel (`Task.WhenAll`) before opening the wizard.
+4. `Services/FileLinkService.cs` orchestrates the upload and public-share flow through the dedicated planner, DAV, transfer, share, and progress components.
+   - `FileLinkSelectionScanner` scans the local selection once. The root-relative scan result preserves empty directories, rejects symbolic links and junctions, and captures file size and modification time. `FileLinkUploadPlanner` then assigns transfer modes without touching the server.
+   - `FileLinkDavClient` creates the share root with one atomic `MKCOL`. A collision stops a manual share; attachment automation tries numbered names without a preliminary `PROPFIND`. Empty directories, parents needed by bulk or chunked transfers, and Direct parents shared by multiple files are created once, parent first, with at most three parallel requests per level. Single-file Direct path chains are created by `X-NC-WebDAV-Auto-Mkcol`.
+   - `FileLinkTransferService` coordinates dedicated bulk, direct, and chunked uploaders. Non-bulk files up to 20 MiB use direct WebDAV `PUT` and the server-side `X-NC-WebDAV-Auto-Mkcol: 1` header. Larger files use Nextcloud chunked upload v2 under `/remote.php/dav/uploads/<user>/<upload-id>` and are assembled with `MOVE .file`. Direct and chunked files share the limit of three concurrent transfers.
+   - When the typed capability snapshot exposes `dav.bulkupload = "1.0"`, at least 20 candidate files of at most 8 MiB can be packed into sequential multipart batches of at most 100 files and about 20 MiB. The planner selects bulk only when the batch plan saves at least 20 percent of all upload requests, counting base-path and share-root creation, planned directories, direct files, and every chunk-folder, chunk-`PUT`, and final `MOVE`.
+   - After all transfers finish, `FileLinkShareClient` sends one OCS create-share `POST` with path, explicit permissions, password, expiration date, label, and note. It omits the legacy `publicUpload` parameter because Nextcloud would use it to replace the explicit permission mask. No metadata update request follows.
+   - A missing response, a transient gateway/service response without an OCS result, or a successful response without usable share data makes the create result ambiguous. `FileLinkShareClient` records that path and performs an exact-path OCS lookup with child shares disabled before another create request. It reuses a matching public-link share, retries only after a confirmed empty result, and keeps blocking duplicate creation while the lookup result remains unknown.
+   - Replay-safe `MKCOL`, direct `PUT`, chunk `PUT`, and bulk `POST` operations receive at most two retries for transport failures and selected transient HTTP responses. Each bulk retry rebuilds the same request body from the unchanged local plan. A final chunk `MOVE` is never sent twice blindly: after an indeterminate transport result, an exact depth-zero DAV probe accepts the transfer only when the target is a non-collection resource with the expected length.
+   - `FileLinkUploadProgress` limits phase updates to at most ten per second. Debug logs contain plan, retry, five-second aggregate progress, and completion records instead of per-file success noise.
 5. `Utilities/FileLinkHtmlBuilder.cs` generates the HTML block (header + link + password + permissions + expiration date).
    - backend-provided custom share templates are sanitized via `HtmlTemplateSanitizer` and fail closed on sanitizer errors.
    - `Models/AttachmentLinkTargetPolicy.cs` resolves `policy.share.attachment_link_target` (`zip_download` / `share_page`) against the nullable local setting. An invalid stored local value is treated as unset, so a valid editable backend value can seed it. ZIP is used when no valid local or usable backend value exists; a locked backend value wins.
@@ -307,9 +330,11 @@ Talk (OCS, selection):
 
 Sharing:
 
+- Capabilities and required server version: `GET /ocs/v2.php/cloud/capabilities?format=json`
 - Current canonical user ID: `GET /ocs/v2.php/cloud/user?format=json`
 - Create public share: `POST /ocs/v2.php/apps/files_sharing/api/v1/shares`
 - Upload/folder creation: `remote.php/dav/...` (WebDAV)
+- Optional small-file bulk upload: `POST /remote.php/dav/bulk` (`multipart/related`, only when `ocs.data.capabilities.dav.bulkupload` is exactly `"1.0"`)
 - Large file upload: `MKCOL /remote.php/dav/uploads/<user>/<upload-id>`, chunk `PUT`s, then `MOVE /remote.php/dav/uploads/<user>/<upload-id>/.file` to the final file path
 
 Secrets (optional separate password mode):
@@ -377,6 +402,7 @@ Guidelines for new code:
 - Log **decisions** (feature detection, version checks, fallbacks).
 - Log **exceptions with context** (use `DiagnosticsLogger.LogException(...)`).
   `LogException(...)` bypasses the optional debug switch and must remain the always-on error path.
+- FileLink hot paths log upload plans, retries, periodic aggregate progress, and completion summaries, not every successful request.
 - Never swallow exceptions silently.
 
 ## Compatibility & version checks
@@ -396,11 +422,15 @@ Installer definition:
 
 ### Nextcloud feature detection
 
-Some features depend on server capabilities.
+All add-in functions require Nextcloud **32 or newer**. `NextcloudCapabilitiesService` reads the authenticated OCS capabilities endpoint, validates the structured version, and caches a typed snapshot for five minutes per server/user pair. Connection checks refresh the snapshot; feature flows reuse it and reject older or unversioned responses.
 
-- Event conversations require Nextcloud **>= 31**.
-- Version checks and cached “server version hint” live in:
-  - `src/NcTalkOutlookAddIn/Utilities/NextcloudVersionHelper.cs`
+The same snapshot controls optional DAV bulk upload. Bulk is active only when `ocs.data.capabilities.dav.bulkupload` is exactly `"1.0"`, at least 20 candidates are no larger than 8 MiB, and sequential batches of at most 100 files and about 20 MiB reduce the complete upload request count by at least 20 percent. That comparison includes base-path and share-root creation, planned directories, direct files, and every chunk-folder, chunk-`PUT`, and final `MOVE`. Direct upload remains available when any condition is not met.
+
+Implementation:
+
+- `src/NcTalkOutlookAddIn/Services/NextcloudCapabilitiesService.cs`
+- `src/NcTalkOutlookAddIn/Models/NextcloudCapabilitiesSnapshot.cs`
+- `src/NcTalkOutlookAddIn/Utilities/NextcloudVersionHelper.cs`
 
 ### UI theming (WinForms)
 
@@ -503,7 +533,10 @@ Primary write location:
 
 1. Add to the appropriate service:
    - Talk: `src/NcTalkOutlookAddIn/Services/TalkService.cs`
-   - Sharing: `src/NcTalkOutlookAddIn/Services/FileLinkService.cs`
+   - Sharing orchestration: `src/NcTalkOutlookAddIn/Services/FileLinkService.cs`
+   - Sharing DAV collections: `src/NcTalkOutlookAddIn/Services/FileLinkDavClient.cs`
+   - Sharing transfers: `src/NcTalkOutlookAddIn/Services/FileLinkTransferService.cs`
+   - Sharing OCS share creation: `src/NcTalkOutlookAddIn/Services/FileLinkShareClient.cs`
    - Use `Services/NcHttpClient.cs` + `Utilities/NcJson.cs` for new OCS/JSON calls instead of introducing service-local request/parsing helpers.
 2. Add request/response model in `src/NcTalkOutlookAddIn/Models/` (if needed).
 3. Add logging scopes and error handling.
