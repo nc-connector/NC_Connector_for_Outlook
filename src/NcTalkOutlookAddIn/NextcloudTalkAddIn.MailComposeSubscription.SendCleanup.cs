@@ -36,6 +36,11 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
+                if (!TryFinalizeEmailSignatureBeforeSend(ref cancel))
+                {
+                    return;
+                }
+
                 _sendPending = true;
                 _sendPendingAtUtc = DateTime.UtcNow;
                 _cleanupGraceTimer.Stop();
@@ -361,7 +366,12 @@ namespace NcTalkOutlookAddIn
                 }
 
                 string senderEmail = EmailSignaturePolicyService.NormalizeEmail(ResolveCurrentSenderEmail());
-                string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(ResolveSendUsingAccountSmtpAddress());
+                string accountSmtp = EmailSignaturePolicyService.NormalizeEmail(
+                    OutlookRecipientResolverController.ResolveSendUsingAccountSmtpAddress(
+                        _mail,
+                        LogCategories.Core,
+                        "compose",
+                        string.Empty));
                 string sentOnBehalfOfName = ReadCurrentSentOnBehalfOfName();
                 for (int i = 0; i < _passwordDispatchQueue.Count; i++)
                 {

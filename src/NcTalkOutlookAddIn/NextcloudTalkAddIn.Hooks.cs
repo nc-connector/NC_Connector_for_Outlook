@@ -45,7 +45,7 @@ namespace NcTalkOutlookAddIn
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook Explorer.InlineResponse.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook Explorer inline-response lifecycle.", ex);
             }
         }
 
@@ -82,7 +82,7 @@ namespace NcTalkOutlookAddIn
                         }
                         catch (Exception ex)
                         {
-                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook existing Explorer.InlineResponse.", ex);
+                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook existing Explorer inline-response lifecycle.", ex);
                             ComInteropScope.TryRelease(explorer, LogCategories.Core, "Failed to release Explorer after hook failure.");
                         }
                     }
@@ -96,13 +96,13 @@ namespace NcTalkOutlookAddIn
                 }
                 catch (Exception ex)
                 {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook active Explorer.InlineResponse.", ex);
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook active Explorer inline-response lifecycle.", ex);
                     ComInteropScope.TryRelease(activeExplorer, LogCategories.Core, "Failed to release ActiveExplorer after hook failure.");
                 }
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to ensure Explorer.InlineResponse hooks.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to initialize Explorer inline-response hooks.", ex);
             }
         }
 
@@ -124,10 +124,40 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            explorerEvents.InlineResponse += OnExplorerInlineResponse;
+            Outlook.ExplorerEvents_10_InlineResponseEventHandler inlineResponseHandler =
+                item => OnExplorerInlineResponse(explorerKey, item);
+            Outlook.ExplorerEvents_10_InlineResponseCloseEventHandler inlineResponseCloseHandler =
+                () => OnExplorerInlineResponseClose(explorerKey);
+
+            explorerEvents.InlineResponse += inlineResponseHandler;
+            try
+            {
+                explorerEvents.InlineResponseClose += inlineResponseCloseHandler;
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    explorerEvents.InlineResponse -= inlineResponseHandler;
+                }
+                catch (Exception rollbackEx)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Core,
+                        "Failed to roll back Explorer.InlineResponse hook (explorerKey=" + explorerKey + ").",
+                        rollbackEx);
+                }
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to hook Explorer.InlineResponseClose (explorerKey=" + explorerKey + ").",
+                    ex);
+                return false;
+            }
             _inlineResponseExplorerEvents[explorerKey] = explorerEvents;
+            _inlineResponseHandlers[explorerKey] = inlineResponseHandler;
+            _inlineResponseCloseHandlers[explorerKey] = inlineResponseCloseHandler;
             _inlineResponseExplorers[explorerKey] = explorer;
-            LogCore("Explorer.InlineResponse hooked (explorerKey=" + explorerKey + ").");
+            LogCore("Explorer inline-response lifecycle hooked (explorerKey=" + explorerKey + ").");
             return true;
         }
 
@@ -135,16 +165,43 @@ namespace NcTalkOutlookAddIn
         {
             foreach (var pair in _inlineResponseExplorerEvents)
             {
+                Outlook.ExplorerEvents_10_InlineResponseEventHandler inlineResponseHandler;
+                if (_inlineResponseHandlers.TryGetValue(pair.Key, out inlineResponseHandler))
+                {
+                    try
+                    {
+                        pair.Value.InlineResponse -= inlineResponseHandler;
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(
+                            LogCategories.Core,
+                            "Failed to unhook Explorer.InlineResponse (explorerKey=" + pair.Key + ").",
+                            ex);
+                    }
+                }
+
+                Outlook.ExplorerEvents_10_InlineResponseCloseEventHandler inlineResponseCloseHandler;
+                if (!_inlineResponseCloseHandlers.TryGetValue(pair.Key, out inlineResponseCloseHandler))
+                {
+                    continue;
+                }
                 try
                 {
-                    pair.Value.InlineResponse -= OnExplorerInlineResponse;
+                    pair.Value.InlineResponseClose -= inlineResponseCloseHandler;
                 }
                 catch (Exception ex)
                 {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Explorer.InlineResponse.", ex);
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Core,
+                        "Failed to unhook Explorer.InlineResponseClose (explorerKey=" + pair.Key + ").",
+                        ex);
                 }
             }
             _inlineResponseExplorerEvents.Clear();
+            _inlineResponseHandlers.Clear();
+            _inlineResponseCloseHandlers.Clear();
+            _inlineResponseSubscriptions.Clear();
 
             foreach (var pair in _inlineResponseExplorers)
             {
@@ -207,7 +264,14 @@ namespace NcTalkOutlookAddIn
                 if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
                 {
                     string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
-                    EnsureMailComposeSubscription(mail, inspectorIdentityKey);
+                    MailComposeSubscription subscription = EnsureMailComposeSubscription(mail, inspectorIdentityKey);
+                    if (subscription != null && DiagnosticsLogger.IsEnabled)
+                    {
+                        LogFileLink(
+                            "Compose subscription bound to Inspector surface (inspectorKey="
+                            + (inspectorIdentityKey ?? string.Empty)
+                            + ").");
+                    }
                 }
             }
             catch (Exception ex)
@@ -224,11 +288,11 @@ namespace NcTalkOutlookAddIn
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook new Explorer.InlineResponse.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to hook new Explorer inline-response lifecycle.", ex);
             }
         }
 
-        private void OnExplorerInlineResponse(object item)
+        private void OnExplorerInlineResponse(string explorerKey, object item)
         {
             var mail = item as Outlook.MailItem;
             if (mail == null || !IsMailComposeCandidate(mail, "inline_response"))
@@ -237,15 +301,66 @@ namespace NcTalkOutlookAddIn
             }
             try
             {
-                EnsureMailComposeSubscription(mail, string.Empty, true);
+                MailComposeSubscription subscription = EnsureMailComposeSubscription(mail, string.Empty, true, explorerKey);
+                if (subscription == null)
+                {
+                    return;
+                }
+
+                MailComposeSubscription previousSubscription;
+                if (_inlineResponseSubscriptions.TryGetValue(explorerKey, out previousSubscription)
+                    && !ReferenceEquals(previousSubscription, subscription))
+                {
+                    previousSubscription.MarkInlineResponseClosed(explorerKey);
+                }
+                _inlineResponseSubscriptions[explorerKey] = subscription;
                 if (DiagnosticsLogger.IsEnabled)
                 {
-                    LogFileLink("Compose subscription ensured via Explorer.InlineResponse.");
+                    LogFileLink(
+                        "Compose subscription bound via Explorer.InlineResponse (explorerKey="
+                        + (explorerKey ?? string.Empty)
+                        + ").");
                 }
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to ensure compose subscription on Explorer.InlineResponse.", ex);
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Failed to bind compose subscription on Explorer.InlineResponse (explorerKey="
+                    + (explorerKey ?? string.Empty)
+                    + ").",
+                    ex);
+            }
+        }
+
+        private void OnExplorerInlineResponseClose(string explorerKey)
+        {
+            try
+            {
+                MailComposeSubscription subscription;
+                if (!_inlineResponseSubscriptions.TryGetValue(explorerKey, out subscription))
+                {
+                    if (DiagnosticsLogger.IsEnabled)
+                    {
+                        LogFileLink(
+                            "Explorer.InlineResponseClose ignored without tracked compose subscription (explorerKey="
+                            + (explorerKey ?? string.Empty)
+                            + ").");
+                    }
+                    return;
+                }
+
+                _inlineResponseSubscriptions.Remove(explorerKey);
+                subscription.MarkInlineResponseClosed(explorerKey);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Failed to close inline compose surface (explorerKey="
+                    + (explorerKey ?? string.Empty)
+                    + ").",
+                    ex);
             }
         }
 

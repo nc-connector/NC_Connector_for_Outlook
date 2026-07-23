@@ -265,39 +265,17 @@ namespace NcTalkOutlookAddIn.UI
 
         private void InitializePolicyWarningPanel()
         {
-            _policyWarningPanel.Visible = false;
-            _policyWarningPanel.BackColor = Color.FromArgb(20, 176, 0, 32);
-            _policyWarningPanel.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(
-                    e.Graphics,
-                    _policyWarningPanel.ClientRectangle,
-                    Color.FromArgb(176, 0, 32),
-                    ButtonBorderStyle.Solid);
-            };
+            PolicyUiHelper.InitializePolicyWarningPanel(
+                _policyWarningPanel,
+                _policyWarningTitleLabel,
+                _policyWarningTextLabel,
+                _policyWarningLinkLabel);
             Controls.Add(_policyWarningPanel);
-
-            _policyWarningTitleLabel.AutoSize = true;
-            _policyWarningTitleLabel.ForeColor = Color.FromArgb(176, 0, 32);
-            _policyWarningTitleLabel.Font = new Font(_policyWarningTitleLabel.Font, FontStyle.Bold);
-            _policyWarningTitleLabel.Text = "\u26a0 " + Strings.PolicyWarningTitle;
-            _policyWarningPanel.Controls.Add(_policyWarningTitleLabel);
-
-            _policyWarningTextLabel.AutoSize = true;
-            _policyWarningTextLabel.Text = string.Empty;
-            _policyWarningPanel.Controls.Add(_policyWarningTextLabel);
-
-            _policyWarningLinkLabel.AutoSize = true;
-            _policyWarningLinkLabel.Text = Strings.PolicyWarningAdminLinkLabel;
-            _policyWarningLinkLabel.LinkColor = Color.FromArgb(0, 130, 201);
-            _policyWarningLinkLabel.ActiveLinkColor = Color.FromArgb(0, 102, 153);
-            _policyWarningLinkLabel.VisitedLinkColor = Color.FromArgb(0, 130, 201);
             _policyWarningLinkLabel.LinkClicked += (s, e) =>
                 BrowserLauncher.OpenUrl(
                     Strings.PolicyAdminGuideUrl,
                     LogCategories.Core,
                     "Failed to open policy admin guide URL.");
-            _policyWarningPanel.Controls.Add(_policyWarningLinkLabel);
         }
 
         private void InitializeGeneralTab()
@@ -334,13 +312,13 @@ namespace NcTalkOutlookAddIn.UI
             _manualRadio.Text = Strings.RadioManual;
             _manualRadio.Location = new Point(12, 25);
             _manualRadio.AutoSize = true;
-            _manualRadio.CheckedChanged += OnAuthModeChanged;
+            _manualRadio.CheckedChanged += OnGeneralValueChanged;
             authGroup.Controls.Add(_manualRadio);
 
             _loginFlowRadio.Text = Strings.RadioLoginFlow;
             _loginFlowRadio.Location = new Point(12, 55);
             _loginFlowRadio.AutoSize = true;
-            _loginFlowRadio.CheckedChanged += OnAuthModeChanged;
+            _loginFlowRadio.CheckedChanged += OnGeneralValueChanged;
             authGroup.Controls.Add(_loginFlowRadio);
 
             _loginFlowButton.Text = Strings.ButtonLoginFlow;
@@ -1390,9 +1368,18 @@ namespace NcTalkOutlookAddIn.UI
                 _talkDefaultLobbyCheckBox.Checked = Result.TalkDefaultLobbyEnabled;
                 _talkDefaultSearchCheckBox.Checked = Result.TalkDefaultSearchVisible;
                 _talkDeleteRoomOnEventDeleteCheckBox.Checked = Result.TalkDeleteRoomOnEventDelete;
-                _emailSignatureOnComposeCheckBox.Checked = ResolveEmailSignatureFlag("email_signature_on_compose", Result.EmailSignatureOnCompose);
-                _emailSignatureOnReplyCheckBox.Checked = ResolveEmailSignatureFlag("email_signature_on_reply", Result.EmailSignatureOnReply);
-                _emailSignatureOnForwardCheckBox.Checked = ResolveEmailSignatureFlag("email_signature_on_forward", Result.EmailSignatureOnForward);
+                _emailSignatureOnComposeCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
+                    _backendPolicyStatus,
+                    "email_signature_on_compose",
+                    Result.EmailSignatureOnCompose);
+                _emailSignatureOnReplyCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
+                    _backendPolicyStatus,
+                    "email_signature_on_reply",
+                    Result.EmailSignatureOnReply);
+                _emailSignatureOnForwardCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
+                    _backendPolicyStatus,
+                    "email_signature_on_forward",
+                    Result.EmailSignatureOnForward);
                 SelectTalkRoomType(Result.TalkDefaultRoomType);
                 UpdateTalkRoomTypeTooltip();
                 RefreshLanguageOverrideCombos(Result.ShareBlockLang, Result.EventDescriptionLang);
@@ -1724,16 +1711,6 @@ namespace NcTalkOutlookAddIn.UI
             return lines[0].Trim();
         }
 
-        private void OnAuthModeChanged(object sender, EventArgs e)
-        {
-            if (_isBusy)
-            {
-                return;
-            }
-
-            UpdateControlState();
-        }
-
         private void OnIfbEnabledChanged(object sender, EventArgs e)
         {
             _ifbDefaultApplied = true;
@@ -1775,31 +1752,9 @@ namespace NcTalkOutlookAddIn.UI
             return _backendPolicyStatus != null && _backendPolicyStatus.IsLocked(domain, key);
         }
 
-        private bool ResolveEmailSignatureFlag(string policyKey, bool? localValue)
-        {
-            bool backendValue;
-            if (_backendPolicyStatus == null
-                || !_backendPolicyStatus.TryGetPolicyBool("email_signature", policyKey, out backendValue))
-            {
-                backendValue = false;
-            }
-            if (IsPolicyLocked("email_signature", policyKey))
-            {
-                return backendValue;
-            }
-            return localValue.HasValue ? localValue.Value : backendValue;
-        }
-
         private bool IsEmailSignaturePolicyAvailable()
         {
-            bool backendOnCompose;
-            return PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus)
-                   && _backendPolicyStatus != null
-                   && PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "email_signature")
-                   && _backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_compose", out backendOnCompose)
-                   && backendOnCompose
-                   && !string.IsNullOrWhiteSpace(_backendPolicyStatus.GetPolicyString("email_signature", "email_signature_template"))
-                   && !string.IsNullOrWhiteSpace(_backendPolicyStatus.GetPolicyString("email_signature", "user_email"));
+            return EmailSignaturePolicyService.IsAvailableForConfiguration(_backendPolicyStatus);
         }
 
         private string GetEmailSignatureUnavailableTooltip()
@@ -1839,13 +1794,12 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyBackendPolicyStatus(string trigger)
         {
-            bool warningVisible = _backendPolicyStatus != null
-                                  && _backendPolicyStatus.WarningVisible
-                                  && !string.IsNullOrWhiteSpace(_backendPolicyStatus.WarningMessage);
+            bool warningVisible = PolicyUiHelper.ApplyPolicyWarningState(
+                _backendPolicyStatus,
+                _policyWarningPanel,
+                _policyWarningTextLabel);
             string currentShareLanguage = GetSelectedLanguageChoice(_shareBlockLangCombo);
             string currentTalkLanguage = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
-            _policyWarningPanel.Visible = warningVisible;
-            _policyWarningTextLabel.Text = warningVisible ? _backendPolicyStatus.WarningMessage : string.Empty;
             RefreshLanguageOverrideCombos(currentShareLanguage, currentTalkLanguage);
 
             if (PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
@@ -2004,21 +1958,24 @@ namespace NcTalkOutlookAddIn.UI
             }
             if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_compose", out policyBool))
             {
-                _emailSignatureOnComposeCheckBox.Checked = IsPolicyLocked("email_signature", "email_signature_on_compose")
-                    ? policyBool
-                    : ResolveEmailSignatureFlag("email_signature_on_compose", Result.EmailSignatureOnCompose);
+                _emailSignatureOnComposeCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
+                    _backendPolicyStatus,
+                    "email_signature_on_compose",
+                    Result.EmailSignatureOnCompose);
             }
             if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_reply", out policyBool))
             {
-                _emailSignatureOnReplyCheckBox.Checked = IsPolicyLocked("email_signature", "email_signature_on_reply")
-                    ? policyBool
-                    : ResolveEmailSignatureFlag("email_signature_on_reply", Result.EmailSignatureOnReply);
+                _emailSignatureOnReplyCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
+                    _backendPolicyStatus,
+                    "email_signature_on_reply",
+                    Result.EmailSignatureOnReply);
             }
             if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_forward", out policyBool))
             {
-                _emailSignatureOnForwardCheckBox.Checked = IsPolicyLocked("email_signature", "email_signature_on_forward")
-                    ? policyBool
-                    : ResolveEmailSignatureFlag("email_signature_on_forward", Result.EmailSignatureOnForward);
+                _emailSignatureOnForwardCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
+                    _backendPolicyStatus,
+                    "email_signature_on_forward",
+                    Result.EmailSignatureOnForward);
             }
 
             policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");

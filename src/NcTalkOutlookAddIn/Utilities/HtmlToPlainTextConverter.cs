@@ -343,4 +343,29 @@ namespace NcTalkOutlookAddIn.Utilities
             internal int Index;
         }
     }
+
+    internal static class EmailSignatureContentBuilder
+    {
+        internal static string BuildManagedHtml(string sanitizedHtml)
+        {
+            return "<div data-nc-connector-signature=\"true\">"
+                   + (sanitizedHtml ?? string.Empty)
+                   + "</div>";
+        }
+
+        internal static string BuildPlainText(string sanitizedHtml)
+        {
+            string plainText = HtmlToPlainTextConverter.Convert(sanitizedHtml);
+            if (string.IsNullOrWhiteSpace(plainText))
+            {
+                return string.Empty;
+            }
+
+            string normalized = plainText
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n')
+                .Trim('\r', '\n');
+            return "-- \r\n" + normalized.Replace("\n", "\r\n") + "\r\n";
+        }
+    }
 }

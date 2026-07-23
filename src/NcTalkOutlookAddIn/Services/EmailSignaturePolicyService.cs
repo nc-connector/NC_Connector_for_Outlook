@@ -41,7 +41,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             bool backendOnCompose;
-            if (!_status.TryGetPolicyBool(Domain, KeyOnCompose, out backendOnCompose) || !backendOnCompose)
+            if (!_status.TryGetPolicyBool(Domain, KeyOnCompose, out backendOnCompose))
             {
                 return Inactive("signature_disabled_by_backend");
             }
@@ -63,14 +63,14 @@ namespace NcTalkOutlookAddIn.Services
             _status.TryGetPolicyBool(Domain, KeyOnReply, out backendOnReply);
             _status.TryGetPolicyBool(Domain, KeyOnForward, out backendOnForward);
 
-            bool onCompose = ResolveFlag(KeyOnCompose, _settings.EmailSignatureOnCompose, backendOnCompose);
-            bool onReply = ResolveFlag(KeyOnReply, _settings.EmailSignatureOnReply, backendOnReply);
-            bool onForward = ResolveFlag(KeyOnForward, _settings.EmailSignatureOnForward, backendOnForward);
+            bool onCompose = ResolveFlag(_status, KeyOnCompose, _settings.EmailSignatureOnCompose, backendOnCompose);
+            bool onReply = ResolveFlag(_status, KeyOnReply, _settings.EmailSignatureOnReply, backendOnReply);
+            bool onForward = ResolveFlag(_status, KeyOnForward, _settings.EmailSignatureOnForward, backendOnForward);
 
             return new EmailSignaturePolicy
             {
                 Active = onCompose,
-                Reason = onCompose ? "active" : "signature_disabled_locally",
+                Reason = onCompose ? "active" : ResolveComposeInactiveReason(backendOnCompose),
                 UserEmail = userEmail,
                 TemplateHtml = templateHtml.Trim(),
                 OnCompose = onCompose,
@@ -79,18 +79,52 @@ namespace NcTalkOutlookAddIn.Services
             };
         }
 
+        internal static bool IsAvailableForConfiguration(BackendPolicyStatus status)
+        {
+            bool backendOnCompose;
+            return status != null
+                   && status.IsDomainActive(Domain)
+                   && status.TryGetPolicyBool(Domain, KeyOnCompose, out backendOnCompose)
+                   && !string.IsNullOrWhiteSpace(status.GetPolicyString(Domain, KeyTemplate))
+                   && !string.IsNullOrWhiteSpace(status.GetPolicyString(Domain, KeyUserEmail));
+        }
+
         internal static string NormalizeEmail(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
         }
 
-        private bool ResolveFlag(string key, bool? localValue, bool backendValue)
+        internal static bool ResolveFlag(BackendPolicyStatus status, string key, bool? localValue)
         {
-            if (_status.IsLocked(Domain, key))
+            bool backendValue;
+            if (status == null || !status.TryGetPolicyBool(Domain, key, out backendValue))
+            {
+                backendValue = false;
+            }
+            return ResolveFlag(status, key, localValue, backendValue);
+        }
+
+        private static bool ResolveFlag(
+            BackendPolicyStatus status,
+            string key,
+            bool? localValue,
+            bool backendValue)
+        {
+            if (status != null && status.IsLocked(Domain, key))
             {
                 return backendValue;
             }
             return localValue.HasValue ? localValue.Value : backendValue;
+        }
+
+        private string ResolveComposeInactiveReason(bool backendValue)
+        {
+            if (_status.IsLocked(Domain, KeyOnCompose)
+                || (!backendValue && !_settings.EmailSignatureOnCompose.HasValue))
+            {
+                return "signature_disabled_by_backend";
+            }
+            return "signature_disabled_locally";
         }
 
         private static EmailSignaturePolicy Inactive(string reason)

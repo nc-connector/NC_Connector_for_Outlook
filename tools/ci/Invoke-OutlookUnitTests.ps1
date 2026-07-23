@@ -66,6 +66,7 @@ internal static class OutlookUtilityTests
         TestNcJson();
         TestBackendPolicyStatus();
         TestHtmlToPlainText();
+        TestEmailSignatureSlotPlacement();
         TestSecretsCrypto();
         TestOutlookUiSynchronizationContext();
 
@@ -163,6 +164,58 @@ internal static class OutlookUtilityTests
         Check("HtmlToPlainText skips script content", !plain.Contains("alert"), plain);
     }
 
+    private static void TestEmailSignatureSlotPlacement()
+    {
+        Equal(
+            "Reply signature below _MailOriginal moves above quote",
+            EmailSignatureSlotPlacementDecision.MoveToSafeInsertionPoint,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 140, 180, 100, 102, false));
+        Equal(
+            "Forward signature below border quote moves above quote",
+            EmailSignatureSlotPlacementDecision.MoveToSafeInsertionPoint,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 240, 280, 200, 200, false));
+        Equal(
+            "Direct-match native table ending at _MailOriginal stays in place",
+            EmailSignatureSlotPlacementDecision.KeepExistingSlot,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 160, 200, 198, 200, false));
+        Equal(
+            "Managed signature ending at protected insertion point stays in place",
+            EmailSignatureSlotPlacementDecision.KeepExistingSlot,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 160, 198, 198, 200, false));
+        Equal(
+            "Signature crossing actual quote boundary fails closed",
+            EmailSignatureSlotPlacementDecision.UnsafeQuoteBoundaryOverlap,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 160, 201, 198, 200, false));
+        Equal(
+            "Signature starting at actual quote boundary fails closed",
+            EmailSignatureSlotPlacementDecision.UnsafeQuoteBoundaryOverlap,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 200, 240, 198, 200, false));
+        Equal(
+            "Signature entirely below actual quote boundary moves above quote",
+            EmailSignatureSlotPlacementDecision.MoveToSafeInsertionPoint,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 201, 240, 198, 200, false));
+        Equal(
+            "Inline border target also acts as quote boundary",
+            EmailSignatureSlotPlacementDecision.KeepExistingSlot,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 160, 200, 200, 200, false));
+        Equal(
+            "Authored text after signature moves replacement to safe point",
+            EmailSignatureSlotPlacementDecision.MoveToSafeInsertionPoint,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 40, 80, 160, 162, true));
+        Equal(
+            "Whitespace after signature keeps existing slot",
+            EmailSignatureSlotPlacementDecision.KeepExistingSlot,
+            EmailSignatureSlotPlacementPolicy.Resolve(true, 40, 80, 160, 162, false));
+        Equal(
+            "New-mail authored text still moves replacement to document end",
+            EmailSignatureSlotPlacementDecision.MoveToSafeInsertionPoint,
+            EmailSignatureSlotPlacementPolicy.Resolve(false, 40, 80, 160, 160, true));
+        Equal(
+            "New mail does not apply reply quote correction",
+            EmailSignatureSlotPlacementDecision.KeepExistingSlot,
+            EmailSignatureSlotPlacementPolicy.Resolve(false, 140, 180, 100, 100, false));
+    }
+
     private static void TestSecretsCrypto()
     {
         SecretsEncryptedPayload payload = SecretsCrypto.EncryptToSecretsPayload("secret");
@@ -257,6 +310,7 @@ internal static class OutlookUtilityTests
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpAuthUtilities.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NcJson.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\BackendPolicyStatus.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\EmailSignatureSlotPlacementPolicy.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HtmlToPlainTextConverter.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\SecretsCrypto.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\OutlookUiSynchronizationContext.cs")

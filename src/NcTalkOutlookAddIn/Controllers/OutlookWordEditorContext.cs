@@ -74,6 +74,23 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal static bool TryOpenInline(Outlook.Application application, Outlook.MailItem mail, string operation, string composeKey, out OutlookWordEditorContext context)
         {
+            return TryOpenInline(
+                application,
+                mail,
+                operation,
+                composeKey,
+                string.Empty,
+                out context);
+        }
+
+        internal static bool TryOpenInline(
+            Outlook.Application application,
+            Outlook.MailItem mail,
+            string operation,
+            string composeKey,
+            string explorerIdentityKey,
+            out OutlookWordEditorContext context)
+        {
             context = null;
             if (application == null || mail == null)
             {
@@ -88,7 +105,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
             try
             {
-                candidate.Explorer = application.ActiveExplorer();
+                candidate.Explorer = ResolveInlineExplorer(
+                    application,
+                    explorerIdentityKey);
                 if (candidate.Explorer == null)
                 {
                     candidate.Dispose();
@@ -123,6 +142,73 @@ namespace NcTalkOutlookAddIn.Controllers
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to open inline Word editor for " + (operation ?? "mail compose") + ".", ex);
                 candidate.Dispose();
                 return false;
+            }
+        }
+
+        private static Outlook.Explorer ResolveInlineExplorer(
+            Outlook.Application application,
+            string explorerIdentityKey)
+        {
+            if (application == null)
+            {
+                return null;
+            }
+            if (string.IsNullOrWhiteSpace(explorerIdentityKey))
+            {
+                return application.ActiveExplorer();
+            }
+
+            Outlook.Explorers explorers = null;
+            try
+            {
+                explorers = application.Explorers;
+                int count = explorers != null ? explorers.Count : 0;
+                for (int index = 1; index <= count; index++)
+                {
+                    Outlook.Explorer explorer = null;
+                    try
+                    {
+                        explorer = explorers[index];
+                        string identityKey = ComInteropScope.ResolveIdentityKey(
+                            explorer,
+                            LogCategories.Core,
+                            "Explorer");
+                        if (!string.Equals(
+                                identityKey,
+                                explorerIdentityKey,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        Outlook.Explorer matched = explorer;
+                        explorer = null;
+                        return matched;
+                    }
+                    finally
+                    {
+                        ComInteropScope.TryRelease(
+                            explorer,
+                            LogCategories.Core,
+                            "Failed to release non-matching inline Explorer COM object.");
+                    }
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to resolve the tracked inline Explorer.",
+                    ex);
+                return null;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(
+                    explorers,
+                    LogCategories.Core,
+                    "Failed to release Explorers collection after inline lookup.");
             }
         }
 

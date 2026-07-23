@@ -19,7 +19,27 @@ namespace NcTalkOutlookAddIn.Controllers
     {
         private const string OutlookAutoSignatureBookmarkName = "_MailAutoSig";
         private const string OutlookOriginalMessageBookmarkName = "_MailOriginal";
+        private const string ManagedEmailSignatureBookmarkName = "NcConnectorSignature";
+        private const int OutlookOriginalMessageProtectedGap = 2;
         private readonly NextcloudTalkAddIn _owner;
+
+        internal sealed class EmailSignatureReconcileResult
+        {
+            internal bool Success { get; set; }
+
+            internal bool Changed { get; set; }
+
+            internal bool Managed { get; set; }
+
+            internal string Source { get; set; }
+        }
+
+        private enum EmailSignatureReconcileMode
+        {
+            Apply,
+            ClearManaged,
+            ClearInitial
+        }
 
         internal MailInteropController(NextcloudTalkAddIn owner)
         {
@@ -272,15 +292,15 @@ namespace NcTalkOutlookAddIn.Controllers
                     MessageBoxIcon.Error);
                 return;
             }
-            if (TryInsertHtmlIntoMailBody(mail, html))
+            if (TryInsertHtmlIntoInspectorWordEditor(mail, html))
             {
-                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (HTMLBody primary).");
+                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (WordEditor InsertFile primary).");
                 return;
             }
 
-            if (TryInsertHtmlIntoInspectorWordEditor(mail, html))
+            if (TryInsertHtmlIntoMailBody(mail, html))
             {
-                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (WordEditor InsertFile).");
+                DiagnosticsLogger.Log(LogCategories.Core, "Inserted HTML block into mail (HTMLBody compatibility fallback).");
                 return;
             }
 
@@ -413,17 +433,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 using (context)
                 {
-                    int replyCursorStart = context.GetDocumentStart(0);
-                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
-                    context.TypeParagraph();
-                    context.TypeParagraph();
-
-                    tempHtmlPath = Path.Combine(
-                        Path.GetTempPath(),
-                        "nc4ol-inline-share-" + Guid.NewGuid().ToString("N") + ".html");
-                    File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
-                    context.InsertFile(tempHtmlPath);
-                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                    InsertHtmlIntoWordEditor(context, html, "nc4ol-inline-share-", ref tempHtmlPath);
                 }
 
                 return true;
@@ -435,17 +445,7 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             finally
             {
-                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
-                {
-                    try
-                    {
-                        File.Delete(tempHtmlPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline share HTML file.", ex);
-                    }
-                }
+                TryDeleteTemporaryHtmlFile(tempHtmlPath, "Failed to delete temporary inline share HTML file.");
             }
         }
 
@@ -463,17 +463,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 using (context)
                 {
-                    int replyCursorStart = context.GetDocumentStart(0);
-                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
-                    context.TypeParagraph();
-                    context.TypeParagraph();
-
-                    tempHtmlPath = Path.Combine(
-                        Path.GetTempPath(),
-                        "nc4ol-share-" + Guid.NewGuid().ToString("N") + ".html");
-                    File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
-                    context.InsertFile(tempHtmlPath);
-                    context.SetSelectionRange(replyCursorStart, replyCursorStart);
+                    InsertHtmlIntoWordEditor(context, html, "nc4ol-share-", ref tempHtmlPath);
                 }
 
                 return true;
@@ -485,17 +475,43 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             finally
             {
-                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
-                {
-                    try
-                    {
-                        File.Delete(tempHtmlPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary share HTML file.", ex);
-                    }
-                }
+                TryDeleteTemporaryHtmlFile(tempHtmlPath, "Failed to delete temporary share HTML file.");
+            }
+        }
+
+        private static void InsertHtmlIntoWordEditor(
+            OutlookWordEditorContext context,
+            string html,
+            string tempFilePrefix,
+            ref string tempHtmlPath)
+        {
+            int replyCursorStart = context.GetDocumentStart(0);
+            context.SetSelectionRange(replyCursorStart, replyCursorStart);
+            context.TypeParagraph();
+            context.TypeParagraph();
+
+            tempHtmlPath = Path.Combine(
+                Path.GetTempPath(),
+                tempFilePrefix + Guid.NewGuid().ToString("N") + ".html");
+            File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
+            context.InsertFile(tempHtmlPath);
+            context.SetSelectionRange(replyCursorStart, replyCursorStart);
+        }
+
+        private static void TryDeleteTemporaryHtmlFile(string tempHtmlPath, string failureMessage)
+        {
+            if (string.IsNullOrWhiteSpace(tempHtmlPath))
+            {
+                return;
+            }
+
+            try
+            {
+                File.Delete(tempHtmlPath);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, failureMessage, ex);
             }
         }
 
@@ -531,267 +547,6 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        internal bool TryWriteMailHtmlBodyPreservingSelection(Outlook.MailItem mail, string html, string composeKey, string operation, bool placeCursorAtBodyStart = false)
-        {
-            if (mail == null)
-            {
-                return false;
-            }
-
-            Outlook.Inspector inspector = null;
-            object wordEditor = null;
-            object wordApplication = null;
-            object selection = null;
-            WordSelectionSnapshot snapshot = null;
-
-            try
-            {
-                inspector = mail.GetInspector;
-                if (inspector != null)
-                {
-                    wordEditor = inspector.WordEditor;
-                    if (wordEditor != null)
-                    {
-                        wordApplication = wordEditor.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, wordEditor, null);
-                        if (wordApplication != null)
-                        {
-                            selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
-                            snapshot = CaptureWordSelection(selection);
-                        }
-                    }
-                }
-
-                mail.HTMLBody = html ?? string.Empty;
-
-                if (wordApplication != null && (snapshot != null || placeCursorAtBodyStart))
-                {
-                    ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release pre-write Word selection COM object.");
-                    selection = wordApplication.GetType().InvokeMember("Selection", BindingFlags.GetProperty, null, wordApplication, null);
-                    if (placeCursorAtBodyStart)
-                    {
-                        if (!TryMoveWordSelectionToDocumentStart(selection, wordEditor, snapshot) && snapshot != null)
-                        {
-                            RestoreWordSelection(selection, wordEditor, snapshot);
-                        }
-                    }
-                    else if (snapshot != null)
-                    {
-                        RestoreWordSelection(selection, wordEditor, snapshot);
-                    }
-                }
-
-                DiagnosticsLogger.Log(
-                    LogCategories.Core,
-                    "Mail HTML body written with Word selection restore (operation="
-                    + (operation ?? "n/a")
-                    + ", composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ", selectionCaptured="
-                    + (snapshot != null).ToString(CultureInfo.InvariantCulture)
-                    + ", cursorAtBodyStart="
-                    + placeCursorAtBodyStart.ToString(CultureInfo.InvariantCulture)
-                    + ").");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(
-                    LogCategories.Core,
-                    "Failed to write mail HTML body with Word selection restore (operation="
-                    + (operation ?? "n/a")
-                    + ", composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ").",
-                    ex);
-                return false;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(selection, LogCategories.Core, "Failed to release Word selection COM object after HTML body write.");
-                ComInteropScope.TryRelease(wordApplication, LogCategories.Core, "Failed to release Word application COM object after HTML body write.");
-                ComInteropScope.TryRelease(wordEditor, LogCategories.Core, "Failed to release Word editor COM object after HTML body write.");
-                ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release Inspector COM object after HTML body write.");
-            }
-        }
-
-        private static WordSelectionSnapshot CaptureWordSelection(object selection)
-        {
-            if (selection == null)
-            {
-                return null;
-            }
-
-            object font = null;
-            try
-            {
-                var snapshot = new WordSelectionSnapshot
-                {
-                    Start = Convert.ToInt32(selection.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, selection, null), CultureInfo.InvariantCulture),
-                    End = Convert.ToInt32(selection.GetType().InvokeMember("End", BindingFlags.GetProperty, null, selection, null), CultureInfo.InvariantCulture)
-                };
-
-                font = selection.GetType().InvokeMember("Font", BindingFlags.GetProperty, null, selection, null);
-                if (font != null)
-                {
-                    snapshot.FontName = ReadWordFontProperty(font, "Name");
-                    snapshot.FontNameAscii = ReadWordFontProperty(font, "NameAscii");
-                    snapshot.FontNameOther = ReadWordFontProperty(font, "NameOther");
-                    snapshot.FontNameFarEast = ReadWordFontProperty(font, "NameFarEast");
-                    snapshot.FontSize = ReadWordFontProperty(font, "Size");
-                }
-
-                return snapshot;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to capture Word selection formatting.", ex);
-                return null;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(font, LogCategories.Core, "Failed to release captured Word font COM object.");
-            }
-        }
-
-        private static string ReadWordFontProperty(object font, string propertyName)
-        {
-            try
-            {
-                object value = font.GetType().InvokeMember(propertyName, BindingFlags.GetProperty, null, font, null);
-                return value != null ? Convert.ToString(value, CultureInfo.InvariantCulture) : null;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word font property (" + propertyName + ").", ex);
-                return null;
-            }
-        }
-
-        private static void RestoreWordSelection(object selection, object wordEditor, WordSelectionSnapshot snapshot)
-        {
-            if (selection == null || snapshot == null)
-            {
-                return;
-            }
-
-            try
-            {
-                int documentEnd = GetWordDocumentEnd(wordEditor);
-                int start = ClampWordPosition(snapshot.Start, documentEnd);
-                int end = ClampWordPosition(snapshot.End, documentEnd);
-                if (end < start)
-                {
-                    end = start;
-                }
-
-                selection.GetType().InvokeMember("SetRange", BindingFlags.InvokeMethod, null, selection, new object[] { start, end });
-                RestoreWordSelectionFont(selection, snapshot);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection formatting.", ex);
-            }
-        }
-
-        private static bool TryMoveWordSelectionToDocumentStart(object selection, object wordEditor, WordSelectionSnapshot snapshot)
-        {
-            if (selection == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                int start = GetWordDocumentStart(wordEditor, 0);
-                selection.GetType().InvokeMember("SetRange", BindingFlags.InvokeMethod, null, selection, new object[] { start, start });
-                RestoreWordSelectionFont(selection, snapshot);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move Word selection to body start.", ex);
-                return false;
-            }
-        }
-
-        private static void RestoreWordSelectionFont(object selection, WordSelectionSnapshot snapshot)
-        {
-            if (selection == null || snapshot == null)
-            {
-                return;
-            }
-
-            object font = null;
-            try
-            {
-                font = selection.GetType().InvokeMember("Font", BindingFlags.GetProperty, null, selection, null);
-                if (font != null)
-                {
-                    WriteWordFontProperty(font, "Name", snapshot.FontName);
-                    WriteWordFontProperty(font, "NameAscii", snapshot.FontNameAscii);
-                    WriteWordFontProperty(font, "NameOther", snapshot.FontNameOther);
-                    WriteWordFontProperty(font, "NameFarEast", snapshot.FontNameFarEast);
-                    WriteWordFontProperty(font, "Size", snapshot.FontSize);
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection font.", ex);
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(font, LogCategories.Core, "Failed to release restored Word font COM object.");
-            }
-        }
-
-        private static int GetWordDocumentStart(object wordEditor, int fallback)
-        {
-            object content = null;
-            try
-            {
-                content = wordEditor != null ? wordEditor.GetType().InvokeMember("Content", BindingFlags.GetProperty, null, wordEditor, null) : null;
-                if (content == null)
-                {
-                    return fallback;
-                }
-
-                return Convert.ToInt32(content.GetType().InvokeMember("Start", BindingFlags.GetProperty, null, content, null), CultureInfo.InvariantCulture);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document start.", ex);
-                return fallback;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(content, LogCategories.Core, "Failed to release Word content COM object.");
-            }
-        }
-
-        private static int GetWordDocumentEnd(object wordEditor)
-        {
-            object content = null;
-            try
-            {
-                content = wordEditor != null ? wordEditor.GetType().InvokeMember("Content", BindingFlags.GetProperty, null, wordEditor, null) : null;
-                if (content == null)
-                {
-                    return int.MaxValue;
-                }
-
-                return Convert.ToInt32(content.GetType().InvokeMember("End", BindingFlags.GetProperty, null, content, null), CultureInfo.InvariantCulture);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read Word document end.", ex);
-                return int.MaxValue;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(content, LogCategories.Core, "Failed to release Word content COM object.");
-            }
-        }
-
         private static int ClampWordPosition(int value, int documentEnd)
         {
             if (value < 0)
@@ -807,485 +562,1338 @@ namespace NcTalkOutlookAddIn.Controllers
             return value;
         }
 
-        private static void WriteWordFontProperty(object font, string propertyName, string value)
+        internal EmailSignatureReconcileResult ApplyManagedEmailSignature(
+            Outlook.MailItem mail,
+            bool isInlineResponse,
+            bool isPlainText,
+            string signatureContent,
+            bool isReplyOrForward,
+            string composeKey,
+            string operation,
+            string inlineExplorerIdentityKey = null)
         {
-            if (font == null || string.IsNullOrWhiteSpace(value))
+            return ReconcileEmailSignatureWordSlot(
+                mail,
+                isInlineResponse,
+                isPlainText,
+                signatureContent,
+                isReplyOrForward,
+                composeKey,
+                operation,
+                inlineExplorerIdentityKey,
+                EmailSignatureReconcileMode.Apply);
+        }
+
+        internal EmailSignatureReconcileResult ClearManagedEmailSignature(
+            Outlook.MailItem mail,
+            bool isInlineResponse,
+            string composeKey,
+            string operation,
+            string inlineExplorerIdentityKey = null)
+        {
+            return ReconcileEmailSignatureWordSlot(
+                mail,
+                isInlineResponse,
+                false,
+                string.Empty,
+                false,
+                composeKey,
+                operation,
+                inlineExplorerIdentityKey,
+                EmailSignatureReconcileMode.ClearManaged);
+        }
+
+        internal EmailSignatureReconcileResult ClearInitialEmailSignatureSlot(
+            Outlook.MailItem mail,
+            bool isInlineResponse,
+            string composeKey,
+            string operation,
+            string inlineExplorerIdentityKey = null)
+        {
+            return ReconcileEmailSignatureWordSlot(
+                mail,
+                isInlineResponse,
+                false,
+                string.Empty,
+                false,
+                composeKey,
+                operation,
+                inlineExplorerIdentityKey,
+                EmailSignatureReconcileMode.ClearInitial);
+        }
+
+        private EmailSignatureReconcileResult ReconcileEmailSignatureWordSlot(
+            Outlook.MailItem mail,
+            bool isInlineResponse,
+            bool isPlainText,
+            string signatureContent,
+            bool isReplyOrForward,
+            string composeKey,
+            string operation,
+            string inlineExplorerIdentityKey,
+            EmailSignatureReconcileMode mode)
+        {
+            var result = new EmailSignatureReconcileResult
+            {
+                Source = "word_editor_unavailable"
+            };
+            if (mail == null)
+            {
+                return result;
+            }
+
+            OutlookWordEditorContext context;
+            if (!TryOpenEmailSignatureWordEditor(
+                    mail,
+                    isInlineResponse,
+                    composeKey,
+                    operation,
+                    inlineExplorerIdentityKey,
+                    out context))
+            {
+                return result;
+            }
+
+            using (context)
+            {
+                object bookmarks = null;
+                string selectionBookmarkName = string.Empty;
+                string previousSlotBookmarkName = string.Empty;
+                int originalSelectionStart = context.Selection != null
+                    ? OutlookWordEditorContext.GetIntProperty(context.Selection, "Start")
+                    : context.GetDocumentStart(0);
+                int originalSelectionEnd = context.Selection != null
+                    ? OutlookWordEditorContext.GetIntProperty(context.Selection, "End")
+                    : originalSelectionStart;
+                try
+                {
+                    bookmarks = OutlookWordEditorContext.GetProperty(context.Document, "Bookmarks");
+                    if (bookmarks == null)
+                    {
+                        result.Source = "bookmarks_unavailable";
+                        return result;
+                    }
+                    TryShowHiddenBookmarks(bookmarks);
+                    selectionBookmarkName = CaptureEmailSignatureSelectionBookmark(
+                        context.Document,
+                        bookmarks,
+                        originalSelectionStart,
+                        originalSelectionEnd);
+
+                    int slotStart;
+                    int slotEnd;
+                    bool slotIsTable;
+                    string slotSource;
+                    bool hasManagedSlot = TryGetEmailSignatureBookmarkSlot(
+                        context.Document,
+                        bookmarks,
+                        ManagedEmailSignatureBookmarkName,
+                        out slotStart,
+                        out slotEnd,
+                        out slotIsTable,
+                        out slotSource);
+
+                    if (mode == EmailSignatureReconcileMode.ClearManaged)
+                    {
+                        if (!hasManagedSlot)
+                        {
+                            result.Success = true;
+                            result.Source = "managed_not_found";
+                            return result;
+                        }
+                        result.Success = TryDeleteEmailSignatureSlot(
+                            context.Document,
+                            slotStart,
+                            slotEnd,
+                            slotIsTable,
+                            slotSource);
+                        if (result.Success)
+                        {
+                            TryDeleteEmailSignatureBookmark(bookmarks, ManagedEmailSignatureBookmarkName);
+                        }
+                        result.Changed = result.Success;
+                        result.Managed = false;
+                        result.Source = slotSource;
+                        return result;
+                    }
+
+                    bool hasInitialSlot = hasManagedSlot;
+                    if (!hasInitialSlot)
+                    {
+                        hasInitialSlot = TryGetEmailSignatureBookmarkSlot(
+                            context.Document,
+                            bookmarks,
+                            OutlookAutoSignatureBookmarkName,
+                            out slotStart,
+                            out slotEnd,
+                            out slotIsTable,
+                            out slotSource);
+                    }
+
+                    if (mode == EmailSignatureReconcileMode.ClearInitial)
+                    {
+                        if (!hasInitialSlot)
+                        {
+                            result.Success = true;
+                            result.Source = "initial_not_found";
+                            return result;
+                        }
+                        result.Success = TryDeleteEmailSignatureSlot(
+                            context.Document,
+                            slotStart,
+                            slotEnd,
+                            slotIsTable,
+                            slotSource);
+                        if (result.Success)
+                        {
+                            TryDeleteEmailSignatureBookmark(
+                                bookmarks,
+                                hasManagedSlot
+                                    ? ManagedEmailSignatureBookmarkName
+                                    : OutlookAutoSignatureBookmarkName);
+                        }
+                        result.Changed = result.Success;
+                        result.Managed = false;
+                        result.Source = slotSource;
+                        return result;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(signatureContent))
+                    {
+                        result.Source = "signature_content_empty";
+                        return result;
+                    }
+
+                    bool safeFallback = false;
+                    bool addQuoteGap = false;
+                    if (!hasInitialSlot)
+                    {
+                        int unusedQuoteBoundaryPosition;
+                        if (!TryResolveSafeEmailSignatureInsertionPoint(
+                                context,
+                                bookmarks,
+                                isReplyOrForward,
+                                false,
+                                0,
+                                0,
+                                out slotStart,
+                                out unusedQuoteBoundaryPosition,
+                                out addQuoteGap,
+                                out slotSource))
+                        {
+                            result.Source = slotSource;
+                            return result;
+                        }
+                        slotEnd = slotStart;
+                        slotIsTable = false;
+                        safeFallback = true;
+                    }
+
+                    string resolvedSlotSource = slotSource;
+                    bool initialSlotManaged = hasInitialSlot
+                                              && string.Equals(
+                                                  slotSource,
+                                                  "managed",
+                                                  StringComparison.Ordinal);
+                    int insertionPosition = hasInitialSlot ? slotEnd : slotStart;
+                    if (hasInitialSlot)
+                    {
+                        int safeInsertionPosition;
+                        int quoteBoundaryPosition;
+                        bool safeAddQuoteGap;
+                        string safeSource;
+                        bool hasSafeInsertionPoint = TryResolveSafeEmailSignatureInsertionPoint(
+                                context,
+                                bookmarks,
+                                isReplyOrForward,
+                                true,
+                                slotStart,
+                                slotEnd,
+                                out safeInsertionPosition,
+                                out quoteBoundaryPosition,
+                                out safeAddQuoteGap,
+                                out safeSource);
+                        if (isReplyOrForward && !hasSafeInsertionPoint)
+                        {
+                            result.Source = safeSource;
+                            return result;
+                        }
+
+                        bool hasMeaningfulTextBetween = false;
+                        if (hasSafeInsertionPoint
+                            && safeInsertionPosition > slotEnd
+                            && !TryHasMeaningfulEmailSignatureText(
+                                    context.Document,
+                                    slotEnd,
+                                    safeInsertionPosition,
+                                    out hasMeaningfulTextBetween))
+                        {
+                            result.Source = "authored_content_probe_failed";
+                            return result;
+                        }
+
+                        EmailSignatureSlotPlacementDecision placementDecision = hasSafeInsertionPoint
+                            ? EmailSignatureSlotPlacementPolicy.Resolve(
+                                isReplyOrForward,
+                                slotStart,
+                                slotEnd,
+                                safeInsertionPosition,
+                                quoteBoundaryPosition,
+                                hasMeaningfulTextBetween)
+                            : EmailSignatureSlotPlacementDecision.KeepExistingSlot;
+                        if (placementDecision == EmailSignatureSlotPlacementDecision.UnsafeQuoteBoundaryOverlap)
+                        {
+                            result.Source = "initial_slot_crosses_" + safeSource;
+                            DiagnosticsLogger.Log(
+                                LogCategories.Core,
+                                "Email signature slot overlaps the reply quote boundary; reconciliation skipped (source="
+                                + result.Source
+                                + ", slot="
+                                + (slotSource ?? "n/a")
+                                + ", safe="
+                                + safeInsertionPosition.ToString(CultureInfo.InvariantCulture)
+                                + ", boundary="
+                                + quoteBoundaryPosition.ToString(CultureInfo.InvariantCulture)
+                                + ", composeKey="
+                                + (composeKey ?? string.Empty)
+                                + ").");
+                            return result;
+                        }
+
+                        if (placementDecision == EmailSignatureSlotPlacementDecision.MoveToSafeInsertionPoint)
+                        {
+                            bool movedAboveQuoteBoundary = isReplyOrForward
+                                                           && safeInsertionPosition < slotEnd;
+                            insertionPosition = safeInsertionPosition;
+                            addQuoteGap = safeAddQuoteGap;
+                            safeFallback = true;
+                            resolvedSlotSource += movedAboveQuoteBoundary
+                                ? "_moved_above_" + safeSource
+                                : "_moved_to_" + safeSource;
+                            DiagnosticsLogger.Log(
+                                LogCategories.Core,
+                                (movedAboveQuoteBoundary
+                                    ? "Email signature slot moved above quoted content (source="
+                                    : "Email signature slot moved below authored content (source=")
+                                + resolvedSlotSource
+                                + ", composeKey="
+                                + (composeKey ?? string.Empty)
+                                + ").");
+                        }
+                    }
+
+                    if (hasInitialSlot && safeFallback && insertionPosition < slotStart)
+                    {
+                        previousSlotBookmarkName = "NcSigPrevious" + Guid.NewGuid().ToString("N").Substring(0, 12);
+                        if (!TryAddEmailSignatureBookmark(
+                                context.Document,
+                                bookmarks,
+                                previousSlotBookmarkName,
+                                slotStart,
+                                slotEnd))
+                        {
+                            result.Source = "initial_slot_track_failed";
+                            return result;
+                        }
+                    }
+
+                    int stagedMutationStart = insertionPosition;
+                    if (safeFallback
+                        && !TryAddMissingEmailSignatureLeadingParagraphs(
+                            context.Document,
+                            ref insertionPosition,
+                            out slotSource))
+                    {
+                        TryRollbackStagedEmailSignatureMutation(
+                            context.Document,
+                            bookmarks,
+                            string.Empty,
+                            stagedMutationStart,
+                            insertionPosition,
+                            "leading_gap_rollback");
+                        result.Source = slotSource;
+                        return result;
+                    }
+
+                    int insertedStart;
+                    int insertedEnd;
+                    if (!TryInsertEmailSignatureContent(
+                            context,
+                            insertionPosition,
+                            isPlainText,
+                            signatureContent,
+                            out insertedStart,
+                            out insertedEnd,
+                            out slotSource))
+                    {
+                        TryRollbackStagedEmailSignatureMutation(
+                            context.Document,
+                            bookmarks,
+                            string.Empty,
+                            stagedMutationStart,
+                            insertionPosition,
+                            "content_insert_rollback");
+                        result.Source = slotSource;
+                        return result;
+                    }
+
+                    bool includeManagedQuoteGap = isReplyOrForward
+                                                  && ((safeFallback && addQuoteGap)
+                                                      || (hasInitialSlot
+                                                          && string.Equals(
+                                                              resolvedSlotSource,
+                                                              "managed",
+                                                              StringComparison.Ordinal)));
+                    if (includeManagedQuoteGap)
+                    {
+                        int gapEnd;
+                        if (!TryInsertEmailSignatureParagraphs(
+                                context.Document,
+                                insertedEnd,
+                                1,
+                                out slotSource,
+                                out gapEnd))
+                        {
+                            TryRollbackStagedEmailSignatureMutation(
+                                context.Document,
+                                bookmarks,
+                                string.Empty,
+                                stagedMutationStart,
+                                insertedEnd,
+                                "quote_gap_rollback");
+                            result.Source = slotSource;
+                            return result;
+                        }
+                        insertedEnd = gapEnd;
+                    }
+
+                    string stagedBookmarkName = "NcSigStage" + Guid.NewGuid().ToString("N").Substring(0, 12);
+                    if (!TryAddEmailSignatureBookmark(
+                            context.Document,
+                            bookmarks,
+                            stagedBookmarkName,
+                            stagedMutationStart,
+                            insertedEnd))
+                    {
+                        TryDeleteEmailSignatureBookmark(bookmarks, stagedBookmarkName);
+                        TryRollbackStagedEmailSignatureMutation(
+                            context.Document,
+                            bookmarks,
+                            string.Empty,
+                            stagedMutationStart,
+                            insertedEnd,
+                            "staged_insert");
+                        result.Source = "managed_bookmark_stage_failed";
+                        return result;
+                    }
+
+                    int currentSlotStart = slotStart;
+                    int currentSlotEnd = slotEnd;
+                    if (!string.IsNullOrWhiteSpace(previousSlotBookmarkName)
+                        && !TryGetBookmarkRange(
+                            bookmarks,
+                            previousSlotBookmarkName,
+                            out currentSlotStart,
+                            out currentSlotEnd))
+                    {
+                        TryRollbackStagedEmailSignatureMutation(
+                            context.Document,
+                            bookmarks,
+                            stagedBookmarkName,
+                            stagedMutationStart,
+                            insertedEnd,
+                            "staged_insert");
+                        result.Source = "initial_slot_track_lost";
+                        return result;
+                    }
+
+                    bool replacingManaged = initialSlotManaged;
+                    if (replacingManaged)
+                    {
+                        TryDeleteEmailSignatureBookmark(bookmarks, ManagedEmailSignatureBookmarkName);
+                    }
+
+                    if (!TryAddEmailSignatureBookmark(
+                            context.Document,
+                            bookmarks,
+                            ManagedEmailSignatureBookmarkName,
+                            insertedStart,
+                            insertedEnd))
+                    {
+                        TryRollbackStagedEmailSignatureMutation(
+                            context.Document,
+                            bookmarks,
+                            stagedBookmarkName,
+                            stagedMutationStart,
+                            insertedEnd,
+                            "staged_insert");
+                        TryDeleteEmailSignatureBookmark(bookmarks, ManagedEmailSignatureBookmarkName);
+                        if (replacingManaged)
+                        {
+                            if (TryResolveTrackedEmailSignatureSlot(
+                                    bookmarks,
+                                    previousSlotBookmarkName,
+                                    slotStart,
+                                    slotEnd,
+                                    out currentSlotStart,
+                                    out currentSlotEnd))
+                            {
+                                TryAddEmailSignatureBookmark(
+                                    context.Document,
+                                    bookmarks,
+                                    ManagedEmailSignatureBookmarkName,
+                                    currentSlotStart,
+                                    currentSlotEnd);
+                            }
+                        }
+                        result.Source = "managed_bookmark_add_failed";
+                        return result;
+                    }
+
+                    if (hasInitialSlot
+                        && !TryDeleteEmailSignatureSlot(
+                            context.Document,
+                            currentSlotStart,
+                            currentSlotEnd,
+                            slotIsTable,
+                            resolvedSlotSource))
+                    {
+                        bool stagedMutationRolledBack = TryRollbackStagedEmailSignatureMutation(
+                            context.Document,
+                            bookmarks,
+                            stagedBookmarkName,
+                            stagedMutationStart,
+                            insertedEnd,
+                            "managed_rollback");
+                        if (stagedMutationRolledBack)
+                        {
+                            TryDeleteEmailSignatureBookmark(bookmarks, ManagedEmailSignatureBookmarkName);
+                            if (replacingManaged
+                                && TryResolveTrackedEmailSignatureSlot(
+                                    bookmarks,
+                                    previousSlotBookmarkName,
+                                    slotStart,
+                                    slotEnd,
+                                    out currentSlotStart,
+                                    out currentSlotEnd))
+                            {
+                                TryAddEmailSignatureBookmark(
+                                    context.Document,
+                                    bookmarks,
+                                    ManagedEmailSignatureBookmarkName,
+                                    currentSlotStart,
+                                    currentSlotEnd);
+                            }
+                        }
+                        result.Source = "initial_slot_delete_failed";
+                        return result;
+                    }
+
+                    TryDeleteEmailSignatureBookmark(bookmarks, stagedBookmarkName);
+                    int managedStart;
+                    int managedEnd;
+                    if (!TryGetBookmarkRange(
+                            bookmarks,
+                            ManagedEmailSignatureBookmarkName,
+                            out managedStart,
+                            out managedEnd))
+                    {
+                        result.Source = "managed_bookmark_lost";
+                        return result;
+                    }
+
+                    result.Success = true;
+                    result.Changed = true;
+                    result.Managed = true;
+                    result.Source = hasInitialSlot ? resolvedSlotSource : "safe_" + resolvedSlotSource;
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Email signature Word slot reconciled (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ", editor="
+                        + (context.Source ?? "n/a")
+                        + ", body="
+                        + (isPlainText ? "plain" : "formatted")
+                        + ", source="
+                        + (result.Source ?? "n/a")
+                        + ").");
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Core,
+                        "Failed to reconcile email signature Word slot (operation="
+                        + (operation ?? "n/a")
+                        + ", composeKey="
+                        + (composeKey ?? string.Empty)
+                        + ").",
+                        ex);
+                    result.Source = "exception";
+                    return result;
+                }
+                finally
+                {
+                    if (!string.IsNullOrWhiteSpace(previousSlotBookmarkName))
+                    {
+                        TryDeleteEmailSignatureBookmark(bookmarks, previousSlotBookmarkName);
+                    }
+                    RestoreEmailSignatureSelection(
+                        context,
+                        bookmarks,
+                        selectionBookmarkName,
+                        originalSelectionStart,
+                        originalSelectionEnd);
+                    ComInteropScope.TryRelease(bookmarks, LogCategories.Core, "Failed to release email signature Word bookmarks COM object.");
+                }
+            }
+        }
+
+        private bool TryOpenEmailSignatureWordEditor(
+            Outlook.MailItem mail,
+            bool isInlineResponse,
+            string composeKey,
+            string operation,
+            string inlineExplorerIdentityKey,
+            out OutlookWordEditorContext context)
+        {
+            context = null;
+            bool activeInline = _owner != null && _owner.IsActiveInlineResponse(mail);
+            if (isInlineResponse || activeInline)
+            {
+                if (OutlookWordEditorContext.TryOpenInline(
+                        _owner != null ? _owner.OutlookApplication : null,
+                        mail,
+                        operation,
+                        composeKey,
+                        inlineExplorerIdentityKey,
+                        out context))
+                {
+                    return true;
+                }
+
+                DiagnosticsLogger.Log(
+                    LogCategories.Core,
+                    "Email signature Word editor is not ready for the tracked inline response (composeKey="
+                    + (composeKey ?? string.Empty)
+                    + ").");
+                return false;
+            }
+
+            if (OutlookWordEditorContext.TryOpenInspector(mail, operation, out context))
+            {
+                return true;
+            }
+
+            DiagnosticsLogger.Log(
+                LogCategories.Core,
+                "Email signature Word editor is unavailable (composeKey="
+                + (composeKey ?? string.Empty)
+                + ", inlineState="
+                + isInlineResponse.ToString(CultureInfo.InvariantCulture)
+                + ").");
+            return false;
+        }
+
+        private static bool TryGetEmailSignatureBookmarkSlot(
+            object wordEditor,
+            object bookmarks,
+            string bookmarkName,
+            out int start,
+            out int end,
+            out bool isTable,
+            out string source)
+        {
+            start = 0;
+            end = 0;
+            isTable = false;
+            source = string.Equals(bookmarkName, ManagedEmailSignatureBookmarkName, StringComparison.Ordinal)
+                ? "managed"
+                : "mail_auto_sig";
+            if (!TryGetBookmarkRange(bookmarks, bookmarkName, out start, out end))
+            {
+                source += "_not_found";
+                return false;
+            }
+
+            if (string.Equals(bookmarkName, OutlookAutoSignatureBookmarkName, StringComparison.Ordinal))
+            {
+                int tableStart;
+                int tableEnd;
+                if (TryExpandRangeToContainingTable(wordEditor, start, end, out tableStart, out tableEnd))
+                {
+                    start = tableStart;
+                    end = tableEnd;
+                    isTable = true;
+                    source = "mail_auto_sig_table";
+                }
+            }
+            return true;
+        }
+
+        private static bool TryResolveSafeEmailSignatureInsertionPoint(
+            OutlookWordEditorContext context,
+            object bookmarks,
+            bool isReplyOrForward,
+            bool hasExcludedRange,
+            int excludedStart,
+            int excludedEnd,
+            out int insertionPosition,
+            out int quoteBoundaryPosition,
+            out bool addQuoteGap,
+            out string source)
+        {
+            insertionPosition = 0;
+            quoteBoundaryPosition = 0;
+            addQuoteGap = false;
+            source = "safe_slot_unavailable";
+            if (context == null || context.Document == null)
+            {
+                return false;
+            }
+
+            int documentStart = context.GetDocumentStart(0);
+            if (!isReplyOrForward)
+            {
+                int documentEnd = context.GetDocumentEnd(documentStart);
+                insertionPosition = Math.Max(documentStart, documentEnd - 1);
+                quoteBoundaryPosition = insertionPosition;
+                source = "document_end";
+                return true;
+            }
+
+            int originalStart;
+            int originalEnd;
+            if (TryGetBookmarkRange(
+                    bookmarks,
+                    OutlookOriginalMessageBookmarkName,
+                    out originalStart,
+                    out originalEnd))
+            {
+                quoteBoundaryPosition = originalStart;
+                insertionPosition = Math.Max(
+                    documentStart,
+                    originalStart - OutlookOriginalMessageProtectedGap);
+                addQuoteGap = true;
+                source = "mail_original";
+                return true;
+            }
+
+            int separatorStart;
+            if (TryFindInlineQuoteSeparatorStart(
+                    context.Document,
+                    documentStart,
+                    hasExcludedRange,
+                    excludedStart,
+                    excludedEnd,
+                    out separatorStart))
+            {
+                quoteBoundaryPosition = separatorStart;
+                insertionPosition = Math.Max(documentStart, separatorStart);
+                addQuoteGap = true;
+                source = "quote_separator";
+                return true;
+            }
+
+            source = "quote_boundary_unavailable";
+            return false;
+        }
+
+        private static bool TryAddMissingEmailSignatureLeadingParagraphs(
+            object wordEditor,
+            ref int insertionPosition,
+            out string source)
+        {
+            source = "leading_gap";
+            if (wordEditor == null)
+            {
+                source = "word_editor_unavailable";
+                return false;
+            }
+
+            int existingParagraphMarks;
+            if (!TryCountTrailingParagraphMarks(
+                    wordEditor,
+                    insertionPosition,
+                    out existingParagraphMarks))
+            {
+                source = "leading_gap_read_failed";
+                return false;
+            }
+
+            int missing = Math.Max(0, 2 - existingParagraphMarks);
+            if (missing == 0)
+            {
+                source = "leading_gap_preserved";
+                return true;
+            }
+
+            int insertedEnd;
+            if (!TryInsertEmailSignatureParagraphs(
+                    wordEditor,
+                    insertionPosition,
+                    missing,
+                    out source,
+                    out insertedEnd))
+            {
+                return false;
+            }
+            insertionPosition = insertedEnd;
+            source = "leading_gap_added_" + missing.ToString(CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        private static bool TryHasMeaningfulEmailSignatureText(
+            object wordEditor,
+            int start,
+            int end,
+            out bool hasMeaningfulText)
+        {
+            hasMeaningfulText = false;
+            if (wordEditor == null || end <= start)
+            {
+                return true;
+            }
+
+            object range = null;
+            try
+            {
+                range = OutlookWordEditorContext.InvokeMethod(
+                    wordEditor,
+                    "Range",
+                    new object[] { start, end });
+                if (range == null)
+                {
+                    return false;
+                }
+
+                string text = Convert.ToString(
+                    OutlookWordEditorContext.GetProperty(range, "Text"),
+                    CultureInfo.InvariantCulture) ?? string.Empty;
+                hasMeaningfulText = text.Trim(
+                    '\r',
+                    '\n',
+                    '\t',
+                    ' ',
+                    '\u00A0').Length > 0;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to inspect authored content after the email signature slot.",
+                    ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(
+                    range,
+                    LogCategories.Core,
+                    "Failed to release authored-content inspection range COM object.");
+            }
+        }
+
+        private static bool TryCountTrailingParagraphMarks(
+            object wordEditor,
+            int insertionPosition,
+            out int paragraphMarks)
+        {
+            paragraphMarks = 0;
+            object content = null;
+            object range = null;
+            try
+            {
+                content = OutlookWordEditorContext.GetProperty(wordEditor, "Content");
+                int documentStart = content != null
+                    ? OutlookWordEditorContext.GetIntProperty(content, "Start")
+                    : 0;
+                int readStart = Math.Max(documentStart, insertionPosition - 256);
+                range = OutlookWordEditorContext.InvokeMethod(
+                    wordEditor,
+                    "Range",
+                    new object[] { readStart, Math.Max(readStart, insertionPosition) });
+                string text = range != null
+                    ? Convert.ToString(OutlookWordEditorContext.GetProperty(range, "Text"), CultureInfo.InvariantCulture)
+                    : string.Empty;
+                if (string.IsNullOrEmpty(text))
+                {
+                    return true;
+                }
+
+                for (int i = text.Length - 1; i >= 0; i--)
+                {
+                    char current = text[i];
+                    if (current == '\r')
+                    {
+                        paragraphMarks++;
+                        continue;
+                    }
+                    if (current == '\n'
+                        || current == '\t'
+                        || current == ' '
+                        || current == '\u00A0')
+                    {
+                        continue;
+                    }
+                    break;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to inspect paragraphs before the email signature slot.", ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release email signature gap range COM object.");
+                ComInteropScope.TryRelease(content, LogCategories.Core, "Failed to release email signature gap content COM object.");
+            }
+        }
+
+        private static bool TryInsertEmailSignatureParagraphs(
+            object wordEditor,
+            int position,
+            int count,
+            out string source)
+        {
+            int insertedEnd;
+            return TryInsertEmailSignatureParagraphs(
+                wordEditor,
+                position,
+                count,
+                out source,
+                out insertedEnd);
+        }
+
+        private static bool TryInsertEmailSignatureParagraphs(
+            object wordEditor,
+            int position,
+            int count,
+            out string source,
+            out int insertedEnd)
+        {
+            source = "paragraph_gap";
+            insertedEnd = position;
+            if (wordEditor == null || count <= 0)
+            {
+                return true;
+            }
+
+            object range = null;
+            try
+            {
+                range = OutlookWordEditorContext.InvokeMethod(
+                    wordEditor,
+                    "Range",
+                    new object[] { position, position });
+                if (range == null)
+                {
+                    source = "paragraph_range_unavailable";
+                    return false;
+                }
+                OutlookWordEditorContext.SetProperty(range, "Text", new string('\r', count));
+                insertedEnd = OutlookWordEditorContext.GetIntProperty(range, "End");
+                if (insertedEnd <= position)
+                {
+                    insertedEnd = position + count;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert email signature paragraph gap.", ex);
+                source = "paragraph_insert_failed";
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release email signature paragraph range COM object.");
+            }
+        }
+
+        private static bool TryInsertEmailSignatureContent(
+            OutlookWordEditorContext context,
+            int position,
+            bool isPlainText,
+            string content,
+            out int insertedStart,
+            out int insertedEnd,
+            out string source)
+        {
+            insertedStart = position;
+            insertedEnd = position;
+            source = isPlainText ? "plain_text" : "formatted_html";
+            if (context == null || context.Document == null || string.IsNullOrWhiteSpace(content))
+            {
+                source = "content_unavailable";
+                return false;
+            }
+
+            if (isPlainText)
+            {
+                object range = null;
+                try
+                {
+                    range = OutlookWordEditorContext.InvokeMethod(
+                        context.Document,
+                        "Range",
+                        new object[] { position, position });
+                    if (range == null)
+                    {
+                        source = "plain_range_unavailable";
+                        return false;
+                    }
+                    OutlookWordEditorContext.SetProperty(range, "Text", content);
+                    insertedEnd = OutlookWordEditorContext.GetIntProperty(range, "End");
+                    if (insertedEnd <= insertedStart)
+                    {
+                        insertedEnd = insertedStart + content.Length;
+                    }
+                    return insertedEnd > insertedStart;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert plain-text email signature through Word range.", ex);
+                    source = "plain_insert_failed";
+                    return false;
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release plain-text email signature range COM object.");
+                }
+            }
+
+            string tempHtmlPath = null;
+            try
+            {
+                int documentEndBefore = context.GetDocumentEnd(position);
+                if (!context.SetSelectionRange(position, position))
+                {
+                    source = "selection_unavailable";
+                    return false;
+                }
+
+                tempHtmlPath = Path.Combine(
+                    Path.GetTempPath(),
+                    "nc4ol-signature-" + Guid.NewGuid().ToString("N") + ".html");
+                File.WriteAllText(
+                    tempHtmlPath,
+                    EnsureHtmlDocumentForWordInsert(content),
+                    new UTF8Encoding(true));
+                context.InsertFile(tempHtmlPath);
+
+                int selectionStart = OutlookWordEditorContext.GetIntProperty(context.Selection, "Start");
+                int selectionEnd = OutlookWordEditorContext.GetIntProperty(context.Selection, "End");
+                int documentEndAfter = context.GetDocumentEnd(documentEndBefore);
+                insertedEnd = Math.Max(selectionStart, selectionEnd);
+                if (insertedEnd <= insertedStart)
+                {
+                    insertedEnd = insertedStart + Math.Max(0, documentEndAfter - documentEndBefore);
+                }
+                if (insertedEnd <= insertedStart)
+                {
+                    source = "formatted_insert_empty";
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to insert formatted email signature through Word editor.", ex);
+                source = "formatted_insert_failed";
+                return false;
+            }
+            finally
+            {
+                TryDeleteTemporaryHtmlFile(tempHtmlPath, "Failed to delete temporary email signature HTML file.");
+            }
+        }
+
+        private static bool TryAddEmailSignatureBookmark(
+            object wordEditor,
+            object bookmarks,
+            string bookmarkName,
+            int start,
+            int end)
+        {
+            if (wordEditor == null
+                || bookmarks == null
+                || string.IsNullOrWhiteSpace(bookmarkName)
+                || end < start)
+            {
+                return false;
+            }
+
+            object range = null;
+            object bookmark = null;
+            try
+            {
+                range = OutlookWordEditorContext.InvokeMethod(
+                    wordEditor,
+                    "Range",
+                    new object[] { start, end });
+                if (range == null)
+                {
+                    return false;
+                }
+                bookmark = OutlookWordEditorContext.InvokeMethod(
+                    bookmarks,
+                    "Add",
+                    new object[] { bookmarkName, range });
+                int verifiedStart;
+                int verifiedEnd;
+                return TryGetBookmarkRange(
+                    bookmarks,
+                    bookmarkName,
+                    out verifiedStart,
+                    out verifiedEnd)
+                       && verifiedEnd >= verifiedStart;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to add email signature Word bookmark (name=" + bookmarkName + ").", ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(bookmark, LogCategories.Core, "Failed to release added email signature bookmark COM object.");
+                ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release added email signature bookmark range COM object.");
+            }
+        }
+
+        private static bool TryResolveTrackedEmailSignatureSlot(
+            object bookmarks,
+            string trackingBookmarkName,
+            int fallbackStart,
+            int fallbackEnd,
+            out int start,
+            out int end)
+        {
+            start = fallbackStart;
+            end = fallbackEnd;
+            if (string.IsNullOrWhiteSpace(trackingBookmarkName))
+            {
+                return true;
+            }
+
+            int trackedStart;
+            int trackedEnd;
+            if (!TryGetBookmarkRange(
+                    bookmarks,
+                    trackingBookmarkName,
+                    out trackedStart,
+                    out trackedEnd))
+            {
+                return false;
+            }
+
+            start = trackedStart;
+            end = trackedEnd;
+            return true;
+        }
+
+        private static bool TryRollbackStagedEmailSignatureMutation(
+            object wordEditor,
+            object bookmarks,
+            string trackingBookmarkName,
+            int fallbackStart,
+            int fallbackEnd,
+            string source)
+        {
+            int rollbackStart = fallbackStart;
+            int rollbackEnd = fallbackEnd;
+            if (!string.IsNullOrWhiteSpace(trackingBookmarkName))
+            {
+                int trackedStart;
+                int trackedEnd;
+                if (TryGetBookmarkRange(
+                        bookmarks,
+                        trackingBookmarkName,
+                        out trackedStart,
+                        out trackedEnd))
+                {
+                    rollbackStart = trackedStart;
+                    rollbackEnd = trackedEnd;
+                }
+                else
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Staged email signature bookmark was unavailable during rollback; using the captured mutation range (source="
+                        + (source ?? "n/a")
+                        + ").");
+                }
+            }
+
+            bool deleted = TryDeleteEmailSignatureSlot(
+                wordEditor,
+                rollbackStart,
+                rollbackEnd,
+                false,
+                source);
+            if (!string.IsNullOrWhiteSpace(trackingBookmarkName))
+            {
+                TryDeleteEmailSignatureBookmark(bookmarks, trackingBookmarkName);
+            }
+            return deleted;
+        }
+
+        private static bool TryDeleteEmailSignatureBookmark(object bookmarks, string bookmarkName)
+        {
+            if (bookmarks == null || string.IsNullOrWhiteSpace(bookmarkName))
+            {
+                return false;
+            }
+
+            object bookmark = null;
+            try
+            {
+                int start;
+                int end;
+                if (!TryGetBookmarkRange(bookmarks, bookmarkName, out start, out end))
+                {
+                    return false;
+                }
+                bookmark = OutlookWordEditorContext.InvokeMethod(
+                    bookmarks,
+                    "Item",
+                    new object[] { bookmarkName });
+                if (bookmark == null)
+                {
+                    return false;
+                }
+                OutlookWordEditorContext.InvokeMethod(bookmark, "Delete", null);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete email signature Word bookmark (name=" + bookmarkName + ").", ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(bookmark, LogCategories.Core, "Failed to release deleted email signature bookmark COM object.");
+            }
+        }
+
+        private static bool TryDeleteEmailSignatureSlot(
+            object wordEditor,
+            int start,
+            int end,
+            bool isTable,
+            string source)
+        {
+            if (wordEditor == null || end < start)
+            {
+                return false;
+            }
+
+            if (end == start)
+            {
+                return true;
+            }
+
+            if (isTable)
+            {
+                if (TryDeleteContainingTableAtRange(wordEditor, start, end))
+                {
+                    return true;
+                }
+                DiagnosticsLogger.Log(
+                    LogCategories.Core,
+                    "Email signature table deletion failed (source=" + (source ?? "n/a") + ").");
+                return false;
+            }
+
+            object range = null;
+            try
+            {
+                range = OutlookWordEditorContext.InvokeMethod(
+                    wordEditor,
+                    "Range",
+                    new object[] { start, end });
+                if (range == null)
+                {
+                    return false;
+                }
+                OutlookWordEditorContext.InvokeMethod(range, "Delete", null);
+                int remainingStart = OutlookWordEditorContext.GetIntProperty(range, "Start");
+                int remainingEnd = OutlookWordEditorContext.GetIntProperty(range, "End");
+                return remainingEnd <= remainingStart;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to delete email signature Word range (source=" + (source ?? "n/a") + ").",
+                    ex);
+                return false;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(range, LogCategories.Core, "Failed to release deleted email signature range COM object.");
+            }
+        }
+
+        private static string CaptureEmailSignatureSelectionBookmark(
+            object wordEditor,
+            object bookmarks,
+            int selectionStart,
+            int selectionEnd)
+        {
+            string bookmarkName = "NcCursor" + Guid.NewGuid().ToString("N").Substring(0, 12);
+            return TryAddEmailSignatureBookmark(
+                wordEditor,
+                bookmarks,
+                bookmarkName,
+                selectionStart,
+                Math.Max(selectionStart, selectionEnd))
+                ? bookmarkName
+                : string.Empty;
+        }
+
+        private static void RestoreEmailSignatureSelection(
+            OutlookWordEditorContext context,
+            object bookmarks,
+            string bookmarkName,
+            int fallbackStart,
+            int fallbackEnd)
+        {
+            if (context == null || context.Selection == null)
             {
                 return;
             }
 
+            int start = fallbackStart;
+            int end = Math.Max(fallbackStart, fallbackEnd);
+            bool bookmarkFound = !string.IsNullOrWhiteSpace(bookmarkName)
+                                 && TryGetBookmarkRange(bookmarks, bookmarkName, out start, out end);
+            if (!bookmarkFound)
+            {
+                int documentStart = context.GetDocumentStart(0);
+                int documentEnd = context.GetDocumentEnd(documentStart);
+                start = ClampWordPosition(fallbackStart, documentEnd);
+                end = ClampWordPosition(Math.Max(start, fallbackEnd), documentEnd);
+            }
             try
             {
-                object typedValue = value;
-                float fontSize;
-                if (string.Equals(propertyName, "Size", StringComparison.OrdinalIgnoreCase)
-                    && float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out fontSize))
-                {
-                    typedValue = fontSize;
-                }
-                font.GetType().InvokeMember(propertyName, BindingFlags.SetProperty, null, font, new[] { typedValue });
+                context.SetSelectionRange(start, end);
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word font property (" + propertyName + ").", ex);
-            }
-        }
-
-        private sealed class WordSelectionSnapshot
-        {
-            internal int Start;
-            internal int End;
-            internal string FontName;
-            internal string FontNameAscii;
-            internal string FontNameOther;
-            internal string FontNameFarEast;
-            internal string FontSize;
-        }
-
-        internal bool TryReplaceInspectorSignatureSlot(Outlook.MailItem mail, string html, string composeKey, string operation, bool placeCursorAtBodyStart = false)
-        {
-            if (mail == null)
-            {
-                return false;
-            }
-
-            OutlookWordEditorContext context;
-            string tempHtmlPath = null;
-
-            try
-            {
-                if (!OutlookWordEditorContext.TryOpenInspector(mail, "signature slot write", out context))
-                {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inspector signature slot write skipped (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", reason=word_editor_unavailable).");
-                    return false;
-                }
-
-                using (context)
-                {
-                    object wordEditor = context.Document;
-                    object selection = context.Selection;
-                    if (selection == null)
-                    {
-                        DiagnosticsLogger.Log(
-                            LogCategories.Core,
-                            "Inspector signature slot write skipped (operation="
-                            + (operation ?? "n/a")
-                            + ", composeKey="
-                            + (composeKey ?? string.Empty)
-                            + ", reason=word_selection_unavailable).");
-                        return false;
-                    }
-
-                    int selectionStart = OutlookWordEditorContext.GetIntProperty(selection, "Start");
-                    int selectionEnd = OutlookWordEditorContext.GetIntProperty(selection, "End");
-                    int originalSelectionStart = selectionStart;
-                    string signatureSlotSource;
-                    bool signatureSlotSelected = TrySelectOutlookSignatureSlot(
-                        wordEditor,
-                        selection,
-                        out selectionStart,
-                        out selectionEnd,
-                        out signatureSlotSource);
-                    if (!signatureSlotSelected)
-                    {
-                        DiagnosticsLogger.Log(
-                            LogCategories.Core,
-                            "Inspector signature slot write skipped (operation="
-                            + (operation ?? "n/a")
-                            + ", composeKey="
-                            + (composeKey ?? string.Empty)
-                            + ", reason=signature_boundary_unavailable).");
-                        return false;
-                    }
-
-                    int cursorStart = placeCursorAtBodyStart
-                        ? context.GetDocumentStart(0)
-                        : originalSelectionStart;
-                    if (signatureSlotSelected && selectionEnd > selectionStart)
-                    {
-                        bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
-                        if (deletedTable)
-                        {
-                            signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
-                        }
-                        if (!deletedTable)
-                        {
-                            selection.GetType().InvokeMember(
-                                "Delete",
-                                BindingFlags.InvokeMethod,
-                                null,
-                                selection,
-                                null);
-                        }
-                        try
-                        {
-                            context.SetSelectionRange(selectionStart, selectionStart);
-                        }
-                        catch (Exception ex)
-                        {
-                            DiagnosticsLogger.LogException(LogCategories.Core, "Failed to move Word selection after inspector signature slot delete.", ex);
-                        }
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(html))
-                    {
-                        tempHtmlPath = Path.Combine(
-                            Path.GetTempPath(),
-                            "nc4ol-inspector-signature-" + Guid.NewGuid().ToString("N") + ".html");
-                        File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
-                        context.InsertFile(tempHtmlPath);
-                    }
-                    try
-                    {
-                        context.SetSelectionRange(cursorStart, cursorStart);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore cursor after inspector signature slot write.", ex);
-                    }
-
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inspector signature slot written via WordEditor.Selection.InsertFile (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", selectionStart="
-                        + selectionStart.ToString(CultureInfo.InvariantCulture)
-                        + ", selectionEnd="
-                        + selectionEnd.ToString(CultureInfo.InvariantCulture)
-                        + ", signatureSlotSelected="
-                        + signatureSlotSelected.ToString(CultureInfo.InvariantCulture)
-                        + ", signatureSlotSource="
-                        + (signatureSlotSource ?? "n/a")
-                        + ").");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(
-                    LogCategories.Core,
-                    "Failed to write inspector signature slot (operation="
-                    + (operation ?? "n/a")
-                    + ", composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ").",
-                    ex);
-                return false;
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to restore Word selection after email signature reconciliation.", ex);
             }
             finally
             {
-                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
+                if (!string.IsNullOrWhiteSpace(bookmarkName))
                 {
-                    try
-                    {
-                        File.Delete(tempHtmlPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inspector signature HTML file.", ex);
-                    }
+                    TryDeleteEmailSignatureBookmark(bookmarks, bookmarkName);
                 }
-            }
-        }
-
-        internal bool TryReplaceActiveInlineResponseSignatureSlot(Outlook.MailItem mail, string html, string composeKey, string operation)
-        {
-            if (mail == null)
-            {
-                return false;
-            }
-
-            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
-            if (application == null)
-            {
-                DiagnosticsLogger.Log(
-                    LogCategories.Core,
-                    "Inline response HTML write skipped (operation="
-                    + (operation ?? "n/a")
-                    + ", composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ", reason=application_unavailable).");
-                return false;
-            }
-
-            OutlookWordEditorContext context;
-            string tempHtmlPath = null;
-
-            try
-            {
-                if (!OutlookWordEditorContext.TryOpenInline(application, mail, "inline signature slot write", composeKey, out context))
-                {
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inline response HTML write skipped (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", reason=word_editor_unavailable).");
-                    return false;
-                }
-
-                using (context)
-                {
-                    object wordEditor = context.Document;
-                    object selection = context.Selection;
-                    if (selection == null)
-                    {
-                        DiagnosticsLogger.Log(
-                            LogCategories.Core,
-                            "Inline response signature slot write skipped (operation="
-                            + (operation ?? "n/a")
-                            + ", composeKey="
-                            + (composeKey ?? string.Empty)
-                            + ", reason=word_selection_unavailable).");
-                        return false;
-                    }
-
-                    int selectionStart = OutlookWordEditorContext.GetIntProperty(selection, "Start");
-                    int selectionEnd = OutlookWordEditorContext.GetIntProperty(selection, "End");
-                    int originalSelectionStart = selectionStart;
-                    string signatureSlotSource;
-                    bool signatureSlotSelected = TrySelectOutlookSignatureSlot(
-                        wordEditor,
-                        selection,
-                        out selectionStart,
-                        out selectionEnd,
-                        out signatureSlotSource);
-                    if (!signatureSlotSelected)
-                    {
-                        DiagnosticsLogger.Log(
-                            LogCategories.Core,
-                            "Inline response signature slot write skipped (operation="
-                            + (operation ?? "n/a")
-                            + ", composeKey="
-                            + (composeKey ?? string.Empty)
-                            + ", reason=signature_boundary_unavailable).");
-                        return false;
-                    }
-
-                    int fallbackReplyCursorStart = originalSelectionStart < selectionStart ? originalSelectionStart : selectionStart;
-                    int replyCursorStart = context.GetDocumentStart(fallbackReplyCursorStart);
-                    if (!string.IsNullOrWhiteSpace(html))
-                    {
-                        if (signatureSlotSelected && selectionEnd > selectionStart)
-                        {
-                            bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
-                            if (deletedTable)
-                            {
-                                signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
-                            }
-                            if (!deletedTable)
-                            {
-                                selection.GetType().InvokeMember(
-                                    "Delete",
-                                    BindingFlags.InvokeMethod,
-                                    null,
-                                    selection,
-                                    null);
-                            }
-                            context.SetSelectionRange(selectionStart, selectionStart);
-                        }
-                        context.TypeParagraph();
-                        context.TypeParagraph();
-
-                        tempHtmlPath = Path.Combine(
-                            Path.GetTempPath(),
-                            "nc4ol-inline-signature-" + Guid.NewGuid().ToString("N") + ".html");
-                        File.WriteAllText(tempHtmlPath, EnsureHtmlDocumentForWordInsert(html), new UTF8Encoding(true));
-                        context.InsertFile(tempHtmlPath);
-                        context.SetSelectionRange(replyCursorStart, replyCursorStart);
-                    }
-                    else if (signatureSlotSelected && selectionEnd > selectionStart)
-                    {
-                        bool deletedTable = TryDeleteContainingTableAtRange(wordEditor, selectionStart, selectionEnd);
-                        if (deletedTable)
-                        {
-                            signatureSlotSource = (signatureSlotSource ?? "mail_auto_sig") + "_table_deleted";
-                        }
-                        if (!deletedTable)
-                        {
-                            selection.GetType().InvokeMember(
-                                "Delete",
-                                BindingFlags.InvokeMethod,
-                                null,
-                                selection,
-                                null);
-                        }
-                        context.SetSelectionRange(replyCursorStart, replyCursorStart);
-                    }
-
-                    DiagnosticsLogger.Log(
-                        LogCategories.Core,
-                        "Inline response signature inserted via ActiveInlineResponseWordEditor.Selection.InsertFile (operation="
-                        + (operation ?? "n/a")
-                        + ", composeKey="
-                        + (composeKey ?? string.Empty)
-                        + ", selectionStart="
-                        + selectionStart.ToString(CultureInfo.InvariantCulture)
-                        + ", selectionEnd="
-                        + selectionEnd.ToString(CultureInfo.InvariantCulture)
-                        + ", replyCursorStart="
-                        + replyCursorStart.ToString(CultureInfo.InvariantCulture)
-                        + ", signatureSlotSelected="
-                        + signatureSlotSelected.ToString(CultureInfo.InvariantCulture)
-                        + ", signatureSlotSource="
-                        + (signatureSlotSource ?? "n/a")
-                        + ").");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(
-                    LogCategories.Core,
-                    "Failed to write inline response signature slot (operation="
-                    + (operation ?? "n/a")
-                    + ", composeKey="
-                    + (composeKey ?? string.Empty)
-                    + ").",
-                    ex);
-                return false;
-            }
-            finally
-            {
-                if (!string.IsNullOrWhiteSpace(tempHtmlPath))
-                {
-                    try
-                    {
-                        File.Delete(tempHtmlPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to delete temporary inline response HTML file.", ex);
-                    }
-                }
-            }
-        }
-
-        private static bool TrySelectOutlookSignatureSlot(
-            object wordEditor,
-            object selection,
-            out int selectionStart,
-            out int selectionEnd,
-            out string source)
-        {
-            selectionStart = 0;
-            selectionEnd = 0;
-            source = "none";
-            if (wordEditor == null || selection == null)
-            {
-                return false;
-            }
-
-            object bookmarks = null;
-            try
-            {
-                bookmarks = wordEditor.GetType().InvokeMember("Bookmarks", BindingFlags.GetProperty, null, wordEditor, null);
-                if (bookmarks == null)
-                {
-                    return false;
-                }
-
-                TryShowHiddenBookmarks(bookmarks);
-
-                int autoSignatureStart;
-                int autoSignatureEnd;
-                int originalStart;
-                int originalEnd;
-                bool hasAutoSignature = TryGetBookmarkRange(
-                    bookmarks,
-                    OutlookAutoSignatureBookmarkName,
-                    out autoSignatureStart,
-                    out autoSignatureEnd);
-                bool hasOriginalMessage = TryGetBookmarkRange(
-                    bookmarks,
-                    OutlookOriginalMessageBookmarkName,
-                    out originalStart,
-                    out originalEnd);
-                if (hasAutoSignature)
-                {
-                    selectionStart = autoSignatureStart;
-                    selectionEnd = autoSignatureEnd;
-                    source = "mail_auto_sig";
-
-                    int tableStart;
-                    int tableEnd;
-                    if (TryExpandRangeToContainingTable(wordEditor, selectionStart, selectionEnd, out tableStart, out tableEnd))
-                    {
-                        selectionStart = tableStart;
-                        selectionEnd = tableEnd;
-                        source = "mail_auto_sig_table";
-                    }
-
-                    if (hasOriginalMessage)
-                    {
-                        int protectedOriginalStart = Math.Max(selectionStart, originalStart - 2);
-                        if (protectedOriginalStart < selectionEnd)
-                        {
-                            selectionEnd = protectedOriginalStart;
-                            source = "mail_auto_sig_clamped_before_mail_original";
-                        }
-                        else if (protectedOriginalStart > selectionEnd)
-                        {
-                            selectionEnd = protectedOriginalStart;
-                            source = "mail_auto_sig_extended_to_mail_original_gap";
-                        }
-                    }
-                    else
-                    {
-                        int separatorStart;
-                        if (TryFindInlineQuoteSeparatorStart(wordEditor, selectionEnd, out separatorStart)
-                            && separatorStart > selectionEnd)
-                        {
-                            selectionEnd = separatorStart;
-                            source = "mail_auto_sig_extended_to_quote_separator";
-                        }
-                    }
-                }
-                else if (hasOriginalMessage)
-                {
-                    selectionStart = Math.Max(0, originalStart - 2);
-                    selectionEnd = selectionStart;
-                    source = "mail_original_insert";
-                }
-                else
-                {
-                    return false;
-                }
-
-                if (selectionEnd < selectionStart)
-                {
-                    int swap = selectionStart;
-                    selectionStart = selectionEnd;
-                    selectionEnd = swap;
-                }
-
-                selection.GetType().InvokeMember(
-                    "SetRange",
-                    BindingFlags.InvokeMethod,
-                    null,
-                    selection,
-                    new object[] { selectionStart, selectionEnd });
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to select Outlook auto-signature bookmark.", ex);
-                return false;
-            }
-            finally
-            {
-                ComInteropScope.TryRelease(bookmarks, LogCategories.Core, "Failed to release inline signature bookmarks COM object.");
             }
         }
 
@@ -1434,7 +2042,10 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             catch (Exception ex)
             {
-                GC.KeepAlive(ex);
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to expand the Outlook signature range to its containing table.",
+                    ex);
                 return false;
             }
             finally
@@ -1467,7 +2078,10 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             catch (Exception ex)
             {
-                GC.KeepAlive(ex);
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to delete the Outlook signature table.",
+                    ex);
                 return false;
             }
             finally
@@ -1539,7 +2153,10 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             catch (Exception ex)
             {
-                GC.KeepAlive(ex);
+                DiagnosticsLogger.LogException(
+                    LogCategories.Core,
+                    "Failed to resolve the table containing the Outlook signature range.",
+                    ex);
                 return null;
             }
             finally
@@ -1553,7 +2170,13 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
-        private static bool TryFindInlineQuoteSeparatorStart(object wordEditor, int searchStart, out int separatorStart)
+        private static bool TryFindInlineQuoteSeparatorStart(
+            object wordEditor,
+            int searchStart,
+            bool hasExcludedRange,
+            int excludedStart,
+            int excludedEnd,
+            out int separatorStart)
         {
             separatorStart = 0;
             if (wordEditor == null)
@@ -1621,6 +2244,13 @@ namespace NcTalkOutlookAddIn.Controllers
                             paragraphRange.GetType().InvokeMember("End", BindingFlags.GetProperty, null, paragraphRange, null),
                             CultureInfo.InvariantCulture);
                         if (paragraphEnd <= searchStart)
+                        {
+                            continue;
+                        }
+
+                        if (hasExcludedRange
+                            && paragraphStart < excludedEnd
+                            && paragraphEnd > excludedStart)
                         {
                             continue;
                         }
@@ -1703,7 +2333,16 @@ namespace NcTalkOutlookAddIn.Controllers
             }
             catch (Exception ex)
             {
-                GC.KeepAlive(ex);
+                if (DiagnosticsLogger.IsEnabled)
+                {
+                    DiagnosticsLogger.Log(
+                        LogCategories.Core,
+                        "Inline reply border lookup was unavailable (index="
+                        + index.ToString(CultureInfo.InvariantCulture)
+                        + ", errorType="
+                        + ex.GetType().Name
+                        + ").");
+                }
                 return false;
             }
             finally

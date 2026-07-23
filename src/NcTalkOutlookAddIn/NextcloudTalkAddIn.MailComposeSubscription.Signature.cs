@@ -6,7 +6,7 @@ using System;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using System.Web;
+using System.Windows.Forms;
 using NcTalkOutlookAddIn.Controllers;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
@@ -20,14 +20,19 @@ namespace NcTalkOutlookAddIn
     {
         internal sealed partial class MailComposeSubscription
         {
-            private const string ManagedSignatureStartPrefix = "<!-- nc-connector-signature:start hash=";
-            private const string ManagedSignatureEnd = "<!-- nc-connector-signature:end -->";
-            private const string ReplyComposeEditGapHtml = "<p style=\"margin:0;\"><br /></p><p style=\"margin:0;\"><br /></p>";
-            private const string ReplyComposeQuoteGapHtml = "<p style=\"margin:0;\"><br /></p>";
+            private const int EmailSignatureReadyRetryDelayMs = 750;
+            private const int EmailSignatureReadyRetryLimit = 4;
 
-            private static readonly Regex ManagedSignatureBlockRegex = new Regex(
-                @"<!--\s*nc-connector-signature:start\b[^>]*-->.*?<!--\s*nc-connector-signature:end\s*-->",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+            private int _emailSignatureRequestGeneration;
+            private int _emailSignatureReadyRetryCount;
+            private bool _emailSignatureStateStable;
+
+            private sealed class EmailSignatureApplicationResult
+            {
+                internal bool Success { get; set; }
+
+                internal string Source { get; set; }
+            }
 
             private enum EmailSignatureComposeKind
             {
@@ -44,10 +49,38 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
+
+                string normalizedReason = string.IsNullOrWhiteSpace(reason)
+                    ? "scheduled"
+                    : reason.Trim();
+                if (!normalizedReason.StartsWith("retry_", StringComparison.OrdinalIgnoreCase))
+                {
+                    _emailSignatureReadyRetryCount = 0;
+                }
+
+                _pendingEmailSignatureReason = normalizedReason;
+                _emailSignatureStateStable = false;
+                _emailSignatureRequestGeneration++;
                 try
                 {
-                    _pendingEmailSignatureReason = string.IsNullOrWhiteSpace(reason) ? "scheduled" : reason.Trim();
                     _emailSignatureTimer.Stop();
+                    if (_composeSurfaceState == ComposeSurfaceState.Detached)
+                    {
+                        DeferEmailSignatureApplication(normalizedReason, "schedule_detached");
+                        return;
+                    }
+                    if (_emailSignatureApplying)
+                    {
+                        LogEmailSignature(
+                            "reconcile queued while policy fetch is active (reason="
+                            + normalizedReason
+                            + ", generation="
+                            + _emailSignatureRequestGeneration.ToString(CultureInfo.InvariantCulture)
+                            + ").");
+                        return;
+                    }
+
+                    ConfigureEmailSignatureTimer(normalizedReason);
                     _emailSignatureTimer.Start();
                 }
                 catch (Exception ex)
@@ -59,789 +92,541 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void OnEmailSignatureTimerTick(object sender, EventArgs e)
+            private void ConfigureEmailSignatureTimer(string reason)
+            {
+                _emailSignatureTimer.Interval = !string.IsNullOrWhiteSpace(reason)
+                                                && reason.StartsWith("retry_", StringComparison.OrdinalIgnoreCase)
+                    ? EmailSignatureReadyRetryDelayMs
+                    : (_composeSurfaceState == ComposeSurfaceState.InlineResponse
+                        ? EmailSignatureInlineApplyDebounceMs
+                        : EmailSignatureApplyDebounceMs);
+            }
+
+            private async void OnEmailSignatureTimerTick(object sender, EventArgs e)
             {
                 _emailSignatureTimer.Stop();
-                if (_disposed || _emailSignatureApplying)
+                if (_disposed)
                 {
+                    return;
+                }
+                if (_emailSignatureApplying)
+                {
+                    DeferEmailSignatureApplication(_pendingEmailSignatureReason, "timer_busy");
                     return;
                 }
 
                 _emailSignatureApplying = true;
+                int generation = _emailSignatureRequestGeneration;
+                string reason = string.IsNullOrWhiteSpace(_pendingEmailSignatureReason)
+                    ? "scheduled"
+                    : _pendingEmailSignatureReason;
+                Exception processingException = null;
                 try
                 {
-                    ApplyEmailSignaturePolicy(_pendingEmailSignatureReason);
+                    _owner.EnsureSettingsLoaded();
+                    AddinSettings settings = _owner._currentSettings ?? new AddinSettings();
+                    var configuration = new TalkServiceConfiguration(
+                        settings.ServerUrl,
+                        settings.Username,
+                        settings.AppPassword);
+
+                    BackendPolicyStatus policyStatus = null;
+                    if (configuration.IsComplete())
+                    {
+                        policyStatus = await _owner.GetEmailSignaturePolicyStatusAsync(
+                            configuration,
+                            "compose_email_signature_" + reason).ConfigureAwait(false);
+                    }
+
+                    await _owner.RunOnOutlookUiThreadAsync(
+                        () => CompleteEmailSignaturePolicyFetch(
+                            generation,
+                            reason,
+                            settings,
+                            configuration,
+                            policyStatus)).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
+                    processingException = ex;
                     DiagnosticsLogger.LogException(
                         LogCategories.Core,
-                        "Email signature processing failed (composeKey=" + _composeKey + ").",
+                        "Email signature policy processing failed (composeKey=" + _composeKey + ").",
                         ex);
                 }
-                finally
+
+                if (processingException != null)
+                {
+                    try
+                    {
+                        await _owner.RunOnOutlookUiThreadAsync(
+                            () =>
+                            {
+                                if (!_disposed && generation == _emailSignatureRequestGeneration)
+                                {
+                                    ScheduleEmailSignatureRetry(reason, "policy_exception");
+                                }
+                            }).ConfigureAwait(false);
+                    }
+                    catch (Exception dispatchException)
+                    {
+                        DiagnosticsLogger.LogException(
+                            LogCategories.Core,
+                            "Failed to dispatch email signature retry to the Outlook UI thread.",
+                            dispatchException);
+                    }
+                }
+
+                try
+                {
+                    await _owner.RunOnOutlookUiThreadAsync(
+                        () => CompleteEmailSignatureAsyncRun(generation)).ConfigureAwait(false);
+                }
+                catch (Exception ex)
                 {
                     _emailSignatureApplying = false;
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Core,
+                        "Failed to complete email signature processing on the Outlook UI thread.",
+                        ex);
                 }
             }
 
-            private void ApplyEmailSignaturePolicy(string reason)
+            private void CompleteEmailSignaturePolicyFetch(
+                int generation,
+                string reason,
+                AddinSettings settings,
+                TalkServiceConfiguration configuration,
+                BackendPolicyStatus policyStatus)
+            {
+                if (_disposed || generation != _emailSignatureRequestGeneration)
+                {
+                    LogEmailSignature(
+                        "stale policy result ignored (generation="
+                        + generation.ToString(CultureInfo.InvariantCulture)
+                        + ", currentGeneration="
+                        + _emailSignatureRequestGeneration.ToString(CultureInfo.InvariantCulture)
+                        + ").");
+                    return;
+                }
+
+                EmailSignatureApplicationResult result = configuration != null && configuration.IsComplete()
+                    ? ApplyEmailSignaturePolicy(policyStatus, settings, reason)
+                    : ReconcileEmailSignatureWithoutBackendConfiguration(reason);
+                if (result.Success)
+                {
+                    _emailSignatureStateStable = true;
+                    _emailSignatureReadyRetryCount = 0;
+                    _pendingEmailSignatureReason = string.Empty;
+                    LogEmailSignature(
+                        "reconcile completed (trigger="
+                        + (reason ?? "n/a")
+                        + ", source="
+                        + (result.Source ?? "n/a")
+                        + ", surface="
+                        + _composeSurfaceState.ToString()
+                        + ").");
+                    return;
+                }
+
+                _emailSignatureStateStable = false;
+                ScheduleEmailSignatureRetry(reason, result.Source);
+            }
+
+            private void CompleteEmailSignatureAsyncRun(int generation)
+            {
+                _emailSignatureApplying = false;
+                if (_disposed)
+                {
+                    return;
+                }
+
+                if (ResumeDeferredEmailSignatureApplication("policy_complete"))
+                {
+                    return;
+                }
+
+                if (generation != _emailSignatureRequestGeneration
+                    && _composeSurfaceState != ComposeSurfaceState.Detached
+                    && !string.IsNullOrWhiteSpace(_pendingEmailSignatureReason)
+                    && !_emailSignatureTimer.Enabled)
+                {
+                    ConfigureEmailSignatureTimer(_pendingEmailSignatureReason);
+                    _emailSignatureTimer.Start();
+                }
+            }
+
+            private void ScheduleEmailSignatureRetry(string originalReason, string source)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _emailSignatureReadyRetryCount++;
+                if (_emailSignatureReadyRetryCount > EmailSignatureReadyRetryLimit)
+                {
+                    _pendingEmailSignatureReason = "retry_exhausted_"
+                                                   + (string.IsNullOrWhiteSpace(originalReason)
+                                                       ? "scheduled"
+                                                       : originalReason);
+                    LogEmailSignature(
+                        "reconcile retry limit reached (trigger="
+                        + (originalReason ?? "n/a")
+                        + ", source="
+                        + (source ?? "n/a")
+                        + ", retries="
+                        + EmailSignatureReadyRetryLimit.ToString(CultureInfo.InvariantCulture)
+                        + ").");
+                    return;
+                }
+
+                string retryReason = "retry_"
+                                     + _emailSignatureReadyRetryCount.ToString(CultureInfo.InvariantCulture)
+                                     + "_"
+                                     + (string.IsNullOrWhiteSpace(originalReason)
+                                         ? "scheduled"
+                                         : originalReason);
+                LogEmailSignature(
+                    "reconcile retry scheduled (trigger="
+                    + (originalReason ?? "n/a")
+                    + ", source="
+                    + (source ?? "n/a")
+                    + ", retry="
+                    + _emailSignatureReadyRetryCount.ToString(CultureInfo.InvariantCulture)
+                    + ").");
+                ScheduleEmailSignatureApplication(retryReason);
+            }
+
+            private EmailSignatureApplicationResult ReconcileEmailSignatureWithoutBackendConfiguration(string reason)
+            {
+                return ClearManagedEmailSignature(
+                    "configuration_incomplete:" + (reason ?? "n/a"));
+            }
+
+            private EmailSignatureApplicationResult ApplyEmailSignaturePolicy(
+                BackendPolicyStatus policyStatus,
+                AddinSettings settings,
+                string reason)
             {
                 if (_owner == null || _mail == null)
                 {
-                    return;
+                    return EmailSignatureFailure("compose_unavailable");
                 }
                 if (!IsMailComposeCandidate(_mail, "email_signature_" + (reason ?? "scheduled")))
                 {
-                    LogEmailSignature("Email signature skipped for non-compose mail (trigger=" + (reason ?? "n/a") + ").");
-                    return;
+                    return EmailSignatureSuccess("not_compose");
+                }
+                if (policyStatus == null || !policyStatus.FetchSucceeded)
+                {
+                    LogEmailSignature(
+                        "policy result unavailable; message body left unchanged (trigger="
+                        + (reason ?? "n/a")
+                        + ").");
+                    return EmailSignatureFailure("policy_unavailable");
                 }
 
-                _owner.EnsureSettingsLoaded();
-                AddinSettings settings = _owner._currentSettings ?? new AddinSettings();
-                var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
-                BackendPolicyStatus policyStatus = _owner.FetchBackendPolicyStatus(configuration, "compose_email_signature");
-                var policy = new EmailSignaturePolicyService(policyStatus, settings).Resolve();
-
+                var policy = new EmailSignaturePolicyService(
+                    policyStatus,
+                    settings ?? new AddinSettings()).Resolve();
                 if (!policy.Active)
                 {
-                    ClearManagedEmailSignatureIfNeeded(policy.Reason);
-                    LogEmailSignature("Email signature inactive (reason=" + (policy.Reason ?? "n/a") + ", trigger=" + (reason ?? "n/a") + ").");
-                    return;
+                    return ClearManagedEmailSignature(
+                        "policy_inactive:" + (policy.Reason ?? "n/a"));
                 }
 
-                string senderEmail = EmailSignaturePolicyService.NormalizeEmail(ResolveCurrentSenderEmail());
-                if (!string.Equals(senderEmail, policy.UserEmail, StringComparison.OrdinalIgnoreCase))
+                string senderEmail = EmailSignaturePolicyService.NormalizeEmail(
+                    ResolveCurrentSenderEmail());
+                if (!string.Equals(
+                        senderEmail,
+                        policy.UserEmail,
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    ClearManagedEmailSignatureIfNeeded("identity_mismatch");
                     LogEmailSignature(
-                        "Email signature skipped for non-seat sender (trigger="
+                        "sender does not match backend seat (trigger="
                         + (reason ?? "n/a")
                         + ", hasSender="
                         + (!string.IsNullOrWhiteSpace(senderEmail)).ToString(CultureInfo.InvariantCulture)
                         + ", hasPolicyEmail="
                         + (!string.IsNullOrWhiteSpace(policy.UserEmail)).ToString(CultureInfo.InvariantCulture)
                         + ").");
-                    return;
+                    return ClearManagedEmailSignature("identity_mismatch");
                 }
 
                 EmailSignatureComposeKind composeKind = ResolveEmailSignatureComposeKind();
-                bool shouldInsert = ShouldInsertEmailSignature(policy, composeKind);
-                bool shouldClearForeign = ShouldClearForeignEmailSignature(policy, composeKind);
-                if (DiagnosticsLogger.IsEnabled)
+                if (composeKind == EmailSignatureComposeKind.Unknown)
+                {
+                    LogEmailSignature("compose kind is not yet reliable; body left unchanged.");
+                    return EmailSignatureFailure("compose_kind_unknown");
+                }
+                if (composeKind == EmailSignatureComposeKind.Response
+                    && policy.OnReply != policy.OnForward)
                 {
                     LogEmailSignature(
-                        "Email signature decision (trigger="
-                        + (reason ?? "n/a")
-                        + ", kind="
-                        + composeKind
-                        + ", onCompose="
-                        + policy.OnCompose.ToString(CultureInfo.InvariantCulture)
-                        + ", onReply="
-                        + policy.OnReply.ToString(CultureInfo.InvariantCulture)
-                        + ", onForward="
-                        + policy.OnForward.ToString(CultureInfo.InvariantCulture)
-                        + ", shouldInsert="
-                        + shouldInsert.ToString(CultureInfo.InvariantCulture)
-                        + ", shouldClearForeign="
-                        + shouldClearForeign.ToString(CultureInfo.InvariantCulture)
-                        + ").");
+                        "ambiguous response not changed because reply/forward policy differs.");
+                    return EmailSignatureFailure("response_kind_ambiguous");
                 }
+
+                bool shouldInsert = ShouldInsertEmailSignature(policy, composeKind);
+                LogEmailSignature(
+                    "decision (trigger="
+                    + (reason ?? "n/a")
+                    + ", kind="
+                    + composeKind.ToString()
+                    + ", onCompose="
+                    + policy.OnCompose.ToString(CultureInfo.InvariantCulture)
+                    + ", onReply="
+                    + policy.OnReply.ToString(CultureInfo.InvariantCulture)
+                    + ", onForward="
+                    + policy.OnForward.ToString(CultureInfo.InvariantCulture)
+                    + ", insert="
+                    + shouldInsert.ToString(CultureInfo.InvariantCulture)
+                    + ", surface="
+                    + _composeSurfaceState.ToString()
+                    + ").");
                 if (!shouldInsert)
                 {
-                    if (shouldClearForeign)
-                    {
-                        ClearEmailSignatureSlotWithoutInsert("compose_type_disabled:" + (reason ?? "n/a"), composeKind);
-                    }
-                    else
-                    {
-                        ClearManagedEmailSignatureIfNeeded("compose_type_disabled");
-                    }
-                    LogEmailSignature(
-                        "Email signature skipped for compose kind (trigger="
-                        + (reason ?? "n/a")
-                        + ", kind="
-                        + composeKind
-                        + ", clearForeign="
-                        + shouldClearForeign.ToString(CultureInfo.InvariantCulture)
-                        + ").");
-                    return;
+                    return ClearInitialEmailSignatureSlot(
+                        "compose_type_disabled:" + (reason ?? "n/a"));
                 }
 
-                string sanitized = HtmlTemplateSanitizer.SanitizeEmailSignatureTemplateHtml(policy.TemplateHtml);
+                string sanitized = HtmlTemplateSanitizer.SanitizeEmailSignatureTemplateHtml(
+                    policy.TemplateHtml);
                 if (string.IsNullOrWhiteSpace(sanitized))
                 {
-                    ClearManagedEmailSignatureIfNeeded("sanitized_empty");
-                    LogEmailSignature("Email signature sanitized to empty output (trigger=" + (reason ?? "n/a") + ").");
-                    return;
+                    EmailSignatureApplicationResult clearResult =
+                        ClearManagedEmailSignature("sanitized_empty");
+                    return EmailSignatureFailure(
+                        clearResult.Success
+                            ? "sanitized_empty"
+                            : "sanitized_empty_clear_failed:" + (clearResult.Source ?? "n/a"));
                 }
 
-                ApplyManagedEmailSignature(sanitized, composeKind, reason);
-            }
-
-            private void ApplyManagedEmailSignature(string sanitizedHtml, EmailSignatureComposeKind composeKind, string reason)
-            {
-                Outlook.OlBodyFormat bodyFormat = ReadMailBodyFormatForEmailSignature("apply");
-                if (bodyFormat == Outlook.OlBodyFormat.olFormatPlain)
+                Outlook.OlBodyFormat bodyFormat;
+                try
                 {
-                    ApplyManagedPlainTextEmailSignature(sanitizedHtml, composeKind, reason);
-                    return;
+                    bodyFormat = _mail.BodyFormat;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Core,
+                        "Failed to read compose body format for email signature.",
+                        ex);
+                    return EmailSignatureFailure("body_format_unavailable");
                 }
 
-                if (!EnsureHtmlBodyForEmailSignature("apply"))
-                {
-                    return;
-                }
-
-                string existing = _mail.HTMLBody ?? string.Empty;
-                int slotStart;
-                int slotEnd;
-                bool hasQuoteBoundary;
-                TryGetComposeSignatureSlotBounds(existing, out slotStart, out slotEnd, out hasQuoteBoundary);
-                string managedBlock = BuildManagedSignatureBlock(sanitizedHtml, hasQuoteBoundary);
-                string inlineManagedBlock = _isInlineResponse
-                    ? BuildManagedSignatureBlock(sanitizedHtml, false, true)
-                    : managedBlock;
-                bool replacedManaged;
-                string updated = ReplaceManagedSignatureBlocks(existing, managedBlock, out replacedManaged);
-                bool removedInitialSlot = false;
-                if (!replacedManaged)
-                {
-                    bool removedManaged;
-                    string bodyWithoutManaged = RemoveManagedSignatureBlocks(updated, out removedManaged);
-                    bool mayReplaceForeignSlot = !_emailSignatureInitialSlotHandled;
-                    if (mayReplaceForeignSlot
-                        && !_isInlineResponse
-                        && IsEmailSignaturePropertyTrigger(reason)
-                        && _owner != null
-                        && _owner._mailInteropController != null
-                        && _owner._mailInteropController.TryReplaceInspectorSignatureSlot(_mail, managedBlock, _composeKey, "apply"))
-                    {
-                        _emailSignatureInitialSlotHandled = true;
-                        _emailSignatureManaged = true;
-                        LogEmailSignature(
-                            "Email signature applied via inspector signature slot (trigger="
-                            + (reason ?? "n/a")
-                            + ", kind="
-                            + composeKind
-                            + ", htmlLength="
-                            + sanitizedHtml.Length.ToString(CultureInfo.InvariantCulture)
-                            + ").");
-                        return;
-                    }
-                    if (IsEmailSignaturePropertyTrigger(reason))
-                    {
-                        mayReplaceForeignSlot = false;
-                    }
-                    updated = ReplaceComposeSignatureSlot(
-                        bodyWithoutManaged,
-                        managedBlock,
-                        mayReplaceForeignSlot,
-                        composeKind,
-                        out removedInitialSlot);
-                    replacedManaged = removedManaged;
-                }
-                if (!TryWriteEmailSignatureHtmlBody(updated, "apply", inlineManagedBlock))
-                {
-                    return;
-                }
-                _emailSignatureInitialSlotHandled = true;
-                _emailSignatureManaged = true;
-
+                bool isPlainText = bodyFormat == Outlook.OlBodyFormat.olFormatPlain;
                 LogEmailSignature(
-                    "Email signature applied (trigger="
+                    "format resolved (trigger="
                     + (reason ?? "n/a")
-                    + ", kind="
-                    + composeKind
-                    + ", htmlLength="
-                    + sanitizedHtml.Length.ToString(CultureInfo.InvariantCulture)
-                    + ", removedManaged="
-                    + replacedManaged.ToString(CultureInfo.InvariantCulture)
-                    + ", removedInitialSlot="
-                    + removedInitialSlot.ToString(CultureInfo.InvariantCulture)
+                    + ", bodyFormat="
+                    + bodyFormat.ToString()
+                    + ", plainText="
+                    + isPlainText.ToString(CultureInfo.InvariantCulture)
                     + ").");
+                string signatureContent = isPlainText
+                    ? EmailSignatureContentBuilder.BuildPlainText(sanitized)
+                    : EmailSignatureContentBuilder.BuildManagedHtml(sanitized);
+                if (string.IsNullOrWhiteSpace(signatureContent))
+                {
+                    return EmailSignatureFailure("signature_content_empty");
+                }
+
+                MailInteropController.EmailSignatureReconcileResult reconcile =
+                    _owner._mailInteropController.ApplyManagedEmailSignature(
+                        _mail,
+                        _isInlineResponse,
+                        isPlainText,
+                        signatureContent,
+                        IsReplyOrForwardComposeKind(composeKind),
+                        _composeKey,
+                        "apply:" + (reason ?? "n/a"),
+                        _inlineExplorerIdentityKey);
+                return ApplyEmailSignatureReconcileResult(reconcile);
             }
 
-            private void ApplyManagedPlainTextEmailSignature(string sanitizedHtml, EmailSignatureComposeKind composeKind, string reason)
+            private EmailSignatureApplicationResult ClearManagedEmailSignature(string reason)
             {
-                string plainText = HtmlToPlainTextConverter.Convert(sanitizedHtml);
-                if (string.IsNullOrWhiteSpace(plainText))
+                if (_owner == null || _owner._mailInteropController == null || _mail == null)
                 {
-                    ClearEmailSignatureSlotWithoutInsert("plain_text_empty", composeKind);
-                    LogEmailSignature("Plain-text email signature sanitized to empty output (trigger=" + (reason ?? "n/a") + ").");
-                    return;
+                    return EmailSignatureFailure("interop_unavailable");
                 }
 
-                EmailSignaturePlainTextController.Result result = EmailSignaturePlainTextController.Apply(
-                    _owner != null ? _owner.OutlookApplication : null,
-                    _mail,
-                    _isInlineResponse,
-                    _composeKey,
-                    plainText,
-                    LogEmailSignature);
-                if (!result.Success)
+                MailInteropController.EmailSignatureReconcileResult reconcile =
+                    _owner._mailInteropController.ClearManagedEmailSignature(
+                        _mail,
+                        _isInlineResponse,
+                        _composeKey,
+                        "clear_managed:" + (reason ?? "n/a"),
+                        _inlineExplorerIdentityKey);
+                return ApplyEmailSignatureReconcileResult(reconcile);
+            }
+
+            private EmailSignatureApplicationResult ClearInitialEmailSignatureSlot(string reason)
+            {
+                if (_owner == null || _owner._mailInteropController == null || _mail == null)
                 {
+                    return EmailSignatureFailure("interop_unavailable");
+                }
+
+                MailInteropController.EmailSignatureReconcileResult reconcile =
+                    _owner._mailInteropController.ClearInitialEmailSignatureSlot(
+                        _mail,
+                        _isInlineResponse,
+                        _composeKey,
+                        "clear_initial:" + (reason ?? "n/a"),
+                        _inlineExplorerIdentityKey);
+                return ApplyEmailSignatureReconcileResult(reconcile);
+            }
+
+            private EmailSignatureApplicationResult ApplyEmailSignatureReconcileResult(
+                MailInteropController.EmailSignatureReconcileResult reconcile)
+            {
+                if (reconcile == null || !reconcile.Success)
+                {
+                    return EmailSignatureFailure(
+                        reconcile != null ? reconcile.Source : "reconcile_unavailable");
+                }
+
+                return EmailSignatureSuccess(reconcile.Source);
+            }
+
+            private static EmailSignatureApplicationResult EmailSignatureSuccess(string source)
+            {
+                return new EmailSignatureApplicationResult
+                {
+                    Success = true,
+                    Source = source ?? "success"
+                };
+            }
+
+            private static EmailSignatureApplicationResult EmailSignatureFailure(string source)
+            {
+                return new EmailSignatureApplicationResult
+                {
+                    Success = false,
+                    Source = source ?? "failed"
+                };
+            }
+
+            private bool TryFinalizeEmailSignatureBeforeSend(ref bool cancel)
+            {
+                if (_disposed || cancel || _owner == null || _mail == null)
+                {
+                    return !cancel;
+                }
+
+                _emailSignatureTimer.Stop();
+                _emailSignatureRequestGeneration++;
+                _owner.EnsureSettingsLoaded();
+                AddinSettings settings = _owner._currentSettings ?? new AddinSettings();
+                var configuration = new TalkServiceConfiguration(
+                    settings.ServerUrl,
+                    settings.Username,
+                    settings.AppPassword);
+
+                if (!configuration.IsComplete())
+                {
+                    EmailSignatureApplicationResult noConfiguration =
+                        ReconcileEmailSignatureWithoutBackendConfiguration("send");
+                    if (noConfiguration.Success)
+                    {
+                        _emailSignatureStateStable = true;
+                        _pendingEmailSignatureReason = string.Empty;
+                        _deferredEmailSignatureReason = string.Empty;
+                        return true;
+                    }
+
                     LogEmailSignature(
-                        "Plain-text email signature apply skipped (trigger="
-                        + (reason ?? "n/a")
-                        + ", kind="
-                        + composeKind
-                        + ", source="
-                        + (result.Source ?? "n/a")
+                        "best-effort managed cleanup could not run before send with incomplete configuration (source="
+                        + (noConfiguration.Source ?? "n/a")
                         + ").");
-                    return;
+                    return true;
                 }
 
-                _emailSignatureInitialSlotHandled = _emailSignatureInitialSlotHandled || result.InitialSlotHandled;
-                _emailSignatureManaged = result.Managed;
+                BackendPolicyStatus policyStatus;
+                if (!_owner.TryGetCachedEmailSignaturePolicyStatus(
+                        configuration,
+                        out policyStatus)
+                    || policyStatus == null
+                    || !policyStatus.FetchSucceeded)
+                {
+                    ScheduleEmailSignatureApplication("send_policy_required");
+                    cancel = true;
+                    return BlockEmailSignatureSend(
+                        ref cancel,
+                        "policy_unavailable",
+                        true);
+                }
 
+                if (_composeSurfaceState == ComposeSurfaceState.Detached)
+                {
+                    if (_emailSignatureStateStable
+                        && string.IsNullOrWhiteSpace(_pendingEmailSignatureReason)
+                        && string.IsNullOrWhiteSpace(_deferredEmailSignatureReason))
+                    {
+                        LogEmailSignature(
+                            "send accepted from detached inline transition using the last stable reconcile.");
+                        return true;
+                    }
+
+                    DeferEmailSignatureApplication("send_reconcile_required", "send_detached");
+                    cancel = true;
+                    return BlockEmailSignatureSend(
+                        ref cancel,
+                        "compose_surface_detached",
+                        false);
+                }
+
+                EmailSignatureApplicationResult finalResult = ApplyEmailSignaturePolicy(
+                    policyStatus,
+                    settings,
+                    "send");
+                if (finalResult.Success)
+                {
+                    _emailSignatureStateStable = true;
+                    _emailSignatureReadyRetryCount = 0;
+                    _pendingEmailSignatureReason = string.Empty;
+                    _deferredEmailSignatureReason = string.Empty;
+                    return true;
+                }
+
+                ScheduleEmailSignatureApplication("send_reconcile_failed");
+                cancel = true;
+                return BlockEmailSignatureSend(
+                    ref cancel,
+                    finalResult.Source,
+                    string.Equals(
+                        finalResult.Source,
+                        "policy_unavailable",
+                        StringComparison.OrdinalIgnoreCase));
+            }
+
+            private bool BlockEmailSignatureSend(
+                ref bool cancel,
+                string source,
+                bool policyUnavailable)
+            {
+                cancel = true;
+                _emailSignatureStateStable = false;
                 LogEmailSignature(
-                    "Plain-text email signature applied (trigger="
-                    + (reason ?? "n/a")
-                    + ", kind="
-                    + composeKind
-                    + ", textLength="
-                    + plainText.Length.ToString(CultureInfo.InvariantCulture)
-                    + ", source="
-                    + (result.Source ?? "n/a")
+                    "send blocked because final reconcile is not reliable (source="
+                    + (source ?? "n/a")
                     + ").");
-            }
 
-            private void ClearEmailSignatureSlotWithoutInsert(string reason, EmailSignatureComposeKind composeKind)
-            {
-                if (_mail == null)
-                {
-                    return;
-                }
-
-                try
-                {
-                    Outlook.OlBodyFormat bodyFormat = ReadMailBodyFormatForEmailSignature("clear");
-                    if (bodyFormat == Outlook.OlBodyFormat.olFormatPlain)
-                    {
-                        EmailSignaturePlainTextController.Result result = EmailSignaturePlainTextController.ClearInitialSlot(
-                            _owner != null ? _owner.OutlookApplication : null,
-                            _mail,
-                            _isInlineResponse,
-                            _composeKey,
-                            LogEmailSignature);
-                        if (result.Success)
-                        {
-                            _emailSignatureInitialSlotHandled = _emailSignatureInitialSlotHandled || result.InitialSlotHandled;
-                            if (result.Changed)
-                            {
-                                _emailSignatureManaged = result.Managed;
-                            }
-                        }
-                        LogEmailSignature(
-                            "Plain-text email signature slot clear completed (reason="
-                            + (reason ?? "n/a")
-                            + ", kind="
-                            + composeKind
-                            + ", changed="
-                            + (result != null && result.Changed).ToString(CultureInfo.InvariantCulture)
-                            + ", source="
-                            + (result != null ? result.Source ?? "n/a" : "n/a")
-                            + ").");
-                        return;
-                    }
-
-                    if (!EnsureHtmlBodyForEmailSignature("clear"))
-                    {
-                        return;
-                    }
-
-                    string existing = _mail.HTMLBody ?? string.Empty;
-                    string clearReplacement = BuildSignatureClearBlock(composeKind);
-                    bool removedManaged;
-                    string cleaned = ReplaceManagedSignatureBlocks(existing, clearReplacement, out removedManaged);
-                    bool removedInitialSlot = false;
-                    if (!removedManaged && !_emailSignatureInitialSlotHandled)
-                    {
-                        bool mayReplaceForeignSlot = true;
-                        if (!_isInlineResponse
-                            && IsEmailSignaturePropertyTrigger(reason)
-                            && _owner != null
-                            && _owner._mailInteropController != null
-                            && _owner._mailInteropController.TryReplaceInspectorSignatureSlot(_mail, clearReplacement, _composeKey, "clear_slot", true))
-                        {
-                            _emailSignatureInitialSlotHandled = true;
-                            _emailSignatureManaged = false;
-                            LogEmailSignature(
-                                "Email signature slot cleared via inspector signature slot (reason="
-                                + (reason ?? "n/a")
-                                + ", kind="
-                                + composeKind
-                                + ").");
-                            return;
-                        }
-                        if (IsEmailSignaturePropertyTrigger(reason))
-                        {
-                            mayReplaceForeignSlot = false;
-                        }
-                        if (!removedInitialSlot && mayReplaceForeignSlot)
-                        {
-                            cleaned = ReplaceComposeSignatureSlot(
-                                cleaned,
-                                clearReplacement,
-                                true,
-                                composeKind,
-                                out removedInitialSlot);
-                        }
-                    }
-                    if (removedManaged || removedInitialSlot || _isInlineResponse)
-                    {
-                        if (!TryWriteEmailSignatureHtmlBody(cleaned, "clear_slot", string.Empty, true))
-                        {
-                            return;
-                        }
-                    }
-                    _emailSignatureInitialSlotHandled = true;
-                    _emailSignatureManaged = false;
-
-                    LogEmailSignature(
-                        "Email signature slot cleared without backend insert (reason="
-                        + (reason ?? "n/a")
-                        + ", kind="
-                        + composeKind
-                        + ", removedManaged="
-                        + removedManaged.ToString(CultureInfo.InvariantCulture)
-                        + ", removedInitialSlot="
-                        + removedInitialSlot.ToString(CultureInfo.InvariantCulture)
-                        + ").");
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to clear email signature slot.", ex);
-                }
-            }
-
-            private void ClearManagedEmailSignatureIfNeeded(string reason)
-            {
-                if (_mail == null)
-                {
-                    return;
-                }
-                try
-                {
-                    if (_mail.BodyFormat == Outlook.OlBodyFormat.olFormatPlain)
-                    {
-                        if (!_emailSignatureManaged)
-                        {
-                            return;
-                        }
-
-                        EmailSignaturePlainTextController.Result result = EmailSignaturePlainTextController.ClearManaged(
-                            _owner != null ? _owner.OutlookApplication : null,
-                            _mail,
-                            _isInlineResponse,
-                            _composeKey,
-                            LogEmailSignature);
-                        if (result.Success && result.Changed)
-                        {
-                            _emailSignatureManaged = false;
-                        }
-                        LogEmailSignature(
-                            "Managed plain-text email signature clear completed (reason="
-                            + (reason ?? "n/a")
-                            + ", changed="
-                            + (result != null && result.Changed).ToString(CultureInfo.InvariantCulture)
-                            + ", source="
-                            + (result != null ? result.Source ?? "n/a" : "n/a")
-                            + ").");
-                        return;
-                    }
-
-                    string existing = _mail.HTMLBody ?? string.Empty;
-                    if (!_emailSignatureManaged && !ManagedSignatureBlockRegex.IsMatch(existing))
-                    {
-                        return;
-                    }
-
-                    bool removed;
-                    string cleaned = RemoveManagedSignatureBlocks(existing, out removed);
-                    if (removed)
-                    {
-                        if (!TryWriteEmailSignatureHtmlBody(cleaned, "clear_managed", string.Empty))
-                        {
-                            return;
-                        }
-                    }
-                    _emailSignatureManaged = false;
-                    LogEmailSignature(
-                        "Managed email signature cleared (reason="
-                        + (reason ?? "n/a")
-                        + ", changed="
-                        + removed.ToString(CultureInfo.InvariantCulture)
-                        + ").");
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to clear managed email signature.", ex);
-                }
-            }
-
-            private Outlook.OlBodyFormat ReadMailBodyFormatForEmailSignature(string operation)
-            {
-                try
-                {
-                    return _mail.BodyFormat;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read mail body format for email signature (" + (operation ?? "n/a") + ").", ex);
-                    return Outlook.OlBodyFormat.olFormatUnspecified;
-                }
-            }
-
-            private bool EnsureHtmlBodyForEmailSignature(string operation)
-            {
-                Outlook.OlBodyFormat bodyFormat = ReadMailBodyFormatForEmailSignature(operation);
-                if (bodyFormat != Outlook.OlBodyFormat.olFormatPlain
-                    && bodyFormat != Outlook.OlBodyFormat.olFormatRichText)
-                {
-                    return true;
-                }
-
-                try
-                {
-                    _mail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to switch mail to HTML for email signature (" + (operation ?? "n/a") + ").", ex);
-                    return false;
-                }
-            }
-
-            private static string RemoveManagedSignatureBlocks(string html, out bool removed)
-            {
-                removed = false;
-                if (string.IsNullOrEmpty(html))
-                {
-                    return html ?? string.Empty;
-                }
-                removed = ManagedSignatureBlockRegex.IsMatch(html);
-                return removed ? ManagedSignatureBlockRegex.Replace(html, string.Empty) : html;
-            }
-
-            private bool TryWriteEmailSignatureHtmlBody(string html, string operation, string inlineSignatureSlotHtml = null, bool placeCursorAtBodyStart = false)
-            {
-                if (!_isInlineResponse)
-                {
-                    if (_owner != null && _owner._mailInteropController != null)
-                    {
-                        return _owner._mailInteropController.TryWriteMailHtmlBodyPreservingSelection(
-                            _mail,
-                            html ?? string.Empty,
-                            _composeKey,
-                            operation,
-                            placeCursorAtBodyStart);
-                    }
-
-                    _mail.HTMLBody = html ?? string.Empty;
-                    return true;
-                }
-
-                if (_owner == null || _owner._mailInteropController == null)
-                {
-                    LogEmailSignature("Inline email signature write skipped (operation=" + (operation ?? "n/a") + ", reason=interop_unavailable).");
-                    return false;
-                }
-
-                bool written = _owner._mailInteropController.TryReplaceActiveInlineResponseSignatureSlot(
-                    _mail,
-                    inlineSignatureSlotHtml ?? html ?? string.Empty,
-                    _composeKey,
-                    operation);
-                if (!written)
-                {
-                    LogEmailSignature("Inline email signature write skipped (operation=" + (operation ?? "n/a") + ", reason=inline_editor_unavailable).");
-                }
-                return written;
-            }
-
-            private static string BuildManagedSignatureBlock(string sanitizedHtml, bool addTrailingQuoteGap)
-            {
-                return BuildManagedSignatureBlock(sanitizedHtml, true, addTrailingQuoteGap);
-            }
-
-            private static string BuildManagedSignatureBlock(string sanitizedHtml, bool addLeadingReplyGap, bool addTrailingQuoteGap)
-            {
-                string html = sanitizedHtml ?? string.Empty;
-                string hash = ComputeSignatureHash(html);
-                return ManagedSignatureStartPrefix
-                       + hash
-                       + " -->"
-                       + (addLeadingReplyGap ? ReplyComposeEditGapHtml : string.Empty)
-                       + "<div data-nc-connector-signature=\"true\">"
-                       + html
-                       + "</div>"
-                       + (addTrailingQuoteGap ? ReplyComposeQuoteGapHtml : string.Empty)
-                       + ManagedSignatureEnd;
-            }
-
-            private static string BuildSignatureClearBlock(EmailSignatureComposeKind composeKind)
-            {
-                return IsReplyOrForwardComposeKind(composeKind) ? ReplyComposeEditGapHtml : string.Empty;
-            }
-
-            private static bool IsReplyOrForwardComposeKind(EmailSignatureComposeKind composeKind)
-            {
-                return composeKind == EmailSignatureComposeKind.Reply
-                       || composeKind == EmailSignatureComposeKind.Forward
-                       || composeKind == EmailSignatureComposeKind.Response;
-            }
-
-            private static string ReplaceManagedSignatureBlocks(string html, string replacement, out bool replaced)
-            {
-                replaced = false;
-                if (string.IsNullOrEmpty(html))
-                {
-                    return html ?? string.Empty;
-                }
-                replaced = ManagedSignatureBlockRegex.IsMatch(html);
-                if (!replaced)
-                {
-                    return html;
-                }
-                return ManagedSignatureBlockRegex.Replace(html, replacement ?? string.Empty);
-            }
-
-            private static string ReplaceComposeSignatureSlot(
-                string html,
-                string replacement,
-                bool mayReplaceForeignSlot,
-                EmailSignatureComposeKind composeKind,
-                out bool removedForeignSlot)
-            {
-                removedForeignSlot = false;
-                string existing = html ?? string.Empty;
-                int slotStart;
-                int slotEnd;
-                bool hasQuoteBoundary;
-                if (!TryGetComposeSignatureSlotBounds(existing, out slotStart, out slotEnd, out hasQuoteBoundary))
-                {
-                    return (replacement ?? string.Empty) + existing;
-                }
-
-                string slot = slotEnd > slotStart ? existing.Substring(slotStart, slotEnd - slotStart) : string.Empty;
-                bool slotHasText = !string.IsNullOrWhiteSpace(StripHtmlToText(slot));
-                bool canReplaceForeignSlot = mayReplaceForeignSlot
-                    && (composeKind == EmailSignatureComposeKind.New || hasQuoteBoundary);
-                if (slotHasText && !canReplaceForeignSlot)
-                {
-                    return existing.Insert(slotStart, replacement ?? string.Empty);
-                }
-
-                removedForeignSlot = slotHasText && canReplaceForeignSlot;
-                return existing.Substring(0, slotStart)
-                       + (replacement ?? string.Empty)
-                       + existing.Substring(slotEnd);
-            }
-
-            private static bool TryGetComposeSignatureSlotBounds(string html, out int slotStart, out int slotEnd, out bool hasQuoteBoundary)
-            {
-                slotStart = 0;
-                slotEnd = 0;
-                hasQuoteBoundary = false;
-                if (string.IsNullOrEmpty(html))
-                {
-                    return false;
-                }
-
-                int bodyStart = html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
-                if (bodyStart >= 0)
-                {
-                    int bodyTagEnd = html.IndexOf(">", bodyStart);
-                    if (bodyTagEnd >= 0)
-                    {
-                        slotStart = bodyTagEnd + 1;
-                    }
-                }
-
-                int bodyEnd = html.IndexOf("</body>", slotStart, StringComparison.OrdinalIgnoreCase);
-                if (bodyEnd < 0)
-                {
-                    bodyEnd = html.Length;
-                }
-
-                int quoteStart = FindQuoteBoundary(html, slotStart, bodyEnd);
-                slotEnd = quoteStart >= 0 ? quoteStart : bodyEnd;
-                hasQuoteBoundary = quoteStart >= 0;
-                if (slotEnd < slotStart)
-                {
-                    slotEnd = slotStart;
-                }
-                return true;
-            }
-
-            private static int FindQuoteBoundary(string html, int start, int end)
-            {
-                string[] structuralMarkers = new[]
-                {
-                    "id=\"divRplyFwdMsg\"",
-                    "id=divRplyFwdMsg",
-                    "id=\"x_divRplyFwdMsg\"",
-                    "id=x_divRplyFwdMsg",
-                    "border:none;border-top",
-                    "border: none; border-top",
-                    "mso-border-top-alt",
-                    "<blockquote",
-                    "<hr"
-                };
-                int structuralBoundary = FindEarliestBoundaryMarker(html, start, end, structuralMarkers);
-                if (structuralBoundary >= 0)
-                {
-                    return NormalizeBoundaryToElementStart(html, start, structuralBoundary);
-                }
-
-                string[] textMarkers = new[]
-                {
-                    "-----Original Message-----",
-                    "Von:",
-                    "From:"
-                };
-                int textBoundary = FindEarliestBoundaryMarker(html, start, end, textMarkers);
-                if (textBoundary < 0)
-                {
-                    return -1;
-                }
-
-                int headerElementStart = FindReplyHeaderElementStart(html, start, textBoundary);
-                if (headerElementStart >= 0)
-                {
-                    return headerElementStart;
-                }
-
-                // Keep visual separation intact when Outlook places a divider
-                // immediately before the localized header text marker.
-                int hrBeforeText = html.LastIndexOf("<hr", textBoundary, StringComparison.OrdinalIgnoreCase);
-                if (hrBeforeText >= start && hrBeforeText < textBoundary && (textBoundary - hrBeforeText) <= 512)
-                {
-                    return hrBeforeText;
-                }
-                return -1;
-            }
-
-            private static int NormalizeBoundaryToElementStart(string html, int start, int markerIndex)
-            {
-                if (string.IsNullOrEmpty(html) || markerIndex < start)
-                {
-                    return markerIndex;
-                }
-
-                if (markerIndex + 1 < html.Length && html[markerIndex] == '<')
-                {
-                    return markerIndex;
-                }
-
-                int tagStart = html.LastIndexOf("<", markerIndex, StringComparison.OrdinalIgnoreCase);
-                int tagEnd = html.IndexOf(">", tagStart >= 0 ? tagStart : markerIndex, StringComparison.OrdinalIgnoreCase);
-                if (tagStart >= start && tagEnd >= markerIndex)
-                {
-                    return tagStart;
-                }
-                return markerIndex;
-            }
-
-            private static int FindReplyHeaderElementStart(string html, int start, int textBoundary)
-            {
-                int openBlock = FindOpenAncestorTagStart(html, start, textBoundary, "div");
-                if (openBlock >= 0)
-                {
-                    return openBlock;
-                }
-
-                openBlock = FindOpenAncestorTagStart(html, start, textBoundary, "table");
-                if (openBlock >= 0)
-                {
-                    return openBlock;
-                }
-
-                int paragraphStart = html.LastIndexOf("<p", textBoundary, StringComparison.OrdinalIgnoreCase);
-                if (paragraphStart >= start)
-                {
-                    int paragraphEnd = html.IndexOf(">", paragraphStart, StringComparison.OrdinalIgnoreCase);
-                    if (paragraphEnd >= textBoundary)
-                    {
-                        return paragraphStart;
-                    }
-                    int previousParagraphClose = html.LastIndexOf("</p>", textBoundary, StringComparison.OrdinalIgnoreCase);
-                    if (previousParagraphClose < paragraphStart)
-                    {
-                        return paragraphStart;
-                    }
-                }
-
-                return -1;
-            }
-
-            private static int FindOpenAncestorTagStart(string html, int start, int textBoundary, string tagName)
-            {
-                if (string.IsNullOrEmpty(html) || string.IsNullOrEmpty(tagName) || textBoundary <= start)
-                {
-                    return -1;
-                }
-
-                string openMarker = "<" + tagName;
-                string closeMarker = "</" + tagName + ">";
-                int open = html.LastIndexOf(openMarker, textBoundary, StringComparison.OrdinalIgnoreCase);
-                if (open < start)
-                {
-                    return -1;
-                }
-
-                int close = html.LastIndexOf(closeMarker, textBoundary, StringComparison.OrdinalIgnoreCase);
-                if (close > open)
-                {
-                    return -1;
-                }
-
-                int tagEnd = html.IndexOf(">", open, StringComparison.OrdinalIgnoreCase);
-                if (tagEnd < 0 || tagEnd > textBoundary)
-                {
-                    return -1;
-                }
-
-                return open;
-            }
-
-            private static int FindEarliestBoundaryMarker(string html, int start, int end, string[] markers)
-            {
-                if (string.IsNullOrEmpty(html) || markers == null || markers.Length == 0)
-                {
-                    return -1;
-                }
-
-                int result = -1;
-                for (int i = 0; i < markers.Length; i++)
-                {
-                    string marker = markers[i];
-                    if (string.IsNullOrEmpty(marker))
-                    {
-                        continue;
-                    }
-                    int index = html.IndexOf(marker, start, StringComparison.OrdinalIgnoreCase);
-                    if (index < 0 || index >= end)
-                    {
-                        continue;
-                    }
-                    if (result < 0 || index < result)
-                    {
-                        result = index;
-                    }
-                }
-                return result;
-            }
-
-            private static string StripHtmlToText(string html)
-            {
-                string text = Regex.Replace(html ?? string.Empty, @"<\s*br\s*/?\s*>", "\n", RegexOptions.IgnoreCase);
-                text = Regex.Replace(text, "<[^>]+>", string.Empty, RegexOptions.IgnoreCase);
-                text = HttpUtility.HtmlDecode(text) ?? string.Empty;
-                return text.Replace('\u00A0', ' ').Trim();
+                string message = policyUnavailable
+                    ? Strings.PolicyWarningTitle
+                    : string.Format(
+                        CultureInfo.CurrentCulture,
+                        Strings.ErrorInsertHtmlFailed,
+                        "email signature (" + (source ?? "unknown") + ")");
+                MessageBox.Show(
+                    message,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return false;
             }
 
             private EmailSignatureComposeKind ResolveEmailSignatureComposeKind()
@@ -1052,166 +837,31 @@ namespace NcTalkOutlookAddIn
                 return false;
             }
 
-            private static bool ShouldClearForeignEmailSignature(EmailSignaturePolicy policy, EmailSignatureComposeKind composeKind)
+            private static bool IsReplyOrForwardComposeKind(EmailSignatureComposeKind composeKind)
             {
-                if (policy == null || !policy.OnCompose)
-                {
-                    return false;
-                }
-                return composeKind == EmailSignatureComposeKind.New
-                       || composeKind == EmailSignatureComposeKind.Reply
+                return composeKind == EmailSignatureComposeKind.Reply
                        || composeKind == EmailSignatureComposeKind.Forward
                        || composeKind == EmailSignatureComposeKind.Response;
             }
 
             private string ResolveCurrentSenderEmail()
             {
-                string sentOnBehalfOf;
-                bool hasSentOnBehalfOf;
-                if (TryResolveSentOnBehalfOfSmtpAddress(out sentOnBehalfOf, out hasSentOnBehalfOf))
-                {
-                    return sentOnBehalfOf;
-                }
-                if (hasSentOnBehalfOf)
-                {
-                    LogEmailSignature("Sender identity unresolved because SentOnBehalfOfName is set but not resolvable.");
-                    return string.Empty;
-                }
-
-                return ResolveSendUsingAccountSmtpAddress();
-            }
-
-            private string ResolveSendUsingAccountSmtpAddress()
-            {
-                Outlook.Account account = null;
-                try
-                {
-                    account = _mail.SendUsingAccount;
-                    if (account != null)
-                    {
-                        string smtpAddress = account.SmtpAddress;
-                        if (IsSmtpEmailCandidate(smtpAddress))
-                        {
-                            return smtpAddress.Trim();
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to resolve compose sender account SMTP address.", ex);
-                }
-                finally
-                {
-                    ComInteropScope.TryRelease(account, LogCategories.Core, "Failed to release compose sender account COM object.");
-                }
-
-                return string.Empty;
-            }
-
-            private bool TryResolveSentOnBehalfOfSmtpAddress(out string smtpAddress, out bool hasSentOnBehalfOf)
-            {
-                smtpAddress = string.Empty;
-                hasSentOnBehalfOf = false;
-
-                string sentOnBehalfOfName;
-                try
-                {
-                    sentOnBehalfOfName = _mail.SentOnBehalfOfName;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to read compose sent-on-behalf identity.", ex);
-                    return false;
-                }
-
-                if (string.IsNullOrWhiteSpace(sentOnBehalfOfName))
-                {
-                    return false;
-                }
-
-                hasSentOnBehalfOf = true;
-                sentOnBehalfOfName = sentOnBehalfOfName.Trim();
-                if (IsSmtpEmailCandidate(sentOnBehalfOfName))
-                {
-                    smtpAddress = sentOnBehalfOfName;
-                    return true;
-                }
-
-                Outlook.NameSpace session = null;
-                Outlook.Recipient recipient = null;
-                try
-                {
-                    Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
-                    if (application == null)
-                    {
-                        return false;
-                    }
-
-                    session = application.Session;
-                    if (session == null)
-                    {
-                        return false;
-                    }
-
-                    recipient = session.CreateRecipient(sentOnBehalfOfName);
-                    if (recipient == null || !recipient.Resolve())
-                    {
-                        return false;
-                    }
-
-                    string resolved = OutlookRecipientResolverController.TryResolveRecipientSmtpAddress(recipient);
-                    if (!IsSmtpEmailCandidate(resolved))
-                    {
-                        return false;
-                    }
-
-                    smtpAddress = resolved.Trim();
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to resolve compose sent-on-behalf SMTP address.", ex);
-                    return false;
-                }
-                finally
-                {
-                    ComInteropScope.TryRelease(recipient, LogCategories.Core, "Failed to release sent-on-behalf Recipient COM object.");
-                    ComInteropScope.TryRelease(session, LogCategories.Core, "Failed to release sent-on-behalf Session COM object.");
-                }
-            }
-
-            private static bool IsSmtpEmailCandidate(string value)
-            {
-                return !string.IsNullOrWhiteSpace(value)
-                       && value.IndexOf("@", StringComparison.Ordinal) > 0;
+                Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+                return OutlookRecipientResolverController.ResolveEffectiveSenderSmtpAddress(
+                    _mail,
+                    application,
+                    LogCategories.Core,
+                    "compose",
+                    string.Empty,
+                    true);
             }
 
             private static bool IsEmailSignaturePropertyChange(string propertyName)
             {
                 return string.Equals(propertyName, "SendUsingAccount", StringComparison.OrdinalIgnoreCase)
                        || string.Equals(propertyName, "SenderEmailAddress", StringComparison.OrdinalIgnoreCase)
-                       || string.Equals(propertyName, "SentOnBehalfOfName", StringComparison.OrdinalIgnoreCase);
-            }
-
-            private static bool IsEmailSignaturePropertyTrigger(string reason)
-            {
-                return !string.IsNullOrWhiteSpace(reason)
-                       && reason.Trim().StartsWith("property_", StringComparison.OrdinalIgnoreCase);
-            }
-
-            private static string ComputeSignatureHash(string value)
-            {
-                unchecked
-                {
-                    uint hash = 2166136261;
-                    string text = value ?? string.Empty;
-                    for (int i = 0; i < text.Length; i++)
-                    {
-                        hash ^= text[i];
-                        hash *= 16777619;
-                    }
-                    return hash.ToString("x8", CultureInfo.InvariantCulture);
-                }
+                       || string.Equals(propertyName, "SentOnBehalfOfName", StringComparison.OrdinalIgnoreCase)
+                       || string.Equals(propertyName, "BodyFormat", StringComparison.OrdinalIgnoreCase);
             }
 
             private void LogEmailSignature(string message)

@@ -92,6 +92,141 @@ namespace NcTalkOutlookAddIn.Controllers
             return emails;
         }
 
+        internal static string ResolveEffectiveSenderSmtpAddress(
+            Outlook.MailItem mail,
+            Outlook.Application application,
+            string logCategory,
+            string diagnosticContext,
+            string diagnosticSuffix,
+            bool useSendAccountAfterSentOnBehalfReadFailure)
+        {
+            if (mail == null)
+            {
+                return string.Empty;
+            }
+
+            string context = string.IsNullOrWhiteSpace(diagnosticContext)
+                ? "mail"
+                : diagnosticContext.Trim();
+            string suffix = diagnosticSuffix ?? string.Empty;
+            string sentOnBehalfOfName;
+            try
+            {
+                sentOnBehalfOfName = mail.SentOnBehalfOfName;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    logCategory,
+                    "Failed to read " + context + " sent-on-behalf identity" + suffix + ".",
+                    ex);
+                if (!useSendAccountAfterSentOnBehalfReadFailure)
+                {
+                    return string.Empty;
+                }
+                sentOnBehalfOfName = string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(sentOnBehalfOfName))
+            {
+                string candidate = sentOnBehalfOfName.Trim();
+                if (IsSmtpEmailCandidate(candidate))
+                {
+                    return candidate;
+                }
+
+                Outlook.NameSpace session = null;
+                Outlook.Recipient recipient = null;
+                try
+                {
+                    if (application == null)
+                    {
+                        return string.Empty;
+                    }
+                    session = application.Session;
+                    if (session == null)
+                    {
+                        return string.Empty;
+                    }
+                    recipient = session.CreateRecipient(candidate);
+                    if (recipient == null || !recipient.Resolve())
+                    {
+                        DiagnosticsLogger.Log(
+                            logCategory,
+                            "Effective " + context + " sent-on-behalf identity unresolved" + suffix + ".");
+                        return string.Empty;
+                    }
+
+                    string resolved = TryResolveRecipientSmtpAddress(recipient);
+                    return IsSmtpEmailCandidate(resolved) ? resolved.Trim() : string.Empty;
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(
+                        logCategory,
+                        "Failed to resolve " + context + " sent-on-behalf SMTP address" + suffix + ".",
+                        ex);
+                    return string.Empty;
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(
+                        recipient,
+                        logCategory,
+                        "Failed to release " + context + " sent-on-behalf Recipient COM object.");
+                    ComInteropScope.TryRelease(
+                        session,
+                        logCategory,
+                        "Failed to release " + context + " sent-on-behalf Session COM object.");
+                }
+            }
+
+            return ResolveSendUsingAccountSmtpAddress(
+                mail,
+                logCategory,
+                context,
+                suffix);
+        }
+
+        internal static string ResolveSendUsingAccountSmtpAddress(
+            Outlook.MailItem mail,
+            string logCategory,
+            string diagnosticContext,
+            string diagnosticSuffix)
+        {
+            if (mail == null)
+            {
+                return string.Empty;
+            }
+
+            string context = string.IsNullOrWhiteSpace(diagnosticContext)
+                ? "mail"
+                : diagnosticContext.Trim();
+            string suffix = diagnosticSuffix ?? string.Empty;
+            Outlook.Account account = null;
+            try
+            {
+                account = mail.SendUsingAccount;
+                string smtpAddress = account != null ? account.SmtpAddress : string.Empty;
+                return IsSmtpEmailCandidate(smtpAddress) ? smtpAddress.Trim() : string.Empty;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    logCategory,
+                    "Failed to resolve " + context + " sender account SMTP address" + suffix + ".",
+                    ex);
+                return string.Empty;
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(
+                    account,
+                    logCategory,
+                    "Failed to release " + context + " sender account COM object.");
+            }
+        }
+
         internal static string TryResolveRecipientSmtpAddress(Outlook.Recipient recipient)
         {
             if (recipient == null)
@@ -182,6 +317,12 @@ namespace NcTalkOutlookAddIn.Controllers
                 DiagnosticsLogger.LogException(LogCategories.Talk, "Failed to resolve SMTP address via PropertyAccessor.", ex);
             }
             return !string.IsNullOrWhiteSpace(address) && address.IndexOf('@') >= 0 ? address : null;
+        }
+
+        private static bool IsSmtpEmailCandidate(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value)
+                   && value.IndexOf("@", StringComparison.Ordinal) > 0;
         }
     }
 }

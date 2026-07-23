@@ -33,6 +33,7 @@ $asyncVoidAllowList = @(
     'OnFileLinkButtonPressed',
     'OnAttachmentEvalTimerTick',
     'OnBeforeAddShareTimerTick',
+    'OnEmailSignatureTimerTick',
     'RunAttachmentFlowTask',
     'OnUpdateCheckButtonClick',
     'OnLoginFlowButtonClick',

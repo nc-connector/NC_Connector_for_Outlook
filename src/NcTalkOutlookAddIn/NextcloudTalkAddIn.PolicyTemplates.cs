@@ -3,6 +3,7 @@
 // See LICENSE.txt for details.
 
 using System;
+using System.Threading.Tasks;
 using NcTalkOutlookAddIn.Controllers;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
@@ -13,6 +14,14 @@ namespace NcTalkOutlookAddIn
         // Backend policy retrieval and Talk template/language normalization helpers.
     public sealed partial class NextcloudTalkAddIn
     {
+        private static readonly TimeSpan EmailSignaturePolicyCacheLifetime = TimeSpan.FromMinutes(5);
+        private readonly object _emailSignaturePolicyCacheSync = new object();
+        private BackendPolicyStatus _emailSignaturePolicyCache;
+        private DateTime _emailSignaturePolicyCacheFetchedAtUtc;
+        private string _emailSignaturePolicyCacheKey = string.Empty;
+        private Task<BackendPolicyStatus> _emailSignaturePolicyFetchTask;
+        private string _emailSignaturePolicyFetchKey = string.Empty;
+
         internal BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
         {
             try
@@ -38,28 +47,124 @@ namespace NcTalkOutlookAddIn
             }
         }
 
+        internal Task<BackendPolicyStatus> GetEmailSignaturePolicyStatusAsync(
+            TalkServiceConfiguration configuration,
+            string trigger)
+        {
+            string cacheKey = BuildEmailSignaturePolicyCacheKey(configuration);
+            lock (_emailSignaturePolicyCacheSync)
+            {
+                if (_emailSignaturePolicyCache != null
+                    && string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal)
+                    && DateTime.UtcNow - _emailSignaturePolicyCacheFetchedAtUtc <= EmailSignaturePolicyCacheLifetime)
+                {
+                    LogCore("Email signature policy cache hit (trigger=" + (trigger ?? "n/a") + ").");
+                    return Task.FromResult(_emailSignaturePolicyCache);
+                }
+
+                if (_emailSignaturePolicyFetchTask != null
+                    && string.Equals(_emailSignaturePolicyFetchKey, cacheKey, StringComparison.Ordinal))
+                {
+                    LogCore("Email signature policy fetch joined (trigger=" + (trigger ?? "n/a") + ").");
+                    return _emailSignaturePolicyFetchTask;
+                }
+
+                _emailSignaturePolicyFetchKey = cacheKey;
+                _emailSignaturePolicyFetchTask = FetchAndCacheEmailSignaturePolicyStatusAsync(
+                    configuration,
+                    cacheKey,
+                    trigger);
+                return _emailSignaturePolicyFetchTask;
+            }
+        }
+
+        internal bool TryGetCachedEmailSignaturePolicyStatus(
+            TalkServiceConfiguration configuration,
+            out BackendPolicyStatus status)
+        {
+            string cacheKey = BuildEmailSignaturePolicyCacheKey(configuration);
+            lock (_emailSignaturePolicyCacheSync)
+            {
+                status = string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal)
+                    ? _emailSignaturePolicyCache
+                    : null;
+                return status != null;
+            }
+        }
+
+        private async Task<BackendPolicyStatus> FetchAndCacheEmailSignaturePolicyStatusAsync(
+            TalkServiceConfiguration configuration,
+            string cacheKey,
+            string trigger)
+        {
+            BackendPolicyStatus fetched = await Task.Run(
+                () => FetchBackendPolicyStatus(configuration, trigger)).ConfigureAwait(false);
+            BackendPolicyStatus effective = fetched;
+            lock (_emailSignaturePolicyCacheSync)
+            {
+                if (fetched != null && fetched.FetchSucceeded)
+                {
+                    _emailSignaturePolicyCache = fetched;
+                    _emailSignaturePolicyCacheFetchedAtUtc = DateTime.UtcNow;
+                    _emailSignaturePolicyCacheKey = cacheKey;
+                }
+                else if (_emailSignaturePolicyCache != null
+                         && string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal))
+                {
+                    effective = _emailSignaturePolicyCache;
+                    LogCore("Email signature policy fetch failed; using last successful snapshot (trigger=" + (trigger ?? "n/a") + ").");
+                }
+
+                if (string.Equals(_emailSignaturePolicyFetchKey, cacheKey, StringComparison.Ordinal))
+                {
+                    _emailSignaturePolicyFetchTask = null;
+                    _emailSignaturePolicyFetchKey = string.Empty;
+                }
+            }
+            return effective;
+        }
+
+        private static string BuildEmailSignaturePolicyCacheKey(TalkServiceConfiguration configuration)
+        {
+            if (configuration == null)
+            {
+                return string.Empty;
+            }
+            return configuration.GetNormalizedBaseUrl()
+                   + "\n"
+                   + (configuration.Username ?? string.Empty).Trim()
+                   + "\n"
+                   + (configuration.AppPassword ?? string.Empty);
+        }
+
         internal PasswordPolicyInfo FetchPasswordPolicyForTalkWizard(TalkServiceConfiguration configuration)
         {
-            try
-            {
-                return new PasswordPolicyService(configuration).FetchPolicy();
-            }
-            catch (Exception ex)
-            {
-                LogTalk("Password policy could not be loaded: " + ex.Message);
-                return null;
-            }
+            return FetchPasswordPolicy(
+                configuration,
+                LogTalk,
+                "Password policy could not be loaded: ");
         }
 
         internal PasswordPolicyInfo FetchPasswordPolicyForFileLinkWizard(TalkServiceConfiguration configuration)
         {
+            return FetchPasswordPolicy(
+                configuration,
+                LogFileLink,
+                "Sharing password policy could not be loaded: ");
+        }
+
+        private static PasswordPolicyInfo FetchPasswordPolicy(
+            TalkServiceConfiguration configuration,
+            Action<string> logFailure,
+            string failurePrefix)
+        {
             try
             {
                 return new PasswordPolicyService(configuration).FetchPolicy();
             }
             catch (Exception ex)
             {
-                LogFileLink("Sharing password policy could not be loaded: " + ex.Message);
+                logFailure(failurePrefix + ex.Message);
                 return null;
             }
         }

@@ -24,9 +24,11 @@
       "talk_default_room_type": "event"
     },
     "email_signature": {
-      "signature_on_compose": true,
-      "signature_on_reply": true,
-      "signature_on_forward": true
+      "email_signature_on_compose": true,
+      "email_signature_on_reply": true,
+      "email_signature_on_forward": true,
+      "email_signature_template": "<p>Kind regards,<br>Example User</p>",
+      "user_email": "user@example.test"
     }
   },
   "policy_editable": {
@@ -43,9 +45,9 @@
       "talk_default_room_type": false
     },
     "email_signature": {
-      "signature_on_compose": false,
-      "signature_on_reply": false,
-      "signature_on_forward": false
+      "email_signature_on_compose": false,
+      "email_signature_on_reply": false,
+      "email_signature_on_forward": false
     }
   }
 }

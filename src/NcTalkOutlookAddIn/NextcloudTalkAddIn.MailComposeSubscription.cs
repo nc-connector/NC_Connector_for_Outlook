@@ -68,7 +68,6 @@ namespace NcTalkOutlookAddIn
 
                 internal string ShareLabel { get; set; }
 
-                internal DateTime CreatedUtc { get; set; }
             }
 
             private sealed class BeforeAddShareEntry
@@ -84,6 +83,13 @@ namespace NcTalkOutlookAddIn
                 internal string Trigger { get; set; }
 
                 internal int BaselineAttachmentCount { get; set; }
+            }
+
+            private enum ComposeSurfaceState
+            {
+                Detached,
+                Inspector,
+                InlineResponse
             }
 
             private readonly NextcloudTalkAddIn _owner;
@@ -106,17 +112,25 @@ namespace NcTalkOutlookAddIn
             private bool _sendPending;
             private DateTime _sendPendingAtUtc;
             private bool _awaitingGraceCloseResolution;
-            private bool _emailSignatureManaged;
-            private bool _emailSignatureInitialSlotHandled;
             private bool _emailSignatureApplying;
             private bool _isInlineResponse;
+            private ComposeSurfaceState _composeSurfaceState;
+            private string _activeInspectorIdentityKey = string.Empty;
+            private string _inlineExplorerIdentityKey = string.Empty;
+            private string _deferredEmailSignatureReason = string.Empty;
             private string _pendingEmailSignatureReason = string.Empty;
             private bool _disposed;
             private const int BeforeAddShareBatchDebounceMs = 3000;
             private const int EmailSignatureApplyDebounceMs = 900;
             private const int EmailSignatureInlineApplyDebounceMs = 250;
 
-            internal MailComposeSubscription(NextcloudTalkAddIn owner, Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey, bool isInlineResponse)
+            internal MailComposeSubscription(
+                NextcloudTalkAddIn owner,
+                Outlook.MailItem mail,
+                string mailIdentityKey,
+                string inspectorIdentityKey,
+                bool isInlineResponse,
+                string inlineExplorerIdentityKey)
             {
                 _owner = owner;
                 _mail = mail;
@@ -127,6 +141,11 @@ namespace NcTalkOutlookAddIn
                 _inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityKey)
                     ? (isInlineResponse ? string.Empty : MailInteropController.ResolveMailInspectorIdentityKey(mail))
                     : inspectorIdentityKey.Trim();
+                _composeSurfaceState = isInlineResponse ? ComposeSurfaceState.InlineResponse : ComposeSurfaceState.Inspector;
+                _activeInspectorIdentityKey = isInlineResponse ? string.Empty : _inspectorIdentityKey;
+                _inlineExplorerIdentityKey = isInlineResponse && !string.IsNullOrWhiteSpace(inlineExplorerIdentityKey)
+                    ? inlineExplorerIdentityKey.Trim()
+                    : string.Empty;
                 _composeKey = BuildComposeKey(mail, _mailIdentityKey, _inspectorIdentityKey);
 
                 _attachmentEvalTimer.Interval = ComposeAttachmentEvalDebounceMs;
@@ -160,26 +179,169 @@ namespace NcTalkOutlookAddIn
                     + (_mailIdentityKey ?? string.Empty)
                     + ", inspectorIdentity="
                     + (_inspectorIdentityKey ?? string.Empty)
-                    + ", inline="
-                    + _isInlineResponse.ToString(CultureInfo.InvariantCulture)
+                    + ", surface="
+                    + _composeSurfaceState.ToString()
+                    + ", inlineExplorerIdentity="
+                    + (_inlineExplorerIdentityKey ?? string.Empty)
                     + ").");
 
                 ScheduleEmailSignatureApplication("compose_open");
             }
 
-            internal void MarkInlineResponse()
+            internal void MarkInlineResponse(string explorerIdentityKey)
             {
                 if (_disposed)
                 {
                     return;
                 }
-                if (_isInlineResponse)
+
+                string normalizedExplorerIdentityKey = string.IsNullOrWhiteSpace(explorerIdentityKey)
+                    ? _inlineExplorerIdentityKey
+                    : explorerIdentityKey.Trim();
+                if (_composeSurfaceState == ComposeSurfaceState.InlineResponse
+                    && string.Equals(
+                        _inlineExplorerIdentityKey,
+                        normalizedExplorerIdentityKey,
+                        StringComparison.OrdinalIgnoreCase))
                 {
                     return;
                 }
+
+                ComposeSurfaceState previousSurface = _composeSurfaceState;
+                _composeSurfaceState = ComposeSurfaceState.InlineResponse;
                 _isInlineResponse = true;
+                _activeInspectorIdentityKey = string.Empty;
+                _inlineExplorerIdentityKey = normalizedExplorerIdentityKey;
                 _emailSignatureTimer.Interval = EmailSignatureInlineApplyDebounceMs;
-                ScheduleEmailSignatureApplication("inline_response");
+                LogEmailSignature(
+                    "compose surface changed (from="
+                    + previousSurface.ToString()
+                    + ", to=InlineResponse, explorerKey="
+                    + (_inlineExplorerIdentityKey ?? string.Empty)
+                    + ").");
+                if (!ResumeDeferredEmailSignatureApplication("inline_surface"))
+                {
+                    ScheduleEmailSignatureApplication("inline_response");
+                }
+            }
+
+            internal void MarkInspector(string inspectorIdentityKey)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                string normalizedInspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityKey)
+                    ? _activeInspectorIdentityKey
+                    : inspectorIdentityKey.Trim();
+                if (_composeSurfaceState == ComposeSurfaceState.Inspector
+                    && string.Equals(
+                        _activeInspectorIdentityKey,
+                        normalizedInspectorIdentityKey,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                ComposeSurfaceState previousSurface = _composeSurfaceState;
+                _composeSurfaceState = ComposeSurfaceState.Inspector;
+                _isInlineResponse = false;
+                _activeInspectorIdentityKey = normalizedInspectorIdentityKey;
+                _inlineExplorerIdentityKey = string.Empty;
+                _emailSignatureTimer.Interval = EmailSignatureApplyDebounceMs;
+                LogEmailSignature(
+                    "compose surface changed (from="
+                    + previousSurface.ToString()
+                    + ", to=Inspector, inspectorKey="
+                    + (_activeInspectorIdentityKey ?? string.Empty)
+                    + ").");
+                if (!ResumeDeferredEmailSignatureApplication("inspector_surface"))
+                {
+                    ScheduleEmailSignatureApplication("inspector_surface");
+                }
+            }
+
+            internal void MarkInlineResponseClosed(string explorerIdentityKey)
+            {
+                if (_disposed || _composeSurfaceState != ComposeSurfaceState.InlineResponse)
+                {
+                    return;
+                }
+
+                string normalizedExplorerIdentityKey = string.IsNullOrWhiteSpace(explorerIdentityKey)
+                    ? string.Empty
+                    : explorerIdentityKey.Trim();
+                if (!string.IsNullOrWhiteSpace(_inlineExplorerIdentityKey)
+                    && !string.Equals(
+                        _inlineExplorerIdentityKey,
+                        normalizedExplorerIdentityKey,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    LogEmailSignature(
+                        "inline close ignored for non-owning Explorer (expected="
+                        + _inlineExplorerIdentityKey
+                        + ", actual="
+                        + normalizedExplorerIdentityKey
+                        + ").");
+                    return;
+                }
+
+                _emailSignatureTimer.Stop();
+                _composeSurfaceState = ComposeSurfaceState.Detached;
+                _isInlineResponse = false;
+                _activeInspectorIdentityKey = string.Empty;
+                _inlineExplorerIdentityKey = string.Empty;
+                LogEmailSignature(
+                    "compose surface changed (from=InlineResponse, to=Detached, explorerKey="
+                    + normalizedExplorerIdentityKey
+                    + ").");
+            }
+
+            private void DeferEmailSignatureApplication(string reason, string source)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _deferredEmailSignatureReason = string.IsNullOrWhiteSpace(reason)
+                    ? "property_unknown"
+                    : reason.Trim();
+                LogEmailSignature(
+                    "reconcile deferred (reason="
+                    + _deferredEmailSignatureReason
+                    + ", source="
+                    + (source ?? string.Empty)
+                    + ", surface="
+                    + _composeSurfaceState.ToString()
+                    + ", attachmentSuppressed="
+                    + _attachmentSuppressed.ToString(CultureInfo.InvariantCulture)
+                    + ").");
+            }
+
+            private bool ResumeDeferredEmailSignatureApplication(string trigger)
+            {
+                if (_disposed
+                    || _attachmentSuppressed
+                    || _composeSurfaceState == ComposeSurfaceState.Detached
+                    || string.IsNullOrWhiteSpace(_deferredEmailSignatureReason))
+                {
+                    return false;
+                }
+
+                string reason = _deferredEmailSignatureReason;
+                _deferredEmailSignatureReason = string.Empty;
+                LogEmailSignature(
+                    "deferred reconcile resumed (reason="
+                    + reason
+                    + ", trigger="
+                    + (trigger ?? string.Empty)
+                    + ", surface="
+                    + _composeSurfaceState.ToString()
+                    + ").");
+                ScheduleEmailSignatureApplication(reason);
+                return true;
             }
 
             internal bool IsFor(Outlook.MailItem mail, string mailIdentityKey, string inspectorIdentityKey)
@@ -231,8 +393,7 @@ namespace NcTalkOutlookAddIn
                 {
                     RelativeFolder = relativeFolder,
                     ShareId = result.ShareId ?? string.Empty,
-                    ShareLabel = result.FolderName ?? string.Empty,
-                    CreatedUtc = DateTime.UtcNow
+                    ShareLabel = result.FolderName ?? string.Empty
                 });
 
                 LogFileLink(

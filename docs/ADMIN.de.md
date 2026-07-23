@@ -166,22 +166,28 @@ Wenn das optionale NC-Connector-Backend installiert ist, kann Outlook eine zentr
 - der Backend-Endpunkt muss erreichbar sein
 - dem aktuellen Benutzer muss ein aktiver Seat zugewiesen sein
 - der Backend-Status muss `policy.email_signature` und `policy_editable.email_signature` enthalten
-- `policy.email_signature.email_signature_on_compose` muss `true` sein
+- der effektive Wert von `email_signature_on_compose` muss `true` sein
 - `policy.email_signature.email_signature_template` muss HTML enthalten
 - `policy.email_signature.user_email` muss die E-Mail-Adresse des Nextcloud-Benutzers enthalten
 - die effektive Outlook-Absenderidentitaet muss genau zu dieser E-Mail-Adresse passen. Wenn Outlook einen `SentOnBehalfOfName`-/Von-Override fuer ein Shared Mailbox- oder delegiertes Exchange-Konto verwendet, muss genau dieser Override auf dieselbe SMTP-Adresse aufloesbar sein; andernfalls wird keine Backend-Signatur eingefuegt.
 
-Die lokalen Einstellungen `EmailSignatureOnCompose`, `EmailSignatureOnReply` und `EmailSignatureOnForward` steuern, ob die Backend-Signatur bei neuen Mails, Antworten und Weiterleitungen eingefuegt wird. Wenn das Backend einen Wert per `policy_editable.email_signature.<key>=false` sperrt, ist die Option im UI gesperrt und Outlook verwendet den Backend-Wert.
+Die Backend-Werte fuer Compose, Antwort und Weiterleitung sind Vorgaben, solange der passende Wert `policy_editable.email_signature.<key>` auf `true` steht. Ein Benutzer darf deshalb eine lokal gespeicherte Option aktivieren, obwohl ihre editierbare Backend-Vorgabe `false` ist. Markiert das Backend einen Wert als nicht editierbar, gewinnt immer der Backend-Wert; ein gesperrtes `false` bleibt deaktiviert.
 
 Wenn ein aelteres Backend Freigabe-/Talk-Policy liefert, aber noch keine `policy.email_signature`-Domain kennt, bleiben nur zentrale Signaturen deaktiviert. Die Settings zeigen dann einen Backend-Update-Hinweis; Freigabe und Talk bleiben von dieser Signatur-Domain getrennt.
 
-Wichtig fuer Rollout und Support: Wenn `EmailSignatureOnCompose` fuer das passende Outlook-Absenderkonto aktiv ist, gehoert der Signaturplatz dieser Identitaet NC Connector. In HTML/RTF-Compose werden beim Oeffnen erkannte Outlook-native Signaturen oder Signaturen aus anderen Add-ins nur dann entfernt, wenn die Grenze zur zitierten Nachricht strukturell erkennbar ist. Ist diese Grenze nicht strukturell erkennbar, erhaelt NC Connector Outlooks zitierte Nachricht und den Trenner. Wird die Backend-Signatur vor einem Antwort-/Weiterleitungs-Trenner eingefuegt, behaelt NC Connector eine leere Zeile zwischen Signatur und zitierter Nachricht.
+Neue Mail, Antwort und Weiterleitung verwenden ihre jeweilige effektive Option. Outlook nutzt zuerst seine Operationsmetadaten, um Antwort und Weiterleitung zu unterscheiden. Bleibt eine Inline-Response unklar und unterscheiden sich beide Optionen, raet NC Connector nicht: Die Hintergrundverarbeitung laesst die Mail unveraendert und die finale Send-Pruefung fordert einen erneuten Versuch, statt mit unsicherem Signaturzustand zu senden. Sind beide Optionen gleich, gilt dieser gemeinsame Wert.
 
-Plain-Text-Compose bleibt Plain Text. Outlook wird nicht auf HTML umgestellt. NC Connector wandelt das bereinigte Backend-HTML in Plain Text um und schreibt es ueber Outlooks WordEditor-Signaturplatz. Es werden keine lokalisierten Antwort-Header geparst und `MailItem.Body` wird nicht direkt neu geschrieben.
+HTML, Plain Text und RTF verwenden Outlook WordEditor sowohl im normalen Inspector als auch in Inline-Antworten. Plain Text bleibt Plain Text, RTF bleibt RTF, und NC Connector schreibt weder `MailItem.Body` noch `MailItem.HTMLBody` neu. Beim Auskoppeln einer Inline-Antwort wechselt die Verarbeitung auf den neuen Inspector.
 
-Wenn die Backend-Signatur inaktiv oder unvollstaendig ist, die Compose-Signatur-Policy ausgeschaltet wurde oder das Outlook-Absenderkonto nicht zum Nextcloud-Benutzer passt, greift NC Connector nicht in Outlooks eigene Signaturen ein. Entfernt oder ersetzt wird dann nur ein Signaturblock oder verwaltetes Plain-Text-Bookmark, den bzw. das NC Connector selbst in das geoeffnete Compose-Fenster eingefuegt hat.
+Das Add-in ersetzt nur Outlooks exakten Slot `_MailAutoSig` oder sein eigenes Bookmark `NcConnectorSignature`. Fehlen beide, wird die Signatur einer neuen Mail hinter allen vom Benutzer geschriebenen Text gesetzt. Bei Antwort/Weiterleitung landet sie hinter dem eigenen Antworttext und vor Outlooks Bookmark `_MailOriginal` oder einem ueber Word-Absatzrahmen erkannten Zitat-Trenner. Aktuelle Cursorposition, Body-Anfang und lokalisierte Header wie `From:` oder `Von:` sind keine Fallbacks. Fehlt eine sichere Zitatgrenze, bleiben eigener und zitierter Inhalt unveraendert.
 
-Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanitizer bereinigt wie Freigabe- und Talk-Templates. HTML/RTF-Signaturen werden als markierter HTML-Block eingefuegt; Plain-Text-Signaturen werden fuer die offene Compose-Session ueber ein Word-Bookmark verfolgt.
+Jede eingefuegte Backend-Signatur erhaelt in allen drei Formaten das Word-Bookmark `NcConnectorSignature`. Absenderwechsel, Formatwechsel und spaetere Updates bleiben dadurch auf die exakt verwaltete Range begrenzt. Der Wechsel von einem nicht passenden zum passenden Absender setzt die Signatur einer neuen Mail deshalb unter bereits geschriebenen Text statt darueber. Der Wechsel von der passenden Identitaet entfernt nur die verwaltete Bookmark-Range.
+
+Das Backend-HTML laeuft durch den fail-closed Template-Sanitizer. Die formatierte Einfuegung wird vorbereitet und mit einem Bookmark versehen, bevor die vorige Signatur entfernt wird; ein Fehler loest keinen Body-weiten Ersatz aus. Die Word-Auswahl wird ueber ein temporaeres Bookmark wiederhergestellt, und Inspector sowie Inline-Response verwenden dieselben Abstandsregeln.
+
+Outlook prueft Policy, Absender, Format, Compose-Typ und Bookmark vor Send ein letztes Mal synchron. Bei vollstaendigen Backend-Verbindungseinstellungen bricht es den Versand ab, wenn kein erfolgreicher Policy-Snapshot vorliegt oder ein erforderlicher Apply-/Clear-Vorgang nicht sicher abgeschlossen werden kann. Die Mail bleibt fuer Korrektur und einen neuen Sendeversuch offen. Eine unvollstaendige Einrichtung erzeugt keine Signaturpflicht und versucht nur, ein exaktes NC-Connector-Bookmark best effort zu entfernen. Eine nicht unterstuetzte Signatur-Domain deaktiviert ebenfalls die Einfuegung; bei ansonsten vollstaendiger Backend-Einrichtung verweigert die finale Pruefung den Versand aber weiterhin, wenn eine vorhandene verwaltete Range nicht sicher abgeglichen werden kann.
+
+Ist die Policy inaktiv oder unvollstaendig oder passt der Absender nicht, entfernt NC Connector keine Outlook- oder Drittanbieter-Signatur dieser Identitaet. Ist die Compose-Policy fuer den passenden Absender aktiv, aber Antwort oder Weiterleitung deaktiviert, darf Outlook den exakt erkannten Outlook-Signaturplatz dieser Response leeren, ohne die Backend-Signatur einzufuegen.
 
 ## Compose-Freigabe-Lifecycle (3.1.0)
 
@@ -206,6 +212,9 @@ Die Backend-Signatur wird als HTML geliefert und mit demselben fail-closed Sanit
 ### Separater Passwort-Follow-up-Versand
 - Ist `Passwort separat senden` aktiv, enthaelt der Haupt-HTML-Block kein Inline-Passwort.
 - Der Passwort-Follow-up-Versand startet erst nach bestaetigtem erfolgreichem Hauptversand.
+- Der bereits beim Hauptversand erfolgreich gepruefte Policy-Snapshot wird einmal bereinigt und fuer alle Follow-up-Empfaenger sowie einen moeglichen manuellen Fallback-Entwurf wiederverwendet.
+- Outlook setzt die Absenderidentitaet des Original-Compose und liest sie wieder aus. Automatischer Versand findet nur statt, wenn der effektive Follow-up-Absender exakt dem beim erfolgreichen Hauptversand erfassten Absender entspricht; andernfalls oeffnet Outlook den manuellen Fallback-Entwurf.
+- Passt dieser effektive Absender zusaetzlich zu `policy.email_signature.user_email`, enthaelt der Follow-up die Backend-Signatur. Eine Plain-Text-Hauptmail erzeugt eine Plain-Text-Follow-up-Signatur; HTML/RTF erzeugt einen HTML-Follow-up. Fehlende Policy, Identitaetsabweichung oder Sanitizer-Fehler lassen die Signatur weg, statt ungeprueften Inhalt zu verwenden.
 - Wenn die Backend-Policy Nextcloud Secrets auswaehlt, erzeugt Outlook pro finalem Empfaenger einen verschluesselten einmaligen Secrets-Link.
 - Wenn die Secrets-Erstellung fehlschlaegt, faellt Outlook auf die bisherige separate Klartext-Passwortmail zurueck und zeigt einen Hinweis.
 - Versandstrategie:

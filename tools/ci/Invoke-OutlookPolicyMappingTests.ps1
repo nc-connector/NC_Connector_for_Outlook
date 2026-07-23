@@ -13,6 +13,18 @@ try {
 using System;
 using System.Collections.Generic;
 using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Services;
+using NcTalkOutlookAddIn.Settings;
+
+namespace NcTalkOutlookAddIn.Settings
+{
+    internal sealed class AddinSettings
+    {
+        internal bool? EmailSignatureOnCompose { get; set; }
+        internal bool? EmailSignatureOnReply { get; set; }
+        internal bool? EmailSignatureOnForward { get; set; }
+    }
+}
 
 internal static class OutlookPolicyMappingTests
 {
@@ -37,6 +49,9 @@ internal static class OutlookPolicyMappingTests
         TestEditableBackendValueKeepsLocalChoice();
         TestAttachmentLinkTargetMapping();
         TestAttachmentLinkTargetPrecedence();
+        TestEditableSignatureDefaultCanBeEnabledLocally();
+        TestLockedSignatureDefaultCannotBeEnabledLocally();
+        TestSignaturePolicyAvailability();
 
         if (failures > 0)
         {
@@ -128,6 +143,99 @@ internal static class OutlookPolicyMappingTests
             AttachmentLinkTargetPolicy.Resolve(AttachmentLinkTarget.SharePage, invalidLocked) == AttachmentLinkTarget.ZipDownload);
     }
 
+    private static void TestEditableSignatureDefaultCanBeEnabledLocally()
+    {
+        BackendPolicyStatus status = BuildSignatureStatus(false, true, true, true);
+        var settings = new AddinSettings
+        {
+            EmailSignatureOnCompose = true,
+            EmailSignatureOnReply = true,
+            EmailSignatureOnForward = true
+        };
+
+        EmailSignaturePolicy policy = new EmailSignaturePolicyService(status, settings).Resolve();
+
+        Check("Editable disabled signature default can be enabled locally", policy.Active && policy.OnCompose, policy.Reason);
+        Check("Editable reply and forward flags keep local choices", policy.OnReply && policy.OnForward);
+    }
+
+    private static void TestLockedSignatureDefaultCannotBeEnabledLocally()
+    {
+        BackendPolicyStatus status = BuildSignatureStatus(false, false, true, true);
+        var settings = new AddinSettings { EmailSignatureOnCompose = true };
+
+        EmailSignaturePolicy policy = new EmailSignaturePolicyService(status, settings).Resolve();
+
+        Check("Locked disabled signature default remains disabled", !policy.Active && !policy.OnCompose, policy.Reason);
+        Check("Locked disabled signature reports backend reason", policy.Reason == "signature_disabled_by_backend", policy.Reason);
+    }
+
+    private static void TestSignaturePolicyAvailability()
+    {
+        BackendPolicyStatus editableDisabled = BuildSignatureStatus(false, true, true, true);
+        BackendPolicyStatus lockedDisabled = BuildSignatureStatus(false, false, true, true);
+        BackendPolicyStatus missingTemplate = BuildSignatureStatus(false, true, false, true);
+        BackendPolicyStatus missingUserEmail = BuildSignatureStatus(false, true, true, false);
+
+        Check(
+            "Editable disabled signature policy remains configurable",
+            EmailSignaturePolicyService.IsAvailableForConfiguration(editableDisabled));
+        Check(
+            "Locked disabled signature policy remains available for lock-state rendering",
+            EmailSignaturePolicyService.IsAvailableForConfiguration(lockedDisabled));
+        Check(
+            "Signature policy without template is unavailable",
+            !EmailSignaturePolicyService.IsAvailableForConfiguration(missingTemplate));
+        Check(
+            "Signature policy without user email is unavailable",
+            !EmailSignaturePolicyService.IsAvailableForConfiguration(missingUserEmail));
+    }
+
+    private static BackendPolicyStatus BuildSignatureStatus(
+        bool onCompose,
+        bool onComposeEditable,
+        bool includeTemplate,
+        bool includeUserEmail)
+    {
+        var policy = new Dictionary<string, object>
+        {
+            { "email_signature_on_compose", onCompose },
+            { "email_signature_on_reply", false },
+            { "email_signature_on_forward", false }
+        };
+        if (includeTemplate)
+        {
+            policy["email_signature_template"] = "<p>Backend signature</p>";
+        }
+        if (includeUserEmail)
+        {
+            policy["user_email"] = "sender@example.test";
+        }
+
+        return new BackendPolicyStatus(
+            true,
+            true,
+            true,
+            false,
+            string.Empty,
+            "policy",
+            "policy_active",
+            true,
+            true,
+            "active",
+            new Dictionary<string, object>(),
+            new Dictionary<string, object>(),
+            policy,
+            new Dictionary<string, object>(),
+            new Dictionary<string, object>(),
+            new Dictionary<string, object>
+            {
+                { "email_signature_on_compose", onComposeEditable },
+                { "email_signature_on_reply", true },
+                { "email_signature_on_forward", true }
+            });
+    }
+
     private static BackendPolicyStatus BuildAttachmentTargetStatus(string target, bool editable)
     {
         return new BackendPolicyStatus(
@@ -189,8 +297,10 @@ internal static class OutlookPolicyMappingTests
         $testSource,
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\BackendPolicyStatus.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\AttachmentLinkTargetPolicy.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\EmailSignaturePolicy.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\SharePasswordDeliveryMode.cs"),
-        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\SharePasswordDeliveryPolicy.cs")
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\SharePasswordDeliveryPolicy.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\EmailSignaturePolicyService.cs")
     )
 
     $exe = Join-Path $TempRoot "OutlookPolicyMappingTests.exe"

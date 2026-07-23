@@ -90,6 +90,18 @@ jobs:
         shell: pwsh
         run: .\tools\ci\Check-OutlookEventHooks.ps1
 
+  email-signature-architecture:
+    name: Email signature architecture
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check signature policy, send gate, and WordEditor slots
+        shell: pwsh
+        run: .\tools\ci\Check-EmailSignatureArchitecture.ps1
+
   ribbon-contract:
     name: Ribbon callback contract
     runs-on: windows-latest

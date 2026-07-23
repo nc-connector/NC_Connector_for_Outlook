@@ -46,6 +46,9 @@ namespace NcTalkOutlookAddIn
         private Outlook.ExplorersEvents_Event _explorersEvents;
         private readonly Dictionary<string, Outlook.Explorer> _inlineResponseExplorers = new Dictionary<string, Outlook.Explorer>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Outlook.ExplorerEvents_10_Event> _inlineResponseExplorerEvents = new Dictionary<string, Outlook.ExplorerEvents_10_Event>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Outlook.ExplorerEvents_10_InlineResponseEventHandler> _inlineResponseHandlers = new Dictionary<string, Outlook.ExplorerEvents_10_InlineResponseEventHandler>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Outlook.ExplorerEvents_10_InlineResponseCloseEventHandler> _inlineResponseCloseHandlers = new Dictionary<string, Outlook.ExplorerEvents_10_InlineResponseCloseEventHandler>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, MailComposeSubscription> _inlineResponseSubscriptions = new Dictionary<string, MailComposeSubscription>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AppointmentSubscription> _subscriptionByEntryId = new Dictionary<string, AppointmentSubscription>(StringComparer.OrdinalIgnoreCase);
         private readonly MailComposeSubscriptionRegistryController _mailComposeSubscriptionRegistry = new MailComposeSubscriptionRegistryController();
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
@@ -322,7 +325,11 @@ namespace NcTalkOutlookAddIn
                 });
         }
 
-        internal MailComposeSubscription EnsureMailComposeSubscription(Outlook.MailItem mail, string inspectorIdentityOverride = null, bool isInlineResponse = false)
+        internal MailComposeSubscription EnsureMailComposeSubscription(
+            Outlook.MailItem mail,
+            string inspectorIdentityOverride = null,
+            bool isInlineResponse = false,
+            string inlineExplorerIdentityOverride = null)
         {
             if (mail == null)
             {
@@ -333,18 +340,37 @@ namespace NcTalkOutlookAddIn
                 return null;
             }
             string mailIdentityKey = ComInteropScope.ResolveIdentityKey(mail, LogCategories.FileLink, "MailItem");
-            string inspectorIdentityKey = string.IsNullOrWhiteSpace(inspectorIdentityOverride)
-                ? MailInteropController.ResolveMailInspectorIdentityKey(mail)
-                : inspectorIdentityOverride.Trim();
+            string inspectorIdentityKey = isInlineResponse
+                ? string.Empty
+                : (string.IsNullOrWhiteSpace(inspectorIdentityOverride)
+                    ? MailInteropController.ResolveMailInspectorIdentityKey(mail)
+                    : inspectorIdentityOverride.Trim());
+            string inlineExplorerIdentityKey = isInlineResponse && !string.IsNullOrWhiteSpace(inlineExplorerIdentityOverride)
+                ? inlineExplorerIdentityOverride.Trim()
+                : string.Empty;
 
             MailComposeSubscription subscription = _mailComposeSubscriptionRegistry.GetOrCreate(
                 mail,
                 mailIdentityKey,
                 inspectorIdentityKey,
-                () => new MailComposeSubscription(this, mail, mailIdentityKey, inspectorIdentityKey, isInlineResponse));
-            if (isInlineResponse && subscription != null)
+                () => new MailComposeSubscription(
+                    this,
+                    mail,
+                    mailIdentityKey,
+                    inspectorIdentityKey,
+                    isInlineResponse,
+                    inlineExplorerIdentityKey));
+            if (subscription == null)
             {
-                subscription.MarkInlineResponse();
+                return null;
+            }
+            if (isInlineResponse)
+            {
+                subscription.MarkInlineResponse(inlineExplorerIdentityKey);
+            }
+            else
+            {
+                subscription.MarkInspector(inspectorIdentityKey);
             }
             return subscription;
         }
@@ -352,6 +378,23 @@ namespace NcTalkOutlookAddIn
         private void RemoveMailComposeSubscription(MailComposeSubscription subscription)
         {
             _mailComposeSubscriptionRegistry.Remove(subscription);
+            if (subscription == null || _inlineResponseSubscriptions.Count == 0)
+            {
+                return;
+            }
+
+            var explorerKeys = new List<string>();
+            foreach (var pair in _inlineResponseSubscriptions)
+            {
+                if (ReferenceEquals(pair.Value, subscription))
+                {
+                    explorerKeys.Add(pair.Key);
+                }
+            }
+            for (int i = 0; i < explorerKeys.Count; i++)
+            {
+                _inlineResponseSubscriptions.Remove(explorerKeys[i]);
+            }
         }
 
         private void UnhookMailComposeSubscriptions()

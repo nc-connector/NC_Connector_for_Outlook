@@ -58,6 +58,15 @@ Assert-Check ($policy.policy.share.share_html_block_template -notmatch '\{LINK_(
 Assert-Check ($null -eq $policy.policy_editable.share.share_html_block_template_v2) "Versioned Share template must remain output-only."
 Assert-Check ($policy.policy.share.share_html_block_effective_language -match '^[a-z]{2,3}(?:_[a-z0-9]{2,8})*$') "Effective Share template language must be a normalized locale code."
 Assert-Check ($null -eq $policy.policy_editable.share.share_html_block_effective_language) "Effective Share template language must remain output-only."
+foreach ($key in @("email_signature_on_compose", "email_signature_on_reply", "email_signature_on_forward")) {
+    Assert-Check ($policy.policy.email_signature.$key -is [bool]) "Email signature policy value must be boolean: $key"
+    Assert-Check ($policy.policy_editable.email_signature.$key -is [bool]) "Email signature editable value must be boolean: $key"
+}
+Assert-Check (-not [string]::IsNullOrWhiteSpace($policy.policy.email_signature.email_signature_template)) "Email signature template is required."
+Assert-Check ($policy.policy.email_signature.user_email -match '^[^@\s]+@[^@\s]+$') "Email signature user_email must be an email address."
+Assert-Check ($null -eq $policy.policy.email_signature.signature_on_compose) "Legacy signature_on_compose must not be present."
+Assert-Check ($null -eq $policy.policy.email_signature.signature_on_reply) "Legacy signature_on_reply must not be present."
+Assert-Check ($null -eq $policy.policy.email_signature.signature_on_forward) "Legacy signature_on_forward must not be present."
 
 $secrets = Read-Json "secrets-create-response.json"
 Assert-Check ($secrets.ocs.data.uuid -match '^[A-Za-z0-9_-]+$') "Secrets response uuid must be URL-safe."

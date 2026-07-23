@@ -54,6 +54,13 @@ foreach ($addition in $additions) {
     }
 }
 
+foreach ($requiredEvent in @("InlineResponse", "InlineResponseClose")) {
+    $matchingAddition = $additions | Where-Object { $_.Event -eq $requiredEvent } | Select-Object -First 1
+    if ($null -eq $matchingAddition) {
+        $failures.Add("Compose lifecycle does not subscribe Explorer.$requiredEvent.")
+    }
+}
+
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Error $_ }
     throw "Outlook event hook symmetry check failed with $($failures.Count) issue(s)."

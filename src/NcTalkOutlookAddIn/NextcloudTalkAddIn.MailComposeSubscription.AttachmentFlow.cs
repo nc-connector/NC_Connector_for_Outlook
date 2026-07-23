@@ -183,14 +183,30 @@ namespace NcTalkOutlookAddIn
 
             private void OnPropertyChange(string name)
             {
-                if (_disposed || _attachmentSuppressed)
+                if (_disposed)
                 {
                     return;
                 }
                 string propertyName = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim();
                 if (IsEmailSignaturePropertyChange(propertyName))
                 {
-                    ScheduleEmailSignatureApplication("property_" + propertyName);
+                    string signatureReason = "property_" + propertyName;
+                    if (_attachmentSuppressed)
+                    {
+                        DeferEmailSignatureApplication(signatureReason, "attachment_suppression");
+                    }
+                    else if (_composeSurfaceState == ComposeSurfaceState.Detached)
+                    {
+                        DeferEmailSignatureApplication(signatureReason, "detached_surface");
+                    }
+                    else
+                    {
+                        ScheduleEmailSignatureApplication(signatureReason);
+                    }
+                }
+                if (_attachmentSuppressed)
+                {
+                    return;
                 }
                 if (propertyName.IndexOf("Attach", StringComparison.OrdinalIgnoreCase) < 0
                     && !string.Equals(propertyName, "HasAttachment", StringComparison.OrdinalIgnoreCase))
@@ -900,7 +916,7 @@ namespace NcTalkOutlookAddIn
                     {
                         CleanupTemporaryFiles(new List<string> { localPath });
                     }
-                    _attachmentSuppressed = false;
+                    EndAttachmentSuppression("before_add_single");
                     _beforeAddShareFlowRunning = false;
                     RestartBeforeAddShareTimerIfNeeded();
                 }
@@ -1039,7 +1055,7 @@ namespace NcTalkOutlookAddIn
                             "before_add_batch");
                     }
                     CleanupTemporaryFiles(temporaryFiles);
-                    _attachmentSuppressed = false;
+                    EndAttachmentSuppression("before_add_batch");
                     _beforeAddShareFlowRunning = false;
                     RestartBeforeAddShareTimerIfNeeded();
                 }
@@ -1379,7 +1395,7 @@ namespace NcTalkOutlookAddIn
                         attachments,
                         LogCategories.FileLink,
                         "Failed to release COM object (compose attachments collection remove).");
-                    _attachmentSuppressed = false;
+                    EndAttachmentSuppression("remove_by_index");
                 }
 
                 LogFileLink(
@@ -1431,7 +1447,7 @@ namespace NcTalkOutlookAddIn
                         attachments,
                         LogCategories.FileLink,
                         "Failed to release COM object (compose attachments collection remove_last).");
-                    _attachmentSuppressed = false;
+                    EndAttachmentSuppression("remove_last_batch");
                 }
 
                 LogFileLink(
@@ -1442,6 +1458,12 @@ namespace NcTalkOutlookAddIn
                     + ", removed="
                     + removed.ToString(CultureInfo.InvariantCulture)
                     + ").");
+            }
+
+            private void EndAttachmentSuppression(string trigger)
+            {
+                _attachmentSuppressed = false;
+                ResumeDeferredEmailSignatureApplication("attachment_" + (trigger ?? string.Empty));
             }
 
             private void CleanupTemporaryFiles(List<string> temporaryFiles)

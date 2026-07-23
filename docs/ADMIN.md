@@ -147,7 +147,7 @@ Runtime behavior:
 - checked when deleting a saved Talk appointment would remove the remote Talk room
 - valid active seat => backend policy values apply and `policy_editable=false` fields are locked in the UI
 - missing backend / no seat / invalid seat => local Outlook settings remain active
-- if the backend is unreachable, Outlook falls back to the locally saved add-in settings
+- if the backend is unreachable, Share/Talk use their locally saved add-in settings; the central-signature send check follows the stricter behavior described below
 - if the backend is reachable but the license/seat state is no longer usable, Outlook also falls back to the locally saved add-in settings
 - invalid seat states remain visible in the UI so users can contact their administrator
 - separate password delivery is only available when the backend endpoint exists and the current user has an active assigned seat
@@ -176,22 +176,28 @@ The backend can provide one central HTML email signature for the assigned seat u
 
 - the backend endpoint is reachable and the current account has an active assigned seat
 - the backend status contains `policy.email_signature` and `policy_editable.email_signature`
-- `policy.email_signature.email_signature_on_compose=true`
+- the effective `email_signature_on_compose` value is `true`
 - `policy.email_signature.email_signature_template` contains HTML
 - `policy.email_signature.user_email` contains the Nextcloud user's email address
 - the effective Outlook sender identity matches that email address. If Outlook uses a `SentOnBehalfOfName`/From override for a shared mailbox or delegated Exchange identity, that override must resolve to the same SMTP address; otherwise no backend signature is inserted.
 
-The local settings `EmailSignatureOnCompose`, `EmailSignatureOnReply`, and `EmailSignatureOnForward` control whether the backend signature is inserted for new mails, replies, and forwards unless the backend locks the corresponding setting with `policy_editable.email_signature.<key>=false`.
+The backend values for compose, reply, and forward are defaults while the matching `policy_editable.email_signature.<key>` value is `true`. A user may therefore enable a locally saved option even when its editable backend default is `false`. If the backend marks a value non-editable, that backend value always wins; a locked `false` stays disabled.
 
 If an older backend already returns Share/Talk policy but does not expose the `policy.email_signature` domain yet, only central email signatures remain disabled. Settings then shows a backend update hint; Share and Talk stay controlled by their own policy domains.
 
-When `EmailSignatureOnCompose` is enabled for the matching Outlook sender account, NC Connector owns the signature slot for that identity. In HTML/RTF compose, Outlook-native or third-party signatures captured when the compose window opened are removed only when the quoted-message boundary is structurally identifiable. If the boundary is not structurally identifiable, NC Connector preserves Outlook's quoted message and separator. If the backend signature is inserted before a reply/forward separator, NC Connector keeps one empty line between the signature and the quoted message.
+New mail, reply, and forward use their own effective option. Outlook first uses its operation metadata to distinguish reply and forward. If an inline response remains ambiguous and the two options differ, NC Connector does not guess: background processing leaves the message unchanged and the final send check asks the user to retry instead of sending with an uncertain signature state. If both options have the same value, that common value applies.
 
-Plain-text compose remains plain text. Outlook does not get switched to HTML. NC Connector converts the sanitized backend HTML to plain text and writes it through Outlook's WordEditor signature slot. It does not parse localized reply headers and does not rewrite `MailItem.Body`.
+HTML, plain text, and RTF use Outlook WordEditor in both normal Inspector windows and inline responses. Plain text remains plain text, RTF remains RTF, and NC Connector does not rewrite `MailItem.Body` or `MailItem.HTMLBody`. Popping an inline response into its own window switches processing to that Inspector.
 
-If the backend signature is inactive, incomplete, compose-signature policy is disabled, or the Outlook sender account does not match the Nextcloud user email, NC Connector leaves Outlook's own signature handling untouched. It only removes/replaces a signature block or managed plain-text bookmark that NC Connector itself inserted into the open compose window.
+The add-in replaces only Outlook's exact `_MailAutoSig` slot or its own `NcConnectorSignature` bookmark. If neither exists, a new-mail signature is placed after all text written by the user. A reply/forward signature is placed after the user's response and before Outlook's `_MailOriginal` bookmark or a Word paragraph-border quote separator. The current cursor, the start of the body, and localized headers such as `From:` or `Von:` are not fallbacks. If no safe reply/forward boundary exists, authored and quoted content remain unchanged.
 
-The backend signature HTML is sanitized with the same fail-closed template sanitizer used for sharing and Talk blocks. HTML/RTF signatures are inserted as marked HTML blocks; plain-text signatures are tracked with a Word bookmark for the open compose session.
+Every inserted backend signature receives the `NcConnectorSignature` Word bookmark in all three formats. This keeps sender changes, format changes, and later updates limited to the exact managed range. Switching from a non-matching to the matching sender therefore places the signature below existing new-mail text instead of above it. Switching away from the matching sender removes only the managed bookmark range.
+
+The backend HTML passes through the fail-closed template sanitizer. Formatted insertion is staged and bookmarked before the previous signature is removed; failure does not trigger a body-wide replacement. Word selection is restored through a temporary bookmark, and Inspector and inline response use the same spacing rules.
+
+Outlook performs a final synchronous policy, sender, format, compose-type, and bookmark check before send. With complete backend connection settings, it cancels sending if no successful policy snapshot is available or if a required signature apply/clear operation cannot complete safely. The message stays open for correction and another send attempt. An incomplete setup creates no signature requirement and only attempts best-effort removal of an exact NC Connector bookmark. An unsupported signature domain also disables insertion; with otherwise complete backend settings, however, the final check still refuses to send if an existing managed range cannot be reconciled safely.
+
+If policy is inactive, incomplete, or the sender does not match, NC Connector does not remove an Outlook or third-party signature belonging to that identity. When compose policy is active for the matching sender but reply or forward insertion is disabled, it may clear an exact Outlook signature slot for that response without inserting the backend signature.
 
 ### Talk appointment-safe HTML subset (backend templates)
 
@@ -340,6 +346,9 @@ Official Nextcloud references:
 - If `Send password separately` is enabled, the main HTML block does not contain inline password text.
 - This feature is only available when the NC Connector backend endpoint exists and the current user has an active assigned seat.
 - Follow-up password mail dispatch runs only after the primary mail send is confirmed.
+- The successful policy snapshot already verified for the primary send is sanitized once and reused for all follow-up recipients and for a possible manual fallback draft.
+- Outlook applies and reads back the original compose sender identity. Automatic send runs only when the effective follow-up sender exactly matches the sender captured from the successful primary mail; otherwise Outlook opens the manual fallback draft.
+- When that effective sender also matches `policy.email_signature.user_email`, the follow-up contains the backend signature. Plain primary mail produces a plain follow-up signature; HTML/RTF primary mail produces an HTML follow-up. A missing policy, identity mismatch, or sanitizer failure omits the signature rather than using unverified content.
 - If backend policy selects Nextcloud Secrets, Outlook creates one encrypted one-time Secrets link per final recipient.
 - If Secrets creation fails, Outlook falls back to the existing plain follow-up mail and shows a warning.
 - Dispatch strategy:
