@@ -1058,9 +1058,6 @@
   "outlook_version_unknown": {
     "message": "ismeretlen"
   },
-  "outlook_event_conversation_hint": {
-    "message": "Az esemény beszélgetésekhez Nextcloud 31 vagy újabb szükséges.\nÉszlelt verzió: $1"
-  },
   "outlook_loginflow_failed_with_reason": {
     "message": "Sikertelen bejelentkezés: $1"
   },

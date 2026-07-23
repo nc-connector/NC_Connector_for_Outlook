@@ -33,7 +33,6 @@ namespace NcTalkOutlookAddIn.Settings
             TransportTlsUseSystemDefault = false;
             TransportTlsEnable12 = true;
             TransportTlsEnable13 = false;
-            LastKnownServerVersion = string.Empty;
             UpdateNotifyEnabled = false;
             UpdateInstallId = string.Empty;
             UpdateLastCheckedAtUtc = string.Empty;
@@ -102,8 +101,6 @@ namespace NcTalkOutlookAddIn.Settings
         public bool TransportTlsEnable12 { get; set; }
 
         public bool TransportTlsEnable13 { get; set; }
-
-        public string LastKnownServerVersion { get; set; }
 
         public bool UpdateNotifyEnabled { get; set; }
 

@@ -1058,9 +1058,6 @@
   "outlook_version_unknown": {
     "message": "onbekend"
   },
-  "outlook_event_conversation_hint": {
-    "message": "Evenementgesprekken vereisen Nextcloud 31 of nieuwer.\nGedetecteerde versie: $1"
-  },
   "outlook_loginflow_failed_with_reason": {
     "message": "Aanmelden mislukt: $1"
   },

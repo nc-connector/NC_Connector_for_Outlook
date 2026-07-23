@@ -1058,9 +1058,6 @@
   "outlook_version_unknown": {
     "message": "nieznany"
   },
-  "outlook_event_conversation_hint": {
-    "message": "Rozmowy wydarzeń wymagają Nextcloud 31 lub nowszego.\nWykryta wersja: $1"
-  },
   "outlook_loginflow_failed_with_reason": {
     "message": "Logowanie nie powiodło się: $1"
   },

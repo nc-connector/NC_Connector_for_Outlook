@@ -1079,9 +1079,6 @@
   "outlook_version_unknown": {
     "message": "unbekannt"
   },
-  "outlook_event_conversation_hint": {
-    "message": "Event-Unterhaltungen benötigen Nextcloud 31 oder neuer.\nErkannte Version: $1"
-  },
   "outlook_loginflow_failed_with_reason": {
     "message": "Login fehlgeschlagen: $1"
   },

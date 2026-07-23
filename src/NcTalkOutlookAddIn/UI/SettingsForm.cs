@@ -142,7 +142,6 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _cancelButton = new Button();
         private bool _isBusy;
         private AddinSettings _result;
-        private string _lastKnownServerVersion = string.Empty;
         private bool _initialIfbEnabled;
         private bool _ifbDefaultApplied;
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
@@ -1315,7 +1314,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _initialIfbEnabled = Result.IfbEnabled;
                 _ifbDefaultApplied = _initialIfbEnabled || !string.IsNullOrEmpty(Result.IfbPreviousFreeBusyPath);
-                _lastKnownServerVersion = Result.LastKnownServerVersion ?? string.Empty;
                 _serverUrlTextBox.Text = Result.ManagedNextcloudUrlLocked ? Result.ManagedNextcloudUrl : Result.ServerUrl;
                 _usernameTextBox.Text = Result.Username;
                 _appPasswordTextBox.Text = Result.AppPassword;
@@ -1454,7 +1452,6 @@ namespace NcTalkOutlookAddIn.UI
             Result.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
             Result.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
             Result.UpdateNotifyEnabled = _updateNotifyCheckBox.Checked;
-            Result.LastKnownServerVersion = _lastKnownServerVersion ?? string.Empty;
             Result.FileLinkBasePath = _fileLinkBaseTextBox.Text.Trim();
             Result.SharingDefaultShareName = _sharingDefaultShareNameTextBox.Text.Trim();
             Result.SharingDefaultPermCreate = _sharingDefaultPermCreateCheckBox.Checked;
@@ -1613,7 +1610,6 @@ namespace NcTalkOutlookAddIn.UI
                 bool success = await Task.Run(() => service.VerifyConnection(out responseMessage));
                 if (success)
                 {
-                    UpdateKnownServerVersion(responseMessage);
                     DiagnosticsLogger.Log(LogCategories.Core, "Connection test succeeded (Response=" + (string.IsNullOrEmpty(responseMessage) ? "OK" : responseMessage) + ").");
                     string suffix = string.IsNullOrEmpty(responseMessage)
                         ? string.Empty
@@ -2742,15 +2738,6 @@ namespace NcTalkOutlookAddIn.UI
             _toolTip.SetToolTip(_sharingAttachmentsOfferAboveCheckBox, Strings.TooltipSharingAttachmentsOffer);
             _toolTip.SetToolTip(_sharingAttachmentLinkTargetLabel, Strings.SharingAttachmentLinkTargetTooltip);
             _toolTip.SetToolTip(_sharingAttachmentLinkTargetCombo, Strings.SharingAttachmentLinkTargetTooltip);
-        }
-
-        private void UpdateKnownServerVersion(string candidate)
-        {
-            Version parsed;
-            if (NextcloudVersionHelper.TryParse(candidate, out parsed))
-            {
-                _lastKnownServerVersion = parsed.ToString();
-            }
         }
 
     }

@@ -273,7 +273,6 @@ namespace NcTalkOutlookAddIn.Controllers
                     NextcloudTalkAddIn.LogTalkMessage("Starting credential verification request.");
                     if (service.VerifyConnection(out response))
                     {
-                        _owner.UpdateStoredServerVersion(response);
                         NextcloudTalkAddIn.LogTalkMessage("Credentials verified (response=" + (string.IsNullOrEmpty(response) ? "OK" : response) + ").");
                         return true;
                     }

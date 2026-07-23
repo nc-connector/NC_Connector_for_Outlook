@@ -1058,9 +1058,6 @@
   "outlook_version_unknown": {
     "message": "不明"
   },
-  "outlook_event_conversation_hint": {
-    "message": "イベント会話には Nextcloud 31 以降が必要です。\n検出されたバージョン: $1"
-  },
   "outlook_loginflow_failed_with_reason": {
     "message": "ログインに失敗しました: $1"
   },

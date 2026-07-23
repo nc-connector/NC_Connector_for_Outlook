@@ -466,7 +466,6 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TransportTlsUseSystemDefault", settings.TransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable12", settings.TransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable13", settings.TransportTlsEnable13.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "LastKnownServerVersion", Safe(settings.LastKnownServerVersion));
             AppendElement(document, root, "UpdateNotifyEnabled", settings.UpdateNotifyEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "UpdateInstallId", Safe(settings.UpdateInstallId));
             AppendElement(document, root, "UpdateLastCheckedAtUtc", Safe(settings.UpdateLastCheckedAtUtc));
@@ -613,9 +612,6 @@ namespace NcTalkOutlookAddIn.Settings
                     {
                         settings.TransportTlsEnable13 = transportTlsEnable13;
                     }
-                    break;
-                case "LastKnownServerVersion":
-                    settings.LastKnownServerVersion = value;
                     break;
                 case "UpdateNotifyEnabled":
                     bool updateNotifyEnabled;

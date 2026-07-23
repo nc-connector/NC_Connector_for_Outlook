@@ -587,8 +587,6 @@ namespace NcTalkOutlookAddIn.Utilities
             }
         }
         internal static string TalkVersionUnknown { get { return Get("outlook_version_unknown", "unknown"); } }
-        internal static string TalkEventHint { get { return Get("outlook_event_conversation_hint", "Event conversations require Nextcloud 31 or newer.\nDetected version: {0}"); } }
-
         internal static string DialogOk { get { return Get("ui_button_ok", "OK"); } }
         internal static string DialogCancel { get { return Get("ui_button_cancel", "Cancel"); } }
 

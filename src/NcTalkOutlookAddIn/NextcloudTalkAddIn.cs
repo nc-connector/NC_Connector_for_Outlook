@@ -649,39 +649,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        internal void UpdateStoredServerVersion(string response)
-        {
-            if (_currentSettings == null || string.IsNullOrWhiteSpace(response))
-            {
-                return;
-            }
-
-            Version parsed;
-            if (!NextcloudVersionHelper.TryParse(response, out parsed))
-            {
-                return;
-            }
-            string versionText = parsed.ToString();
-            if (string.Equals(_currentSettings.LastKnownServerVersion, versionText, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            _currentSettings.LastKnownServerVersion = versionText;
-            if (_settingsStorage != null)
-            {
-                try
-                {
-                    _settingsStorage.Save(_currentSettings);
-                }
-                catch (Exception ex)
-                {
-                    // Ignore errors when saving the version asynchronously.
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to persist server version hint.", ex);
-                }
-            }
-        }
-
         private string ResolveRoomTokenForAppointment(Outlook.AppointmentItem appointment)
         {
             string roomToken = TalkAppointmentController.GetUserPropertyText(appointment, IcalToken);

@@ -34,7 +34,6 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Label _roomTypeLabel = new Label();
         private readonly Label _passwordLabel = new Label();
         private readonly GroupBox _settingsGroup = new GroupBox();
-        private readonly Label _eventSupportHintLabel = new Label();
         private readonly TextBox _titleTextBox = new TextBox();
         private readonly ComboBox _roomTypeComboBox = new ComboBox();
         private readonly CheckBox _passwordToggleCheckBox = new CheckBox();
@@ -64,8 +63,6 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _cancelButton = new Button();
         private readonly BrandedHeader _headerPanel = new BrandedHeader();
         private const int HeaderHeight = 48;
-        private readonly bool _eventConversationsSupported;
-        private readonly string _serverVersionHint;
         private readonly PasswordPolicyInfo _passwordPolicy;
         private readonly TalkServiceConfiguration _configuration;
         private readonly BackendPolicyStatus _backendPolicyStatus;
@@ -154,7 +151,6 @@ namespace NcTalkOutlookAddIn.UI
             DateTime startTime,
             DateTime endTime)
         {
-            _eventConversationsSupported = DetermineEventConversationSupport(defaults, out _serverVersionHint);
             _passwordPolicy = passwordPolicy;
             _configuration = configuration;
             _backendPolicyStatus = policyStatus;
@@ -304,16 +300,6 @@ namespace NcTalkOutlookAddIn.UI
             };
             _moderatorGroup.Controls.Add(_moderatorHintLabel);
 
-            _eventSupportHintLabel.AutoSize = true;
-            _eventSupportHintLabel.MaximumSize = new Size(ScaleLogical(260), 0);
-            _eventSupportHintLabel.ForeColor = Color.DimGray;
-            _eventSupportHintLabel.Visible = !_eventConversationsSupported;
-            if (_eventSupportHintLabel.Visible)
-            {
-                var versionInfo = string.IsNullOrEmpty(_serverVersionHint) ? Strings.TalkVersionUnknown : _serverVersionHint;
-                _eventSupportHintLabel.Text = string.Format(Strings.TalkEventHint, versionInfo);
-            }
-
             PolicyUiHelper.InitializePolicyWarningPanel(
                 _policyWarningPanel,
                 _policyWarningTitleLabel,
@@ -338,7 +324,6 @@ namespace NcTalkOutlookAddIn.UI
             Controls.Add(_titleTextBox);
             Controls.Add(_roomTypeLabel);
             Controls.Add(_roomTypeComboBox);
-            Controls.Add(_eventSupportHintLabel);
             Controls.Add(_passwordToggleCheckBox);
             Controls.Add(_passwordLabel);
             Controls.Add(_passwordTextBox);
@@ -418,13 +403,6 @@ namespace NcTalkOutlookAddIn.UI
                 _roomTypeComboBox.SetBounds(inputX, y, inputWidth, roomTypeComboHeight);
                 y = Math.Max(_roomTypeLabel.Bottom, _roomTypeComboBox.Bottom) + rowGap;
 
-                _eventSupportHintLabel.Visible = !_eventConversationsSupported;
-                if (_eventSupportHintLabel.Visible)
-                {
-                    _eventSupportHintLabel.Location = new Point(inputX, y - ScaleLogical(2));
-                    _eventSupportHintLabel.MaximumSize = new Size(inputWidth, 0);
-                    y = _eventSupportHintLabel.Bottom + verticalGap;
-                }
                 if (_policyWarningPanel.Visible)
                 {
                     int warningPadding = ScaleLogical(8);
@@ -573,26 +551,6 @@ namespace NcTalkOutlookAddIn.UI
             return _moderatorHintLabel.Bottom + innerPadding;
         }
 
-                // Determines whether event conversations are supported (Nextcloud >= 31).
-        private static bool DetermineEventConversationSupport(AddinSettings defaults, out string versionText)
-        {
-            versionText = string.Empty;
-            if (defaults == null)
-            {
-                return true;
-            }
-
-            versionText = defaults.LastKnownServerVersion ?? string.Empty;
-
-            Version parsed;
-            if (NextcloudVersionHelper.TryParse(versionText, out parsed))
-            {
-                versionText = parsed.ToString();
-                return parsed.Major >= 31;
-            }
-            return true;
-        }
-
         private void ApplyDefaults(AddinSettings defaults, string appointmentSubject)
         {
             string titleDefault = string.IsNullOrWhiteSpace(appointmentSubject) ? DefaultTitle : appointmentSubject.Trim();
@@ -663,11 +621,6 @@ namespace NcTalkOutlookAddIn.UI
             _addGuestsCheckBox.Checked = addGuestsDefault;
             _lobbyCheckBox.Checked = lobbyDefault;
             _searchCheckBox.Checked = searchDefault;
-
-            if (!_eventConversationsSupported && roomTypeDefault == TalkRoomType.EventConversation)
-            {
-                roomTypeDefault = TalkRoomType.StandardRoom;
-            }
 
             SelectRoomType(roomTypeDefault);
 

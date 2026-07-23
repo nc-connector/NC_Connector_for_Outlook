@@ -1058,9 +1058,6 @@
   "outlook_version_unknown": {
     "message": "neznámé"
   },
-  "outlook_event_conversation_hint": {
-    "message": "Událostní konverzace vyžadují Nextcloud 31 nebo novější.\nZjištěná verze: $1"
-  },
   "outlook_loginflow_failed_with_reason": {
     "message": "Přihlášení se nezdařilo: $1"
   },

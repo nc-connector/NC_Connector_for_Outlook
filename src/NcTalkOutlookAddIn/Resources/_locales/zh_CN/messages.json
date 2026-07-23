@@ -1058,9 +1058,6 @@
   "outlook_version_unknown": {
     "message": "未知"
   },
-  "outlook_event_conversation_hint": {
-    "message": "事件会话需要 Nextcloud 31 或更高版本。\n检测到的版本：$1"
-  },
   "outlook_loginflow_failed_with_reason": {
     "message": "登录失败：$1"
   },
