@@ -29,6 +29,31 @@ namespace NcTalkOutlookAddIn.Services
             string failureMessage,
             CancellationToken cancellationToken)
         {
+            NcHttpResponse response = ProbeResource(
+                url,
+                cancellationToken,
+                failureMessage);
+            return response.StatusCode != HttpStatusCode.NotFound
+                   && ResponseContainsCollection(response.ResponseText);
+        }
+
+        internal bool ResourceExists(
+            string url,
+            string failureMessage,
+            CancellationToken cancellationToken)
+        {
+            NcHttpResponse response = ProbeResource(
+                url,
+                cancellationToken,
+                failureMessage);
+            return response.StatusCode != HttpStatusCode.NotFound;
+        }
+
+        private NcHttpResponse ProbeResource(
+            string url,
+            CancellationToken cancellationToken,
+            string failureMessage)
+        {
             NcHttpResponse response = SendWithRetry(
                 () => new NcHttpRequestOptions
                 {
@@ -52,7 +77,7 @@ namespace NcTalkOutlookAddIn.Services
                 cancellationToken,
                 null);
 
-            if (!response.HasHttpResponse)
+            if (response == null || !response.HasHttpResponse)
             {
                 ThrowProbeFailure(
                     response,
@@ -61,18 +86,14 @@ namespace NcTalkOutlookAddIn.Services
             }
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                return false;
+                return response;
             }
+            bool successful =
+                response.StatusCode == HttpStatusCode.OK
+                || (int)response.StatusCode == 207;
             if (response.StatusCode == HttpStatusCode.Unauthorized
-                || response.StatusCode == HttpStatusCode.Forbidden)
-            {
-                ThrowProbeFailure(
-                    response,
-                    failureMessage,
-                    cancellationToken);
-            }
-            if (response.StatusCode != HttpStatusCode.OK
-                && (int)response.StatusCode != 207)
+                || response.StatusCode == HttpStatusCode.Forbidden
+                || !successful)
             {
                 ThrowProbeFailure(
                     response,
@@ -80,7 +101,7 @@ namespace NcTalkOutlookAddIn.Services
                     cancellationToken);
             }
 
-            return ResponseContainsCollection(response.ResponseText);
+            return response;
         }
 
         internal bool ResourceHasContentLength(

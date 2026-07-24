@@ -10,6 +10,33 @@ using System.Text;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
+    internal sealed class FileLinkShareTarget
+    {
+        internal FileLinkShareTarget(
+            string basePath,
+            string shareName,
+            DateTime shareDate,
+            string folderName,
+            string relativeFolderPath)
+        {
+            BasePath = basePath ?? string.Empty;
+            ShareName = shareName ?? string.Empty;
+            ShareDate = shareDate;
+            FolderName = folderName ?? string.Empty;
+            RelativeFolderPath = relativeFolderPath ?? string.Empty;
+        }
+
+        internal string BasePath { get; private set; }
+
+        internal string ShareName { get; private set; }
+
+        internal DateTime ShareDate { get; private set; }
+
+        internal string FolderName { get; private set; }
+
+        internal string RelativeFolderPath { get; private set; }
+    }
+
     // Defines the local-to-DAV naming rules shared by the wizard and upload pipeline.
     internal static class FileLinkPath
     {
@@ -24,6 +51,30 @@ namespace NcTalkOutlookAddIn.Utilities
                        CultureInfo.InvariantCulture)
                    + "_"
                    + (sanitizedShareName ?? string.Empty);
+        }
+
+        internal static FileLinkShareTarget ResolveShareTarget(
+            string basePath,
+            string shareName,
+            DateTime shareDate,
+            string fallbackShareName)
+        {
+            string normalizedBasePath = NormalizeRelativePath(basePath);
+            string sanitizedShareName = SanitizeComponent(shareName);
+            if (string.IsNullOrWhiteSpace(sanitizedShareName))
+            {
+                sanitizedShareName = fallbackShareName ?? string.Empty;
+            }
+
+            string folderName = BuildShareFolderName(
+                shareDate,
+                sanitizedShareName);
+            return new FileLinkShareTarget(
+                normalizedBasePath,
+                sanitizedShareName,
+                shareDate,
+                folderName,
+                Combine(normalizedBasePath, folderName));
         }
 
         internal static string NormalizeRelativePath(string path)

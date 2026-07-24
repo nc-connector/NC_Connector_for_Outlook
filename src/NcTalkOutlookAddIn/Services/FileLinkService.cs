@@ -45,6 +45,49 @@ namespace NcTalkOutlookAddIn.Services
             _capabilitiesSnapshot = capabilitiesSnapshot;
         }
 
+        internal bool ManualShareFolderExists(
+            FileLinkRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException("request");
+            }
+            if (request.AttachmentMode)
+            {
+                throw new ArgumentException(
+                    "Attachment shares use automatic collision resolution.",
+                    "request");
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            using (DiagnosticsLogger.BeginOperation(
+                LogCategories.FileLink,
+                "FileLink.ManualSharePreflight"))
+            {
+                ResolveRequiredCapabilities();
+                FileLinkShareTarget target = ResolveShareTarget(request);
+                string normalizedBaseUrl =
+                    _configuration.GetNormalizedBaseUrl();
+                string userId =
+                    NextcloudUserIdentityService.ResolveCurrentUserId(
+                        _configuration);
+                bool exists = _davClient.ResourceExists(
+                    FileLinkDavClient.BuildFileUrl(
+                        normalizedBaseUrl,
+                        userId,
+                        target.RelativeFolderPath),
+                    Strings.FileLinkWizardFolderCheckFailedFormat,
+                    cancellationToken);
+                DiagnosticsLogger.Log(
+                    LogCategories.FileLink,
+                    "Manual share folder preflight completed (exists="
+                    + exists.ToString()
+                    + ").");
+                return exists;
+            }
+        }
+
         internal FileLinkUploadContext PrepareUpload(
             FileLinkRequest request,
             IList<FileLinkSelection> selections,
@@ -83,23 +126,12 @@ namespace NcTalkOutlookAddIn.Services
                 string userId =
                     NextcloudUserIdentityService.ResolveCurrentUserId(
                         _configuration);
-                string basePath = FileLinkPath.NormalizeRelativePath(
-                    request.BasePath);
-                string sanitizedShareName =
-                    FileLinkPath.SanitizeComponent(request.ShareName);
-                if (string.IsNullOrWhiteSpace(sanitizedShareName))
-                {
-                    sanitizedShareName =
-                        Strings.FileLinkWizardFallbackShareName;
-                }
-
-                DateTime shareDate = request.ShareDate.HasValue
-                    ? request.ShareDate.Value
-                    : DateTime.Now;
+                FileLinkShareTarget shareTarget =
+                    ResolveShareTarget(request);
                 FileLinkUploadPlan plan = FileLinkUploadPlanBuilder.Build(
                     selections,
                     capabilities.BulkUploadSupported,
-                    FileLinkPath.GetDepth(basePath) + 1,
+                    FileLinkPath.GetDepth(shareTarget.BasePath) + 1,
                     duplicateResolver,
                     cancellationToken);
                 _transferService.PrepareBulkChecksums(
@@ -114,7 +146,7 @@ namespace NcTalkOutlookAddIn.Services
                     _davClient.EnsureFolderPath(
                         normalizedBaseUrl,
                         userId,
-                        basePath,
+                        shareTarget.BasePath,
                         cancellationToken);
 
                     context = CreateShareRoot(
@@ -122,9 +154,7 @@ namespace NcTalkOutlookAddIn.Services
                         plan,
                         normalizedBaseUrl,
                         userId,
-                        basePath,
-                        sanitizedShareName,
-                        shareDate,
+                        shareTarget,
                         cancellationToken);
                     shareRootCreated = true;
 
@@ -224,13 +254,11 @@ namespace NcTalkOutlookAddIn.Services
             FileLinkUploadPlan plan,
             string normalizedBaseUrl,
             string userId,
-            string basePath,
-            string sanitizedShareName,
-            DateTime shareDate,
+            FileLinkShareTarget initialTarget,
             CancellationToken cancellationToken)
         {
-            string resolvedShareName = sanitizedShareName;
-            string resolvedFolderName = string.Empty;
+            string resolvedShareName = initialTarget.ShareName;
+            FileLinkShareTarget resolvedTarget = initialTarget;
             int candidateLimit = request.AttachmentMode
                 ? AttachmentShareNameCandidateLimit
                 : 1;
@@ -239,20 +267,21 @@ namespace NcTalkOutlookAddIn.Services
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 resolvedShareName = suffix == 0
-                    ? sanitizedShareName
-                    : sanitizedShareName
+                    ? initialTarget.ShareName
+                    : initialTarget.ShareName
                       + "_"
                       + suffix.ToString(CultureInfo.InvariantCulture);
-                resolvedFolderName = FileLinkPath.BuildShareFolderName(
-                    shareDate,
-                    resolvedShareName);
-                string resolvedFolderPath = FileLinkPath.Combine(
-                    basePath,
-                    resolvedFolderName);
+                resolvedTarget = suffix == 0
+                    ? initialTarget
+                    : FileLinkPath.ResolveShareTarget(
+                        initialTarget.BasePath,
+                        resolvedShareName,
+                        initialTarget.ShareDate,
+                        Strings.FileLinkWizardFallbackShareName);
                 if (!_davClient.TryCreateShareRoot(
                     normalizedBaseUrl,
                     userId,
-                    resolvedFolderPath,
+                    resolvedTarget.RelativeFolderPath,
                     cancellationToken))
                 {
                     continue;
@@ -270,8 +299,8 @@ namespace NcTalkOutlookAddIn.Services
                     normalizedBaseUrl,
                     userId,
                     resolvedShareName,
-                    resolvedFolderName,
-                    resolvedFolderPath,
+                    resolvedTarget.FolderName,
+                    resolvedTarget.RelativeFolderPath,
                     plan);
             }
 
@@ -279,10 +308,23 @@ namespace NcTalkOutlookAddIn.Services
                 string.Format(
                     CultureInfo.CurrentCulture,
                     Strings.FileLinkWizardFolderExistsFormat,
-                    resolvedFolderName),
+                    resolvedTarget.FolderName),
                 false,
                 HttpStatusCode.MethodNotAllowed,
                 null);
+        }
+
+        private static FileLinkShareTarget ResolveShareTarget(
+            FileLinkRequest request)
+        {
+            DateTime shareDate = request.ShareDate.HasValue
+                ? request.ShareDate.Value
+                : DateTime.Now;
+            return FileLinkPath.ResolveShareTarget(
+                request.BasePath,
+                request.ShareName,
+                shareDate,
+                Strings.FileLinkWizardFallbackShareName);
         }
 
         private NextcloudCapabilitiesSnapshot ResolveRequiredCapabilities()

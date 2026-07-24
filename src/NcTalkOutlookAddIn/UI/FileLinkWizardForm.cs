@@ -92,6 +92,7 @@ namespace NcTalkOutlookAddIn.UI
         private CancellationTokenSource _cancellationSource;
         private FileLinkUploadContext _uploadContext;
         private bool _uploadInProgress;
+        private bool _preflightInProgress;
         private bool _uploadCompleted;
         private bool _allowEmptyUpload;
         private bool _shareFinalized;
@@ -229,9 +230,14 @@ namespace NcTalkOutlookAddIn.UI
             PositionProgressBars();
         }
 
-        private void Navigate(int direction)
+        private bool IsWizardBusy
         {
-            if (_attachmentMode)
+            get { return _uploadInProgress || _preflightInProgress; }
+        }
+
+        private async Task NavigateAsync(int direction)
+        {
+            if (_attachmentMode || IsWizardBusy)
             {
                 return;
             }
@@ -239,8 +245,116 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
+            if (direction > 0
+                && _currentStepIndex == 0
+                && !await CanAdvanceFromShareStepAsync())
+            {
+                return;
+            }
             int newIndex = _currentStepIndex + direction;
             ShowStep(newIndex);
+        }
+
+        private async Task<bool> CanAdvanceFromShareStepAsync()
+        {
+            if (_uploadCompleted && _uploadContext != null)
+            {
+                return true;
+            }
+
+            ApplyFormData();
+            _preflightInProgress = true;
+            _progressBar.Style = ProgressBarStyle.Marquee;
+            _progressLabel.Text =
+                Strings.FileLinkWizardStatusCheckingFolder;
+            SetProgressPanelVisible(true);
+            UpdateNavigationState();
+            UpdateUploadButtonState();
+
+            Cursor previousCursor = Cursor.Current;
+            Cursor.Current = Cursors.WaitCursor;
+            UseWaitCursor = true;
+            bool generalStepWasEnabled = _generalStepPanel.Enabled;
+            bool focusShareNameAfterPreflight = false;
+            _generalStepPanel.Enabled = false;
+            try
+            {
+                _cancellationSource = new CancellationTokenSource();
+                CancellationToken token = _cancellationSource.Token;
+                bool exists = await Task.Run(
+                    () => _service.ManualShareFolderExists(
+                        _request,
+                        token));
+                token.ThrowIfCancellationRequested();
+                if (!exists)
+                {
+                    return true;
+                }
+
+                MessageBox.Show(
+                    Strings.FileLinkWizardFolderExistsFormat,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                focusShareNameAfterPreflight = true;
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                DiagnosticsLogger.Log(
+                    LogCategories.FileLink,
+                    "Manual share folder preflight cancelled.");
+                return false;
+            }
+            catch (TalkServiceException ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Manual share folder preflight failed with service error.",
+                    ex);
+                MessageBox.Show(
+                    ex.Message,
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(
+                    LogCategories.FileLink,
+                    "Manual share folder preflight failed unexpectedly.",
+                    ex);
+                MessageBox.Show(
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        Strings.FileLinkWizardFolderCheckFailedFormat,
+                        ex.Message),
+                    Strings.DialogTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return false;
+            }
+            finally
+            {
+                if (_cancellationSource != null)
+                {
+                    _cancellationSource.Dispose();
+                    _cancellationSource = null;
+                }
+                _preflightInProgress = false;
+                SetProgressPanelVisible(false);
+                UseWaitCursor = false;
+                Cursor.Current = previousCursor;
+                _generalStepPanel.Enabled = generalStepWasEnabled;
+                UpdateNavigationState();
+                UpdateUploadButtonState();
+                if (focusShareNameAfterPreflight)
+                {
+                    _shareNameTextBox.Focus();
+                }
+                CloseAfterCancellation();
+            }
         }
 
         private bool ValidateCurrentStep()
@@ -673,7 +787,7 @@ namespace NcTalkOutlookAddIn.UI
                 _uploadButton.Visible = false;
                 _finishButton.Visible = onFileStep;
                 _cancelButton.Visible = true;
-                _finishButton.Enabled = onFileStep && !_uploadInProgress && (_uploadCompleted || _items.Count > 0);
+                _finishButton.Enabled = onFileStep && !IsWizardBusy && (_uploadCompleted || _items.Count > 0);
                 LayoutBottomButtons();
                 return;
             }
@@ -683,24 +797,24 @@ namespace NcTalkOutlookAddIn.UI
             _finishButton.Visible = true;
             _cancelButton.Visible = true;
 
-            _backButton.Enabled = _currentStepIndex > 0 && !_uploadInProgress;
+            _backButton.Enabled = _currentStepIndex > 0 && !IsWizardBusy;
 
-            bool canAdvance = _currentStepIndex < _steps.Count - 1 && !_uploadInProgress;
+            bool canAdvance = _currentStepIndex < _steps.Count - 1 && !IsWizardBusy;
             if (onFileStep)
             {
                 if (_items.Count == 0 && _permissionCreateCheckBox.Checked)
                 {
-                    canAdvance = !_uploadInProgress;
+                    canAdvance = !IsWizardBusy;
                 }
                 else
                 {
-                    canAdvance = _uploadCompleted && !_uploadInProgress;
+                    canAdvance = _uploadCompleted && !IsWizardBusy;
                 }
             }
             _nextButton.Enabled = canAdvance;
 
             bool finishAllowed = _uploadCompleted || (_allowEmptyUpload && _items.Count == 0);
-            _finishButton.Enabled = onLastStep && finishAllowed && !_uploadInProgress;
+            _finishButton.Enabled = onLastStep && finishAllowed && !IsWizardBusy;
             _uploadButton.Visible = onFileStep;
             LayoutBottomButtons();
             UpdateStepHostBounds();
@@ -709,7 +823,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdateUploadButtonState()
         {
-            _uploadButton.Enabled = _uploadButton.Visible && !_uploadInProgress && _items.Count > 0 && !_uploadCompleted;
+            _uploadButton.Enabled = _uploadButton.Visible && !IsWizardBusy && _items.Count > 0 && !_uploadCompleted;
         }
 
 

@@ -75,7 +75,8 @@ namespace NcTalkOutlookAddIn.UI
 
             _backButton.Text = Strings.ButtonBack;
             _backButton.AutoSize = false;
-            _backButton.Click += (s, e) => Navigate(-1);
+            _backButton.Click += async (s, e) =>
+                await NavigateAsync(-1);
             Controls.Add(_backButton);
 
             _uploadButton.Text = Strings.FileLinkWizardUploadButton;
@@ -87,7 +88,8 @@ namespace NcTalkOutlookAddIn.UI
 
             _nextButton.Text = Strings.ButtonNext;
             _nextButton.AutoSize = false;
-            _nextButton.Click += (s, e) => Navigate(1);
+            _nextButton.Click += async (s, e) =>
+                await NavigateAsync(1);
             Controls.Add(_nextButton);
 
             _finishButton.Text = Strings.FileLinkWizardFinishButton;

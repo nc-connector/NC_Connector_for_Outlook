@@ -240,6 +240,9 @@ internal static class FileLinkProtocolTests
     {
         TestAutoMkcolHeader();
         TestDavPathNormalization();
+        TestMissingResourcePreflight();
+        TestExistingResourcePreflight();
+        TestUnauthorizedPreflight();
         TestKnownRootCollision();
         TestIndeterminateRootCollision();
         TestOwnedDirectoryRecovery();
@@ -280,6 +283,82 @@ internal static class FileLinkProtocolTests
                 "https://cloud.example.test",
                 "user",
                 "safe/../file.txt"));
+    }
+
+    private static void TestMissingResourcePreflight()
+    {
+        var requests = new List<NcHttpRequestOptions>();
+        var client = new FileLinkDavClient(options =>
+        {
+            requests.Add(options);
+            return Http(HttpStatusCode.NotFound);
+        });
+
+        bool exists = client.ResourceExists(
+            "https://cloud.example.test/remote.php/dav/files/user/NC%20Connector/20260724_share",
+            "folder check failed: {0}",
+            CancellationToken.None);
+        Check("Missing share target passes the preflight", !exists);
+        Equal("Missing target sends one probe", 1, requests.Count);
+        Equal("Share target probe uses PROPFIND", "PROPFIND", requests[0].Method);
+        Equal("Share target probe uses depth zero", "0", requests[0].Headers["Depth"]);
+    }
+
+    private static void TestExistingResourcePreflight()
+    {
+        var requests = new List<NcHttpRequestOptions>();
+        var client = new FileLinkDavClient(options =>
+        {
+            requests.Add(options);
+            return new NcHttpResponse
+            {
+                HasHttpResponse = true,
+                StatusCode = (HttpStatusCode)207,
+                ResponseText =
+                    "<?xml version=\"1.0\"?>"
+                    + "<d:multistatus xmlns:d=\"DAV:\">"
+                    + "<d:response><d:propstat><d:prop>"
+                    + "<d:getcontentlength>12</d:getcontentlength>"
+                    + "</d:prop></d:propstat></d:response>"
+                    + "</d:multistatus>"
+            };
+        });
+
+        bool exists = client.ResourceExists(
+            "https://cloud.example.test/remote.php/dav/files/user/NC%20Connector/20260724_share",
+            "folder check failed: {0}",
+            CancellationToken.None);
+        Check(
+            "Any existing resource blocks the manual share target",
+            exists);
+        Equal("Existing target sends one probe", 1, requests.Count);
+    }
+
+    private static void TestUnauthorizedPreflight()
+    {
+        var client = new FileLinkDavClient(options =>
+            Http(HttpStatusCode.Unauthorized));
+        try
+        {
+            client.ResourceExists(
+                "https://cloud.example.test/remote.php/dav/files/user/NC%20Connector/20260724_share",
+                "folder check failed: {0}",
+                CancellationToken.None);
+            Check(
+                "Unauthorized preflight fails closed",
+                false,
+                "no exception");
+        }
+        catch (TalkServiceException ex)
+        {
+            Check(
+                "Unauthorized preflight fails closed",
+                ex.IsAuthenticationError);
+            Equal(
+                "Unauthorized preflight keeps the HTTP status",
+                HttpStatusCode.Unauthorized,
+                ex.StatusCode);
+        }
     }
 
     private static void TestKnownRootCollision()

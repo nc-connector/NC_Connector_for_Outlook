@@ -949,6 +949,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardUploadFirst { get { return Get("outlook_sharing_upload_first", "Please upload the selected files first."); } }
         internal static string FileLinkWizardCreatingShare { get { return Get("sharing_progress_label", "Creating share..."); } }
         internal static string FileLinkWizardCreateFailedFormat { get { return Get("outlook_sharing_create_failed_format", "Could not create share: {0}"); } }
+        internal static string FileLinkWizardStatusCheckingFolder { get { return Get("sharing_status_checking_folder", "Checking folder availability..."); } }
         internal static string FileLinkWizardFolderExistsFormat { get { return Get("sharing_error_folder_exists", "A share folder with this name already exists. Please choose a different name."); } }
         internal static string FileLinkWizardFolderCheckFailedFormat { get { return Get("outlook_sharing_folder_check_failed_format", "Could not check share folder: {0}"); } }
         internal static string FileLinkWizardStatusSuccess { get { return Get("sharing_status_done_row", "Done"); } }
