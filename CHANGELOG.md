@@ -4,6 +4,23 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.3.0] - 2026-07-24
+
+### Added
+- Attachment automation can now insert either a direct ZIP download or the Nextcloud share page, with local settings and backend policy support.
+- FileLink can now use capability-gated Nextcloud DAV bulk upload for suitable small-file sets and run up to three direct or chunked transfers in parallel.
+
+### Changed
+- Nextcloud 32 or newer is now required for all add-in functions and is validated through authenticated capabilities.
+- FileLink now scans selections once, plans folders and transfers before changing the server, reports phased byte and transfer-rate progress, and checks ambiguous DAV and OCS results before repeating a request.
+
+### Fixed
+- Backend-managed signatures now use exact Outlook WordEditor slots across Inspector and inline compose, preserve authored and quoted content through sender, format, reply, and forward changes, and stop sending when a required reconciliation cannot finish.
+- Editable backend signature defaults can now be overridden locally, while administrator-locked values continue to win.
+- Separate-password follow-up mails now verify the captured sender, reuse the validated policy snapshot, and apply the matching backend signature to automatic and manual fallback mails.
+- File shares now preserve the selected permission mask, reserve their target folder atomically, and avoid duplicate shares after ambiguous server responses.
+- ZIP attachment links now fail visibly when the public share URL or token cannot be verified instead of inserting a mislabeled fallback URL.
+
 ## [3.2.2] - 2026-07-17
 
 ### Added
