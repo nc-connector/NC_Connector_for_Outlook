@@ -921,7 +921,7 @@
     "message": "Einrichtungsanleitung"
   },
   "policy_warning_no_seat": {
-    "message": "Ihrem Konto ist kein NC Connector Seat zugewiesen. Es werden lokale Einstellungen verwendet. Bitte wenden Sie sich an Ihren Nextcloud-Administrator."
+    "message": "Ihrem Konto ist kein NC Connector Seat zugewiesen. Freigaben und Talk können Sie weiterhin mit Ihren lokalen Einstellungen nutzen. Für Pro-Funktionen benötigen Sie einen vom Administrator zugeteilten Seat."
   },
   "policy_admin_controlled_tooltip": {
     "message": "Vom Administrator gesteuert"

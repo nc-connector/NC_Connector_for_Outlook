@@ -900,7 +900,7 @@
     "message": "セットアップガイド"
   },
   "policy_warning_no_seat": {
-    "message": "あなたのアカウントには NC Connector のシートが割り当てられていません。ローカル設定が使用されます。Nextcloud 管理者に連絡してください。"
+    "message": "あなたのアカウントには NC Connector のシートが割り当てられていません。共有と Talk はローカル設定で引き続き利用できます。Pro 機能を利用するには、管理者によるシートの割り当てが必要です。"
   },
   "policy_admin_controlled_tooltip": {
     "message": "管理者により制御"

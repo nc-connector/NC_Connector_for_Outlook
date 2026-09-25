@@ -900,7 +900,7 @@
     "message": "Průvodce nastavením"
   },
   "policy_warning_no_seat": {
-    "message": "K vašemu účtu není přiřazen žádný seat NC Connectoru. Použijí se místní nastavení. Obraťte se prosím na správce Nextcloudu."
+    "message": "K vašemu účtu není přiřazen žádný seat NC Connectoru. Sdílení a Talk můžete nadále používat s místním nastavením. Funkce Pro vyžadují seat přiřazený správcem."
   },
   "policy_admin_controlled_tooltip": {
     "message": "Řízeno správcem"

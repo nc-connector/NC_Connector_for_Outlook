@@ -921,7 +921,7 @@
     "message": "Setup guide"
   },
   "policy_warning_no_seat": {
-    "message": "No NC Connector seat is assigned to your account. Local settings are used. Please contact your Nextcloud administrator."
+    "message": "No NC Connector seat is assigned to your account. You can continue to use sharing and Talk with your local settings. Pro features require a seat assigned by your administrator."
   },
   "policy_admin_controlled_tooltip": {
     "message": "Admin controlled"

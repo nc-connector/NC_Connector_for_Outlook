@@ -900,7 +900,7 @@
     "message": "设置指南"
   },
   "policy_warning_no_seat": {
-    "message": "您的账户未分配 NC Connector 席位。将使用本地设置。请联系您的 Nextcloud 管理员。"
+    "message": "您的账户未分配 NC Connector 席位。您仍可使用本地设置进行共享和使用 Talk。使用 Pro 功能需要管理员为您分配席位。"
   },
   "policy_admin_controlled_tooltip": {
     "message": "由管理员控制"

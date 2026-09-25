@@ -900,7 +900,7 @@
     "message": "設定指南"
   },
   "policy_warning_no_seat": {
-    "message": "您的帳戶未指派 NC Connector 席位。將使用本機設定。請聯絡您的 Nextcloud 管理員。"
+    "message": "您的帳戶未指派 NC Connector 席位。您仍可使用本機設定進行分享及使用 Talk。使用 Pro 功能需要管理員為您指派席位。"
   },
   "policy_admin_controlled_tooltip": {
     "message": "由管理員控制"

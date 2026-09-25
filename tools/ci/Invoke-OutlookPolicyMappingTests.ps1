@@ -505,6 +505,20 @@ internal static class OutlookPolicyMappingTests
         using (var link = new LinkLabel())
         {
             panel.Controls.AddRange(new Control[] { text, title, link });
+            foreach (string locale in Strings.SupportedLanguageCodes)
+            {
+                Strings.SetPreferredUiLanguage(locale);
+                foreach (bool canManageLicense in new[] { false, true })
+                {
+                    BackendPolicyStatus noSeat = ParseLicense("ACTIVE", "ACTIVE", true, false, "none", canManageLicense);
+                    PolicyUiHelper.ApplyPolicyWarningState(noSeat, panel, text, title, link, "https://cloud.example.test");
+                    Check(locale + " no-seat banner explains local use separately from feature hints", panel.Visible && !link.Visible
+                        && text.Text == Strings.PolicyWarningNoSeat && text.Text != Strings.SharingPasswordSeparateNoSeatTooltip);
+                    Check(locale + " no-seat feature tooltip remains unchanged", PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(noSeat) == Strings.SharingPasswordSeparateNoSeatTooltip);
+                    Check(locale + " no-seat notice leaves policies local and Pro disabled", !noSeat.PolicyActive && !PolicyUiHelper.HasBackendSeatEntitlement(noSeat));
+                }
+            }
+            Strings.SetPreferredUiLanguage("en");
             BackendPolicyStatus admin = ParseLicense("EXPIRED", "EXPIRED", false, true, "active", true);
             bool visible = PolicyUiHelper.ApplyPolicyWarningState(admin, panel, text, title, link, "https://cloud.example.test/nextcloud");
             Check("License warning renders cause and admin-only action", visible && panel.Visible && link.Visible

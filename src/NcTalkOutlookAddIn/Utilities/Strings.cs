@@ -584,7 +584,7 @@ namespace NcTalkOutlookAddIn.Utilities
             }
         }
         internal static string PolicyWarningTitle { get { return Get("policy_warning_title", "NC Connector status"); } }
-        internal static string PolicyWarningNoSeat { get { return Get("policy_warning_no_seat", "No NC Connector seat is assigned to your account. Local settings are used. Please contact your Nextcloud administrator."); } }
+        internal static string PolicyWarningNoSeat { get { return Get("policy_warning_no_seat", "No NC Connector seat is assigned to your account. You can continue to use sharing and Talk with your local settings. Pro features require a seat assigned by your administrator."); } }
         internal static string PolicyWarningLicenseInvalid { get { return Get("policy_warning_license_invalid", "The backend could not confirm access to Pro features. Basic features remain available."); } }
         internal static string PolicyWarningSeatSuspended { get { return Get("policy_warning_seat_suspended", "Your NC Connector seat is suspended. Pro features are unavailable."); } }
         internal static string PolicyWarningSeatUnavailable { get { return Get("policy_warning_seat_unavailable", "Your assigned NC Connector seat is currently unavailable."); } }

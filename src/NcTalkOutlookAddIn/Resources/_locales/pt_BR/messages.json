@@ -900,7 +900,7 @@
     "message": "Guia de configuração"
   },
   "policy_warning_no_seat": {
-    "message": "Nenhum seat do NC Connector está atribuído à sua conta. As configurações locais serão usadas. Entre em contato com o administrador do Nextcloud."
+    "message": "Nenhum seat do NC Connector está atribuído à sua conta. Você pode continuar usando o compartilhamento e o Talk com suas configurações locais. Os recursos Pro exigem um seat atribuído pelo administrador."
   },
   "policy_admin_controlled_tooltip": {
     "message": "Controlado pelo administrador"

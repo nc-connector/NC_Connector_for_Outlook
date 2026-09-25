@@ -900,7 +900,7 @@
     "message": "Installatiehandleiding"
   },
   "policy_warning_no_seat": {
-    "message": "Aan uw account is geen NC Connector-seat toegewezen. Lokale instellingen worden gebruikt. Neem contact op met uw Nextcloud-beheerder."
+    "message": "Aan uw account is geen NC Connector-seat toegewezen. U kunt delen en Talk blijven gebruiken met uw lokale instellingen. Voor Pro-functies is een door uw beheerder toegewezen seat nodig."
   },
   "policy_admin_controlled_tooltip": {
     "message": "Door beheerder beheerd"
