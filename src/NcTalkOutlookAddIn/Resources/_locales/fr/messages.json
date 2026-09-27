@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Composer le partage"
   },
-  "sharing_files_table_path": {
-    "message": "Chemin"
-  },
-  "sharing_files_table_type": {
-    "message": "Taper"
-  },
-  "sharing_files_table_status": {
-    "message": "Statut"
-  },
-  "sharing_button_add_files": {
-    "message": "Ajouter des fichiers..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Ajouter un dossier..."
-  },
-  "sharing_button_remove": {
-    "message": "Supprimer"
-  },
   "sharing_button_upload": {
     "message": "Téléverser"
-  },
-  "sharing_file_type_file": {
-    "message": "Fichier"
-  },
-  "sharing_file_type_folder": {
-    "message": "Dossier"
   },
   "sharing_status_done_row": {
     "message": "Terminé"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Partage"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Répertoire de base : "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "La date d'expiration doit être dans le futur."
@@ -915,10 +888,16 @@
     "message": "Le backend n’a pas pu confirmer l’accès aux fonctionnalités Pro. Les fonctionnalités de base restent disponibles."
   },
   "policy_license_grace_format": {
-    "message": "Votre licence a expiré. Les fonctionnalités Pro restent disponibles jusqu’au $1."
+    "message": "Votre licence a expiré. Les utilisateurs disposant d’un Seat attribué et actif peuvent continuer à utiliser les fonctions Pro jusqu’au $1."
   },
   "policy_license_grace": {
-    "message": "Votre licence a expiré. Les fonctionnalités Pro restent disponibles pendant le délai de grâce."
+    "message": "Votre licence a expiré. Les utilisateurs disposant d’un Seat attribué et actif peuvent continuer à utiliser les fonctions Pro pendant le délai de grâce."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "La politique de signature n’est pas encore disponible. Vérifiez la connexion à votre Nextcloud et réessayez d’envoyer le message."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "La signature du courriel n’a pas pu être mise à jour en toute sécurité. Votre message n’a pas été envoyé. Réessayez de l’envoyer."
   },
   "policy_license_expired": {
     "message": "Votre licence a expiré et le délai de grâce est terminé. Les fonctionnalités Pro ne sont plus disponibles. Vous pouvez continuer à utiliser les fonctionnalités de base."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Stockage : $1 utilisés sur $2"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Fichiers de Mon Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Dossier de Mon Nextcloud..."
   }
 }

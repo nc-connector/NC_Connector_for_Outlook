@@ -134,6 +134,7 @@ internal static class OutlookPolicyMappingTests
         TestLicenseStatusParsing();
         TestLicenseNotices();
         TestLicenseMetadataDoesNotGrantAccess();
+        TestSeatAccessMatrix();
         TestLicenseSeatAndConnectionPrecedence();
         TestSuspendedSeatNoticePrecedence();
         TestLicenseAdminLinks();
@@ -416,6 +417,62 @@ internal static class OutlookPolicyMappingTests
         }
     }
 
+    private static void TestSeatAccessMatrix()
+    {
+        int cases = 0;
+        foreach (string access in new[] { "ACTIVE", "GRACE", "EXPIRED", "INACTIVE", "INVALID", "ACTIVATION_REQUIRED", "OFFLINE_EXPIRED", "UNKNOWN" })
+        foreach (string seat in new[] { "active", "suspended_overlimit", "none" })
+        foreach (bool overlicensed in new[] { false, true })
+        foreach (bool admin in new[] { false, true })
+        foreach (bool syncError in new[] { false, true })
+        {
+            string pairedBanner = null;
+            string pairedTooltip = null;
+            foreach (string mode in new[] { "community", "pro" })
+            {
+                bool valid = access == "ACTIVE" || access == "GRACE";
+                bool assigned = seat != "none";
+                bool usable = valid && seat == "active";
+                var payload = LicensePayload(access, access, valid, assigned, seat, admin);
+                IDictionary<string, object> fields = NcJson.GetDictionary(payload, "status");
+                fields["mode"] = mode;
+                fields["overlicensed"] = overlicensed;
+                fields["license_connection_error"] = syncError;
+                BackendPolicyStatus status = BackendPolicyService.ParseStatus(payload);
+                string banner = PolicyUiHelper.GetPolicyWarningMessage(status);
+                string tooltip = PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(status);
+                string name = mode + "/" + access + "/" + seat + "/over=" + overlicensed + "/admin=" + admin + "/sync=" + syncError;
+                Check(name + " personal access and all policy domains", PolicyUiHelper.HasBackendSeatEntitlement(status) == usable
+                    && status.PolicyActive == usable && status.IsDomainActive("share") == usable
+                    && status.IsDomainActive("talk") == usable && status.IsDomainActive("email_signature") == usable
+                    && PolicyUiHelper.HasPasswordDeliveryMode(status) == usable
+                    && new EmailSignaturePolicyService(status, new AddinSettings()).Resolve().Active == usable);
+                Check(name + " feature tooltip follows personal access", usable ? tooltip == string.Empty
+                    : !assigned ? tooltip == Strings.SharingPasswordSeparateNoSeatTooltip : tooltip == banner);
+                if (!assigned)
+                {
+                    Check(name + " banner explains missing seat and local settings", banner.Contains(Strings.PolicyWarningNoSeat));
+                    if (admin && (access == "GRACE" || syncError || !valid))
+                    {
+                        Check(name + " admin also receives license diagnostics", banner.Contains(Strings.PolicyLicenseAdminHint));
+                    }
+                }
+                if (usable && access == "ACTIVE" && !syncError)
+                {
+                    Check(name + " global capacity alone produces no personal warning", banner == string.Empty);
+                }
+                if (pairedBanner != null)
+                {
+                    Check(name + " Community and Pro messages agree", banner == pairedBanner && tooltip == pairedTooltip);
+                }
+                pairedBanner = banner;
+                pairedTooltip = tooltip;
+                cases++;
+            }
+        }
+        Check("Seat access matrix covers 384 paired status combinations", cases == 384);
+    }
+
     private static void TestLicenseSeatAndConnectionPrecedence()
     {
         BackendPolicyStatus noSeat = ParseLicense("EXPIRED", "EXPIRED", false, false);
@@ -449,6 +506,26 @@ internal static class OutlookPolicyMappingTests
             && PolicyUiHelper.GetPolicyWarningMessage(unavailableBackend) == Strings.PolicyWarningBackendUnavailable
             && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(unavailableBackend) == Strings.PolicyWarningBackendUnavailable
             && !PolicyUiHelper.HasBackendSeatEntitlement(unavailableBackend));
+        NcHttpClient.NextResponse = null;
+        foreach (var malformed in new Dictionary<string, object>[] {
+            null,
+            new Dictionary<string, object>(),
+            new Dictionary<string, object> { { "status", "not-an-object" } },
+            new Dictionary<string, object> { { "ocs", new Dictionary<string, object> {
+                { "data", new Dictionary<string, object>() }
+            } } }
+        })
+        {
+            BackendPolicyStatus rejected = BackendPolicyService.ParseStatus(malformed);
+            Check("Missing status object is a fetch failure, never a confirmed missing seat", !rejected.FetchSucceeded
+                && rejected.EndpointAvailable && !rejected.PolicyActive && !PolicyUiHelper.HasBackendSeatEntitlement(rejected)
+                && PolicyUiHelper.GetPolicyWarningMessage(rejected) == Strings.PolicyWarningBackendUnavailable
+                && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(rejected) == Strings.PolicyWarningBackendUnavailable);
+        }
+        NcHttpClient.NextResponse = new NcHttpResponse {
+            HasHttpResponse = true, StatusCode = HttpStatusCode.OK, ParsedJson = new Dictionary<string, object>()
+        };
+        Check("HTTP 200 without status cannot replace a last-success cache", !new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus().FetchSucceeded);
         NcHttpClient.NextResponse = null;
     }
 
@@ -589,7 +666,8 @@ internal static class OutlookPolicyMappingTests
         Check(name + " is not described as a suspended seat", !message.Contains(Strings.PolicyWarningSeatSuspended), message);
         if (!status.IsValid)
         {
-            Check(name + " disabled tooltip uses the same cause", PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(status) == message);
+            Check(name + " disabled tooltip uses the personal cause", PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(status)
+                == (status.SeatAssigned ? message : Strings.SharingPasswordSeparateNoSeatTooltip));
         }
     }
 

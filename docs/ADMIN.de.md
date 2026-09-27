@@ -471,6 +471,10 @@ Nach Ende der Nachfrist unterscheidet Outlook eine abgelaufene Lizenz von einer 
 
 Vollständige Nextcloud-Administratoren sehen Lizenzhinweise auch ohne eigenen Seat und können **Lizenz im Backend verwalten** öffnen. Der Link führt zur NC-Connector-Verwaltung der konfigurierten Nextcloud. Andere Benutzer werden an ihren Nextcloud-Administrator verwiesen. Bei älteren Backends ohne diese zusätzlichen Angaben erscheint ein allgemeiner Hinweis statt einer vermuteten Ablaufursache oder eines Verwaltungslinks.
 
+Ein Administrator ohne eigenen Seat sieht zusätzlich, dass Freigaben und Talk mit lokalen Einstellungen nutzbar bleiben. Der Tooltip an einer gesperrten Seat-Funktion nennt die fehlende Zuweisung, auch wenn der Banner zusätzlich eine Nachfrist oder ein Synchronisationsproblem meldet. Administratorrechte schalten keine persönlichen Funktionen frei.
+
+Ein aktiv zugeteilter Community-Seat besitzt dieselben vorhandenen Funktionen wie ein aktiv zugeteilter Pro-Seat. Bei überschrittener Kapazität verlieren nur die überzähligen pausierten Seats ihre Seat-Funktionen; die übrigen aktiven Benutzer behalten Richtlinien und Funktionen.
+
 Eine fehlgeschlagene Lizenzsynchronisierung wird für sich genommen nicht als ungültige Lizenz bezeichnet: Ursache können ein Verbindungsproblem, eine unbrauchbare Serverantwort oder nicht verfügbare lokale Aktivierungsdaten sein. Wenn das Backend die Angaben liefert, nennt der Hinweis die letzte erfolgreiche Synchronisierung und die Offline-Prüffrist. Scheitert dagegen der Abruf des Nextcloud-Backend-Status, erscheint ein eigener Verbindungshinweis. Tooltips deaktivierter Funktionen verwenden den passenden Grund; ein zusätzliches Lizenz-Popup bei jeder Aktion gibt es nicht.
 
 Die Lizenzaktivierung bleibt Teil der normalen Backend-Synchronisierung. Outlook aktiviert keine Lizenzen und kontaktiert den Lizenzserver nicht direkt. Nach Korrektur einer Lizenz oder Seat-Zuweisung den betroffenen Dialog erneut öffnen oder die Verbindung in den Einstellungen aktualisieren, um den aktuellen Backend-Status zu laden.
@@ -532,6 +536,8 @@ Erwartetes Ergebnis:
 - die Passwort-Follow-up-Mail erhält die Signatur nur bei ebenfalls passendem wirksamen Absender
 
 Kann eine erforderliche abschließende Signaturprüfung nicht abgeschlossen werden, lässt Outlook die Mail geöffnet, statt sie mit ungeprüftem Signaturzustand zu senden.
+
+Die Meldung unterscheidet eine noch nicht verfügbare Signaturrichtlinie von einer nicht sicher aktualisierbaren Signatur. Ist die Richtlinie nicht verfügbar, die Nextcloud-Verbindung prüfen und das Senden erneut versuchen. Eine zuvor bestätigte Richtlinie desselben Kontos bleibt nach einem fehlgeschlagenen Refresh nutzbar; eine neu empfangene Ablehnung wird wirksam.
 
 ## Funktionsbetrieb
 

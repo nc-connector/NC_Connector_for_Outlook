@@ -71,6 +71,14 @@ namespace NcTalkOutlookAddIn.Services
         {
             IDictionary<string, object> normalized = NormalizePayload(payload);
             IDictionary<string, object> status = NcJson.GetDictionary(normalized, "status");
+            if (status == null)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Policy status response has no status object.", null);
+                return BuildLocalStatus(
+                    endpointAvailable: true,
+                    fetchSucceeded: false,
+                    reason: "invalid_payload");
+            }
             IDictionary<string, object> licenseActivation = NcJson.GetDictionary(status, "license_activation");
             IDictionary<string, object> policy = NcJson.GetDictionary(normalized, "policy");
             IDictionary<string, object> policyEditable = NcJson.GetDictionary(normalized, "policy_editable");

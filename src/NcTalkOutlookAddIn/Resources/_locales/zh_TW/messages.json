@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "建立分享"
   },
-  "sharing_files_table_path": {
-    "message": "路徑"
-  },
-  "sharing_files_table_type": {
-    "message": "類型"
-  },
-  "sharing_files_table_status": {
-    "message": "狀態"
-  },
-  "sharing_button_add_files": {
-    "message": "新增檔案..."
-  },
-  "sharing_button_add_folder": {
-    "message": "新增資料夾..."
-  },
-  "sharing_button_remove": {
-    "message": "移除"
-  },
   "sharing_button_upload": {
     "message": "上傳"
-  },
-  "sharing_file_type_file": {
-    "message": "檔案"
-  },
-  "sharing_file_type_folder": {
-    "message": "資料夾"
   },
   "sharing_status_done_row": {
     "message": "完成"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "分享"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "基礎目錄： "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "到期日期必須在未來。"
@@ -915,10 +888,16 @@
     "message": "後端無法確認 Pro 功能的存取權限。基本功能仍可使用。"
   },
   "policy_license_grace_format": {
-    "message": "您的授權已到期。Pro 功能在 $1 之前仍可使用。"
+    "message": "您的授權已到期。已獲指派有效席位的使用者可以繼續使用 Pro 功能，直到 $1。"
   },
   "policy_license_grace": {
-    "message": "您的授權已到期。Pro 功能在寬限期內仍可使用。"
+    "message": "您的授權已到期。已獲指派有效席位的使用者可以在寬限期內繼續使用 Pro 功能。"
+  },
+  "email_signature_policy_unavailable": {
+    "message": "簽章原則暫時無法使用。請檢查與 Nextcloud 的連線，然後重新嘗試傳送。"
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "無法安全更新電子郵件簽章。您的郵件尚未傳送。請重新嘗試傳送。"
   },
   "policy_license_expired": {
     "message": "您的授權已到期，寬限期也已結束。Pro 功能已無法使用。您仍可使用基本功能。"
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "儲存空間：已使用 $1，共 $2"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "從「我的 Nextcloud」選取檔案..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "從「我的 Nextcloud」選取資料夾..."
   }
 }

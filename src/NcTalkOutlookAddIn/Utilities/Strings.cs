@@ -590,8 +590,10 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string PolicyWarningSeatUnavailable { get { return Get("policy_warning_seat_unavailable", "Your assigned NC Connector seat is currently unavailable."); } }
         internal static string PolicyWarningBackendUnavailable { get { return Get("policy_warning_backend_unavailable", "The Nextcloud backend status could not be retrieved. Please check the connection and try again."); } }
         internal static string PolicyWarningAdminLinkLabel { get { return Get("policy_warning_admin_link_label", "Manage license in backend"); } }
-        internal static string PolicyLicenseGraceFormat { get { return Get("policy_license_grace_format", "Your license has expired. Pro features remain available until {0}."); } }
-        internal static string PolicyLicenseGrace { get { return Get("policy_license_grace", "Your license has expired. Pro features remain available during the grace period."); } }
+        internal static string PolicyLicenseGraceFormat { get { return Get("policy_license_grace_format", "Your license has expired. Users with an active assigned Seat can continue using Pro features until {0}."); } }
+        internal static string PolicyLicenseGrace { get { return Get("policy_license_grace", "Your license has expired. Users with an active assigned Seat can continue using Pro features during the grace period."); } }
+        internal static string EmailSignaturePolicyUnavailable { get { return Get("email_signature_policy_unavailable", "The signature policy is not available yet. Please check the connection to your Nextcloud and try sending again."); } }
+        internal static string EmailSignatureSendReconcileFailed { get { return Get("email_signature_send_reconcile_failed", "The email signature could not be updated safely. Your message has not been sent. Please try sending again."); } }
         internal static string PolicyLicenseExpired { get { return Get("policy_license_expired", "Your license has expired and the grace period has ended. Pro features are no longer available. You can still use the basic features."); } }
         internal static string PolicyLicenseInactive { get { return Get("policy_license_inactive", "Your license is currently inactive. Pro features are unavailable."); } }
         internal static string PolicyLicenseInvalid { get { return Get("policy_license_invalid", "Your license is invalid. Pro features are unavailable."); } }
@@ -940,7 +942,6 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardPasswordSeparateToggle { get { return Get("sharing_password_separate_toggle", "Send password in separate email"); } }
         internal static string FileLinkWizardExpireToggle { get { return Get("sharing_expire_toggle", "Set expiration date"); } }
         internal static string FileLinkWizardExpireHint { get { return Get("sharing_expire_hint", "After this date the link is no longer available."); } }
-        internal static string FileLinkWizardBasePathPrefix { get { return Get("outlook_sharing_base_path_prefix", "Base directory: "); } }
         internal static string FileLinkQueueTargetFolder { get { return Get("sharing_base_path_info", "Target folder:"); } }
         internal static string FileLinkQueueAddLocal { get { return Get("sharing_button_add_local", "+ Local"); } }
         internal static string FileLinkQueueAddNextcloud { get { return Get("sharing_button_add_nextcloud", "+ My Nextcloud"); } }
@@ -962,16 +963,6 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkQueueWaiting { get { return Get("sharing_status_waiting", "Waiting"); } }
         internal static string FileLinkQueueEmpty { get { return Get("sharing_files_empty", "No files selected."); } }
         internal static string FileLinkQueueReadFailedFormat { get { return Get("outlook_sharing_queue_read_failed", "The selected item could not be read: {0}"); } }
-        internal static string FileLinkWizardAddFilesButton { get { return Get("sharing_button_add_files", "Add files..."); } }
-        internal static string FileLinkWizardAddFolderButton { get { return Get("sharing_button_add_folder", "Add folder..."); } }
-        internal static string FileLinkWizardAddNextcloudFilesButton { get { return Get("outlook_sharing_add_nextcloud_files", "My Nextcloud files..."); } }
-        internal static string FileLinkWizardAddNextcloudFolderButton { get { return Get("outlook_sharing_add_nextcloud_folder", "My Nextcloud folder..."); } }
-        internal static string FileLinkWizardRemoveButton { get { return Get("sharing_button_remove", "Remove"); } }
-        internal static string FileLinkWizardColumnPath { get { return Get("sharing_files_table_path", "Path"); } }
-        internal static string FileLinkWizardColumnType { get { return Get("sharing_files_table_type", "Type"); } }
-        internal static string FileLinkWizardColumnStatus { get { return Get("sharing_files_table_status", "Status"); } }
-        internal static string FileLinkWizardTypeFile { get { return Get("sharing_file_type_file", "File"); } }
-        internal static string FileLinkWizardTypeFolder { get { return Get("sharing_file_type_folder", "Folder"); } }
         internal static string FileLinkWizardNoteToggle { get { return Get("sharing_note_toggle", "Add note for recipients"); } }
         internal static string FileLinkWizardUploadButton { get { return Get("sharing_button_upload", "Upload"); } }
         internal static string FileLinkWizardFinishButton { get { return Get("sharing_button_finish", "Create share"); } }

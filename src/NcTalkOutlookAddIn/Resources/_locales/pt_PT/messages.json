@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Preparar partilha"
   },
-  "sharing_files_table_path": {
-    "message": "Caminho"
-  },
-  "sharing_files_table_type": {
-    "message": "Tipo"
-  },
-  "sharing_files_table_status": {
-    "message": "Estado"
-  },
-  "sharing_button_add_files": {
-    "message": "Adicionar ficheiros..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Adicionar pasta..."
-  },
-  "sharing_button_remove": {
-    "message": "Remover"
-  },
   "sharing_button_upload": {
     "message": "Carregar"
-  },
-  "sharing_file_type_file": {
-    "message": "Ficheiro"
-  },
-  "sharing_file_type_folder": {
-    "message": "Pasta"
   },
   "sharing_status_done_row": {
     "message": "Concluído"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Partilha"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Diretório base: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "A data de expiração tem de estar no futuro."
@@ -915,10 +888,16 @@
     "message": "O backend não conseguiu confirmar o acesso às funcionalidades Pro. As funcionalidades básicas continuam disponíveis."
   },
   "policy_license_grace_format": {
-    "message": "A sua licença expirou. As funcionalidades Pro continuam disponíveis até $1."
+    "message": "A sua licença expirou. Os utilizadores com um Seat atribuído e ativo podem continuar a utilizar as funcionalidades Pro até $1."
   },
   "policy_license_grace": {
-    "message": "A sua licença expirou. As funcionalidades Pro continuam disponíveis durante o período de tolerância."
+    "message": "A sua licença expirou. Os utilizadores com um Seat atribuído e ativo podem continuar a utilizar as funcionalidades Pro durante o período de tolerância."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "A política de assinatura ainda não está disponível. Verifique a ligação ao seu Nextcloud e tente enviar novamente."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "Não foi possível atualizar a assinatura de email em segurança. A sua mensagem não foi enviada. Tente enviar novamente."
   },
   "policy_license_expired": {
     "message": "A sua licença expirou e o período de tolerância terminou. As funcionalidades Pro já não estão disponíveis. Pode continuar a utilizar as funcionalidades básicas."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Armazenamento: $1 de $2 em uso"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Ficheiros do meu Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Pasta do meu Nextcloud..."
   }
 }

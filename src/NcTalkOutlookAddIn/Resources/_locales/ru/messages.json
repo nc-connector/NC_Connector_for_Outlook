@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Сформировать общий ресурс"
   },
-  "sharing_files_table_path": {
-    "message": "Путь"
-  },
-  "sharing_files_table_type": {
-    "message": "Тип"
-  },
-  "sharing_files_table_status": {
-    "message": "Статус"
-  },
-  "sharing_button_add_files": {
-    "message": "Добавить файлы..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Добавить папку..."
-  },
-  "sharing_button_remove": {
-    "message": "Удалить"
-  },
   "sharing_button_upload": {
     "message": "Загрузить"
-  },
-  "sharing_file_type_file": {
-    "message": "Файл"
-  },
-  "sharing_file_type_folder": {
-    "message": "Папка"
   },
   "sharing_status_done_row": {
     "message": "Готово"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Общий доступ"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Базовый каталог: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "Дата истечения должна быть в будущем."
@@ -915,10 +888,16 @@
     "message": "Серверная часть не смогла подтвердить доступ к функциям Pro. Базовые функции остаются доступными."
   },
   "policy_license_grace_format": {
-    "message": "Срок действия вашей лицензии истёк. Функции Pro остаются доступными до $1."
+    "message": "Срок действия лицензии истёк. Пользователи с назначенным активным местом могут продолжать использовать функции Pro до $1."
   },
   "policy_license_grace": {
-    "message": "Срок действия вашей лицензии истёк. Функции Pro остаются доступными в течение льготного периода."
+    "message": "Срок действия лицензии истёк. Пользователи с назначенным активным местом могут продолжать использовать функции Pro в течение льготного периода."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "Политика подписи пока недоступна. Проверьте подключение к Nextcloud и попробуйте отправить сообщение ещё раз."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "Не удалось безопасно обновить подпись электронной почты. Сообщение не отправлено. Попробуйте отправить его ещё раз."
   },
   "policy_license_expired": {
     "message": "Срок действия вашей лицензии истёк, и льготный период закончился. Функции Pro больше недоступны. Вы по-прежнему можете использовать базовые функции."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Хранилище: занято $1 из $2"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Файлы из «Моего Nextcloud»..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Папка из «Моего Nextcloud»..."
   }
 }

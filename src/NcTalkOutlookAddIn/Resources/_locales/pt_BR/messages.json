@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Montar compartilhamento"
   },
-  "sharing_files_table_path": {
-    "message": "Caminho"
-  },
-  "sharing_files_table_type": {
-    "message": "Tipo"
-  },
-  "sharing_files_table_status": {
-    "message": "Status"
-  },
-  "sharing_button_add_files": {
-    "message": "Adicionar arquivos..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Adicionar pasta..."
-  },
-  "sharing_button_remove": {
-    "message": "Remover"
-  },
   "sharing_button_upload": {
     "message": "Enviar"
-  },
-  "sharing_file_type_file": {
-    "message": "Arquivo"
-  },
-  "sharing_file_type_folder": {
-    "message": "Pasta"
   },
   "sharing_status_done_row": {
     "message": "Concluído"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Compartilhamento"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Diretório base: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "A data de expiração deve estar no futuro."
@@ -915,10 +888,16 @@
     "message": "O backend não conseguiu confirmar o acesso aos recursos Pro. Os recursos básicos continuam disponíveis."
   },
   "policy_license_grace_format": {
-    "message": "Sua licença expirou. Os recursos Pro continuam disponíveis até $1."
+    "message": "Sua licença expirou. Usuários com um Seat atribuído e ativo podem continuar usando os recursos Pro até $1."
   },
   "policy_license_grace": {
-    "message": "Sua licença expirou. Os recursos Pro continuam disponíveis durante o período de carência."
+    "message": "Sua licença expirou. Usuários com um Seat atribuído e ativo podem continuar usando os recursos Pro durante o período de tolerância."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "A política de assinatura ainda não está disponível. Verifique a conexão com seu Nextcloud e tente enviar novamente."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "Não foi possível atualizar a assinatura de email com segurança. Sua mensagem não foi enviada. Tente enviar novamente."
   },
   "policy_license_expired": {
     "message": "Sua licença expirou e o período de carência terminou. Os recursos Pro não estão mais disponíveis. Você pode continuar usando os recursos básicos."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Armazenamento: $1 de $2 em uso"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Arquivos do Meu Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Pasta do Meu Nextcloud..."
   }
 }

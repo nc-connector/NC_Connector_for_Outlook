@@ -461,32 +461,8 @@
   "sharing_step_files_title": {
     "message": "Build share"
   },
-  "sharing_files_table_path": {
-    "message": "Path"
-  },
-  "sharing_files_table_type": {
-    "message": "Type"
-  },
-  "sharing_files_table_status": {
-    "message": "Status"
-  },
-  "sharing_button_add_files": {
-    "message": "Add files..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Add folder..."
-  },
-  "sharing_button_remove": {
-    "message": "Remove"
-  },
   "sharing_button_upload": {
     "message": "Upload"
-  },
-  "sharing_file_type_file": {
-    "message": "File"
-  },
-  "sharing_file_type_folder": {
-    "message": "Folder"
   },
   "sharing_status_done_row": {
     "message": "Done"
@@ -700,9 +676,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Share"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Base directory: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "The expiration date must be in the future."
@@ -936,10 +909,16 @@
     "message": "The backend could not confirm access to Pro features. Basic features remain available."
   },
   "policy_license_grace_format": {
-    "message": "Your license has expired. Pro features remain available until $1."
+    "message": "Your license has expired. Users with an active assigned Seat can continue using Pro features until $1."
   },
   "policy_license_grace": {
-    "message": "Your license has expired. Pro features remain available during the grace period."
+    "message": "Your license has expired. Users with an active assigned Seat can continue using Pro features during the grace period."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "The signature policy is not available yet. Please check the connection to your Nextcloud and try sending again."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "The email signature could not be updated safely. Your message has not been sent. Please try sending again."
   },
   "policy_license_expired": {
     "message": "Your license has expired and the grace period has ended. Pro features are no longer available. You can still use the basic features."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Storage: $1 of $2 used"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Files from My Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Folder from My Nextcloud..."
   }
 }

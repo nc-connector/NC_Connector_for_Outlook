@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Przygotuj udostępnienie"
   },
-  "sharing_files_table_path": {
-    "message": "Ścieżka"
-  },
-  "sharing_files_table_type": {
-    "message": "Typ"
-  },
-  "sharing_files_table_status": {
-    "message": "Status"
-  },
-  "sharing_button_add_files": {
-    "message": "Dodaj pliki..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Dodaj folder..."
-  },
-  "sharing_button_remove": {
-    "message": "Usuń"
-  },
   "sharing_button_upload": {
     "message": "Prześlij"
-  },
-  "sharing_file_type_file": {
-    "message": "Plik"
-  },
-  "sharing_file_type_folder": {
-    "message": "Falcówka"
   },
   "sharing_status_done_row": {
     "message": "Gotowe"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Udostępnienie"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Katalog bazowy: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "Data wygaśnięcia musi być w przyszłości."
@@ -915,10 +888,16 @@
     "message": "Serwer nie mógł potwierdzić dostępu do funkcji Pro. Funkcje podstawowe pozostają dostępne."
   },
   "policy_license_grace_format": {
-    "message": "Twoja licencja wygasła. Funkcje Pro pozostają dostępne do $1."
+    "message": "Licencja wygasła. Użytkownicy z przypisanym aktywnym stanowiskiem mogą nadal korzystać z funkcji Pro do $1."
   },
   "policy_license_grace": {
-    "message": "Twoja licencja wygasła. Funkcje Pro pozostają dostępne w okresie karencji."
+    "message": "Licencja wygasła. Użytkownicy z przypisanym aktywnym stanowiskiem mogą nadal korzystać z funkcji Pro w okresie karencji."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "Zasady podpisu nie są jeszcze dostępne. Sprawdź połączenie z serwerem Nextcloud i spróbuj ponownie wysłać wiadomość."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "Nie udało się bezpiecznie zaktualizować podpisu e-mail. Wiadomość nie została wysłana. Spróbuj wysłać ją ponownie."
   },
   "policy_license_expired": {
     "message": "Twoja licencja wygasła, a okres karencji dobiegł końca. Funkcje Pro nie są już dostępne. Nadal możesz korzystać z funkcji podstawowych."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Miejsce: wykorzystano $1 z $2"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Pliki z Mojego Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Folder z Mojego Nextcloud..."
   }
 }

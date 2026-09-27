@@ -461,32 +461,8 @@
   "sharing_step_files_title": {
     "message": "Freigabe zusammenstellen"
   },
-  "sharing_files_table_path": {
-    "message": "Pfad"
-  },
-  "sharing_files_table_type": {
-    "message": "Typ"
-  },
-  "sharing_files_table_status": {
-    "message": "Status"
-  },
-  "sharing_button_add_files": {
-    "message": "Dateien hinzufügen..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Ordner hinzufügen..."
-  },
-  "sharing_button_remove": {
-    "message": "Entfernen"
-  },
   "sharing_button_upload": {
     "message": "Hochladen"
-  },
-  "sharing_file_type_file": {
-    "message": "Datei"
-  },
-  "sharing_file_type_folder": {
-    "message": "Ordner"
   },
   "sharing_status_done_row": {
     "message": "Fertig"
@@ -700,9 +676,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Freigabe"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Basisverzeichnis: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "Das Ablaufdatum muss in der Zukunft liegen."
@@ -936,10 +909,16 @@
     "message": "Das Backend konnte den Zugriff auf die Pro-Funktionen nicht bestätigen. Die Basisfunktionen bleiben verfügbar."
   },
   "policy_license_grace_format": {
-    "message": "Ihre Lizenz ist abgelaufen. Die Pro-Funktionen bleiben bis $1 verfügbar."
+    "message": "Ihre Lizenz ist abgelaufen. Benutzer mit aktiv zugeteiltem Seat können die Pro-Funktionen bis $1 weiterhin nutzen."
   },
   "policy_license_grace": {
-    "message": "Ihre Lizenz ist abgelaufen. Die Pro-Funktionen bleiben während der Nachfrist verfügbar."
+    "message": "Ihre Lizenz ist abgelaufen. Benutzer mit aktiv zugeteiltem Seat können die Pro-Funktionen während der Nachfrist weiterhin nutzen."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "Die Signaturrichtlinie ist noch nicht verfügbar. Bitte prüfen Sie die Verbindung zu Ihrer Nextcloud und versuchen Sie das Senden erneut."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "Die E-Mail-Signatur konnte nicht sicher aktualisiert werden. Ihre Nachricht wurde nicht gesendet. Bitte versuchen Sie das Senden erneut."
   },
   "policy_license_expired": {
     "message": "Ihre Lizenz ist abgelaufen und die Nachfrist ist beendet. Die Pro-Funktionen sind nicht mehr verfügbar. Sie können die Basisfunktionen weiterhin nutzen."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Speicher: $1 von $2 belegt"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Dateien aus Meine Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Ordner aus Meine Nextcloud..."
   }
 }

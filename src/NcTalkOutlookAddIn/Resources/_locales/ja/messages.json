@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "共有を作成"
   },
-  "sharing_files_table_path": {
-    "message": "パス"
-  },
-  "sharing_files_table_type": {
-    "message": "種類"
-  },
-  "sharing_files_table_status": {
-    "message": "状態"
-  },
-  "sharing_button_add_files": {
-    "message": "ファイルを追加..."
-  },
-  "sharing_button_add_folder": {
-    "message": "フォルダーを追加..."
-  },
-  "sharing_button_remove": {
-    "message": "削除"
-  },
   "sharing_button_upload": {
     "message": "アップロード"
-  },
-  "sharing_file_type_file": {
-    "message": "ファイル"
-  },
-  "sharing_file_type_folder": {
-    "message": "フォルダー"
   },
   "sharing_status_done_row": {
     "message": "完了"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "共有"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "ベースディレクトリ: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "有効期限は未来の日付である必要があります。"
@@ -915,10 +888,16 @@
     "message": "バックエンドで Pro 機能へのアクセスを確認できませんでした。基本機能は引き続き利用できます。"
   },
   "policy_license_grace_format": {
-    "message": "ライセンスの有効期限が切れています。Pro 機能は $1 まで引き続き利用できます。"
+    "message": "ライセンスの有効期限が切れています。有効なシートが割り当てられているユーザーは、$1までPro機能を引き続き利用できます。"
   },
   "policy_license_grace": {
-    "message": "ライセンスの有効期限が切れています。猶予期間中は Pro 機能を引き続き利用できます。"
+    "message": "ライセンスの有効期限が切れています。有効なシートが割り当てられているユーザーは、猶予期間中もPro機能を引き続き利用できます。"
+  },
+  "email_signature_policy_unavailable": {
+    "message": "署名ポリシーはまだ利用できません。Nextcloudへの接続を確認して、もう一度送信してください。"
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "メール署名を安全に更新できませんでした。メッセージは送信されていません。もう一度送信してください。"
   },
   "policy_license_expired": {
     "message": "ライセンスの有効期限が切れ、猶予期間も終了しました。Pro 機能は利用できません。基本機能は引き続き利用できます。"
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "ストレージ: $2 中 $1 使用中"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "マイ Nextcloud のファイル..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "マイ Nextcloud のフォルダー..."
   }
 }

@@ -475,6 +475,7 @@ if ($null -eq $signatureSendGate) {
 } else {
     Require-Pattern $signatureSendGate '\bTryGetCachedEmailSignaturePolicyStatus\s*\(' 'Signature send gate does not use the cached policy snapshot.'
     Require-Pattern $signatureSendGate '\bBlockEmailSignatureSend\s*\(\s*ref\s+cancel\s*,' 'Signature send gate has no fail-closed cancellation path.'
+    Require-Pattern $signatureSendGate 'BlockEmailSignatureSend\(\s*ref\s+cancel\s*,\s*"policy_unavailable"\s*,\s*true\s*\)' 'Missing policy must select the policy-unavailable explanation.'
     Forbid-Pattern $signatureSendGate '\bGetEmailSignaturePolicyStatusAsync\s*\(|\bFetchBackendPolicyStatus\s*\(' 'Signature send gate performs network policy work.'
     Forbid-Pattern $signatureSendGate '\.Result\s*(?:[;,\)\]\}]|\?\?)|\.Wait\s*\(|GetAwaiter\(\)\.GetResult\(' 'Signature send gate blocks on an asynchronous operation.'
 }
@@ -485,6 +486,8 @@ if ($null -eq $signatureSendBlocker) {
 } else {
     Require-Pattern $signatureSendBlocker '\bcancel\s*=\s*true\s*;' 'Signature send blocker does not cancel Outlook send.'
     Require-Pattern $signatureSendBlocker '\breturn\s+false\s*;' 'Signature send blocker does not report gate failure.'
+    Require-Pattern $signatureSendBlocker 'policyUnavailable\s*\?\s*Strings\.EmailSignaturePolicyUnavailable\s*:\s*Strings\.EmailSignatureSendReconcileFailed' 'Signature send blocker must distinguish unavailable policy from failed reconciliation.'
+    Forbid-Pattern $signatureSendBlocker 'Strings\.(PolicyWarningTitle|ErrorInsertHtmlFailed)|"email signature \(' 'Signature send blocker still exposes a title-only notice or internal failure source.'
 }
 
 if ($Failures.Count -gt 0) {
@@ -494,4 +497,142 @@ if ($Failures.Count -gt 0) {
     throw "Email signature architecture check failed with $($Failures.Count) issue(s)."
 }
 
-Write-Host "Email signature architecture OK: cached policy, send gate, and exact WordEditor slots are wired."
+$signatureNoticeHarness = @'
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public static class SignatureSendNoticeRegression
+{
+    private static class Strings
+    {
+        internal const string DialogTitle = "dialog-title";
+        internal const string EmailSignaturePolicyUnavailable = "policy-unavailable";
+        internal const string EmailSignatureSendReconcileFailed = "reconcile-failed";
+    }
+    private enum MessageBoxButtons { OK }
+    private enum MessageBoxIcon { Warning }
+    private static class MessageBox
+    {
+        internal static string Message;
+        internal static void Show(string message, string title, MessageBoxButtons buttons, MessageBoxIcon icon)
+        { Message = message; }
+    }
+    private sealed class BackendPolicyStatus
+    {
+        internal bool FetchSucceeded;
+    }
+    private sealed class TalkServiceConfiguration
+    {
+        internal string Username = "user";
+        internal string AppPassword = "test-password";
+        internal string GetNormalizedBaseUrl() { return "https://cloud.example.test"; }
+    }
+    private sealed class SignatureRuntime
+    {
+        private static readonly TimeSpan EmailSignaturePolicyCacheLifetime = TimeSpan.FromMinutes(5);
+        private readonly object _emailSignaturePolicyCacheSync = new object();
+        private BackendPolicyStatus _emailSignaturePolicyCache;
+        private DateTime _emailSignaturePolicyCacheFetchedAtUtc;
+        private string _emailSignaturePolicyCacheKey = string.Empty;
+        private Task<BackendPolicyStatus> _emailSignaturePolicyFetchTask;
+        private string _emailSignaturePolicyFetchKey = string.Empty;
+        private bool _emailSignatureStateStable = true;
+        internal BackendPolicyStatus FetchResult;
+        internal readonly List<string> Log = new List<string>();
+        private void LogCore(string text) { Log.Add(text); }
+        private void LogEmailSignature(string text) { Log.Add(text); }
+        private BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
+        { return FetchResult; }
+
+        __CACHE_KEY__
+        __CACHE_READ__
+        __CACHE_FETCH__
+        __BLOCK_SEND__
+
+        internal void SeedExpiredSnapshot(TalkServiceConfiguration configuration, BackendPolicyStatus snapshot)
+        {
+            _emailSignaturePolicyCache = snapshot;
+            _emailSignaturePolicyCacheKey = BuildEmailSignaturePolicyCacheKey(configuration);
+            _emailSignaturePolicyCacheFetchedAtUtc = DateTime.UtcNow.AddMinutes(-30);
+        }
+        internal Task<BackendPolicyStatus> Refresh(TalkServiceConfiguration configuration)
+        {
+            return FetchAndCacheEmailSignaturePolicyStatusAsync(
+                configuration, BuildEmailSignaturePolicyCacheKey(configuration), "test");
+        }
+        internal void VerifyMessage(bool unavailable)
+        {
+            _emailSignatureStateStable = true;
+            bool cancel = false;
+            const string source = "internal-signature-source";
+            bool result = BlockEmailSignatureSend(ref cancel, source, unavailable);
+            Check(!result && cancel && !_emailSignatureStateStable,
+                "A signature refusal must still cancel send and mark reconciliation unstable.");
+            Check(MessageBox.Message == (unavailable
+                ? Strings.EmailSignaturePolicyUnavailable
+                : Strings.EmailSignatureSendReconcileFailed),
+                "A signature refusal selected the wrong explanation.");
+            Check(!MessageBox.Message.Contains(source) && Log[Log.Count - 1].Contains(source),
+                "Internal signature causes belong in the diagnostic log, not the user message.");
+        }
+    }
+
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) { throw new InvalidOperationException(message); }
+    }
+    public static void Run()
+    {
+        var configuration = new TalkServiceConfiguration();
+        var confirmed = new BackendPolicyStatus { FetchSucceeded = true };
+        var runtime = new SignatureRuntime();
+        runtime.VerifyMessage(true);
+        runtime.VerifyMessage(false);
+        runtime.SeedExpiredSnapshot(configuration, confirmed);
+        BackendPolicyStatus cached;
+        Check(runtime.TryGetCachedEmailSignaturePolicyStatus(configuration, out cached)
+            && object.ReferenceEquals(cached, confirmed),
+            "A successful snapshot older than five minutes must remain available to the send gate.");
+        foreach (BackendPolicyStatus failure in new BackendPolicyStatus[] {
+            null, new BackendPolicyStatus { FetchSucceeded = false }
+        })
+        {
+            runtime.FetchResult = failure;
+            Check(object.ReferenceEquals(runtime.Refresh(configuration).GetAwaiter().GetResult(), confirmed),
+                "A failed refresh must preserve the previous successful signature policy.");
+            Check(runtime.TryGetCachedEmailSignaturePolicyStatus(configuration, out cached)
+                && object.ReferenceEquals(cached, confirmed),
+                "A failed refresh must not introduce a missing-policy send warning.");
+        }
+        var withoutSnapshot = new SignatureRuntime { FetchResult = new BackendPolicyStatus { FetchSucceeded = false } };
+        withoutSnapshot.Refresh(configuration).GetAwaiter().GetResult();
+        Check(!withoutSnapshot.TryGetCachedEmailSignaturePolicyStatus(configuration, out cached),
+            "A failed initial fetch must not invent a successful policy snapshot.");
+        var changedConfiguration = new TalkServiceConfiguration { Username = "other-user" };
+        Check(!runtime.TryGetCachedEmailSignaturePolicyStatus(changedConfiguration, out cached),
+            "A different backend account must not reuse a previous account's signature policy.");
+        var updatedSnapshot = new BackendPolicyStatus { FetchSucceeded = true };
+        runtime.FetchResult = updatedSnapshot;
+        runtime.Refresh(configuration).GetAwaiter().GetResult();
+        Check(runtime.TryGetCachedEmailSignaturePolicyStatus(configuration, out cached)
+            && object.ReferenceEquals(cached, updatedSnapshot),
+            "A fresh successful response, including an access refusal, must replace the old snapshot.");
+    }
+}
+'@
+foreach ($method in @{
+    '__CACHE_KEY__' = 'BuildEmailSignaturePolicyCacheKey'
+    '__CACHE_READ__' = 'TryGetCachedEmailSignaturePolicyStatus'
+    '__CACHE_FETCH__' = 'FetchAndCacheEmailSignaturePolicyStatusAsync'
+}.GetEnumerator()) {
+    $methodSource = Get-CSharpMethodBlock $PolicySource $method.Value
+    if (-not $methodSource) {
+        throw "Signature regression test could not read $($method.Value)."
+    }
+    $signatureNoticeHarness = $signatureNoticeHarness.Replace($method.Key, $methodSource)
+}
+$signatureNoticeHarness = $signatureNoticeHarness.Replace('__BLOCK_SEND__', $signatureSendBlocker)
+Add-Type -TypeDefinition $signatureNoticeHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
+[SignatureSendNoticeRegression]::Run()
+Write-Host "Email signature architecture OK: clear send notices, last-success cache, and exact WordEditor slots are wired."

@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Preparar recurso compartido"
   },
-  "sharing_files_table_path": {
-    "message": "Ruta"
-  },
-  "sharing_files_table_type": {
-    "message": "Tipo"
-  },
-  "sharing_files_table_status": {
-    "message": "Estado"
-  },
-  "sharing_button_add_files": {
-    "message": "Añadir archivos..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Añadir carpeta..."
-  },
-  "sharing_button_remove": {
-    "message": "Eliminar"
-  },
   "sharing_button_upload": {
     "message": "Subir"
-  },
-  "sharing_file_type_file": {
-    "message": "Archivo"
-  },
-  "sharing_file_type_folder": {
-    "message": "Carpeta"
   },
   "sharing_status_done_row": {
     "message": "Hecho"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Compartir"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Directorio base: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "La fecha de caducidad debe ser futura."
@@ -915,10 +888,16 @@
     "message": "El backend no ha podido confirmar el acceso a las funciones Pro. Las funciones básicas siguen disponibles."
   },
   "policy_license_grace_format": {
-    "message": "Su licencia ha caducado. Las funciones Pro siguen disponibles hasta el $1."
+    "message": "Su licencia ha caducado. Los usuarios con un Seat asignado y activo pueden seguir utilizando las funciones Pro hasta $1."
   },
   "policy_license_grace": {
-    "message": "Su licencia ha caducado. Las funciones Pro siguen disponibles durante el período de gracia."
+    "message": "Su licencia ha caducado. Los usuarios con un Seat asignado y activo pueden seguir utilizando las funciones Pro durante el período de gracia."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "La política de firmas aún no está disponible. Compruebe la conexión con su Nextcloud e intente enviar de nuevo."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "La firma del correo no se pudo actualizar de forma segura. Su mensaje no se ha enviado. Intente enviarlo de nuevo."
   },
   "policy_license_expired": {
     "message": "Su licencia ha caducado y el período de gracia ha finalizado. Las funciones Pro ya no están disponibles. Puede seguir utilizando las funciones básicas."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Almacenamiento: $1 de $2 utilizados"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Archivos de Mi Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Carpeta de Mi Nextcloud..."
   }
 }

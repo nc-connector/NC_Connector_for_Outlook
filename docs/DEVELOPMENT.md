@@ -178,6 +178,8 @@ Runtime rules:
 - When policy becomes inactive or the sender no longer matches, NC Connector removes only `NcConnectorSignature`. It does not scan or rewrite arbitrary body content and does not remove a native signature from a non-matching identity.
 - Signature processing only runs for unsent Outlook compose items. Opening a received or already sent message for reading must never modify its body.
 - Before send, the pending debounce is stopped and the current sender, format, compose kind, policy, and managed slot are reconciled synchronously. With complete backend connection settings, sending is cancelled if no successful policy snapshot is available or if a required apply/clear operation cannot finish safely. The compose item stays open for correction and retry.
+
+- Missing policy uses `email_signature_policy_unavailable`; a failed final apply/clear uses `email_signature_send_reconcile_failed`. Both cancel send and explain the next step without exposing internal source identifiers. The cache still accepts a matching last-success snapshot after a failed refresh; a fresh successful response, including refusal, replaces it. No network work is added to Outlook's send event.
 - An incomplete backend setup does not create a signature requirement; cleanup is limited to best-effort removal of an exact `NcConnectorSignature` bookmark. An unsupported signature domain disables insertion as well, but with otherwise complete backend settings an existing managed range must still reconcile safely at send time. An `InlineResponseClose` that arrives just before send does not by itself block a previously reconciled, unchanged message.
 - Separate password follow-up dispatch captures the successful policy and settings snapshot at share creation. On the primary mail's `Send` event it applies and reads back `SendUsingAccount`/`SentOnBehalfOfName`, submits only when the effective follow-up identity equals the captured primary sender, and adds the backend signature only when that identity also matches `policy.email_signature.user_email`. Plain source mail produces a plain follow-up; HTML/RTF source produces an HTML follow-up. A definite automatic-send failure displays the fully prepared message for manual delivery; an ambiguous submission is never repeated.
 - Debug logging records the trigger, active surface, body format, compose kind, slot source, and reconciliation result without writing the signature template or sender address.
@@ -230,9 +232,15 @@ Runtime rules:
 
 ### License status presentation
 
+A response without a `status` object is a failed fetch (`invalid_payload`), not a confirmed missing seat. It uses the backend-unavailable notice and cannot replace a cached successful response. Optional license metadata remains optional for older backends.
+
 `BackendPolicyService.ParseStatus` normalizes both plain and OCS-wrapped status responses. `BackendPolicyStatus` retains the optional `license_status`, `access_status`, `can_manage_license`, `grace_until_iso`, `license_activation.state`, `license_connection_error`, `license_last_sync_at_iso` and `license_offline_until_iso` metadata. Missing fields default to empty/false; only a JSON boolean `true` enables the license-management action.
 
 `PolicyUiHelper` selects localized notices at display time for Settings, FileLink and Talk, and reuses the same causes in disabled-feature tooltips. It distinguishes license refusal from `seat_state=suspended_overlimit`; unknown seat states receive a generic seat message. Old backends without explanatory fields receive a generic access warning. Grace and connection notices use a yellow status style without altering feature access. Dates supplied by the backend are formatted in local time for display only, never evaluated as client-side entitlement deadlines.
+
+An administrator without a seat receives the license diagnosis plus the local-use/no-seat notice in the banner. The disabled-feature tooltip names the missing personal seat instead. Grace wording describes availability for active assigned seats, not for every administrator. Offline-expiry notices include known synchronization dates even without a current connection-error flag.
+
+Community and Pro use the same personal access checks. Global `overlicensed` does not disable active seats or their policy domains; `suspended_overlimit` does. `Invoke-OutlookPolicyMappingTests.ps1` checks 384 paired mode/access/seat/capacity/role/synchronization combinations.
 
 The administration link is built from the validated configured HTTPS base URL, preserving its installation subpath, and targets `/index.php/settings/admin/ncc_backend_4mc`. It is offered only for license notices to users with `can_manage_license=true`. This is a UI hint, not authorization; the backend still enforces permissions. `WarningPanelUiHelper` sizes panels with or without an action link.
 

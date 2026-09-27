@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Sestavit sdílení"
   },
-  "sharing_files_table_path": {
-    "message": "Cesta"
-  },
-  "sharing_files_table_type": {
-    "message": "Typ"
-  },
-  "sharing_files_table_status": {
-    "message": "Stav"
-  },
-  "sharing_button_add_files": {
-    "message": "Přidat soubory..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Přidat složku..."
-  },
-  "sharing_button_remove": {
-    "message": "Odebrat"
-  },
   "sharing_button_upload": {
     "message": "Nahrát"
-  },
-  "sharing_file_type_file": {
-    "message": "Soubor"
-  },
-  "sharing_file_type_folder": {
-    "message": "Složka"
   },
   "sharing_status_done_row": {
     "message": "Hotovo"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Sdílení"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Základní adresář: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "Datum vypršení platnosti musí být v budoucnosti."
@@ -915,10 +888,16 @@
     "message": "Serverová část nemohla potvrdit přístup k funkcím Pro. Základní funkce zůstávají dostupné."
   },
   "policy_license_grace_format": {
-    "message": "Platnost vaší licence vypršela. Funkce Pro zůstávají dostupné do $1."
+    "message": "Licence vypršela. Uživatelé s aktivně přiřazeným seatem mohou funkce Pro používat do $1."
   },
   "policy_license_grace": {
-    "message": "Platnost vaší licence vypršela. Funkce Pro zůstávají dostupné během ochranné lhůty."
+    "message": "Licence vypršela. Uživatelé s aktivně přiřazeným seatem mohou funkce Pro používat během ochranné lhůty."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "Zásady podpisu zatím nejsou dostupné. Zkontrolujte připojení k vašemu Nextcloudu a zkuste zprávu odeslat znovu."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "E-mailový podpis se nepodařilo bezpečně aktualizovat. Zpráva nebyla odeslána. Zkuste ji odeslat znovu."
   },
   "policy_license_expired": {
     "message": "Platnost vaší licence vypršela a ochranná lhůta skončila. Funkce Pro již nejsou dostupné. Základní funkce můžete nadále používat."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Úložiště: využito $1 z $2"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "Soubory z Mého Nextcloudu..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Složka z Mého Nextcloudu..."
   }
 }

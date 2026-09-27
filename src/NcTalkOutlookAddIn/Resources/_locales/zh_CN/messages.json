@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "创建共享"
   },
-  "sharing_files_table_path": {
-    "message": "路径"
-  },
-  "sharing_files_table_type": {
-    "message": "类型"
-  },
-  "sharing_files_table_status": {
-    "message": "状态"
-  },
-  "sharing_button_add_files": {
-    "message": "添加文件..."
-  },
-  "sharing_button_add_folder": {
-    "message": "添加文件夹..."
-  },
-  "sharing_button_remove": {
-    "message": "移除"
-  },
   "sharing_button_upload": {
     "message": "上传"
-  },
-  "sharing_file_type_file": {
-    "message": "文件"
-  },
-  "sharing_file_type_folder": {
-    "message": "文件夹"
   },
   "sharing_status_done_row": {
     "message": "完成"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "分享"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "基础目录： "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "过期日期必须在未来。"
@@ -915,10 +888,16 @@
     "message": "后端无法确认 Pro 功能的访问权限。基本功能仍然可用。"
   },
   "policy_license_grace_format": {
-    "message": "您的许可证已过期。Pro 功能在 $1 之前仍然可用。"
+    "message": "您的许可证已过期。已分配有效席位的用户可以继续使用 Pro 功能，直到 $1。"
   },
   "policy_license_grace": {
-    "message": "您的许可证已过期。Pro 功能在宽限期内仍然可用。"
+    "message": "您的许可证已过期。已分配有效席位的用户可以在宽限期内继续使用 Pro 功能。"
+  },
+  "email_signature_policy_unavailable": {
+    "message": "签名策略暂时不可用。请检查与 Nextcloud 的连接，然后重新尝试发送。"
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "无法安全更新电子邮件签名。您的邮件尚未发送。请重新尝试发送。"
   },
   "policy_license_expired": {
     "message": "您的许可证已过期，宽限期也已结束。Pro 功能不再可用。您仍可使用基本功能。"
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "存储空间：已使用 $1，共 $2"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "从“我的 Nextcloud”选择文件..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "从“我的 Nextcloud”选择文件夹..."
   }
 }

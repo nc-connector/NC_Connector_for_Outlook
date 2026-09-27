@@ -619,11 +619,8 @@ namespace NcTalkOutlookAddIn
                     + ").");
 
                 string message = policyUnavailable
-                    ? Strings.PolicyWarningTitle
-                    : string.Format(
-                        CultureInfo.CurrentCulture,
-                        Strings.ErrorInsertHtmlFailed,
-                        "email signature (" + (source ?? "unknown") + ")");
+                    ? Strings.EmailSignaturePolicyUnavailable
+                    : Strings.EmailSignatureSendReconcileFailed;
                 MessageBox.Show(
                     message,
                     Strings.DialogTitle,

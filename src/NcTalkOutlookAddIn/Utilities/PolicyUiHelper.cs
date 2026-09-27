@@ -55,7 +55,7 @@ namespace NcTalkOutlookAddIn.Utilities
             string licenseNotice = GetLicenseNotice(status);
             if (!string.IsNullOrEmpty(licenseNotice))
             {
-                return licenseNotice;
+                return status.SeatAssigned ? licenseNotice : AppendNotice(licenseNotice, Strings.PolicyWarningNoSeat);
             }
             if (!status.SeatAssigned)
             {
@@ -121,6 +121,10 @@ namespace NcTalkOutlookAddIn.Utilities
             if (status.LicenseConnectionError)
             {
                 message = AppendNotice(message, Strings.PolicyLicenseConnectionError);
+            }
+            if (status.LicenseConnectionError
+                || (!status.IsValid && string.Equals(accessStatus, "OFFLINE_EXPIRED", StringComparison.OrdinalIgnoreCase)))
+            {
                 message = AppendNotice(message, FormatStatusDate(Strings.PolicyLicenseLastSyncFormat, status.LicenseLastSyncAtIso));
                 message = AppendNotice(message, FormatStatusDate(Strings.PolicyLicenseOfflineUntilFormat, status.LicenseOfflineUntilIso));
             }
@@ -206,13 +210,13 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return Strings.PolicyWarningBackendUnavailable;
             }
-            if (!status.IsValid && (status.SeatAssigned || status.CanManageLicense))
-            {
-                return GetPolicyWarningMessage(status);
-            }
             if (!status.SeatAssigned)
             {
                 return Strings.SharingPasswordSeparateNoSeatTooltip;
+            }
+            if (!status.IsValid)
+            {
+                return GetPolicyWarningMessage(status);
             }
 
             return GetSeatNotice(status);

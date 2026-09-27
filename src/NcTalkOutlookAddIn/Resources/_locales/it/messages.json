@@ -440,32 +440,8 @@
   "sharing_step_files_title": {
     "message": "Componi condivisione"
   },
-  "sharing_files_table_path": {
-    "message": "Percorso"
-  },
-  "sharing_files_table_type": {
-    "message": "Tipo"
-  },
-  "sharing_files_table_status": {
-    "message": "Stato"
-  },
-  "sharing_button_add_files": {
-    "message": "Aggiungi file..."
-  },
-  "sharing_button_add_folder": {
-    "message": "Aggiungi cartella..."
-  },
-  "sharing_button_remove": {
-    "message": "Rimuovi"
-  },
   "sharing_button_upload": {
     "message": "Carica"
-  },
-  "sharing_file_type_file": {
-    "message": "File"
-  },
-  "sharing_file_type_folder": {
-    "message": "Cartella"
   },
   "sharing_status_done_row": {
     "message": "Fatto"
@@ -679,9 +655,6 @@
   },
   "outlook_sharing_fallback_share_name": {
     "message": "Condivisione"
-  },
-  "outlook_sharing_base_path_prefix": {
-    "message": "Directory di base: "
   },
   "outlook_sharing_expire_must_be_future": {
     "message": "La data di scadenza deve essere nel futuro."
@@ -915,10 +888,16 @@
     "message": "Il backend non ha potuto confermare l’accesso alle funzionalità Pro. Le funzionalità di base restano disponibili."
   },
   "policy_license_grace_format": {
-    "message": "La licenza è scaduta. Le funzionalità Pro restano disponibili fino al $1."
+    "message": "La licenza è scaduta. Gli utenti con un Seat assegnato e attivo possono continuare a utilizzare le funzioni Pro fino al $1."
   },
   "policy_license_grace": {
-    "message": "La licenza è scaduta. Le funzionalità Pro restano disponibili durante il periodo di tolleranza."
+    "message": "La licenza è scaduta. Gli utenti con un Seat assegnato e attivo possono continuare a utilizzare le funzioni Pro durante il periodo di tolleranza."
+  },
+  "email_signature_policy_unavailable": {
+    "message": "La policy delle firme non è ancora disponibile. Verifichi la connessione al suo Nextcloud e riprovi a inviare il messaggio."
+  },
+  "email_signature_send_reconcile_failed": {
+    "message": "Non è stato possibile aggiornare la firma email in modo sicuro. Il messaggio non è stato inviato. Riprovi a inviarlo."
   },
   "policy_license_expired": {
     "message": "La licenza è scaduta e il periodo di tolleranza è terminato. Le funzionalità Pro non sono più disponibili. È possibile continuare a utilizzare le funzionalità di base."
@@ -1204,11 +1183,5 @@
   },
   "outlook_nextcloud_picker_storage_of": {
     "message": "Spazio: $1 di $2 utilizzati"
-  },
-  "outlook_sharing_add_nextcloud_files": {
-    "message": "File dal mio Nextcloud..."
-  },
-  "outlook_sharing_add_nextcloud_folder": {
-    "message": "Cartella dal mio Nextcloud..."
   }
 }

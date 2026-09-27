@@ -471,6 +471,10 @@ Once grace has ended, Outlook distinguishes an expired license from an inactive 
 
 Full Nextcloud administrators see license notices even without their own seat and can open **Manage license in backend**. The link opens NC Connector's administration page on the configured Nextcloud. Other users are directed to their Nextcloud administrator. Older backends that do not report these details receive a general notice instead of a guessed expiry reason or an administration link.
 
+An administrator without a personal seat also sees that sharing and Talk remain usable with local settings. A tooltip on a blocked seat feature names the missing assignment, even when the banner also reports grace or a synchronization problem. Administrative rights do not unlock personal features.
+
+An active assigned Community seat has the same existing functions as an active assigned Pro seat. When assignments exceed capacity, only the excess suspended seats lose seat features; the remaining active users keep their policies and functions.
+
 A failed license synchronization is not itself labelled as an invalid license: the cause can be a connection problem, an unusable server response, or unavailable local activation data. The notice includes the last successful synchronization and the offline deadline when supplied by the backend. A failure to retrieve the Nextcloud backend status has its own connection notice. Disabled-feature tooltips use the corresponding reason; there is no additional license pop-up on every action.
 
 License activation remains part of the backend's normal synchronization. Outlook does not activate licenses or contact the license server directly. After correcting a license or seat assignment, reopen the affected dialog or refresh the connection in Settings to load the current backend status.
@@ -532,6 +536,8 @@ Expected result:
 - the follow-up password mail receives the signature only when its effective sender also matches
 
 If a required final signature check cannot complete, Outlook keeps the message open instead of sending it with an unverified signature state.
+
+The message distinguishes an unavailable signature policy from a signature that could not be updated safely. Check the Nextcloud connection if policy is unavailable, then retry sending. A previously confirmed policy for the same account remains usable after a failed refresh; a newly received refusal takes effect.
 
 ## Feature operation
 
