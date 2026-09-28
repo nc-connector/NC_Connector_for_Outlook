@@ -686,19 +686,7 @@ namespace NcTalkOutlookAddIn
                 _currentSettings.Username,
                 _currentSettings.AppPassword);
             BackendPolicyStatus policyStatus = FetchBackendPolicyStatus(configuration, "talk_delete_room_on_event_delete");
-            if (policyStatus != null
-                && policyStatus.IsDomainActive("talk")
-                && policyStatus.IsLocked("talk", "talk_delete_room_on_event_delete"))
-            {
-                bool policyEnabled;
-                if (policyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyEnabled))
-                {
-                    return policyEnabled;
-                }
-                return false;
-            }
-
-            return localEnabled;
+            return _currentSettings.ResolvePolicyDefaults(policyStatus).TalkDeleteRoomOnEventDelete;
         }
 
         private void RefreshEntryBinding(AppointmentSubscription subscription)

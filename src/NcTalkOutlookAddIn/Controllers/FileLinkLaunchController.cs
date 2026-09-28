@@ -159,10 +159,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 return false;
             }
 
-            string basePath = string.IsNullOrWhiteSpace(settings.FileLinkBasePath)
-                ? AddinSettings.DefaultFileLinkBasePath
-                : settings.FileLinkBasePath;
-
             NextcloudTalkAddIn.LogFileLinkMessage(
                 "Sharing wizard UI ready (threadId="
                 + System.Threading.Thread.CurrentThread.ManagedThreadId.ToString(CultureInfo.InvariantCulture)
@@ -176,7 +172,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 capabilities,
                 passwordPolicy,
                 policyStatus,
-                basePath,
                 launchOptions))
             {
                 if (launchOptions != null && launchOptions.AttachmentMode)
@@ -208,7 +203,7 @@ namespace NcTalkOutlookAddIn.Controllers
 
                 if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
                 {
-                    string languageOverride = settings != null ? settings.ShareBlockLang : "default";
+                    string languageOverride = settings.ResolvePolicyDefaults(policyStatus).ShareBlockLang;
                     bool plainTextCompose = MailBodyInsertionController.IsPlainTextMail(mail);
                     NextcloudTalkAddIn.LogFileLinkMessage("Share created (folder=\"" + wizard.Result.FolderName + "\").");
                     ComposeLifecycleOrigin origin =

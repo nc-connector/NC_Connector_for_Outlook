@@ -493,6 +493,10 @@ The backend can manage:
 
 Keep values editable when users may retain or change their saved Outlook setting. Lock only settings that users must not change. Test both a user with an active seat and a user without one before broad rollout.
 
+Settings, the Sharing and Talk wizards, and attachment automation use the same order: a locked backend value wins; otherwise a saved local choice wins; otherwise the editable backend default is used; finally the product default applies. An explicit local `false` or a saved product-default value remains a user choice. Saving credentials alone does not select untouched options. Locked backend values do not overwrite the local choice, so it returns when the administrator unlocks the field. Without usable seat access, local settings remain available; seat-only functions remain restricted.
+
+New backend share lifetimes start at one day. A zero-day value from an older backend is interpreted consistently as one day. This does not alter existing shares or a locally saved choice to disable expiration. Attachment thresholds use 1–10240 MB; an explicit backend `null` disables the threshold, while a legacy backend zero retains the established 5 MB behavior.
+
 ### Template authoring
 
 For custom share templates:

@@ -827,6 +827,314 @@ internal static class OutlookPolicyMappingTests
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
+    # Build the production assembly in an isolated directory for real settings/wizard tests.
+    # No Outlook instance, real account, or persisted user profile is used.
+    $referencePath = & (Join-Path $ProjectRoot 'tools/ci/Resolve-OfficeExtensibilityReference.ps1') -OutputDirectory (Join-Path $TempRoot 'refs')
+    $uiOutput = Join-Path $TempRoot 'bin'
+    $msbuild = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/MSBuild.exe'
+    & $msbuild (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/NcTalkOutlookAddIn.csproj') /t:Rebuild /v:minimal /p:Configuration=Release "/p:ReferencePath=$referencePath" "/p:OutputPath=$uiOutput\" "/p:IntermediateOutputPath=$TempRoot\obj\"
+    if ($LASTEXITCODE -ne 0) { throw 'Production assembly build for policy tests failed.' }
+    $uiSource = Join-Path $TempRoot 'OutlookPolicyUiTests.cs'
+    @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Xml;
+
+internal static class OutlookPolicyUiTests
+{
+    private const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+    private static Assembly Product;
+    private static int Checks;
+    private static Type T(string name) { return Product.GetType("NcTalkOutlookAddIn." + name, true); }
+    private static object New(string name, params object[] args)
+    {
+        return T(name).GetConstructors(Flags).Single(c => c.GetParameters().Length == args.Length).Invoke(args);
+    }
+    private static MethodInfo Method(Type type, string name, int count)
+    {
+        return type.GetMethods(Flags).Single(m => m.Name == name && m.GetParameters().Length == count);
+    }
+    private static object Call(object target, string name, params object[] args)
+    {
+        Type type = target as Type ?? target.GetType();
+        return Method(type, name, args.Length).Invoke(target is Type ? null : target, args);
+    }
+    private static object Get(object target, string name) { return target.GetType().GetProperty(name, Flags).GetValue(target, null); }
+    private static void Set(object target, string name, object value) { target.GetType().GetProperty(name, Flags).SetValue(target, value, null); }
+    private static object Field(object target, string name) { return target.GetType().GetField(name, Flags).GetValue(target); }
+    private static void Check(bool condition, string message)
+    {
+        Checks++;
+        if (!condition) throw new InvalidOperationException(message);
+    }
+    private static object Resolve(object settings, object status) { return Call(settings, "ResolvePolicyDefaults", status); }
+    private static Dictionary<string, object> D(params object[] pairs)
+    {
+        var result = new Dictionary<string, object>();
+        for (int i = 0; i < pairs.Length; i += 2) result[(string)pairs[i]] = pairs[i + 1];
+        return result;
+    }
+    private static object Status(Dictionary<string, object> share, Dictionary<string, object> talk, bool editable, string mode, string seat)
+    {
+        var shareEdit = share.ToDictionary(p => p.Key, p => (object)editable);
+        var talkEdit = talk.ToDictionary(p => p.Key, p => (object)editable);
+        return Call(T("Services.BackendPolicyService"), "ParseStatus", D(
+            "status", D("is_valid", seat != "invalid", "seat_assigned", seat != "none", "seat_state", seat == "paused" ? "suspended_overlimit" : "active", "mode", mode, "overlicensed", true),
+            "policy", D("share", share, "talk", talk),
+            "policy_editable", D("share", shareEdit, "talk", talkEdit)));
+    }
+    private static string Serialize(object settings)
+    {
+        using (var stream = new MemoryStream())
+        {
+            Call(T("Settings.SettingsStorage"), "SaveToXmlStream", stream, settings, "policy-test");
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+    }
+    private static object RoundTrip(object settings, string root)
+    {
+        string path = Path.Combine(root, "policy.xml");
+        File.WriteAllText(path, Serialize(settings));
+        return Call(T("Settings.SettingsStorage"), "LoadFromXmlFile", path);
+    }
+    private static object Addressbook() { return New("Services.IfbAddressBookCache+SystemAddressbookStatus", true, 1, ""); }
+    private static object Configuration() { return New("Services.TalkServiceConfiguration", "", "", ""); }
+    private static Form Settings(object local, object status) { return (Form)New("UI.SettingsForm", local, null, status, null, Addressbook()); }
+    private static Form Share(object local, object status, bool attachment)
+    {
+        object launch = New("Models.FileLinkWizardLaunchOptions");
+        Set(launch, "AttachmentMode", attachment);
+        return (Form)New("UI.FileLinkWizardForm", local, Configuration(), null, null, status, launch);
+    }
+    private static Form Talk(object local, object status)
+    {
+        return (Form)New("UI.TalkLinkForm", local, Configuration(), null, status, null, Addressbook(), "Meeting", DateTime.Today.AddDays(1), DateTime.Today.AddDays(1).AddHours(1));
+    }
+    private static void TestLocalChoices(string root)
+    {
+        object roomEvent = Enum.Parse(T("Models.TalkRoomType"), "EventConversation");
+        object roomGroup = Enum.Parse(T("Models.TalkRoomType"), "StandardRoom");
+        object plain = Enum.Parse(T("Models.SharePasswordDeliveryMode"), "Plain");
+        object secrets = Enum.Parse(T("Models.SharePasswordDeliveryMode"), "Secrets");
+        object[][] bindings = {
+            new object[] { "share", "share_base_directory", "FileLinkBasePath", "Managed", "Local", "Managed" },
+            new object[] { "share", "share_name_template", "SharingDefaultShareName", "Managed", "Local", "Managed" },
+            new object[] { "share", "share_permission_upload", "SharingDefaultPermCreate", true, false, true },
+            new object[] { "share", "share_permission_edit", "SharingDefaultPermWrite", true, false, true },
+            new object[] { "share", "share_permission_delete", "SharingDefaultPermDelete", true, false, true },
+            new object[] { "share", "share_set_password", "SharingDefaultPasswordEnabled", true, false, true },
+            new object[] { "share", "share_send_password_separately", "SharingDefaultPasswordSeparateEnabled", true, false, true },
+            new object[] { "share", "share_send_password_mode", "SharingDefaultPasswordDeliveryMode", "secrets", plain, secrets },
+            new object[] { "share", "share_expire_days", "SharingDefaultExpireDays", 19, 7, 19 },
+            new object[] { "share", "attachments_always_via_ncconnector", "SharingAttachmentsAlwaysConnector", true, false, true },
+            new object[] { "share", "language_share_html_block", "ShareBlockLang", "fr", "default", "fr" },
+            new object[] { "talk", "talk_lobby_active", "TalkDefaultLobbyEnabled", true, false, true },
+            new object[] { "talk", "talk_show_in_search", "TalkDefaultSearchVisible", true, false, true },
+            new object[] { "talk", "talk_set_password", "TalkDefaultPasswordEnabled", true, false, true },
+            new object[] { "talk", "talk_add_users", "TalkDefaultAddUsers", true, false, true },
+            new object[] { "talk", "talk_add_guests", "TalkDefaultAddGuests", true, false, true },
+            new object[] { "talk", "talk_delete_room_on_event_delete", "TalkDeleteRoomOnEventDelete", true, false, true },
+            new object[] { "talk", "language_talk_description", "EventDescriptionLang", "fr", "default", "fr" },
+            new object[] { "talk", "talk_room_type", "TalkDefaultRoomType", "group", roomEvent, roomGroup }
+        };
+        foreach (object[] binding in bindings)
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (bool editable in new[] { false, true })
+        foreach (bool explicitChoice in new[] { false, true })
+        {
+            string property = (string)binding[2];
+            object local = New("Settings.AddinSettings");
+            object productDefault = Get(local, property);
+            if (explicitChoice) Set(local, property, binding[4]);
+            string saved = Serialize(local);
+            var policy = D(binding[1], binding[3]);
+            object status = Status((string)binding[0] == "share" ? policy : D(), (string)binding[0] == "talk" ? policy : D(), editable, mode, seat);
+            object effective = Resolve(local, status);
+            object expected = seat == "active" && (!editable || !explicitChoice) ? binding[5] : explicitChoice ? binding[4] : productDefault;
+            Check(object.Equals(Get(effective, property), expected), "Resolver precedence: " + property + "/" + mode + "/" + seat + "/" + editable + "/" + explicitChoice);
+            Check(Serialize(local) == saved, "Resolution must not modify persisted choices: " + property);
+            object reloaded = RoundTrip(local, root);
+            Check((bool)Call(reloaded, "HasLocalValue", property) == explicitChoice, "Round-trip retains presence: " + property);
+            Check(object.Equals(Get(Resolve(reloaded, status), property), expected), "Round-trip keeps effective choice: " + property);
+        }
+        object initial = New("Settings.AddinSettings");
+        object clone = Call(initial, "Clone");
+        Set(clone, "TalkDefaultLobbyEnabled", false);
+        Check(!(bool)Call(initial, "HasLocalValue", "TalkDefaultLobbyEnabled"), "Clone has independent presence state");
+        object missing = Resolve(initial, Status(D(), D(), true, "community", "active"));
+        Check((int)Get(missing, "SharingDefaultExpireDays") == 7, "Missing backend expiry keeps product default");
+        foreach (object value in new object[] { 0, "0", null, 1, 19, 3650 })
+        {
+            var share = D("share_expire_days", value);
+            object status = Status(share, D(), false, "pro", "active");
+            object actual = Call(status, "GetPolicyValue", "share", "share_expire_days");
+            Check(object.Equals(actual, value != null && value.ToString() == "0" ? (object)1 : value), "Legacy expiry normalization");
+            Check(object.Equals(share["share_expire_days"], value), "Parser must not mutate incoming policy dictionary");
+        }
+        Console.WriteLine("[OK] Local-choice precedence and XML round trips across both modes and all personal seat states");
+    }
+    private static void TestWizards()
+    {
+        string[][] bools = {
+            new[] { "TalkDefaultPasswordEnabled", "_talkDefaultPasswordCheckBox", "_passwordToggleCheckBox" },
+            new[] { "TalkDefaultAddUsers", "_talkDefaultAddUsersCheckBox", "_addUsersCheckBox" },
+            new[] { "TalkDefaultAddGuests", "_talkDefaultAddGuestsCheckBox", "_addGuestsCheckBox" },
+            new[] { "TalkDefaultLobbyEnabled", "_talkDefaultLobbyCheckBox", "_lobbyCheckBox" },
+            new[] { "TalkDefaultSearchVisible", "_talkDefaultSearchCheckBox", "_searchCheckBox" }
+        };
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (bool editable in new[] { false, true })
+        foreach (bool explicitChoice in new[] { false, true })
+        {
+            object local = New("Settings.AddinSettings");
+            if (explicitChoice) {
+                foreach (string[] pair in bools) Set(local, pair[0], false);
+                Set(local, "TalkDefaultRoomType", Enum.Parse(T("Models.TalkRoomType"), "EventConversation"));
+                Set(local, "SharingDefaultPermCreate", false);
+                Set(local, "SharingDefaultExpireDays", 7);
+            }
+            object status = Status(D("share_permission_upload", true, "share_expire_days", 19), D("talk_set_password", true, "talk_add_users", true, "talk_add_guests", true, "talk_lobby_active", true, "talk_show_in_search", true, "talk_room_type", "group"), editable, mode, "active");
+            string before = Serialize(local);
+            using (Form options = Settings(local, status))
+            using (Form talk = Talk(local, status))
+            using (Form share = Share(local, status, false))
+            {
+                bool expected = !editable || !explicitChoice;
+                foreach (string[] pair in bools) {
+                    Check(((CheckBox)Field(options, pair[1])).Checked == expected, "Settings choice: " + pair[0]);
+                    var control = (CheckBox)Field(talk, pair[2]);
+                    Check(control.Checked == expected && control.Enabled == editable, "Talk control choice and lock: " + pair[0]);
+                }
+                Check(((ComboBox)Field(options, "_talkDefaultRoomTypeCombo")).SelectedIndex == ((ComboBox)Field(talk, "_roomTypeComboBox")).SelectedIndex, "Room-type UI agreement");
+                Call(talk, "OnOkButtonClick", null, EventArgs.Empty);
+                Check((bool)Get(talk, "LobbyUntilStart") == expected && (bool)Get(talk, "AddUsers") == expected && (bool)Get(talk, "AddGuests") == expected && (bool)Get(talk, "SearchVisible") == expected, "Talk confirmation retains UI selections");
+                Check(Get(talk, "SelectedRoomType").ToString() == (expected ? "StandardRoom" : "EventConversation"), "Confirmed room type");
+                Call(share, "ApplyFormData");
+                object request = Field(share, "_request");
+                Check(((Convert.ToInt32(Get(request, "Permissions")) & 4) != 0) == expected, "Actual share request upload permission");
+                Check(((DateTime)Get(request, "ExpireDate") - DateTime.Today).Days == (expected ? 19 : 7), "Actual share request expiration");
+                Check(Serialize(Get(options, "Result")) == before && Serialize(local) == before, "Opening settings and wizards preserves raw local state");
+            }
+        }
+        foreach (int days in new[] { 0, 1, 19, 3650 })
+        foreach (bool attachment in new[] { false, true })
+        {
+            object status = Status(D("share_expire_days", days), D(), false, "community", "active");
+            using (Form share = Share(New("Settings.AddinSettings"), status, attachment)) {
+                Call(share, "ApplyFormData");
+                object request = Field(share, "_request");
+                Check((bool)Get(request, "ExpireEnabled") && ((DateTime)Get(request, "ExpireDate") - DateTime.Today).Days == Math.Max(1, days), "Legacy expiry agrees in manual and automated share request");
+            }
+        }
+        object noExpiry = New("Settings.AddinSettings");
+        Set(noExpiry, "SharingDefaultExpireDays", 0);
+        using (Form share = Share(noExpiry, Status(D("share_expire_days", 19), D(), true, "pro", "active"), false)) {
+            Call(share, "ApplyFormData");
+            Check(!(bool)Get(Field(share, "_request"), "ExpireEnabled"), "Explicit local zero still disables expiration");
+        }
+        Console.WriteLine("[OK] Real Settings, Talk and Sharing controls, lock state, confirmation and request payloads");
+    }
+    private static void TestSettingsEdits(string root)
+    {
+        object local = New("Settings.AddinSettings");
+        object editable = Status(D("share_permission_upload", true, "share_expire_days", 19, "language_share_html_block", "fr"), D("talk_lobby_active", true), true, "pro", "active");
+        using (Form options = Settings(local, editable))
+        {
+            object result = Get(options, "Result");
+            Check(!(bool)Call(result, "HasLocalValue", "SharingDefaultPermCreate"), "Opening options does not select a backend default");
+            ((CheckBox)Field(options, "_sharingDefaultPermCreateCheckBox")).Checked = false;
+            ((CheckBox)Field(options, "_talkDefaultLobbyCheckBox")).Checked = false;
+            ((NumericUpDown)Field(options, "_sharingDefaultExpireDaysUpDown")).Value = 7;
+            Check((bool)Call(result, "HasLocalValue", "SharingDefaultPermCreate") && !(bool)Get(result, "SharingDefaultPermCreate"), "User checkbox edit is explicit even when false");
+            Check((bool)Call(result, "HasLocalValue", "SharingDefaultExpireDays") && (int)Get(result, "SharingDefaultExpireDays") == 7, "Product-default numeric choice is explicit");
+            object locked = Status(D("share_permission_upload", true, "share_expire_days", 19), D("talk_lobby_active", true), false, "pro", "active");
+            options.GetType().GetField("_backendPolicyStatus", Flags).SetValue(options, locked);
+            Call(options, "ApplyBackendPolicyStatus", "test_lock");
+            Check(((CheckBox)Field(options, "_sharingDefaultPermCreateCheckBox")).Checked && !((CheckBox)Field(options, "_sharingDefaultPermCreateCheckBox")).Enabled, "Locked overlay is visible and disabled");
+            Check(!(bool)Get(result, "SharingDefaultPermCreate") && !(bool)Get(result, "TalkDefaultLobbyEnabled"), "Lock never replaces saved choices");
+            options.GetType().GetField("_backendPolicyStatus", Flags).SetValue(options, editable);
+            Call(options, "ApplyBackendPolicyStatus", "test_unlock");
+            Check(!((CheckBox)Field(options, "_sharingDefaultPermCreateCheckBox")).Checked && !((CheckBox)Field(options, "_talkDefaultLobbyCheckBox")).Checked, "Unlock restores local choices in both domains");
+            object restored = RoundTrip(result, root);
+            Check(!(bool)Get(Resolve(restored, editable), "SharingDefaultPermCreate"), "User choice survives persistence and reopening");
+        }
+        using (Form options = Settings(New("Settings.AddinSettings"), editable))
+        {
+            ((TextBox)Field(options, "_usernameTextBox")).Text = "test-only-login";
+            Task save = (Task)Call(options, "SaveSettingsAsync");
+            DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+            while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+            Check(save.IsCompleted, "Local settings save completes without a configured server");
+            save.GetAwaiter().GetResult();
+            string xml = Serialize(Get(options, "Result"));
+            Check(xml.Contains("test-only-login") && !xml.Contains("<SharingDefault") && !xml.Contains("<TalkDefault") && !xml.Contains("<ShareBlockLang>"), "Actual credentials-only save leaves untouched policy choices absent");
+        }
+        Console.WriteLine("[OK] User edits, lock/unlock, XML persistence and actual credentials-only save");
+    }
+    private static void TestAttachmentAutomation()
+    {
+        Type subscription = T("NextcloudTalkAddIn+MailComposeSubscription");
+        int cases = 0;
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (bool editable in new[] { false, true })
+        foreach (bool explicitChoice in new[] { false, true })
+        foreach (bool always in new[] { false, true })
+        foreach (object threshold in new object[] { null, 0, 1, 19, 10240 })
+        {
+            object local = New("Settings.AddinSettings");
+            if (explicitChoice) {
+                Set(local, "SharingAttachmentsAlwaysConnector", false);
+                Set(local, "SharingAttachmentsOfferAboveEnabled", false);
+                Set(local, "SharingAttachmentsOfferAboveMb", 20);
+            }
+            object status = Status(D("attachments_always_via_ncconnector", always, "attachments_min_size_mb", threshold), D(), editable, mode, seat);
+            object snapshot = Call(subscription, "BuildAttachmentAutomationSettings", local, local);
+            object actual = Call(subscription, "ApplyAttachmentAutomationPolicy", snapshot, status);
+            bool useBackend = seat == "active" && (!editable || !explicitChoice);
+            bool expectedAlways = useBackend && always;
+            bool expectedEnabled = !expectedAlways && (useBackend ? threshold != null : !explicitChoice);
+            int expectedThreshold = useBackend && threshold != null ? ((int)threshold == 0 ? 5 : (int)threshold) : 20;
+            Check((bool)Get(actual, "AlwaysConnector") == expectedAlways && (bool)Get(actual, "OfferAboveEnabled") == expectedEnabled && (int)Get(actual, "ThresholdMb") == expectedThreshold && (long)Get(actual, "ThresholdBytes") == expectedThreshold * 1024L * 1024L, "Operative attachment policy case " + cases);
+            cases++;
+        }
+        foreach (object threshold in new object[] { null, 0, 1, 19, 10240 }) {
+            object status = Status(D("attachments_min_size_mb", threshold), D(), false, "pro", "active");
+            using (Form options = Settings(New("Settings.AddinSettings"), status)) {
+                Check(((CheckBox)Field(options, "_sharingAttachmentsOfferAboveCheckBox")).Checked == (threshold != null), "Threshold UI null semantics");
+                Check(((NumericUpDown)Field(options, "_sharingAttachmentsOfferAboveMbUpDown")).Value == (threshold == null ? 20 : (int)threshold == 0 ? 5 : (int)threshold), "Threshold UI matches operative value");
+            }
+        }
+        Console.WriteLine("[OK] " + cases + " operative attachment combinations plus real threshold controls");
+    }
+    [STAThread]
+    public static int Main(string[] args)
+    {
+        Product = Assembly.LoadFrom(args[0]);
+        string root = args[1];
+        try {
+            TestLocalChoices(root);
+            TestWizards();
+            TestSettingsEdits(root);
+            TestAttachmentAutomation();
+            Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
+            return 0;
+        } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
+    }
+}
+'@ | Set-Content -LiteralPath $uiSource -Encoding UTF8
+    $uiExe = Join-Path $TempRoot 'OutlookPolicyUiTests.exe'
+    & $csc /nologo /target:exe "/out:$uiExe" /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Windows.Forms.dll $uiSource
+    if ($LASTEXITCODE -ne 0) { throw 'Policy UI test harness compilation failed.' }
+    & $uiExe (Join-Path $uiOutput 'NcTalkOutlookAddIn.dll') $TempRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Production policy/persistence/UI tests failed.' }
 }
 finally {
     if (Test-Path $TempRoot) {

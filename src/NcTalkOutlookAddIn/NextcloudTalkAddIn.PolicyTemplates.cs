@@ -169,21 +169,6 @@ namespace NcTalkOutlookAddIn
             }
         }
 
-        internal static string ResolveTalkDescriptionLanguage(BackendPolicyStatus policyStatus, string fallbackLanguageOverride)
-        {
-            if (policyStatus != null
-                && policyStatus.IsDomainActive("talk")
-                && policyStatus.IsLocked("talk", "language_talk_description"))
-            {
-                string policyLanguageRaw = policyStatus.GetPolicyString("talk", "language_talk_description");
-                if (!string.IsNullOrWhiteSpace(policyLanguageRaw))
-                {
-                    return TalkDescriptionTemplateController.NormalizeTalkDescriptionLanguage(policyLanguageRaw);
-                }
-            }
-            return TalkDescriptionTemplateController.NormalizeTalkDescriptionLanguage(fallbackLanguageOverride);
-        }
-
         internal static string ResolveTalkInvitationTemplate(BackendPolicyStatus policyStatus)
         {
             // Guard against null/inactive backend policy state.

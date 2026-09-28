@@ -139,6 +139,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _cancelButton = new Button();
         private bool _isBusy;
         private AddinSettings _result;
+        private bool _applyingPolicyDefaults;
         private bool _initialIfbEnabled;
         private bool _ifbDefaultApplied;
         private readonly OutlookAttachmentAutomationGuardService _attachmentGuardService = new OutlookAttachmentAutomationGuardService();
@@ -188,6 +189,7 @@ namespace NcTalkOutlookAddIn.UI
             BrandedHeader.AttachToParent(_headerPanel, Controls, HeaderHeight);
             InitializeComponents();
             ApplySettings(settings);
+            TrackLocalPolicyChoices();
             UpdateControlState();
             ApplyResponsiveLayout(true);
 
@@ -408,58 +410,6 @@ namespace NcTalkOutlookAddIn.UI
                 _tlsEnable12CheckBox.Checked = Result.TransportTlsEnable12;
                 _tlsEnable13CheckBox.Checked = Result.TransportTlsEnable13;
                 _updateNotifyCheckBox.Checked = Result.UpdateNotifyEnabled;
-                _fileLinkBaseTextBox.Text = Result.FileLinkBasePath ?? string.Empty;
-                _sharingDefaultShareNameTextBox.Text = Result.SharingDefaultShareName ?? string.Empty;
-                _sharingDefaultPermCreateCheckBox.Checked = Result.SharingDefaultPermCreate;
-                _sharingDefaultPermWriteCheckBox.Checked = Result.SharingDefaultPermWrite;
-                _sharingDefaultPermDeleteCheckBox.Checked = Result.SharingDefaultPermDelete;
-                _sharingDefaultPasswordCheckBox.Checked = Result.SharingDefaultPasswordEnabled;
-                _sharingDefaultPasswordSeparateCheckBox.Checked =
-                    PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus) && Result.SharingDefaultPasswordSeparateEnabled;
-                SharePasswordDeliveryModeComboHelper.Select(_sharingPasswordDeliveryModeCombo, Result.SharingDefaultPasswordDeliveryMode);
-                int expireDays = Result.SharingDefaultExpireDays;
-                if (expireDays <= 0)
-                {
-                    expireDays = 7;
-                }
-                if (expireDays > 3650)
-                {
-                    expireDays = 3650;
-                }
-                _sharingDefaultExpireDaysUpDown.Value = expireDays;
-                _sharingAttachmentsAlwaysCheckBox.Checked = Result.SharingAttachmentsAlwaysConnector;
-                _sharingAttachmentsOfferAboveCheckBox.Checked = Result.SharingAttachmentsOfferAboveEnabled;
-                int offerAboveMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(Result.SharingAttachmentsOfferAboveMb);
-                decimal clampedOfferAbove = Math.Max(
-                    _sharingAttachmentsOfferAboveMbUpDown.Minimum,
-                    Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
-                _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
-                SelectAttachmentLinkTarget(AttachmentLinkTargetPolicy.Resolve(
-                    Result.SharingAttachmentLinkTarget,
-                    _backendPolicyStatus));
-                _talkDefaultPasswordCheckBox.Checked = Result.TalkDefaultPasswordEnabled;
-                _talkDefaultAddUsersCheckBox.Checked = Result.TalkDefaultAddUsers;
-                _talkDefaultAddGuestsCheckBox.Checked = Result.TalkDefaultAddGuests;
-                _talkDefaultLobbyCheckBox.Checked = Result.TalkDefaultLobbyEnabled;
-                _talkDefaultSearchCheckBox.Checked = Result.TalkDefaultSearchVisible;
-                _talkDeleteRoomOnEventDeleteCheckBox.Checked = Result.TalkDeleteRoomOnEventDelete;
-                _emailSignatureOnComposeCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
-                    _backendPolicyStatus,
-                    "email_signature_on_compose",
-                    Result.EmailSignatureOnCompose);
-                _emailSignatureOnReplyCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
-                    _backendPolicyStatus,
-                    "email_signature_on_reply",
-                    Result.EmailSignatureOnReply);
-                _emailSignatureOnForwardCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
-                    _backendPolicyStatus,
-                    "email_signature_on_forward",
-                    Result.EmailSignatureOnForward);
-                TalkRoomTypeComboHelper.Select(
-                    _talkDefaultRoomTypeCombo,
-                    Result.TalkDefaultRoomType);
-                UpdateTalkRoomTypeTooltip();
-                RefreshLanguageOverrideCombos(Result.ShareBlockLang, Result.EventDescriptionLang);
                 UpdateDebugPathLabel();
                 UpdateAboutTab();
                 UpdateUpdateCheckSection();
@@ -473,6 +423,60 @@ namespace NcTalkOutlookAddIn.UI
             {
                 _suppressImmediateTlsApply = false;
             }
+        }
+
+        private void TrackLocalPolicyChoices()
+        {
+            TrackLocalPolicyChoice(_fileLinkBaseTextBox, "share", "share_base_directory", () => Result.FileLinkBasePath = _fileLinkBaseTextBox.Text.Trim());
+            TrackLocalPolicyChoice(_sharingDefaultShareNameTextBox, "share", "share_name_template", () => Result.SharingDefaultShareName = _sharingDefaultShareNameTextBox.Text.Trim());
+            TrackLocalPolicyChoice(_sharingDefaultPermCreateCheckBox, "share", "share_permission_upload", () => Result.SharingDefaultPermCreate = _sharingDefaultPermCreateCheckBox.Checked);
+            TrackLocalPolicyChoice(_sharingDefaultPermWriteCheckBox, "share", "share_permission_edit", () => Result.SharingDefaultPermWrite = _sharingDefaultPermWriteCheckBox.Checked);
+            TrackLocalPolicyChoice(_sharingDefaultPermDeleteCheckBox, "share", "share_permission_delete", () => Result.SharingDefaultPermDelete = _sharingDefaultPermDeleteCheckBox.Checked);
+            TrackLocalPolicyChoice(_sharingDefaultPasswordCheckBox, "share", "share_set_password", () => Result.SharingDefaultPasswordEnabled = _sharingDefaultPasswordCheckBox.Checked);
+            TrackLocalPolicyChoice(_sharingDefaultPasswordSeparateCheckBox, "share", "share_send_password_separately", () => Result.SharingDefaultPasswordSeparateEnabled = _sharingDefaultPasswordSeparateCheckBox.Checked);
+            TrackLocalPolicyChoice(_sharingPasswordDeliveryModeCombo, "share", "share_send_password_mode", () => Result.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryModeComboHelper.GetSelected(_sharingPasswordDeliveryModeCombo));
+            TrackLocalPolicyChoice(_sharingDefaultExpireDaysUpDown, "share", "share_expire_days", () => Result.SharingDefaultExpireDays = (int)_sharingDefaultExpireDaysUpDown.Value);
+            TrackLocalPolicyChoice(_sharingAttachmentsAlwaysCheckBox, "share", "attachments_always_via_ncconnector", () => Result.SharingAttachmentsAlwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked);
+            TrackLocalPolicyChoice(_sharingAttachmentsOfferAboveCheckBox, "share", "attachments_min_size_mb", () => RecordLocalAttachmentThreshold());
+            TrackLocalPolicyChoice(_sharingAttachmentsOfferAboveMbUpDown, "share", "attachments_min_size_mb", () => RecordLocalAttachmentThreshold());
+            TrackLocalPolicyChoice(_sharingAttachmentLinkTargetCombo, "share", "attachment_link_target", () => Result.SharingAttachmentLinkTarget = GetSelectedAttachmentLinkTarget());
+            TrackLocalPolicyChoice(_shareBlockLangCombo, "share", "language_share_html_block", () => Result.ShareBlockLang = GetSelectedLanguageChoice(_shareBlockLangCombo));
+            TrackLocalPolicyChoice(_talkDefaultPasswordCheckBox, "talk", "talk_set_password", () => Result.TalkDefaultPasswordEnabled = _talkDefaultPasswordCheckBox.Checked);
+            TrackLocalPolicyChoice(_talkDefaultAddUsersCheckBox, "talk", "talk_add_users", () => Result.TalkDefaultAddUsers = _talkDefaultAddUsersCheckBox.Checked);
+            TrackLocalPolicyChoice(_talkDefaultAddGuestsCheckBox, "talk", "talk_add_guests", () => Result.TalkDefaultAddGuests = _talkDefaultAddGuestsCheckBox.Checked);
+            TrackLocalPolicyChoice(_talkDefaultLobbyCheckBox, "talk", "talk_lobby_active", () => Result.TalkDefaultLobbyEnabled = _talkDefaultLobbyCheckBox.Checked);
+            TrackLocalPolicyChoice(_talkDefaultSearchCheckBox, "talk", "talk_show_in_search", () => Result.TalkDefaultSearchVisible = _talkDefaultSearchCheckBox.Checked);
+            TrackLocalPolicyChoice(_talkDeleteRoomOnEventDeleteCheckBox, "talk", "talk_delete_room_on_event_delete", () => Result.TalkDeleteRoomOnEventDelete = _talkDeleteRoomOnEventDeleteCheckBox.Checked);
+            TrackLocalPolicyChoice(_talkDefaultRoomTypeCombo, "talk", "talk_room_type", () => Result.TalkDefaultRoomType = TalkRoomTypeComboHelper.GetSelected(_talkDefaultRoomTypeCombo, TalkRoomType.EventConversation));
+            TrackLocalPolicyChoice(_eventDescriptionLangCombo, "talk", "language_talk_description", () => Result.EventDescriptionLang = GetSelectedLanguageChoice(_eventDescriptionLangCombo));
+            TrackLocalPolicyChoice(_emailSignatureOnComposeCheckBox, "email_signature", "email_signature_on_compose", () => Result.EmailSignatureOnCompose = _emailSignatureOnComposeCheckBox.Checked);
+            TrackLocalPolicyChoice(_emailSignatureOnReplyCheckBox, "email_signature", "email_signature_on_reply", () => Result.EmailSignatureOnReply = _emailSignatureOnReplyCheckBox.Checked);
+            TrackLocalPolicyChoice(_emailSignatureOnForwardCheckBox, "email_signature", "email_signature_on_forward", () => Result.EmailSignatureOnForward = _emailSignatureOnForwardCheckBox.Checked);
+        }
+
+        private void RecordLocalAttachmentThreshold()
+        {
+            Result.SharingAttachmentsOfferAboveEnabled = _sharingAttachmentsOfferAboveCheckBox.Checked;
+            Result.SharingAttachmentsOfferAboveMb = (int)_sharingAttachmentsOfferAboveMbUpDown.Value;
+        }
+
+        private void TrackLocalPolicyChoice(Control control, string domain, string key, Action recordChoice)
+        {
+            EventHandler changed = (sender, args) =>
+            {
+                if (!_applyingPolicyDefaults && !_isBusy && control.Enabled && !IsPolicyLocked(domain, key))
+                {
+                    recordChoice();
+                }
+            };
+            CheckBox checkBox = control as CheckBox;
+            TextBox textBox = control as TextBox;
+            ComboBox comboBox = control as ComboBox;
+            NumericUpDown numeric = control as NumericUpDown;
+            if (checkBox != null) checkBox.CheckedChanged += changed;
+            else if (textBox != null) textBox.TextChanged += changed;
+            else if (comboBox != null) comboBox.SelectionChangeCommitted += changed;
+            else if (numeric != null) numeric.ValueChanged += changed;
         }
 
         private async void OnSaveButtonClick(object sender, EventArgs e)
@@ -501,10 +505,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-            bool requestedSignatureOnCompose = _emailSignatureOnComposeCheckBox.Checked;
-            bool requestedSignatureOnReply = _emailSignatureOnReplyCheckBox.Checked;
-            bool requestedSignatureOnForward = _emailSignatureOnForwardCheckBox.Checked;
-            AttachmentLinkTarget requestedAttachmentLinkTarget = GetSelectedAttachmentLinkTarget();
             string requestedServerUrl = Result.ManagedNextcloudUrlLocked
                 ? Result.ManagedNextcloudUrl
                 : _serverUrlTextBox.Text.Trim();
@@ -528,26 +528,6 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-            if (!IsPolicyLocked("share", AttachmentLinkTargetPolicy.Key))
-            {
-                SelectAttachmentLinkTarget(requestedAttachmentLinkTarget);
-            }
-            if (IsEmailSignaturePolicyAvailable())
-            {
-                if (!IsPolicyLocked("email_signature", "email_signature_on_compose"))
-                {
-                    _emailSignatureOnComposeCheckBox.Checked = requestedSignatureOnCompose;
-                }
-                if (!IsPolicyLocked("email_signature", "email_signature_on_reply"))
-                {
-                    _emailSignatureOnReplyCheckBox.Checked = requestedSignatureOnReply;
-                }
-                if (!IsPolicyLocked("email_signature", "email_signature_on_forward"))
-                {
-                    _emailSignatureOnForwardCheckBox.Checked = requestedSignatureOnForward;
-                }
-            }
-
             if (!_tlsUseSystemDefaultCheckBox.Checked
                 && !_tlsEnable12CheckBox.Checked
                 && !_tlsEnable13CheckBox.Checked)
@@ -575,37 +555,6 @@ namespace NcTalkOutlookAddIn.UI
             Result.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
             Result.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
             Result.UpdateNotifyEnabled = _updateNotifyCheckBox.Checked;
-            Result.FileLinkBasePath = _fileLinkBaseTextBox.Text.Trim();
-            Result.SharingDefaultShareName = _sharingDefaultShareNameTextBox.Text.Trim();
-            Result.SharingDefaultPermCreate = _sharingDefaultPermCreateCheckBox.Checked;
-            Result.SharingDefaultPermWrite = _sharingDefaultPermWriteCheckBox.Checked;
-            Result.SharingDefaultPermDelete = _sharingDefaultPermDeleteCheckBox.Checked;
-            Result.SharingDefaultPasswordEnabled = _sharingDefaultPasswordCheckBox.Checked;
-            Result.SharingDefaultPasswordSeparateEnabled =
-                PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus) && _sharingDefaultPasswordSeparateCheckBox.Checked;
-            Result.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryModeComboHelper.GetSelected(_sharingPasswordDeliveryModeCombo);
-            Result.SharingDefaultExpireDays = (int)_sharingDefaultExpireDaysUpDown.Value;
-            Result.SharingAttachmentsAlwaysConnector = _sharingAttachmentsAlwaysCheckBox.Checked;
-            Result.SharingAttachmentsOfferAboveEnabled = _sharingAttachmentsOfferAboveCheckBox.Checked;
-            Result.SharingAttachmentsOfferAboveMb = (int)_sharingAttachmentsOfferAboveMbUpDown.Value;
-            Result.SharingAttachmentLinkTarget = GetSelectedAttachmentLinkTarget();
-            Result.TalkDefaultPasswordEnabled = _talkDefaultPasswordCheckBox.Checked;
-            Result.TalkDefaultAddUsers = _talkDefaultAddUsersCheckBox.Checked;
-            Result.TalkDefaultAddGuests = _talkDefaultAddGuestsCheckBox.Checked;
-            Result.TalkDefaultLobbyEnabled = _talkDefaultLobbyCheckBox.Checked;
-            Result.TalkDefaultSearchVisible = _talkDefaultSearchCheckBox.Checked;
-            Result.TalkDeleteRoomOnEventDelete = _talkDeleteRoomOnEventDeleteCheckBox.Checked;
-            Result.TalkDefaultRoomType = TalkRoomTypeComboHelper.GetSelected(
-                _talkDefaultRoomTypeCombo,
-                TalkRoomType.StandardRoom);
-            if (IsEmailSignaturePolicyAvailable())
-            {
-                Result.EmailSignatureOnCompose = _emailSignatureOnComposeCheckBox.Checked;
-                Result.EmailSignatureOnReply = _emailSignatureOnReplyCheckBox.Checked;
-                Result.EmailSignatureOnForward = _emailSignatureOnForwardCheckBox.Checked;
-            }
-            Result.ShareBlockLang = GetSelectedLanguageChoice(_shareBlockLangCombo);
-            Result.EventDescriptionLang = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
             DialogResult = DialogResult.OK;
             Close();
         }
@@ -734,14 +683,7 @@ namespace NcTalkOutlookAddIn.UI
                 _policyWarningTitleLabel,
                 _policyWarningLinkLabel,
                 _serverUrlTextBox.Text);
-            string currentShareLanguage = GetSelectedLanguageChoice(_shareBlockLangCombo);
-            string currentTalkLanguage = GetSelectedLanguageChoice(_eventDescriptionLangCombo);
-            RefreshLanguageOverrideCombos(currentShareLanguage, currentTalkLanguage);
-
-            if (PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
-            {
-                ApplyPolicyDefaultsToControls();
-            }
+            ApplyPolicyDefaultsToControls();
 
             DiagnosticsLogger.Log(
                 LogCategories.Core,
@@ -762,175 +704,67 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyPolicyDefaultsToControls()
         {
-            if (!PolicyUiHelper.IsPolicyActive(_backendPolicyStatus))
+            AddinSettings effective = Result.ResolvePolicyDefaults(_backendPolicyStatus);
+            bool previousApplying = _applyingPolicyDefaults;
+            _applyingPolicyDefaults = true;
+            try
             {
-                return;
-            }
-            bool policyBool;
-            int policyInt;
-            string policyString;
-
-            policyString = _backendPolicyStatus.GetPolicyString("share", "share_base_directory");
-            if (IsPolicyLocked("share", "share_base_directory")
-                && !string.IsNullOrWhiteSpace(policyString))
-            {
-                _fileLinkBaseTextBox.Text = policyString;
-            }
-
-            policyString = _backendPolicyStatus.GetPolicyString("share", "share_name_template");
-            if (IsPolicyLocked("share", "share_name_template")
-                && !string.IsNullOrWhiteSpace(policyString))
-            {
-                _sharingDefaultShareNameTextBox.Text = policyString;
-            }
-            if (IsPolicyLocked("share", "share_permission_upload")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
-            {
-                _sharingDefaultPermCreateCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("share", "share_permission_edit")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_edit", out policyBool))
-            {
-                _sharingDefaultPermWriteCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("share", "share_permission_delete")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_delete", out policyBool))
-            {
-                _sharingDefaultPermDeleteCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("share", "share_set_password")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_set_password", out policyBool))
-            {
-                _sharingDefaultPasswordCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("share", "share_send_password_separately")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_send_password_separately", out policyBool))
-            {
-                _sharingDefaultPasswordSeparateCheckBox.Checked = policyBool;
-            }
-            policyString = _backendPolicyStatus.GetPolicyString("share", "share_send_password_mode");
-            if (IsPolicyLocked("share", "share_send_password_mode")
-                && _backendPolicyStatus.HasPolicyKey("share", "share_send_password_mode"))
-            {
-                SharePasswordDeliveryModeComboHelper.Select(
-                    _sharingPasswordDeliveryModeCombo,
-                    SharePasswordDeliveryPolicy.ParseMode(policyString));
-            }
-            if (!PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus))
-            {
-                _sharingDefaultPasswordSeparateCheckBox.Checked = false;
-            }
-            if (IsPolicyLocked("share", "share_expire_days")
-                && _backendPolicyStatus.TryGetPolicyInt("share", "share_expire_days", out policyInt))
-            {
-                decimal clamped = Math.Max(_sharingDefaultExpireDaysUpDown.Minimum, Math.Min(_sharingDefaultExpireDaysUpDown.Maximum, policyInt));
-                _sharingDefaultExpireDaysUpDown.Value = clamped;
-            }
-            if (IsPolicyLocked("share", "attachments_always_via_ncconnector")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
-            {
-                _sharingAttachmentsAlwaysCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("share", "attachments_min_size_mb"))
-            {
-                if (_backendPolicyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
+                _fileLinkBaseTextBox.Text = effective.FileLinkBasePath ?? string.Empty;
+                _sharingDefaultShareNameTextBox.Text = effective.SharingDefaultShareName ?? string.Empty;
+                _sharingDefaultPermCreateCheckBox.Checked = effective.SharingDefaultPermCreate;
+                _sharingDefaultPermWriteCheckBox.Checked = effective.SharingDefaultPermWrite;
+                _sharingDefaultPermDeleteCheckBox.Checked = effective.SharingDefaultPermDelete;
+                _sharingDefaultPasswordCheckBox.Checked = effective.SharingDefaultPasswordEnabled;
+                _sharingDefaultPasswordSeparateCheckBox.Checked =
+                    PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus) && effective.SharingDefaultPasswordSeparateEnabled;
+                SharePasswordDeliveryModeComboHelper.Select(_sharingPasswordDeliveryModeCombo, effective.SharingDefaultPasswordDeliveryMode);
+                int expireDays = effective.SharingDefaultExpireDays;
+                if (expireDays <= 0)
                 {
-                    int normalizedThreshold = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
-                    decimal clampedThreshold = Math.Max(
-                        _sharingAttachmentsOfferAboveMbUpDown.Minimum,
-                        Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, normalizedThreshold));
-                    _sharingAttachmentsOfferAboveMbUpDown.Value = clampedThreshold;
-                    _sharingAttachmentsOfferAboveCheckBox.Checked = true;
+                    expireDays = 7;
                 }
-                else if (_backendPolicyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
+                if (expireDays > 3650)
                 {
-                    _sharingAttachmentsOfferAboveCheckBox.Checked = false;
+                    expireDays = 3650;
                 }
-            }
-            if (_backendPolicyStatus.HasPolicyKey("share", AttachmentLinkTargetPolicy.Key)
-                && (IsPolicyLocked("share", AttachmentLinkTargetPolicy.Key)
-                    || Result == null
-                    || !Result.SharingAttachmentLinkTarget.HasValue))
-            {
+                _sharingDefaultExpireDaysUpDown.Value = expireDays;
+                _sharingAttachmentsAlwaysCheckBox.Checked = effective.SharingAttachmentsAlwaysConnector;
+                _sharingAttachmentsOfferAboveCheckBox.Checked = effective.SharingAttachmentsOfferAboveEnabled;
+                int offerAboveMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(effective.SharingAttachmentsOfferAboveMb);
+                decimal clampedOfferAbove = Math.Max(
+                    _sharingAttachmentsOfferAboveMbUpDown.Minimum,
+                    Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
+                _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
                 SelectAttachmentLinkTarget(AttachmentLinkTargetPolicy.Resolve(
-                    Result == null ? (AttachmentLinkTarget?)null : Result.SharingAttachmentLinkTarget,
+                    Result.SharingAttachmentLinkTarget,
                     _backendPolicyStatus));
-            }
-
-            policyString = _backendPolicyStatus.GetPolicyString("share", "language_share_html_block");
-            if (IsPolicyLocked("share", "language_share_html_block")
-                && !string.IsNullOrWhiteSpace(policyString))
-            {
-                SelectLanguageChoice(_shareBlockLangCombo, policyString);
-            }
-            if (IsPolicyLocked("talk", "talk_set_password")
-                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
-            {
-                _talkDefaultPasswordCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("talk", "talk_add_users")
-                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_users", out policyBool))
-            {
-                _talkDefaultAddUsersCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("talk", "talk_add_guests")
-                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_guests", out policyBool))
-            {
-                _talkDefaultAddGuestsCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("talk", "talk_lobby_active")
-                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_lobby_active", out policyBool))
-            {
-                _talkDefaultLobbyCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("talk", "talk_show_in_search")
-                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_show_in_search", out policyBool))
-            {
-                _talkDefaultSearchCheckBox.Checked = policyBool;
-            }
-            if (IsPolicyLocked("talk", "talk_delete_room_on_event_delete")
-                && _backendPolicyStatus.TryGetPolicyBool("talk", "talk_delete_room_on_event_delete", out policyBool))
-            {
-                _talkDeleteRoomOnEventDeleteCheckBox.Checked = policyBool;
-            }
-            if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_compose", out policyBool))
-            {
+                _talkDefaultPasswordCheckBox.Checked = effective.TalkDefaultPasswordEnabled;
+                _talkDefaultAddUsersCheckBox.Checked = effective.TalkDefaultAddUsers;
+                _talkDefaultAddGuestsCheckBox.Checked = effective.TalkDefaultAddGuests;
+                _talkDefaultLobbyCheckBox.Checked = effective.TalkDefaultLobbyEnabled;
+                _talkDefaultSearchCheckBox.Checked = effective.TalkDefaultSearchVisible;
+                _talkDeleteRoomOnEventDeleteCheckBox.Checked = effective.TalkDeleteRoomOnEventDelete;
                 _emailSignatureOnComposeCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
                     _backendPolicyStatus,
                     "email_signature_on_compose",
                     Result.EmailSignatureOnCompose);
-            }
-            if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_reply", out policyBool))
-            {
                 _emailSignatureOnReplyCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
                     _backendPolicyStatus,
                     "email_signature_on_reply",
                     Result.EmailSignatureOnReply);
-            }
-            if (_backendPolicyStatus.TryGetPolicyBool("email_signature", "email_signature_on_forward", out policyBool))
-            {
                 _emailSignatureOnForwardCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
                     _backendPolicyStatus,
                     "email_signature_on_forward",
                     Result.EmailSignatureOnForward);
-            }
-
-            policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");
-            if (IsPolicyLocked("talk", "talk_room_type")
-                && !string.IsNullOrWhiteSpace(policyString))
-            {
                 TalkRoomTypeComboHelper.Select(
                     _talkDefaultRoomTypeCombo,
-                    string.Equals(policyString.Trim(), "event", StringComparison.OrdinalIgnoreCase)
-                    ? TalkRoomType.EventConversation
-                    : TalkRoomType.StandardRoom);
+                    effective.TalkDefaultRoomType);
+                UpdateTalkRoomTypeTooltip();
+                RefreshLanguageOverrideCombos(effective.ShareBlockLang, effective.EventDescriptionLang);
             }
-
-            policyString = _backendPolicyStatus.GetPolicyString("talk", "language_talk_description");
-            if (IsPolicyLocked("talk", "language_talk_description")
-                && !string.IsNullOrWhiteSpace(policyString))
+            finally
             {
-                SelectLanguageChoice(_eventDescriptionLangCombo, policyString);
+                _applyingPolicyDefaults = previousApplying;
             }
         }
 

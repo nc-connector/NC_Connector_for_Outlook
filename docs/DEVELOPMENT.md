@@ -232,6 +232,10 @@ Runtime rules:
 
 ### License status presentation
 
+`AddinSettings.ResolvePolicyDefaults` is the common Share/Talk defaults resolver for Settings, both wizards, generated block languages, attachment automation and saved-room deletion. Resolution is field-specific: an active locked backend field wins, otherwise an explicit local value, otherwise an active editable backend default, otherwise the product default. The settings model records the presence of local choices, not whether they differ from defaults; clones copy that state independently. XML omits untouched fields and loading existing values records them as explicit choices. Settings records edits while suppressing programmatic overlays; a credentials-only save must not write displayed backend defaults into local preferences. Runtime resolved copies are never persisted.
+
+`BackendPolicyService.ParseStatus` normalizes only an explicit legacy backend `share_expire_days=0` to one day, without mutating the incoming dictionary. Missing/null values and local expiration choices remain distinct. Attachment threshold `null` disables automation, legacy zero resolves to five MB and current positive thresholds remain within 1–10240 MB. The always-share switch takes precedence over threshold mode. `Invoke-OutlookPolicyMappingTests.ps1` tests raw persistence, real WinForms controls and the operative attachment resolver; stale successful policy snapshots retain their existing refresh behavior.
+
 A response without a `status` object is a failed fetch (`invalid_payload`), not a confirmed missing seat. It uses the backend-unavailable notice and cannot replace a cached successful response. Optional license metadata remains optional for older backends.
 
 `BackendPolicyService.ParseStatus` normalizes both plain and OCS-wrapped status responses. `BackendPolicyStatus` retains the optional `license_status`, `access_status`, `can_manage_license`, `grace_until_iso`, `license_activation.state`, `license_connection_error`, `license_last_sync_at_iso` and `license_offline_until_iso` metadata. Missing fields default to empty/false; only a JSON boolean `true` enables the license-management action.

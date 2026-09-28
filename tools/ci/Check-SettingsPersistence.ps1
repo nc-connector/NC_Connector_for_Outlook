@@ -22,7 +22,7 @@ $addinLifecycle = Get-Content -Raw -Path $AddinLifecyclePath
 $failures = New-Object System.Collections.Generic.List[string]
 
 $savedKeys = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
-foreach ($match in [regex]::Matches($storage, 'Append(?:OptionalBool)?Element\s*\([^;]*?"(?<key>[^"]+)"', 'Singleline')) {
+foreach ($match in [regex]::Matches($storage, 'Append(?:OptionalBool|LocalChoice)?Element\s*\([^;]*?"(?<key>[^"]+)"', 'Singleline')) {
     [void]$savedKeys.Add($match.Groups["key"].Value)
 }
 
@@ -35,7 +35,7 @@ foreach ($match in [regex]::Matches($storage, 'string\.Equals\(key,\s*"(?<key>[^
 }
 
 $properties = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
-foreach ($match in [regex]::Matches($settings, 'public\s+(?:[\w\?<>]+)\s+(?<name>\w+)\s*\{\s*get;\s*set;\s*\}')) {
+foreach ($match in [regex]::Matches($settings, 'public\s+(?:[\w\?<>]+)\s+(?<name>\w+)\s*\{\s*get(?:;|\s*\{)')) {
     [void]$properties.Add($match.Groups["name"].Value)
 }
 foreach ($match in [regex]::Matches($settings, 'internal\s+(?:[\w\?<>]+)\s+(?<name>Managed\w+)\s*\{\s*get;\s*private\s+set;\s*\}')) {
@@ -159,25 +159,21 @@ else {
     $wizardDefaultsMethod = $fileLinkWizardPolicy.Substring(
         $wizardDefaultsStart,
         $wizardWarningStart - $wizardDefaultsStart)
-    $wizardDefaultBindings = @(
-        @{ Key = "share_base_directory"; Assignment = "_request\.BasePath\s*=" },
-        @{ Key = "share_name_template"; Assignment = "_defaults\.SharingDefaultShareName\s*=" },
-        @{ Key = "share_permission_upload"; Assignment = "_defaults\.SharingDefaultPermCreate\s*=" },
-        @{ Key = "share_permission_edit"; Assignment = "_defaults\.SharingDefaultPermWrite\s*=" },
-        @{ Key = "share_permission_delete"; Assignment = "_defaults\.SharingDefaultPermDelete\s*=" },
-        @{ Key = "share_set_password"; Assignment = "_defaults\.SharingDefaultPasswordEnabled\s*=" },
-        @{ Key = "share_send_password_separately"; Assignment = "_defaults\.SharingDefaultPasswordSeparateEnabled\s*=\s*policyBool" },
-        @{ Key = "share_expire_days"; Assignment = "_defaults\.SharingDefaultExpireDays\s*=" }
-    )
-    foreach ($binding in $wizardDefaultBindings) {
-        $escapedKey = [regex]::Escape($binding.Key)
-        $lockedAssignmentPattern =
-            'if\s*\(\s*IsPolicyLocked\("' + $escapedKey + '"\)[\s\S]{0,350}?' + $binding.Assignment
-        if (-not ($wizardDefaultsMethod -match $lockedAssignmentPattern)) {
-            $failures.Add(
-                "FileLink wizard must preserve a saved local '$($binding.Key)' default when the backend value is editable, while applying a locked backend value.")
-        }
+    $wizardSource = Get-Content (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/UI/FileLinkWizardForm.cs') -Raw
+    if ($wizardSource -notmatch '_defaults\s*=\s*\(defaults\s*\?\?\s*new AddinSettings\(\)\)\.ResolvePolicyDefaults\(policyStatus\)') {
+        $failures.Add('FileLink must resolve defaults through the shared local-choice-aware policy path.')
     }
+    if ($wizardDefaultsMethod -match 'TryGetPolicy|GetPolicyString') {
+        $failures.Add('FileLink must not apply a second independent backend-default overlay.')
+    }
+}
+
+if ($settings -notmatch 'status\.IsLocked\(domain, key\)\s*\|\|\s*!HasLocalValue\(propertyName\)' -or
+    $storage -notmatch 'if\s*\(settings\.HasLocalValue\(name\)\)') {
+    $failures.Add('Policy resolution and XML persistence must retain the distinction between missing and explicit local choices.')
+}
+if ($settingsForm -notmatch 'TrackLocalPolicyChoices\(\)' -or $settingsForm -notmatch '!_applyingPolicyDefaults') {
+    $failures.Add('Settings must track user choices without persisting programmatic backend overlays.')
 }
 
 if ($failures.Count -gt 0) {

@@ -493,6 +493,10 @@ Das Backend kann verwalten:
 
 Werte editierbar lassen, wenn Benutzer ihre gespeicherte Outlook-Einstellung behalten oder ändern dürfen. Nur Einstellungen sperren, die Benutzer nicht ändern dürfen. Vor dem breiten Rollout sowohl einen Benutzer mit aktivem Seat als auch einen Benutzer ohne Seat testen.
 
+Einstellungen, Freigabe- und Talk-Assistent sowie Anhangsautomatisierung verwenden dieselbe Reihenfolge: gesperrte Backend-Vorgabe, sonst gespeicherte lokale Auswahl, sonst editierbarer Backend-Startwert, zuletzt Produktstandard. Auch ein ausdrücklich gespeichertes `false` oder ein Wert gleich dem Produktstandard bleibt eine Benutzerentscheidung. Das bloße Speichern der Zugangsdaten legt unberührte Optionen nicht fest. Gesperrte Backend-Werte überschreiben die lokale Auswahl nicht dauerhaft; nach dem Entsperren gilt sie wieder. Ohne nutzbaren Seat bleiben lokale Einstellungen verfügbar; Seat-Funktionen bleiben eingeschränkt.
+
+Neue Backend-Ablaufvorgaben beginnen bei einem Tag. Eine Null-Tage-Vorgabe älterer Backends wird einheitlich als ein Tag interpretiert. Bestehende Freigaben und eine lokal gespeicherte Deaktivierung des Ablaufdatums bleiben unverändert. Anhangsschwellen liegen bei 1–10240 MB; ein ausdrückliches Backend-`null` deaktiviert die Schwelle, eine alte Backend-Null behält die etablierte Bedeutung von 5 MB.
+
 ### Vorlagen erstellen
 
 Für eigene Freigabevorlagen:

@@ -5,6 +5,7 @@
 using System;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.UI
@@ -19,66 +20,11 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyPolicyDefaultsToSettings()
         {
-            if (!PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "share"))
-            {
-                return;
-            }
-            bool policyBool;
-            int policyInt;
-            string policyString;
-
-            policyString = _backendPolicyStatus.GetPolicyString("share", "share_base_directory");
-            if (IsPolicyLocked("share_base_directory")
-                && !string.IsNullOrWhiteSpace(policyString))
-            {
-                _request.BasePath = policyString;
-            }
-
-            policyString = _backendPolicyStatus.GetPolicyString("share", "share_name_template");
-            if (IsPolicyLocked("share_name_template")
-                && !string.IsNullOrWhiteSpace(policyString))
-            {
-                _defaults.SharingDefaultShareName = policyString;
-            }
-            if (IsPolicyLocked("share_permission_upload")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_upload", out policyBool))
-            {
-                _defaults.SharingDefaultPermCreate = policyBool;
-            }
-            if (IsPolicyLocked("share_permission_edit")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_edit", out policyBool))
-            {
-                _defaults.SharingDefaultPermWrite = policyBool;
-            }
-            if (IsPolicyLocked("share_permission_delete")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_permission_delete", out policyBool))
-            {
-                _defaults.SharingDefaultPermDelete = policyBool;
-            }
-            if (IsPolicyLocked("share_set_password")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_set_password", out policyBool))
-            {
-                _defaults.SharingDefaultPasswordEnabled = policyBool;
-            }
-            if (IsPolicyLocked("share_send_password_separately")
-                && _backendPolicyStatus.TryGetPolicyBool("share", "share_send_password_separately", out policyBool))
-            {
-                _defaults.SharingDefaultPasswordSeparateEnabled = policyBool;
-            }
-            policyString = _backendPolicyStatus.GetPolicyString("share", "share_send_password_mode");
-            if (IsPolicyLocked("share_send_password_mode")
-                && _backendPolicyStatus.HasPolicyKey("share", "share_send_password_mode"))
-            {
-                _defaults.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryPolicy.ParseMode(policyString);
-            }
+            _request.BasePath = string.IsNullOrWhiteSpace(_defaults.FileLinkBasePath)
+                ? AddinSettings.DefaultFileLinkBasePath : _defaults.FileLinkBasePath;
             if (!PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus))
             {
                 _defaults.SharingDefaultPasswordSeparateEnabled = false;
-            }
-            if (IsPolicyLocked("share_expire_days")
-                && _backendPolicyStatus.TryGetPolicyInt("share", "share_expire_days", out policyInt))
-            {
-                _defaults.SharingDefaultExpireDays = Math.Max(1, policyInt);
             }
         }
 

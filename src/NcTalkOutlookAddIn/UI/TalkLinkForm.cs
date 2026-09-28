@@ -524,53 +524,22 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyDefaults(AddinSettings defaults, string appointmentSubject)
         {
+            AddinSettings effective = (defaults ?? new AddinSettings()).ResolvePolicyDefaults(_backendPolicyStatus);
             string titleDefault = string.IsNullOrWhiteSpace(appointmentSubject) ? DefaultTitle : appointmentSubject.Trim();
-            bool passwordDefault = defaults == null || defaults.TalkDefaultPasswordEnabled;
-            bool addUsersDefault = defaults == null || defaults.TalkDefaultAddUsers;
-            bool addGuestsDefault = defaults != null && defaults.TalkDefaultAddGuests;
-            bool lobbyDefault = defaults == null || defaults.TalkDefaultLobbyEnabled;
-            bool searchDefault = defaults == null || defaults.TalkDefaultSearchVisible;
-            TalkRoomType roomTypeDefault = defaults != null ? defaults.TalkDefaultRoomType : TalkRoomType.EventConversation;
-
             if (PolicyUiHelper.IsPolicyDomainActive(_backendPolicyStatus, "talk"))
             {
-                bool policyBool;
-                string policyString;
-
-                policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_title");
-                if (!string.IsNullOrWhiteSpace(policyString))
+                string policyTitle = _backendPolicyStatus.GetPolicyString("talk", "talk_title");
+                if (!string.IsNullOrWhiteSpace(policyTitle))
                 {
-                    titleDefault = policyString;
-                }
-                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_set_password", out policyBool))
-                {
-                    passwordDefault = policyBool;
-                }
-                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_users", out policyBool))
-                {
-                    addUsersDefault = policyBool;
-                }
-                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_add_guests", out policyBool))
-                {
-                    addGuestsDefault = policyBool;
-                }
-                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_lobby_active", out policyBool))
-                {
-                    lobbyDefault = policyBool;
-                }
-                if (_backendPolicyStatus.TryGetPolicyBool("talk", "talk_show_in_search", out policyBool))
-                {
-                    searchDefault = policyBool;
-                }
-
-                policyString = _backendPolicyStatus.GetPolicyString("talk", "talk_room_type");
-                if (!string.IsNullOrWhiteSpace(policyString))
-                {
-                    roomTypeDefault = string.Equals(policyString.Trim(), "event", StringComparison.OrdinalIgnoreCase)
-                        ? TalkRoomType.EventConversation
-                        : TalkRoomType.StandardRoom;
+                    titleDefault = policyTitle;
                 }
             }
+            bool passwordDefault = effective.TalkDefaultPasswordEnabled;
+            bool addUsersDefault = effective.TalkDefaultAddUsers;
+            bool addGuestsDefault = effective.TalkDefaultAddGuests;
+            bool lobbyDefault = effective.TalkDefaultLobbyEnabled;
+            bool searchDefault = effective.TalkDefaultSearchVisible;
+            TalkRoomType roomTypeDefault = effective.TalkDefaultRoomType;
 
             TalkTitle = titleDefault;
             _titleTextBox.Text = TalkTitle;

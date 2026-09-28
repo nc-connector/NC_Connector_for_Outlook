@@ -152,9 +152,8 @@ namespace NcTalkOutlookAddIn.Controllers
                     NextcloudTalkAddIn.LogTalkMessage("Talk link dialog cancelled.");
                     return false;
                 }
-                string descriptionLanguage = NextcloudTalkAddIn.ResolveTalkDescriptionLanguage(
-                    policyStatus,
-                    settings.EventDescriptionLang);
+                string descriptionLanguage = TalkDescriptionTemplateController.NormalizeTalkDescriptionLanguage(
+                    settings.ResolvePolicyDefaults(policyStatus).EventDescriptionLang);
                 string descriptionType = NextcloudTalkAddIn.ResolveTalkEventDescriptionType(policyStatus);
                 string invitationTemplate = NextcloudTalkAddIn.ResolveTalkInvitationTemplate(policyStatus);
                 string initialDescription;

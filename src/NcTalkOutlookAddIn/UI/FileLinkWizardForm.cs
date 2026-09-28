@@ -123,10 +123,9 @@ namespace NcTalkOutlookAddIn.UI
             NextcloudCapabilitiesSnapshot capabilitiesSnapshot,
             PasswordPolicyInfo passwordPolicy,
             BackendPolicyStatus policyStatus,
-            string basePath,
             FileLinkWizardLaunchOptions launchOptions)
         {
-            _defaults = (defaults ?? new AddinSettings()).Clone();
+            _defaults = (defaults ?? new AddinSettings()).ResolvePolicyDefaults(policyStatus);
             _configuration = configuration;
             _passwordPolicy = passwordPolicy;
             _backendPolicyStatus = policyStatus;
@@ -140,7 +139,6 @@ namespace NcTalkOutlookAddIn.UI
             _fileQueueImageList = FileLinkIconProvider.CreateImageList(
                 ScaleLogical(20),
                 ScaleLogical(30));
-            _request.BasePath = basePath ?? string.Empty;
             _request.AttachmentMode = _attachmentMode;
             _request.ShareDate = _shareDate;
             ApplyPolicyDefaultsToSettings();

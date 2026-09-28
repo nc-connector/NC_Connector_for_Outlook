@@ -2,7 +2,11 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // See LICENSE.txt for details.
 
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Settings
@@ -15,6 +19,8 @@ namespace NcTalkOutlookAddIn.Settings
         internal const int MaxIfbPort = 49151;
         internal const string DefaultFileLinkBasePath = "NC Connector";
         internal const int DefaultSharingAttachmentsOfferAboveMb = 20;
+
+        private Dictionary<string, object> _localPolicyValues = new Dictionary<string, object>(StringComparer.Ordinal);
 
         public AddinSettings()
         {
@@ -44,28 +50,7 @@ namespace NcTalkOutlookAddIn.Settings
             UpdateChangelogText = string.Empty;
             UpdateLastNotifiedVersion = string.Empty;
             UpdateLastNotifiedDateUtc = string.Empty;
-            FileLinkBasePath = DefaultFileLinkBasePath;
-            SharingDefaultShareName = Strings.SharingDefaultShareNameLabel;
-            SharingDefaultPermCreate = false;
-            SharingDefaultPermWrite = false;
-            SharingDefaultPermDelete = false;
-            SharingDefaultPasswordEnabled = true;
-            SharingDefaultPasswordSeparateEnabled = false;
-            SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryMode.Plain;
-            SharingDefaultExpireDays = 7;
-            SharingAttachmentsAlwaysConnector = false;
-            SharingAttachmentsOfferAboveEnabled = true;
-            SharingAttachmentsOfferAboveMb = DefaultSharingAttachmentsOfferAboveMb;
             SharingAttachmentLinkTarget = null;
-            ShareBlockLang = "default";
-            EventDescriptionLang = "default";
-            TalkDefaultLobbyEnabled = true;
-            TalkDefaultSearchVisible = true;
-            TalkDefaultRoomType = TalkRoomType.EventConversation;
-            TalkDefaultPasswordEnabled = true;
-            TalkDefaultAddUsers = true;
-            TalkDefaultAddGuests = false;
-            TalkDeleteRoomOnEventDelete = false;
             EmailSignatureOnCompose = null;
             EmailSignatureOnReply = null;
             EmailSignatureOnForward = null;
@@ -126,50 +111,134 @@ namespace NcTalkOutlookAddIn.Settings
 
         public string UpdateLastNotifiedDateUtc { get; set; }
 
-        public string FileLinkBasePath { get; set; }
+        public string FileLinkBasePath
+        {
+            get { return GetLocalValue(DefaultFileLinkBasePath); }
+            set { SetLocalValue(value); }
+        }
 
 
-        public string SharingDefaultShareName { get; set; }
+        public string SharingDefaultShareName
+        {
+            get { return GetLocalValue(Strings.SharingDefaultShareNameLabel); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool SharingDefaultPermCreate { get; set; }
+        public bool SharingDefaultPermCreate
+        {
+            get { return GetLocalValue(false); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool SharingDefaultPermWrite { get; set; }
+        public bool SharingDefaultPermWrite
+        {
+            get { return GetLocalValue(false); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool SharingDefaultPermDelete { get; set; }
+        public bool SharingDefaultPermDelete
+        {
+            get { return GetLocalValue(false); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool SharingDefaultPasswordEnabled { get; set; }
+        public bool SharingDefaultPasswordEnabled
+        {
+            get { return GetLocalValue(true); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool SharingDefaultPasswordSeparateEnabled { get; set; }
+        public bool SharingDefaultPasswordSeparateEnabled
+        {
+            get { return GetLocalValue(false); }
+            set { SetLocalValue(value); }
+        }
 
-        public SharePasswordDeliveryMode SharingDefaultPasswordDeliveryMode { get; set; }
+        public SharePasswordDeliveryMode SharingDefaultPasswordDeliveryMode
+        {
+            get { return GetLocalValue(SharePasswordDeliveryMode.Plain); }
+            set { SetLocalValue(value); }
+        }
 
-        public int SharingDefaultExpireDays { get; set; }
+        public int SharingDefaultExpireDays
+        {
+            get { return GetLocalValue(7); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool SharingAttachmentsAlwaysConnector { get; set; }
+        public bool SharingAttachmentsAlwaysConnector
+        {
+            get { return GetLocalValue(false); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool SharingAttachmentsOfferAboveEnabled { get; set; }
+        public bool SharingAttachmentsOfferAboveEnabled
+        {
+            get { return GetLocalValue(true); }
+            set { SetLocalValue(value); }
+        }
 
-        public int SharingAttachmentsOfferAboveMb { get; set; }
+        public int SharingAttachmentsOfferAboveMb
+        {
+            get { return GetLocalValue(DefaultSharingAttachmentsOfferAboveMb); }
+            set { SetLocalValue(value); }
+        }
 
         public AttachmentLinkTarget? SharingAttachmentLinkTarget { get; set; }
 
-        public string ShareBlockLang { get; set; }
+        public string ShareBlockLang
+        {
+            get { return GetLocalValue("default"); }
+            set { SetLocalValue(value); }
+        }
 
-        public string EventDescriptionLang { get; set; }
+        public string EventDescriptionLang
+        {
+            get { return GetLocalValue("default"); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool TalkDefaultLobbyEnabled { get; set; }
+        public bool TalkDefaultLobbyEnabled
+        {
+            get { return GetLocalValue(true); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool TalkDefaultSearchVisible { get; set; }
+        public bool TalkDefaultSearchVisible
+        {
+            get { return GetLocalValue(true); }
+            set { SetLocalValue(value); }
+        }
 
-        public TalkRoomType TalkDefaultRoomType { get; set; }
+        public TalkRoomType TalkDefaultRoomType
+        {
+            get { return GetLocalValue(TalkRoomType.EventConversation); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool TalkDefaultPasswordEnabled { get; set; }
+        public bool TalkDefaultPasswordEnabled
+        {
+            get { return GetLocalValue(true); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool TalkDefaultAddUsers { get; set; }
+        public bool TalkDefaultAddUsers
+        {
+            get { return GetLocalValue(true); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool TalkDefaultAddGuests { get; set; }
+        public bool TalkDefaultAddGuests
+        {
+            get { return GetLocalValue(false); }
+            set { SetLocalValue(value); }
+        }
 
-        public bool TalkDeleteRoomOnEventDelete { get; set; }
+        public bool TalkDeleteRoomOnEventDelete
+        {
+            get { return GetLocalValue(false); }
+            set { SetLocalValue(value); }
+        }
 
         public bool? EmailSignatureOnCompose { get; set; }
 
@@ -191,7 +260,119 @@ namespace NcTalkOutlookAddIn.Settings
         public AddinSettings Clone()
         {
             var copy = (AddinSettings)MemberwiseClone();
+            copy._localPolicyValues = new Dictionary<string, object>(_localPolicyValues, StringComparer.Ordinal);
             return copy;
+        }
+
+        internal bool HasLocalValue(string propertyName)
+        {
+            return _localPolicyValues.ContainsKey(propertyName);
+        }
+
+        private T GetLocalValue<T>(T defaultValue, [CallerMemberName] string propertyName = null)
+        {
+            object value;
+            return _localPolicyValues.TryGetValue(propertyName, out value) ? (T)value : defaultValue;
+        }
+
+        private void SetLocalValue<T>(T value, [CallerMemberName] string propertyName = null)
+        {
+            _localPolicyValues[propertyName] = value;
+        }
+
+        // Resolve a runtime copy without persisting backend defaults or overwriting local choices.
+        internal AddinSettings ResolvePolicyDefaults(BackendPolicyStatus status)
+        {
+            AddinSettings resolved = Clone();
+            ApplyStringPolicy(resolved, status, "share", "share_base_directory", "FileLinkBasePath");
+            ApplyStringPolicy(resolved, status, "share", "share_name_template", "SharingDefaultShareName");
+            ApplyBoolPolicy(resolved, status, "share", "share_permission_upload", "SharingDefaultPermCreate");
+            ApplyBoolPolicy(resolved, status, "share", "share_permission_edit", "SharingDefaultPermWrite");
+            ApplyBoolPolicy(resolved, status, "share", "share_permission_delete", "SharingDefaultPermDelete");
+            ApplyBoolPolicy(resolved, status, "share", "share_set_password", "SharingDefaultPasswordEnabled");
+            ApplyBoolPolicy(resolved, status, "share", "share_send_password_separately", "SharingDefaultPasswordSeparateEnabled");
+            ApplyBoolPolicy(resolved, status, "share", "attachments_always_via_ncconnector", "SharingAttachmentsAlwaysConnector");
+            ApplyStringPolicy(resolved, status, "share", "language_share_html_block", "ShareBlockLang");
+            ApplyBoolPolicy(resolved, status, "talk", "talk_lobby_active", "TalkDefaultLobbyEnabled");
+            ApplyBoolPolicy(resolved, status, "talk", "talk_show_in_search", "TalkDefaultSearchVisible");
+            ApplyBoolPolicy(resolved, status, "talk", "talk_set_password", "TalkDefaultPasswordEnabled");
+            ApplyBoolPolicy(resolved, status, "talk", "talk_add_users", "TalkDefaultAddUsers");
+            ApplyBoolPolicy(resolved, status, "talk", "talk_add_guests", "TalkDefaultAddGuests");
+            ApplyBoolPolicy(resolved, status, "talk", "talk_delete_room_on_event_delete", "TalkDeleteRoomOnEventDelete");
+            ApplyStringPolicy(resolved, status, "talk", "language_talk_description", "EventDescriptionLang");
+
+            int days;
+            if (ShouldApplyPolicy(status, "share", "share_expire_days", "SharingDefaultExpireDays")
+                && status.TryGetPolicyInt("share", "share_expire_days", out days)
+                && days > 0)
+            {
+                resolved.SharingDefaultExpireDays = Math.Min(3650, days);
+            }
+            if (ShouldApplyPolicy(status, "share", "share_send_password_mode", "SharingDefaultPasswordDeliveryMode")
+                && status.HasPolicyKey("share", "share_send_password_mode"))
+            {
+                resolved.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryPolicy.ParseMode(
+                    status.GetPolicyString("share", "share_send_password_mode"));
+            }
+            if (ShouldApplyPolicy(status, "talk", "talk_room_type", "TalkDefaultRoomType"))
+            {
+                string roomType = status.GetPolicyString("talk", "talk_room_type");
+                if (string.Equals(roomType, "event", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(roomType, "group", StringComparison.OrdinalIgnoreCase))
+                {
+                    resolved.TalkDefaultRoomType = string.Equals(roomType, "event", StringComparison.OrdinalIgnoreCase)
+                        ? TalkRoomType.EventConversation : TalkRoomType.StandardRoom;
+                }
+            }
+
+            bool hasLocalThreshold = HasLocalValue("SharingAttachmentsOfferAboveEnabled")
+                                     || HasLocalValue("SharingAttachmentsOfferAboveMb");
+            if (status != null && status.IsDomainActive("share")
+                && (status.IsLocked("share", "attachments_min_size_mb") || !hasLocalThreshold)
+                && status.HasPolicyKey("share", "attachments_min_size_mb"))
+            {
+                int threshold;
+                if (status.TryGetPolicyInt("share", "attachments_min_size_mb", out threshold))
+                {
+                    // Older backends accepted zero; retain their established five-MB interpretation.
+                    resolved.SharingAttachmentsOfferAboveMb = Math.Min(
+                        10240, OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(threshold));
+                    resolved.SharingAttachmentsOfferAboveEnabled = true;
+                }
+                else if (status.GetPolicyValue("share", "attachments_min_size_mb") == null)
+                {
+                    resolved.SharingAttachmentsOfferAboveEnabled = false;
+                }
+            }
+            return resolved;
+        }
+
+        private bool ShouldApplyPolicy(BackendPolicyStatus status, string domain, string key, string propertyName)
+        {
+            return status != null && status.IsDomainActive(domain)
+                   && (status.IsLocked(domain, key) || !HasLocalValue(propertyName));
+        }
+
+        private void ApplyBoolPolicy(AddinSettings resolved, BackendPolicyStatus status, string domain, string key, string propertyName)
+        {
+            bool value;
+            if (ShouldApplyPolicy(status, domain, key, propertyName)
+                && status.TryGetPolicyBool(domain, key, out value))
+            {
+                resolved._localPolicyValues[propertyName] = value;
+            }
+        }
+
+        private void ApplyStringPolicy(AddinSettings resolved, BackendPolicyStatus status, string domain, string key, string propertyName)
+        {
+            if (ShouldApplyPolicy(status, domain, key, propertyName))
+            {
+                string value = status.GetPolicyString(domain, key);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    resolved._localPolicyValues[propertyName] = value;
+                }
+            }
         }
 
         internal void ApplyManagedSetupPolicy(ManagedSetupPolicy policy)

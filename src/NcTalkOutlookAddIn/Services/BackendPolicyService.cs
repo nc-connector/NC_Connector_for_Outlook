@@ -89,6 +89,18 @@ namespace NcTalkOutlookAddIn.Services
             IDictionary<string, object> talkEditable = NcJson.GetDictionary(policyEditable, "talk");
             IDictionary<string, object> emailSignatureEditable = NcJson.GetDictionary(policyEditable, "email_signature");
 
+            object rawExpireDays;
+            int expireDays;
+            if (sharePolicy != null
+                && sharePolicy.TryGetValue("share_expire_days", out rawExpireDays)
+                && BackendPolicyStatus.TryConvertInt(rawExpireDays, out expireDays)
+                && expireDays == 0)
+            {
+                // Backends before 1.4.2 could return zero; new shares require at least one day.
+                sharePolicy = new Dictionary<string, object>(sharePolicy);
+                sharePolicy["share_expire_days"] = 1;
+            }
+
             bool seatAssigned = GetBool(status, "seat_assigned");
             bool isValid = GetBool(status, "is_valid");
             string seatState = NcJson.GetStringOrEmpty(status, "seat_state");

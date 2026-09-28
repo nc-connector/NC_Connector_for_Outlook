@@ -30,6 +30,8 @@ namespace NcTalkOutlookAddIn
 
             private sealed class AttachmentAutomationSettings
             {
+                internal AddinSettings LocalSettings { get; set; }
+
                 internal bool AlwaysConnector { get; set; }
 
                 internal bool OfferAboveEnabled { get; set; }
@@ -185,55 +187,30 @@ namespace NcTalkOutlookAddIn
             {
                 _owner.EnsureSettingsLoaded();
 
-                var settings = _owner._currentSettings ?? new AddinSettings();
-                int thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(settings.SharingAttachmentsOfferAboveMb);
-                bool alwaysConnector = settings.SharingAttachmentsAlwaysConnector;
-                bool offerAboveEnabled = settings.SharingAttachmentsOfferAboveEnabled && !alwaysConnector;
-                return new AttachmentAutomationSettings
-                {
-                    AlwaysConnector = alwaysConnector,
-                    OfferAboveEnabled = offerAboveEnabled,
-                    ThresholdMb = thresholdMb,
-                    ThresholdBytes = (long)thresholdMb * 1024L * 1024L
-                };
+                AddinSettings settings = (_owner._currentSettings ?? new AddinSettings()).Clone();
+                return BuildAttachmentAutomationSettings(settings, settings);
             }
 
             private static AttachmentAutomationSettings ApplyAttachmentAutomationPolicy(
                 AttachmentAutomationSettings local,
                 BackendPolicyStatus policyStatus)
             {
-                bool alwaysConnector = local != null && local.AlwaysConnector;
-                bool offerAboveEnabled = local != null && local.OfferAboveEnabled;
-                int thresholdMb = local != null
-                    ? local.ThresholdMb
-                    : AddinSettings.DefaultSharingAttachmentsOfferAboveMb;
-                if (policyStatus != null && policyStatus.IsDomainActive("share"))
-                {
-                    bool policyBool;
-                    int policyInt;
+                AddinSettings settings = local != null && local.LocalSettings != null
+                    ? local.LocalSettings : new AddinSettings();
+                return BuildAttachmentAutomationSettings(settings.ResolvePolicyDefaults(policyStatus), settings);
+            }
 
-                    if (policyStatus.IsLocked("share", "attachments_always_via_ncconnector")
-                        && policyStatus.TryGetPolicyBool("share", "attachments_always_via_ncconnector", out policyBool))
-                    {
-                        alwaysConnector = policyBool;
-                    }
-                    if (policyStatus.IsLocked("share", "attachments_min_size_mb"))
-                    {
-                        if (policyStatus.TryGetPolicyInt("share", "attachments_min_size_mb", out policyInt))
-                        {
-                            thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(policyInt);
-                            offerAboveEnabled = true;
-                        }
-                        else if (policyStatus.HasPolicyKey("share", "attachments_min_size_mb"))
-                        {
-                            offerAboveEnabled = false;
-                        }
-                    }
-                }
+            private static AttachmentAutomationSettings BuildAttachmentAutomationSettings(
+                AddinSettings effective,
+                AddinSettings local)
+            {
+                int thresholdMb = OutlookAttachmentAutomationGuardService.NormalizeThresholdMb(effective.SharingAttachmentsOfferAboveMb);
+                bool alwaysConnector = effective.SharingAttachmentsAlwaysConnector;
                 return new AttachmentAutomationSettings
                 {
+                    LocalSettings = local,
                     AlwaysConnector = alwaysConnector,
-                    OfferAboveEnabled = offerAboveEnabled,
+                    OfferAboveEnabled = effective.SharingAttachmentsOfferAboveEnabled && !alwaysConnector,
                     ThresholdMb = thresholdMb,
                     ThresholdBytes = (long)thresholdMb * 1024L * 1024L
                 };

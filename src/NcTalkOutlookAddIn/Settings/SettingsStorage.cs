@@ -636,18 +636,18 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "UpdateChangelogText", Safe(settings.UpdateChangelogText));
             AppendElement(document, root, "UpdateLastNotifiedVersion", Safe(settings.UpdateLastNotifiedVersion));
             AppendElement(document, root, "UpdateLastNotifiedDateUtc", Safe(settings.UpdateLastNotifiedDateUtc));
-            AppendElement(document, root, "FileLinkBasePath", Safe(settings.FileLinkBasePath));
-            AppendElement(document, root, "SharingDefaultShareName", Safe(settings.SharingDefaultShareName));
-            AppendElement(document, root, "SharingDefaultPermCreate", settings.SharingDefaultPermCreate.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingDefaultPermWrite", settings.SharingDefaultPermWrite.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingDefaultPermDelete", settings.SharingDefaultPermDelete.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingDefaultPasswordEnabled", settings.SharingDefaultPasswordEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingDefaultPasswordSeparateEnabled", settings.SharingDefaultPasswordSeparateEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingDefaultPasswordDeliveryMode", SharePasswordDeliveryPolicy.ToStorageValue(settings.SharingDefaultPasswordDeliveryMode));
-            AppendElement(document, root, "SharingDefaultExpireDays", settings.SharingDefaultExpireDays.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingAttachmentsAlwaysConnector", settings.SharingAttachmentsAlwaysConnector.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingAttachmentsOfferAboveEnabled", settings.SharingAttachmentsOfferAboveEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "SharingAttachmentsOfferAboveMb", Math.Max(1, settings.SharingAttachmentsOfferAboveMb).ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "FileLinkBasePath", Safe(settings.FileLinkBasePath));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultShareName", Safe(settings.SharingDefaultShareName));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultPermCreate", settings.SharingDefaultPermCreate.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultPermWrite", settings.SharingDefaultPermWrite.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultPermDelete", settings.SharingDefaultPermDelete.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultPasswordEnabled", settings.SharingDefaultPasswordEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultPasswordSeparateEnabled", settings.SharingDefaultPasswordSeparateEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultPasswordDeliveryMode", SharePasswordDeliveryPolicy.ToStorageValue(settings.SharingDefaultPasswordDeliveryMode));
+            AppendLocalChoiceElement(document, root, settings, "SharingDefaultExpireDays", settings.SharingDefaultExpireDays.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingAttachmentsAlwaysConnector", settings.SharingAttachmentsAlwaysConnector.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingAttachmentsOfferAboveEnabled", settings.SharingAttachmentsOfferAboveEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "SharingAttachmentsOfferAboveMb", Math.Max(1, settings.SharingAttachmentsOfferAboveMb).ToString(CultureInfo.InvariantCulture));
             if (settings.SharingAttachmentLinkTarget.HasValue)
             {
                 AppendElement(
@@ -656,15 +656,15 @@ namespace NcTalkOutlookAddIn.Settings
                     "SharingAttachmentLinkTarget",
                     AttachmentLinkTargetPolicy.ToStorageValue(settings.SharingAttachmentLinkTarget.Value));
             }
-            AppendElement(document, root, "ShareBlockLang", Safe(settings.ShareBlockLang));
-            AppendElement(document, root, "EventDescriptionLang", Safe(settings.EventDescriptionLang));
-            AppendElement(document, root, "TalkDefaultLobbyEnabled", settings.TalkDefaultLobbyEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TalkDefaultSearchVisible", settings.TalkDefaultSearchVisible.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TalkDefaultRoomType", settings.TalkDefaultRoomType.ToString());
-            AppendElement(document, root, "TalkDefaultPasswordEnabled", settings.TalkDefaultPasswordEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TalkDefaultAddUsers", settings.TalkDefaultAddUsers.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TalkDefaultAddGuests", settings.TalkDefaultAddGuests.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TalkDeleteRoomOnEventDelete", settings.TalkDeleteRoomOnEventDelete.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "ShareBlockLang", Safe(settings.ShareBlockLang));
+            AppendLocalChoiceElement(document, root, settings, "EventDescriptionLang", Safe(settings.EventDescriptionLang));
+            AppendLocalChoiceElement(document, root, settings, "TalkDefaultLobbyEnabled", settings.TalkDefaultLobbyEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "TalkDefaultSearchVisible", settings.TalkDefaultSearchVisible.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "TalkDefaultRoomType", settings.TalkDefaultRoomType.ToString());
+            AppendLocalChoiceElement(document, root, settings, "TalkDefaultPasswordEnabled", settings.TalkDefaultPasswordEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "TalkDefaultAddUsers", settings.TalkDefaultAddUsers.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "TalkDefaultAddGuests", settings.TalkDefaultAddGuests.ToString(CultureInfo.InvariantCulture));
+            AppendLocalChoiceElement(document, root, settings, "TalkDeleteRoomOnEventDelete", settings.TalkDeleteRoomOnEventDelete.ToString(CultureInfo.InvariantCulture));
             AppendOptionalBoolElement(document, root, "EmailSignatureOnCompose", settings.EmailSignatureOnCompose);
             AppendOptionalBoolElement(document, root, "EmailSignatureOnReply", settings.EmailSignatureOnReply);
             AppendOptionalBoolElement(document, root, "EmailSignatureOnForward", settings.EmailSignatureOnForward);
@@ -986,6 +986,14 @@ namespace NcTalkOutlookAddIn.Settings
                     break;
                 default:
                     break;
+            }
+        }
+
+        private static void AppendLocalChoiceElement(XmlDocument document, XmlElement root, AddinSettings settings, string name, string value)
+        {
+            if (settings.HasLocalValue(name))
+            {
+                AppendElement(document, root, name, value);
             }
         }
 

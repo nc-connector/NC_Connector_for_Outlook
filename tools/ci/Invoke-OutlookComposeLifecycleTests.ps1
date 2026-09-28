@@ -902,6 +902,9 @@ public static class AttachmentSendGateRegression
     {
         internal bool FetchSucceeded;
     }
+    // The policy-mapping suite executes the real local-choice resolver.
+    // This send-gate harness only carries the snapshot's local-settings reference.
+    private sealed class AddinSettings { }
     private sealed class Owner
     {
         internal bool SettingsComplete = true;
