@@ -3,11 +3,13 @@
 // See LICENSE.txt for details.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
@@ -31,6 +33,8 @@ namespace NcTalkOutlookAddIn.Services
                 StringComparer.OrdinalIgnoreCase);
         private DateTime _generatedUtc = DateTime.MinValue;
         private string _activeScopeFingerprint = string.Empty;
+        private static readonly ConcurrentDictionary<string, byte> FailedRefreshScopes =
+            new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         internal IfbAddressBookCache(string dataDirectory)
             : this(dataDirectory, "default")
@@ -77,8 +81,7 @@ namespace NcTalkOutlookAddIn.Services
             if (configuration == null
                 || !configuration.IsComplete())
             {
-                const string detail =
-                    "Talk credentials are incomplete.";
+                string detail = Strings.ErrorMissingCredentials;
                 DiagnosticsLogger.Log(
                     LogCategories.Ifb,
                     "System address book status check failed: "
@@ -114,15 +117,17 @@ namespace NcTalkOutlookAddIn.Services
                 }
                 catch (Exception ex)
                 {
+                    string error = ex is InvalidDataException
+                        ? Strings.TalkSystemAddressbookInvalidResponse
+                        : Strings.TalkSystemAddressbookFetchFailed;
                     DiagnosticsLogger.LogException(
                         LogCategories.Ifb,
                         "System address book status check failed.",
-                        ex);
+                        new InvalidOperationException(error));
                     return new SystemAddressbookStatus(
                         false,
                         0,
-                        ex.Message
-                        ?? "System address book status check failed.");
+                        error);
                 }
             }
         }
@@ -235,6 +240,11 @@ namespace NcTalkOutlookAddIn.Services
             CacheScope scope)
         {
             int validHours = Math.Max(1, cacheHours);
+            if (FailedRefreshScopes.ContainsKey(BuildCacheFilePath(scope)))
+            {
+                RefreshFromServer(configuration, scope);
+                return;
+            }
             if (string.Equals(
                     _activeScopeFingerprint,
                     scope.Fingerprint,
@@ -291,8 +301,9 @@ namespace NcTalkOutlookAddIn.Services
             {
                 DiagnosticsLogger.LogException(
                     LogCategories.Ifb,
-                    "Failed to load IFB address book cache from disk.",
-                    ex);
+                    "Failed to load IFB address book cache from disk ("
+                    + ex.GetType().Name + ").",
+                    new InvalidDataException("The cached system address book could not be read."));
                 return false;
             }
         }
@@ -301,65 +312,112 @@ namespace NcTalkOutlookAddIn.Services
             TalkServiceConfiguration configuration,
             CacheScope scope)
         {
-            string currentUserId =
-                NextcloudUserIdentityService.ResolveCurrentUserId(
-                    configuration);
-            string addressBookUrl = string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}/remote.php/dav/addressbooks/users/{1}/z-server-generated--system?export",
-                scope.ServerBaseUrl,
-                Uri.EscapeDataString(currentUserId));
-
-            var httpClient = new NcHttpClient(configuration);
-            NcHttpResponse response = httpClient.Send(
-                new NcHttpRequestOptions
-                {
-                    Method = "GET",
-                    Url = addressBookUrl,
-                    Accept =
-                        "text/vcard,text/x-vcard,text/plain,*/*",
-                    TimeoutMs = 60000,
-                    IncludeAuthHeader = true,
-                    IncludeOcsApiHeader = false,
-                    ParseJson = false
-                });
-            if (!response.HasHttpResponse)
+            // A failed refresh must not become a fresh cache hit on the next lookup.
+            string cachePath = BuildCacheFilePath(scope);
+            FailedRefreshScopes[cachePath] = 0;
+            using (DiagnosticsLogger.BeginOperation(
+                LogCategories.Ifb,
+                "Refresh system address book"))
             {
-                if (response.TransportException != null)
+                try
                 {
-                    throw new InvalidOperationException(
-                        "Address book could not be loaded: "
-                        + response.TransportException.Message,
-                        response.TransportException);
+                    string currentUserId =
+                        NextcloudUserIdentityService.ResolveCurrentUserId(
+                            configuration);
+                    string addressBookUrl = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}/remote.php/dav/addressbooks/users/{1}/z-server-generated--system?export",
+                        scope.ServerBaseUrl,
+                        Uri.EscapeDataString(currentUserId));
+
+                    var httpClient = new NcHttpClient(configuration);
+                    NcHttpResponse response = httpClient.Send(
+                        new NcHttpRequestOptions
+                        {
+                            Method = "GET",
+                            Url = addressBookUrl,
+                            Accept =
+                                "text/vcard,text/x-vcard,text/plain,*/*",
+                            TimeoutMs = 60000,
+                            IncludeAuthHeader = true,
+                            IncludeOcsApiHeader = false,
+                            ParseJson = false
+                        });
+                    if (response == null || !response.HasHttpResponse)
+                    {
+                        DiagnosticsLogger.Log(
+                            LogCategories.Ifb,
+                            "System address book fetch failed without an HTTP response.");
+                        throw new InvalidOperationException(
+                            Strings.TalkSystemAddressbookFetchFailed);
+                    }
+                    int statusCode = (int)response.StatusCode;
+                    if ((statusCode < 200 || statusCode >= 300)
+                        && statusCode != 404)
+                    {
+                        DiagnosticsLogger.Log(
+                            LogCategories.Ifb,
+                            "System address book fetch failed: HTTP "
+                            + statusCode.ToString(
+                                CultureInfo.InvariantCulture)
+                            + ".");
+                        throw new InvalidOperationException(
+                            Strings.TalkSystemAddressbookFetchFailed);
+                    }
+                    string responseText =
+                        response.ResponseText ?? string.Empty;
+                    string contentType = (response.ContentType ?? string.Empty)
+                        .Split(';')[0].Trim().ToLowerInvariant();
+                    bool isVcardContentType = contentType == "text/vcard"
+                        || contentType == "text/x-vcard"
+                        || contentType == "text/directory";
+                    if (string.IsNullOrWhiteSpace(responseText)
+                        && (statusCode == 404 || !isVcardContentType))
+                    {
+                        throw new InvalidDataException(
+                            Strings.TalkSystemAddressbookInvalidResponse);
+                    }
+
+                    List<CacheEntry> entries =
+                        ParseAddressBook(responseText);
+                    if (statusCode == 404 && entries.Count == 0)
+                    {
+                        throw new InvalidDataException(
+                            Strings.TalkSystemAddressbookInvalidResponse);
+                    }
+                    if (statusCode == 404)
+                    {
+                        DiagnosticsLogger.Log(
+                            LogCategories.Ifb,
+                            "System address book accepted a valid non-empty HTTP 404 export.");
+                    }
+                    DateTime generatedUtc = DateTime.UtcNow;
+                    ApplyEntries(
+                        entries,
+                        generatedUtc,
+                        scope.Fingerprint);
+                    SaveToDisk(scope, generatedUtc);
+                    byte ignored;
+                    FailedRefreshScopes.TryRemove(cachePath, out ignored);
+                    DiagnosticsLogger.Log(
+                        LogCategories.Ifb,
+                        "System address book refreshed (users="
+                        + _uidToEmail.Count.ToString(CultureInfo.InvariantCulture)
+                        + ").");
                 }
-                throw new InvalidOperationException(
-                    "Address book could not be loaded: no HTTP response.");
+                catch (Exception ex)
+                {
+                    // Upstream exceptions may include response bodies; expose only the failure category.
+                    Exception failure = ex is InvalidDataException
+                        ? (Exception)new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse)
+                        : new InvalidOperationException(Strings.TalkSystemAddressbookFetchFailed);
+                    DiagnosticsLogger.LogException(
+                        LogCategories.Ifb,
+                        "System address book refresh failed (" + ex.GetType().Name + ").",
+                        failure);
+                    throw failure;
+                }
             }
-            if ((int)response.StatusCode < 200
-                || (int)response.StatusCode >= 300)
-            {
-                throw new InvalidOperationException(
-                    "Address book could not be loaded: HTTP "
-                    + ((int)response.StatusCode).ToString(
-                        CultureInfo.InvariantCulture)
-                    + ".");
-            }
-            string responseText =
-                response.ResponseText ?? string.Empty;
-            if (responseText.Length == 0)
-            {
-                throw new InvalidOperationException(
-                    "Address book response was empty.");
-            }
-
-            List<CacheEntry> entries =
-                ParseAddressBook(responseText);
-            DateTime generatedUtc = DateTime.UtcNow;
-            ApplyEntries(
-                entries,
-                generatedUtc,
-                scope.Fingerprint);
-            SaveToDisk(scope, generatedUtc);
         }
 
         private void ApplyEntries(
@@ -374,19 +432,19 @@ namespace NcTalkOutlookAddIn.Services
             foreach (CacheEntry entry in entries)
             {
                 if (entry == null
-                    || string.IsNullOrWhiteSpace(entry.Email)
                     || string.IsNullOrWhiteSpace(entry.Uid))
                 {
                     continue;
                 }
                 string email =
-                    entry.Email.Trim().ToLowerInvariant();
+                    (entry.Email ?? string.Empty).Trim().ToLowerInvariant();
                 string uid = entry.Uid.Trim();
-                if (!emailMap.ContainsKey(email))
+                if (email.Length > 0 && !emailMap.ContainsKey(email))
                 {
                     emailMap[email] = uid;
                 }
-                if (!uidMap.ContainsKey(uid))
+                if (!uidMap.ContainsKey(uid)
+                    || string.IsNullOrEmpty(uidMap[uid]))
                 {
                     uidMap[uid] = email;
                 }
@@ -417,6 +475,17 @@ namespace NcTalkOutlookAddIn.Services
                         Email = pair.Key,
                         Uid = pair.Value
                     });
+            }
+            foreach (KeyValuePair<string, string> pair in _uidToEmail)
+            {
+                if (string.IsNullOrEmpty(pair.Value))
+                {
+                    data.Entries.Add(new CacheEntry
+                    {
+                        Email = string.Empty,
+                        Uid = pair.Key
+                    });
+                }
             }
 
             try
@@ -498,11 +567,10 @@ namespace NcTalkOutlookAddIn.Services
             string data)
         {
             var result = new List<CacheEntry>();
-            string normalized = (data ?? string.Empty)
-                .Replace("\r\n ", string.Empty)
-                .Replace("\n ", string.Empty)
-                .Replace("\r\n\t", string.Empty)
-                .Replace("\n\t", string.Empty);
+            string normalized = Regex.Replace(
+                (data ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n"),
+                "\n[ \t]",
+                string.Empty);
             using (var reader = new StringReader(normalized))
             {
                 string line;
@@ -511,20 +579,36 @@ namespace NcTalkOutlookAddIn.Services
                 bool inside = false;
                 while ((line = reader.ReadLine()) != null)
                 {
-                    if (line.StartsWith(
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        continue;
+                    }
+                    line = line.TrimEnd();
+                    if (line.Equals(
                             "BEGIN:VCARD",
                             StringComparison.OrdinalIgnoreCase))
                     {
+                        if (inside)
+                        {
+                            throw new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse);
+                        }
                         inside = true;
                         uid = null;
                         emails.Clear();
                     }
-                    else if (line.StartsWith(
+                    else if (line.Equals(
                                  "END:VCARD",
                                  StringComparison.OrdinalIgnoreCase))
                     {
-                        if (inside
-                            && !string.IsNullOrWhiteSpace(uid))
+                        if (!inside || string.IsNullOrWhiteSpace(uid))
+                        {
+                            throw new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse);
+                        }
+                        if (emails.Count == 0)
+                        {
+                            result.Add(new CacheEntry { Email = string.Empty, Uid = uid });
+                        }
+                        else
                         {
                             foreach (string email in emails)
                             {
@@ -538,26 +622,36 @@ namespace NcTalkOutlookAddIn.Services
                         }
                         inside = false;
                     }
-                    else if (inside
-                             && line.StartsWith(
-                                 "UID",
-                                 StringComparison.OrdinalIgnoreCase))
+                    else
                     {
-                        uid = ReadVCardValue(line, 3);
-                    }
-                    else if (inside
-                             && line.StartsWith(
-                                 "EMAIL",
-                                 StringComparison.OrdinalIgnoreCase))
-                    {
-                        string email =
-                            ReadVCardValue(line, 5)
-                                .ToLowerInvariant();
-                        if (email.Length > 0)
+                        if (!inside)
                         {
-                            emails.Add(email);
+                            throw new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse);
+                        }
+                        string propertyName;
+                        string value = ReadVCardValue(line, out propertyName);
+                        if (propertyName == "BEGIN" || propertyName == "END")
+                        {
+                            throw new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse);
+                        }
+                        if (propertyName == "UID")
+                        {
+                            if (uid != null || string.IsNullOrWhiteSpace(value)
+                                || Regex.IsMatch(value, @"[\x00-\x1f\x7f]"))
+                            {
+                                throw new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse);
+                            }
+                            uid = value;
+                        }
+                        else if (propertyName == "EMAIL" && value.Length > 0)
+                        {
+                            emails.Add(value.ToLowerInvariant());
                         }
                     }
+                }
+                if (inside)
+                {
+                    throw new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse);
                 }
             }
             return result;
@@ -565,12 +659,20 @@ namespace NcTalkOutlookAddIn.Services
 
         private static string ReadVCardValue(
             string line,
-            int searchStart)
+            out string propertyName)
         {
-            int colon = line.IndexOf(':', searchStart);
-            return colon >= 0 && colon + 1 < line.Length
-                ? line.Substring(colon + 1).Trim()
-                : string.Empty;
+            Match header = Regex.Match(line,
+                @"^(?:[A-Za-z0-9-]+\.)?([A-Za-z0-9-]+)(?:;[A-Za-z0-9-]+=(?:""[^""\r\n]*""|[^;:""\r\n]+)(?:,(?:""[^""\r\n]*""|[^;:""\r\n]+))*)*:");
+            if (!header.Success)
+            {
+                throw new InvalidDataException(Strings.TalkSystemAddressbookInvalidResponse);
+            }
+            propertyName = header.Groups[1].Value.ToUpperInvariant();
+            string value = line.Substring(header.Length).Trim();
+            return Regex.Replace(value, @"\\([\\,;nN])", match =>
+                match.Groups[1].Value.Equals("n", StringComparison.OrdinalIgnoreCase)
+                    ? "\n"
+                    : match.Groups[1].Value);
         }
 
         private sealed class CacheScope

@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Esta función requiere una libreta de direcciones activa del sistema Nextcloud."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud devolvió una libreta de direcciones del sistema no válida. Inténtelo de nuevo o póngase en contacto con su administrador."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "No se pudo cargar la libreta de direcciones del sistema Nextcloud. Compruebe su conexión y sus credenciales e inténtelo de nuevo."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Guía de configuración"
   },

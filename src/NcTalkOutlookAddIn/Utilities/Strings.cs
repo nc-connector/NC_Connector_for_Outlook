@@ -573,6 +573,8 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string TalkModeratorNoMatches { get { return Get("ui_delegate_status_none_with_email", "No matches."); } }
         internal static string TalkSystemAddressbookRequiredShort { get { return Get("talk_system_addressbook_required_short", "Requires an active Nextcloud system address book."); } }
         internal static string TalkSystemAddressbookRequiredMessage { get { return Get("talk_system_addressbook_required_message", "This feature requires an active Nextcloud system address book."); } }
+        internal static string TalkSystemAddressbookInvalidResponse { get { return Get("talk_system_addressbook_invalid_response", "Nextcloud returned an invalid system address book. Please try again or contact your administrator."); } }
+        internal static string TalkSystemAddressbookFetchFailed { get { return Get("talk_system_addressbook_fetch_failed", "The Nextcloud system address book could not be loaded. Check your connection and credentials, then try again."); } }
         internal static string TalkSystemAddressbookAdminLinkLabel { get { return Get("talk_system_addressbook_admin_link_label", "Setup guide"); } }
         internal static string TalkSystemAddressbookAdminGuideUrl
         {

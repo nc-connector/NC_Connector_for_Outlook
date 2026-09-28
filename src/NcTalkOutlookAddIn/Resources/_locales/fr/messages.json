@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Cette fonctionnalité nécessite un carnet d'adresses système Nextcloud actif."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud a renvoyé un carnet d'adresses système non valide. Réessayez ou contactez votre administrateur."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Le carnet d'adresses système Nextcloud n'a pas pu être chargé. Vérifiez votre connexion et vos identifiants, puis réessayez."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Guide de configuration"
   },

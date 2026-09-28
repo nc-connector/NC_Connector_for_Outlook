@@ -437,7 +437,9 @@ Danach das erzeugte Adressbuch für einen Testbenutzer prüfen:
 https://<cloud>/remote.php/dav/addressbooks/users/<user>/z-server-generated--system?export
 ```
 
-Erwartetes Ergebnis: Benutzersuche und Moderatorfelder werden nach einer erneuten Outlook-Verbindung verfügbar. Ist der Endpunkt nicht erreichbar, bleiben diese Felder deaktiviert und zeigen einen Einrichtungshinweis.
+Erwartetes Ergebnis: Benutzersuche und Moderatorfelder werden nach einer erneuten Outlook-Verbindung verfügbar. Ein vollständiger, gültiger Adressbuchexport funktioniert auch dann, wenn ein Reverse-Proxy fälschlich HTTP 404 oder einen falschen Inhaltstyp zurückgibt. Bei anderen HTTP-Fehlern wie 401 oder 403 muss der Zugriff auf den Endpunkt weiterhin korrigiert werden. Eine leere HTTP-404-Antwort ist kein Adressbuch.
+
+Schlägt ein Abruf fehl oder ist die Antwort beschädigt, zeigt Outlook einen Adressbuchfehler an. Die betroffenen Felder bleiben bis zu einem erfolgreichen erneuten Abruf nicht verfügbar. Vorherige Kontakte bleiben im Cache erhalten, werden aber nicht als erfolgreicher neuer Abruf ausgegeben. Die Teilnehmerzuordnung stoppt, statt nicht aufgelöste interne Benutzer als Gäste einzuladen. Benutzer mit gültiger Nextcloud-UID ohne E-Mail-Adresse bleiben in Benutzersuche und Moderatorauswahl verfügbar; die Zuordnung eines E-Mail-Empfängers benötigt weiterhin eine E-Mail-Adresse.
 
 Offizielle Nextcloud-Referenzen:
 
@@ -638,7 +640,7 @@ http://127.0.0.1:7777/nc-ifb/
 
 Die MSI reserviert den Standard-URL-Namespace für authentifizierte Windows-Benutzer. NC Connector ergänzt die Outlook-Free/Busy-URL um ein zufälliges Pfadsegment; Anfragen ohne dieses Segment erhalten `404`. Der geheime Pfad wird intern verwaltet und in dieser Anleitung bewusst nicht angezeigt.
 
-Beim Aktivieren von IFB werden nur benutzerspezifische Outlook-Free/Busy-Werte aktualisiert. Vorhandene Werte und Typen werden getrennt erfasst. Beim Deaktivieren stellt NC Connector einen Wert nur wieder her, solange er noch den von NC Connector geschriebenen Inhalt hat; spätere Änderungen durch Administratoren oder andere Anwendungen bleiben unangetastet. Werte unter `Software\Policies` werden nur auf Konflikte geprüft und nie geschrieben. Der Adressbuch-Cache ist nach Outlook-Profil, vollständiger Nextcloud-Basis-URL einschließlich Unterpfad und kanonischer Nextcloud-Benutzer-ID getrennt.
+Beim Aktivieren von IFB werden nur benutzerspezifische Outlook-Free/Busy-Werte aktualisiert. Vorhandene Werte und Typen werden getrennt erfasst. Beim Deaktivieren stellt NC Connector einen Wert nur wieder her, solange er noch den von NC Connector geschriebenen Inhalt hat; spätere Änderungen durch Administratoren oder andere Anwendungen bleiben unangetastet. Werte unter `Software\Policies` werden nur auf Konflikte geprüft und nie geschrieben. Der Adressbuch-Cache ist nach Outlook-Profil, vollständiger Nextcloud-Basis-URL einschließlich Unterpfad und konfiguriertem Login getrennt. Der Adressbuchabruf selbst verwendet die kanonische Nextcloud-Benutzer-ID.
 
 Der Listener läuft nur, solange Outlook läuft, IFB aktiviert ist und die gespeicherten Nextcloud-Zugangsdaten vollständig sind.
 

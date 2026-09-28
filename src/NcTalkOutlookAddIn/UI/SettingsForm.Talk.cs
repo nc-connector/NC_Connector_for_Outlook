@@ -208,6 +208,7 @@ namespace NcTalkOutlookAddIn.UI
                 && status != null
                 && !string.IsNullOrWhiteSpace(status.Error))
             {
+                detail = status.Error;
                 DiagnosticsLogger.Log(
                     LogCategories.Talk,
                     "System address book unavailable in settings (trigger=" + (trigger ?? "n/a") + ", error=" + status.Error + ").");

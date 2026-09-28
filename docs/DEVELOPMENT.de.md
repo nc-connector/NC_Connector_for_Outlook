@@ -417,6 +417,14 @@ IFB (DAV über lokalen Proxy):
 - Anfragen ohne Request-Secret erhalten `404`
 - Der Proxy greift auf CalDAV- und Adressbuch-Endpunkte unter `remote.php/dav/...` zu.
 
+Antwortvertrag des Systemadressbuchs:
+
+- `Services/IfbAddressBookCache.cs` prüft den vollständigen CardDAV-Export, bevor Kontaktzuordnungen oder der letzte Erfolgszeitpunkt ersetzt werden. Der Cache bleibt an Outlook-Profil, Nextcloud-Basis-URL und konfigurierten Login gebunden; der Anfragepfad verwendet die aufgelöste kanonische UID.
+- Nur erfolgreiche HTTP-Antworten und HTTP 404 gelangen in die vCard-Prüfung. Ein vollständiger, nicht leerer Export mit nutzbaren Benutzer-UIDs wird unabhängig vom Inhaltstyp akzeptiert, auch bei HTTP 404. Andere HTTP-Fehler bleiben auch mit scheinbar gültigem Export Fehler; der gemeinsame HTTP-Client bleibt unverändert.
+- Leere Exporte benötigen sowohl einen erfolgreichen HTTP-Status als auch einen vCard-Inhaltstyp. HTML/JSON, abgeschnittene oder gemischte Exporte, verschachtelte Karten sowie überzählige oder falsch benannte Komponentengrenzen ablehnen. Legale Zeilenfaltung und Kontakte mit UID ohne E-Mail für Benutzersuche und Moderatoren erhalten.
+- Ein fehlgeschlagener Abruf erhält den letzten gültigen Cache, markiert den aktuellen Kontokontext jedoch für einen erneuten Versuch. Nachfolgende Zugriffe dürfen den Fehler nicht mit diesem alten Cache verdecken. Die Talk-Teilnehmerzuordnung muss sämtliche Empfänger vor Änderungen auflösen und darf bei Adressbuchfehlern nicht auf Gasteinladungen ausweichen.
+- Keine Antwortinhalte oder Kontaktdaten protokollieren. `Invoke-OutlookTalkIfbLifecycleTests.ps1` prüft Antwortvalidierung, kontogebundene Cache-Wiederherstellung und Teilnehmerzuordnung über die produktiven Pfade.
+
 Updateprüfung:
 
 - Homepage-Endpunkt: `GET https://nc-connector.de/wp-json/ncc/v1/update-check`

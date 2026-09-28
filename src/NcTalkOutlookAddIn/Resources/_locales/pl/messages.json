@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Ta funkcja wymaga aktywnej książki adresowej systemu Nextcloud."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud zwrócił nieprawidłową systemową książkę adresową. Spróbuj ponownie lub skontaktuj się z administratorem."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Nie udało się wczytać książki adresowej systemu Nextcloud. Sprawdź połączenie i dane logowania, a następnie spróbuj ponownie."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Przewodnik konfiguracji"
   },

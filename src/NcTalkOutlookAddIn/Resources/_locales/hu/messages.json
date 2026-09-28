@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Ehhez a funkcióhoz aktív Nextcloud rendszercímjegyzék szükséges."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "A Nextcloud érvénytelen rendszercímjegyzéket adott vissza. Próbálja újra, vagy forduljon a rendszergazdához."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "A Nextcloud rendszercímjegyzékét nem sikerült betölteni. Ellenőrizze a kapcsolatot és a bejelentkezési adatokat, majd próbálja újra."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Beállítási útmutató"
   },

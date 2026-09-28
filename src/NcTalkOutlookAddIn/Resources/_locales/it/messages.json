@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Questa funzionalità richiede una rubrica attiva del sistema Nextcloud."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud ha restituito una rubrica di sistema non valida. Riprova o contatta l'amministratore."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Impossibile caricare la rubrica del sistema Nextcloud. Verifica la connessione e le credenziali, quindi riprova."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Guida all'installazione"
   },

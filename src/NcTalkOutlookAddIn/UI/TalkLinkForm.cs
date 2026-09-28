@@ -719,7 +719,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _moderatorAddressbookWarningPanel.Visible = lockActive;
             _moderatorAddressbookWarningTextLabel.Text = lockActive
-                ? Strings.TalkSystemAddressbookRequiredMessage
+                ? lockDetail
                 : string.Empty;
 
             _disabledTooltipHints.Apply(

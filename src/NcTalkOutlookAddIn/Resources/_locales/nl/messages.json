@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Voor deze functie is een actief Nextcloud-systeemadresboek vereist."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud heeft een ongeldig systeemadresboek teruggestuurd. Probeer het opnieuw of neem contact op met uw beheerder."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Het Nextcloud-systeemadresboek kon niet worden geladen. Controleer uw verbinding en aanmeldgegevens en probeer het opnieuw."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Installatiehandleiding"
   },

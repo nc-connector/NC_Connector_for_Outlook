@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "この機能には、アクティブな Nextcloud システム アドレス帳が必要です。"
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud から無効なシステムアドレス帳が返されました。もう一度お試しいただくか、管理者にお問い合わせください。"
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Nextcloud システムアドレス帳を読み込めませんでした。接続と認証情報を確認してから、もう一度お試しください。"
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "セットアップガイド"
   },

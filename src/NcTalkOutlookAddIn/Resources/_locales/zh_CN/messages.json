@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "此功能需要活动的 Nextcloud 系统地址簿。"
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud 返回了无效的系统地址簿。请重试或联系您的管理员。"
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "无法加载 Nextcloud 系统地址簿。请检查连接和登录凭据，然后重试。"
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "设置指南"
   },

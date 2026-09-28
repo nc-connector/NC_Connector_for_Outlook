@@ -412,10 +412,11 @@ New-Item -ItemType Directory -Force -Path $TempRoot | Out-Null
 
 try {
     $testSource = Join-Path $TempRoot "TalkIfbLifecycleTests.cs"
-    @'
+    $testCode = @'
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -425,16 +426,33 @@ using System.Web.Script.Serialization;
 using Microsoft.Win32;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
+using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
     internal static class DiagnosticsLogger
     {
-        internal static void Log(string category, string message) { }
+        internal static readonly List<string> Messages = new List<string>();
+        internal static void Log(string category, string message) { Messages.Add(message); }
         internal static void LogException(
             string category,
             string message,
-            Exception ex) { }
+            Exception ex) { Messages.Add(message + " " + ex.Message); }
+        internal static IDisposable BeginOperation(string category, string operation)
+        {
+            return new Scope();
+        }
+        private sealed class Scope : IDisposable
+        {
+            public void Dispose() { }
+        }
+    }
+
+    internal static class Strings
+    {
+        internal const string ErrorMissingCredentials = "Missing credentials";
+        internal const string TalkSystemAddressbookInvalidResponse = "Invalid address book";
+        internal const string TalkSystemAddressbookFetchFailed = "Address book fetch failed";
     }
 }
 
@@ -451,6 +469,39 @@ namespace NcTalkOutlookAddIn.Settings
 
 namespace NcTalkOutlookAddIn.Services
 {
+    internal sealed class NcHttpRequestOptions
+    {
+        internal string Method, Url, Accept;
+        internal int TimeoutMs;
+        internal bool IncludeAuthHeader, IncludeOcsApiHeader, ParseJson;
+    }
+
+    internal sealed class NcHttpResponse
+    {
+        internal bool HasHttpResponse;
+        internal HttpStatusCode StatusCode;
+        internal string ContentType, ResponseText;
+        internal Exception TransportException;
+    }
+
+    internal sealed class NcHttpClient
+    {
+        internal static NcHttpResponse NextResponse;
+        internal static NcHttpRequestOptions LastOptions;
+        internal static int SendCount;
+        internal static string LastLogin;
+        internal NcHttpClient(TalkServiceConfiguration configuration)
+        {
+            LastLogin = configuration.Username;
+        }
+        internal NcHttpResponse Send(NcHttpRequestOptions options)
+        {
+            LastOptions = options;
+            SendCount++;
+            return NextResponse;
+        }
+    }
+
     internal static class NextcloudUserIdentityService
     {
         internal static string CanonicalUserId = "alice";
@@ -465,12 +516,24 @@ namespace NcTalkOutlookAddIn.Services
 
     internal sealed class TalkService
     {
+        internal readonly List<string> Users = new List<string>();
+        internal readonly List<string> Guests = new List<string>();
         internal TalkService(
             TalkServiceConfiguration configuration) { }
 
         internal void DeleteRoom(
             string roomToken,
             bool isEventConversation) { }
+        internal void AddUserParticipant(string roomToken, string uid) { Users.Add(uid); }
+        internal void AddGuestParticipant(string roomToken, string email) { Guests.Add(email); }
+    }
+}
+
+internal static class NextcloudTalkAddIn
+{
+    internal static void LogTalkMessage(string message)
+    {
+        DiagnosticsLogger.Log("TALK", message);
     }
 }
 
@@ -506,6 +569,10 @@ internal static class TalkIfbLifecycleTests
         TestProtectedStateStoreCompatibility();
         TestLegacyIfbRegistryMigration();
         TestDurableReplacement();
+        TestSystemAddressbookResponses();
+        TestSystemAddressbookCacheRecovery();
+        TestSystemAddressbookScope();
+        TestSystemAddressbookParticipants();
 
         if (failures > 0)
         {
@@ -514,6 +581,271 @@ internal static class TalkIfbLifecycleTests
         Console.WriteLine("All Talk/IFB lifecycle tests passed.");
         return 0;
     }
+
+    private const string AddressbookExport =
+        "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:alice\r\nEMAIL:alice@example.test\r\nEND:VCARD\r\n"
+        + "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:bob\r\nEMAIL;TYPE=WORK:bob@example.test\r\n"
+        + "item1.EMAIL;TYPE=\"HOME\":bob.other@example.test\r\nEND:VCARD\r\n"
+        + "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:moderator-only\r\nFN:Moderator\r\nEND:VCARD\r\n";
+
+    private static NcHttpResponse AddressbookResponse(int status, string content, string contentType)
+    {
+        return new NcHttpResponse
+        {
+            HasHttpResponse = true,
+            StatusCode = (HttpStatusCode)status,
+            ResponseText = content,
+            ContentType = contentType
+        };
+    }
+
+    private static void TestSystemAddressbookResponses()
+    {
+        string root = NewTestRoot("addressbook-response");
+        try
+        {
+            var cache = new IfbAddressBookCache(root, "responses");
+            var configuration = NewConfiguration();
+            string[] mediaTypes = { "text/vcard", "text/x-vcard; charset=utf-8", "TEXT/DIRECTORY", "text/html", "application/json", null };
+            string[] invalid =
+            {
+                "<html>private-response-marker</html>",
+                "{\"error\":\"private-response-marker\"}",
+                "BEGIN:VCARD\r\nUID:alice\r\n",
+                "BEGIN:VCARD\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID-FAKE:alice\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID:\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID:alice\r\nUID:bob\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID:alice\\nbob\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID:alice\r\nBEGIN:VCARD\r\nUID:bob\r\nEND:VCARD\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID:alice\r\nBEGIN:VEVENT\r\nEND:VEVENT\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID:alice\r\nEND:VEVENT\r\n",
+                "BEGIN:VCARD\r\nUID:alice\r\nEND:VCARD:extra\r\n",
+                "BEGIN:VCARD:extra\r\nUID:alice\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID:alice\r\nproperty-without-colon\r\nEND:VCARD\r\n",
+                "BEGIN:VCARD\r\nUID;VALUE=\"unterminated:alice\r\nEND:VCARD\r\n",
+                AddressbookExport + "END:VCARD\r\n",
+                AddressbookExport + "BEGIN:VCARD\r\nUID:unfinished\r\n",
+                AddressbookExport + "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
+                AddressbookExport + "<html>private-response-marker</html>",
+                "{\"error\":true}\r\n" + AddressbookExport
+            };
+            int cases = 0;
+            foreach (int status in new[] { 200, 404 })
+            {
+                foreach (string mediaType in mediaTypes)
+                {
+                    NcHttpClient.NextResponse = AddressbookResponse(status, AddressbookExport, mediaType);
+                    var result = cache.GetSystemAddressbookStatus(configuration, 24, true);
+                    Check("Valid export HTTP " + status + " / " + (mediaType ?? "missing"), result.Available && result.Count == 3);
+                    cases++;
+                    foreach (string content in invalid)
+                    {
+                        NcHttpClient.NextResponse = AddressbookResponse(status, content, mediaType);
+                        result = cache.GetSystemAddressbookStatus(configuration, 24, true);
+                        Check("Invalid export case " + cases, !result.Available && result.Count == 0
+                            && result.Error == Strings.TalkSystemAddressbookInvalidResponse);
+                        cases++;
+                    }
+                    foreach (string empty in new[] { "", " \r\n\t\n", null })
+                    {
+                        NcHttpClient.NextResponse = AddressbookResponse(status, empty, mediaType);
+                        result = cache.GetSystemAddressbookStatus(configuration, 24, true);
+                        bool expected = status == 200 && mediaType != null
+                            && mediaType != "text/html" && mediaType != "application/json";
+                        Check("Empty export case " + cases, result.Available == expected && result.Count == 0);
+                        cases++;
+                    }
+                }
+            }
+            foreach (int status in new[] { 301, 400, 401, 403, 500, 503 })
+            {
+                NcHttpClient.NextResponse = AddressbookResponse(status, AddressbookExport, "text/vcard");
+                var result = cache.GetSystemAddressbookStatus(configuration, 24, true);
+                Check("Non-404 error rejects valid export HTTP " + status,
+                    !result.Available && result.Error == Strings.TalkSystemAddressbookFetchFailed);
+            }
+            NcHttpClient.NextResponse = AddressbookResponse(404,
+                "begin:vcard\r\nVERSION:3.0\r\nUID;VALUE=text:canonical\\,id\r\n"
+                + "item1.EMAIL;TYPE=\"work:primary\";PREF=1:folded@exa\r\n mple.test\r\n"
+                + "NOTE:folded content\r\n\tEND:VCARD is text\r\nend:vcard\r\n", "text/html");
+            var users = cache.GetUsers(configuration, 24, true);
+            string uid;
+            Check("Folded and grouped properties retain canonical escaped UID",
+                users.Count == 1 && users[0].UserId == "canonical,id"
+                && cache.TryGetUid(configuration, 24, "folded@example.test", out uid) && uid == "canonical,id");
+            Check("Response contents never enter address book diagnostics",
+                !string.Join("\n", DiagnosticsLogger.Messages.ToArray()).Contains("private-response-marker"));
+            Check("Response matrix executes full cache fetch path", cases == 288);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    private static object CacheField(IfbAddressBookCache cache, string name)
+    {
+        return typeof(IfbAddressBookCache).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(cache);
+    }
+
+    private static void TestSystemAddressbookCacheRecovery()
+    {
+        string root = NewTestRoot("addressbook-cache");
+        try
+        {
+            var configuration = NewConfiguration();
+            var cache = new IfbAddressBookCache(root, "cache");
+            NcHttpClient.NextResponse = AddressbookResponse(404, AddressbookExport, null);
+            var users = cache.GetUsers(configuration, 24, true);
+            string cachePath = Directory.GetFiles(root, "ifb-addressbook-cache-*.json")[0];
+            string saved = File.ReadAllText(cachePath);
+            object savedTime = CacheField(cache, "_generatedUtc");
+            object savedEmails = CacheField(cache, "_emailToUid");
+            int sends = NcHttpClient.SendCount;
+            var reloaded = new IfbAddressBookCache(root, "cache").GetUsers(configuration, 24, false);
+            Check("UID-only moderator survives disk cache reload", users.Count == 3 && reloaded.Count == 3
+                && reloaded[2].UserId == "moderator-only" && reloaded[2].Email == ""
+                && NcHttpClient.SendCount == sends);
+            string uid;
+            Check("Every email for a contact resolves to its UID",
+                cache.TryGetUid(configuration, 24, "BOB.OTHER@example.test", out uid) && uid == "bob");
+            foreach (NcHttpResponse response in new[]
+            {
+                AddressbookResponse(404, "", "text/vcard"),
+                AddressbookResponse(200, "private-response-marker", "text/vcard"),
+                AddressbookResponse(401, AddressbookExport, "text/vcard"),
+                AddressbookResponse(403, AddressbookExport, "text/vcard"),
+                AddressbookResponse(503, AddressbookExport, "text/vcard"),
+                new NcHttpResponse { TransportException = new IOException("private-response-marker") },
+                null
+            })
+            {
+                NcHttpClient.NextResponse = response;
+                var failed = cache.GetSystemAddressbookStatus(configuration, 24, true);
+                Check("Failed refresh preserves contacts, timestamp and disk cache",
+                    !failed.Available && failed.Count == 0
+                    && object.ReferenceEquals(savedEmails, CacheField(cache, "_emailToUid"))
+                    && savedTime.Equals(CacheField(cache, "_generatedUtc"))
+                    && File.ReadAllText(cachePath) == saved);
+                sends = NcHttpClient.SendCount;
+                failed = cache.GetSystemAddressbookStatus(configuration, 24, false);
+                Check("Failed refresh bypasses still-fresh memory and disk on retry",
+                    !failed.Available && NcHttpClient.SendCount == sends + 1);
+                bool rejected = false;
+                try { cache.TryGetUid(configuration, 24, "bob@example.test", out uid); }
+                catch (InvalidOperationException) { rejected = true; }
+                catch (InvalidDataException) { rejected = true; }
+                Check("Identity lookup throws instead of reporting a failed fetch as a miss", rejected);
+                sends = NcHttpClient.SendCount;
+                failed = new IfbAddressBookCache(root, "cache").GetSystemAddressbookStatus(configuration, 24, false);
+                Check("Another consumer cannot reuse disk after the current scope failed",
+                    !failed.Available && NcHttpClient.SendCount == sends + 1);
+            }
+            NcHttpClient.NextResponse = AddressbookResponse(404, AddressbookExport.Replace("bob", "recovered"), "application/json");
+            Check("A valid 404 retry restores availability",
+                cache.GetSystemAddressbookStatus(configuration, 24, false).Available
+                && cache.TryGetUid(configuration, 24, "recovered@example.test", out uid) && uid == "recovered");
+            sends = NcHttpClient.SendCount;
+            cache.GetUsers(configuration, 24, false);
+            Check("Successful recovery re-enables cache hits", NcHttpClient.SendCount == sends);
+            NcHttpClient.NextResponse = AddressbookResponse(200, "", "text/directory");
+            var empty = cache.GetSystemAddressbookStatus(configuration, 24, true);
+            Check("Confirmed empty export replaces old contacts and persists empty success",
+                empty.Available && empty.Count == 0
+                && new IfbAddressBookCache(root, "cache").GetUsers(configuration, 24, false).Count == 0);
+            Check("Transport response contents never reach error logs",
+                !string.Join("\n", DiagnosticsLogger.Messages.ToArray()).Contains("private-response-marker"));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    private static void TestSystemAddressbookScope()
+    {
+        string root = NewTestRoot("addressbook-scope");
+        try
+        {
+            var configuration = NewConfiguration();
+            var cache = new IfbAddressBookCache(root, "scope");
+            NcHttpClient.NextResponse = AddressbookResponse(200, AddressbookExport, "text/vcard");
+            cache.GetUsers(configuration, 24, true);
+            NextcloudUserIdentityService.CanonicalUserId = "canonical/user";
+            var other = new TalkServiceConfiguration(configuration.GetNormalizedBaseUrl(), "second-login@example.test", "test-password");
+            NcHttpClient.NextResponse = AddressbookResponse(404,
+                "BEGIN:VCARD\r\nUID:other-user\r\nEND:VCARD\r\n", "text/plain");
+            var users = cache.GetUsers(other, 24, false);
+            Check("Account switch resolves only the new account export", users.Count == 1 && users[0].UserId == "other-user");
+            Check("DAV path uses canonical UID while authentication uses login",
+                NcHttpClient.LastOptions.Url.Contains("/canonical%2Fuser/z-server-generated--system?export")
+                && NcHttpClient.LastLogin == "second-login@example.test"
+                && NcHttpClient.LastOptions.IncludeAuthHeader && !NcHttpClient.LastOptions.IncludeOcsApiHeader
+                && !NcHttpClient.LastOptions.ParseJson && NcHttpClient.LastOptions.Method == "GET");
+            int sends = NcHttpClient.SendCount;
+            Check("Switching back loads only the matching previous account",
+                cache.GetUsers(configuration, 24, false).Count == 3 && NcHttpClient.SendCount == sends);
+            NcHttpClient.NextResponse = AddressbookResponse(503, AddressbookExport, "text/vcard");
+            foreach (var changed in new[]
+            {
+                new TalkServiceConfiguration("https://other.example.test", configuration.Username, "test-password"),
+                new TalkServiceConfiguration(configuration.GetNormalizedBaseUrl() + "/subpath", configuration.Username, "test-password")
+            })
+            {
+                Check("Server and subpath change cannot reuse another scope",
+                    !cache.GetSystemAddressbookStatus(changed, 24, false).Available);
+            }
+            Check("Profile change cannot reuse another scope",
+                !new IfbAddressBookCache(root, "other-profile").GetSystemAddressbookStatus(configuration, 24, false).Available);
+            Check("Failed other scope does not poison the matching cached account",
+                cache.GetSystemAddressbookStatus(configuration, 24, false).Available);
+        }
+        finally
+        {
+            NextcloudUserIdentityService.CanonicalUserId = "alice";
+            Directory.Delete(root, true);
+        }
+    }
+
+    private static void TestSystemAddressbookParticipants()
+    {
+        string root = NewTestRoot("addressbook-participants");
+        try
+        {
+            var configuration = NewConfiguration();
+            var snapshot = new TalkAppointmentSyncSnapshot
+            {
+                Configuration = configuration, DataDirectory = root, ProfileScope = "participants", CacheHours = 24,
+                AddUsers = true, AddGuests = true, RoomToken = "room",
+                AttendeeEmails = new List<string> { "alice@example.test", "bob@example.test", "external@example.test" }
+            };
+            NcHttpClient.NextResponse = AddressbookResponse(404, AddressbookExport, "text/html");
+            var service = new TalkService(configuration);
+            ExecuteParticipantSync(service, snapshot);
+            Check("Actual participant sync accepts 404, omits self, and distinguishes internal from guest",
+                service.Users.Count == 1 && service.Users[0] == "bob"
+                && service.Guests.Count == 1 && service.Guests[0] == "external@example.test");
+            var cache = new IfbAddressBookCache(root, "participants");
+            foreach (NcHttpResponse response in new[]
+            {
+                AddressbookResponse(200, AddressbookExport + "END:VCARD\r\n", "text/vcard"),
+                AddressbookResponse(404, "", "text/vcard"),
+                AddressbookResponse(401, AddressbookExport, "text/vcard"),
+                new NcHttpResponse { TransportException = new IOException("offline") }
+            })
+            {
+                NcHttpClient.NextResponse = response;
+                cache.GetSystemAddressbookStatus(configuration, 24, true);
+                service = new TalkService(configuration);
+                ExecuteParticipantSync(service, snapshot);
+                Check("Actual participant sync stops on failure even with previous disk contacts",
+                    service.Users.Count == 0 && service.Guests.Count == 0);
+            }
+            NcHttpClient.NextResponse = AddressbookResponse(404, AddressbookExport, null);
+            service = new TalkService(configuration);
+            ExecuteParticipantSync(service, snapshot);
+            Check("Actual participant sync resumes only after successful retry",
+                service.Users.Count == 1 && service.Users[0] == "bob" && service.Guests.Count == 1);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    // EXECUTE_PARTICIPANT_SYNC_SOURCE
 
     private static void TestLifecycleAccountMatching()
     {
@@ -1439,7 +1771,13 @@ internal static class TalkIfbLifecycleTests
         }
     }
 }
-'@ | Set-Content -LiteralPath $testSource -Encoding UTF8
+'@
+    $participantSyncSource = Get-SourceSlice `
+        $appointmentSyncController `
+        '        private static void ExecuteParticipantSync(' `
+        '        private static void ExecuteDelegationSync('
+    $testCode.Replace('// EXECUTE_PARTICIPANT_SYNC_SOURCE', $participantSyncSource) |
+        Set-Content -LiteralPath $testSource -Encoding UTF8
 
     $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
     if (-not (Test-Path -LiteralPath $csc)) {
@@ -1451,12 +1789,14 @@ internal static class TalkIfbLifecycleTests
         (Join-Path $SourceRoot "Services\DurableFileReplace.cs"),
         (Join-Path $SourceRoot "Services\ProtectedJsonStateStore.cs"),
         (Join-Path $SourceRoot "Services\TalkServiceConfiguration.cs"),
+        (Join-Path $SourceRoot "Services\IfbAddressBookCache.cs"),
         (Join-Path $SourceRoot "Services\TalkAppointmentSyncCoordinator.cs"),
         (Join-Path $SourceRoot "Services\TalkRoomLifecycleCoordinator.cs"),
         (Join-Path $SourceRoot "Services\TalkRoomLifecycleStore.cs"),
         (Join-Path $SourceRoot "Services\IfbRegistryStateStore.cs"),
         (Join-Path $SourceRoot "Services\IfbRegistryOwnershipManager.cs"),
         (Join-Path $SourceRoot "Models\TalkAppointmentSyncSnapshot.cs"),
+        (Join-Path $SourceRoot "Models\NextcloudUser.cs"),
         (Join-Path $SourceRoot "Models\TalkRoomLifecycleRecord.cs"),
         (Join-Path $SourceRoot "Utilities\AppDataPaths.cs"),
         (Join-Path $SourceRoot "Utilities\LogCategories.cs"),

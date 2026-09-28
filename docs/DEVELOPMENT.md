@@ -426,6 +426,14 @@ IFB (DAV via proxy):
 - Requests without the request secret return `404`
 - The proxy talks to CalDAV and Addressbook endpoints under `remote.php/dav/...`
 
+System address-book response contract:
+
+- `Services/IfbAddressBookCache.cs` validates the complete CardDAV export before replacing any cached mappings or the last-success timestamp. Its cache remains scoped to the Outlook profile, Nextcloud base URL and configured login; the request path uses the resolved canonical UID.
+- Only successful HTTP responses and HTTP 404 enter vCard validation. A complete, non-empty export with usable user UIDs is accepted regardless of content type, including on HTTP 404. Other HTTP errors remain errors even when the body resembles a valid export; the shared HTTP client is unchanged.
+- Empty exports require both a successful HTTP status and a vCard content type. Reject HTML/JSON, truncated or mixed exports, nested cards and stray or mismatched component boundaries. Preserve legal line folding and UID-only contacts for user search and moderators.
+- A failed refresh keeps the last good cache intact but marks the current scope for retry. Subsequent lookups must not hide the failure behind that old cache. Talk participant synchronization must resolve all recipients before applying changes and must not fall back to guest invitations on a failed address-book lookup.
+- Keep response bodies and contact data out of diagnostics. `Invoke-OutlookTalkIfbLifecycleTests.ps1` covers response validation, scoped cache recovery and participant synchronization through the production paths.
+
 Update check:
 
 - Homepage endpoint: `GET https://nc-connector.de/wp-json/ncc/v1/update-check`

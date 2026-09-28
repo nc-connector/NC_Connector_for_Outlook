@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Este recurso requer um catálogo de endereços do sistema Nextcloud ativo."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "O Nextcloud retornou um catálogo de endereços do sistema inválido. Tente novamente ou entre em contato com seu administrador."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Não foi possível carregar o catálogo de endereços do sistema Nextcloud. Verifique sua conexão e suas credenciais e tente novamente."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Guia de configuração"
   },

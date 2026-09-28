@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Tato funkce vyžaduje aktivní systémový adresář Nextcloud."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud vrátil neplatný systémový adresář. Zkuste to znovu nebo kontaktujte správce."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Systémový adresář Nextcloud se nepodařilo načíst. Zkontrolujte připojení a přihlašovací údaje a zkuste to znovu."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Průvodce nastavením"
   },

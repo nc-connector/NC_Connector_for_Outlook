@@ -890,6 +890,12 @@
   "talk_system_addressbook_required_message": {
     "message": "This feature requires an active Nextcloud system address book."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud returned an invalid system address book. Please try again or contact your administrator."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "The Nextcloud system address book could not be loaded. Check your connection and credentials, then try again."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Setup guide"
   },

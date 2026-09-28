@@ -869,6 +869,12 @@
   "talk_system_addressbook_required_message": {
     "message": "Для этой функции требуется активная адресная книга системы Nextcloud."
   },
+  "talk_system_addressbook_invalid_response": {
+    "message": "Nextcloud вернул некорректную системную адресную книгу. Повторите попытку или обратитесь к администратору."
+  },
+  "talk_system_addressbook_fetch_failed": {
+    "message": "Не удалось загрузить адресную книгу системы Nextcloud. Проверьте подключение и учётные данные, затем повторите попытку."
+  },
   "talk_system_addressbook_admin_link_label": {
     "message": "Руководство по настройке"
   },
