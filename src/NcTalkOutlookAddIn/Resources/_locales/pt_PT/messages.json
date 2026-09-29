@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "A definição centralizada das notificações de atualização é inválida. As notificações permanecem desativadas. Contacte o administrador."
+  },
   "options_logging_managed_hint": {
     "message": "As definições de registo são geridas pela sua organização e não podem ser alteradas aqui."
   },

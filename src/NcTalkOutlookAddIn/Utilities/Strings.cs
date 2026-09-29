@@ -513,6 +513,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string AdvancedTlsHint { get { return Get("options_tls_hint", "If disabled, NC Connector enforces the selected TLS versions in add-in runtime."); } }
         internal static string AdvancedTlsManagedHint { get { return Get("options_tls_managed_hint", "TLS settings are managed by your organization and cannot be changed here."); } }
         internal static string DebugManagedHint { get { return Get("options_logging_managed_hint", "Logging settings are managed by your organization and cannot be changed here."); } }
+        internal static string ManagedUpdateNotifyPolicyInvalid { get { return Get("managed_update_notify_policy_invalid", "The centrally configured update notification setting is invalid. Notifications remain off. Please contact your administrator."); } }
         internal static string ManagedLoggingPolicyInvalid { get { return Get("managed_logging_policy_invalid", "A centrally configured logging value is invalid. Invalid values use their defaults: debug logging off, log anonymization on. Please contact your administrator."); } }
         internal static string ManagedTlsPolicyInvalid { get { return Get("managed_tls_policy_invalid", "The centrally configured TLS settings are invalid. Please contact your administrator. NC Connector will not connect to the server with this configuration."); } }
         internal static string TransportTlsApplyFailed { get { return Get("options_tls_apply_failed", "Selected TLS settings could not be applied: {0}"); } }

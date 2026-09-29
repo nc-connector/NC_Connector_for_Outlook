@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "A frissítési értesítések központi beállítása érvénytelen. Az értesítések kikapcsolva maradnak. Forduljon a rendszergazdához."
+  },
   "options_logging_managed_hint": {
     "message": "A naplózási beállításokat a szervezete kezeli, és itt nem módosíthatók."
   },

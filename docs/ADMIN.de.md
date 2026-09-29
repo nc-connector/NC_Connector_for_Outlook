@@ -327,9 +327,25 @@ Ein nicht lesbarer Wert verwendet den Standard dieses Felds und zeigt im Debug-T
 
 Auf einem Pilotarbeitsplatz nach Outlook-Neustart die effektiven Werte, beide Sperren und ein Support-Log prüfen. Das Speichern anderer Einstellungen darf lokale Logging-Werte nicht ersetzen. Zum Zurücknehmen beide Werte aus allen zutreffenden Hives/Ansichten entfernen und Outlook neu starten; vorherige lokale Werte gelten wieder. Andere Rollout-Policies bleiben wirksam. Eine reine Logging-Policy blendet das Ribbon nicht aus.
 
+### Verwaltete Update-Benachrichtigungen
+
+`UpdateNotifyEnabled` als `REG_DWORD` an denselben Policy-Pfaden setzen: `0` unterdrückt Update-Benachrichtigungen, `1` aktiviert sie. Der erste vorhandene Wert gewinnt in der Reihenfolge HKLM 64-Bit, HKLM 32-Bit, HKCU 64-Bit, HKCU 32-Bit. Bereits seine Existenz aktiviert Enterprise Rollout, auch bei false oder fehlerhaftem Inhalt; deshalb vor der Verteilung Backend und aktiven Community- oder Pro-Seat bereitstellen.
+
+Nach einem Outlook-Neustart zeigt der Benachrichtigungsschalter unter **Einstellungen -> Erweitert** den effektiven Wert und ist mit Administrator-Tooltip gesperrt. Der tägliche Update-Abruf und **Jetzt prüfen** bleiben unverändert: Die Policy steuert Benachrichtigungen, nicht Netzwerkanfragen oder eine automatische Installation. Ein ungültiger ausgewählter Wert verwendet `0`; sein Tooltip fordert zur Korrektur durch den Administrator auf. Er fällt weder auf einen nachrangigen Eintrag zurück noch blockiert er Verbindungen.
+
+Beispiel für eine erhöhte 64-Bit-PowerShell:
+
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name UpdateNotifyEnabled -PropertyType DWord -Value 0 -Force | Out-Null
+```
+
+Auf einem Pilotarbeitsplatz Outlook neu starten, den gesperrten ausgeschalteten Schalter prüfen und **Jetzt prüfen** ausführen. Zum Zurücknehmen den Wert aus allen zutreffenden Policy-Pfaden entfernen und Outlook neu starten. Die gespeicherte Benutzerauswahl gilt wieder, auch nach dem Speichern anderer Einstellungen während aktiver Policy. Ohne gespeicherte Auswahl sind Benachrichtigungen standardmäßig aus. Andere Rollout-Werte bleiben wirksam; nur `ShowMainRibbonTab=false` blendet die Einstellungen aus.
+
 ### Enterprise Rollout
 
-Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled` oder `LogAnonymizationEnabled` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle acht Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
+Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled` oder `UpdateNotifyEnabled` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle neun Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
 
 **Auswirkung beim Upgrade:** Auch eine bereits bestehende Registry-URL-Vorgabe aktiviert diesen Modus nach dem Update. Seats und Backend deshalb vor dem Rollout vorbereiten; eine ausschließlich per XML vorbelegte URL aktiviert ihn nicht.
 
@@ -347,7 +363,7 @@ Erstanmeldung und Prüfung:
 2. Ohne Zugangsdaten in einer Mail **Nextcloud-Freigabe einfügen** oder in einem Termin **Talk-Link einfügen** anklicken. Der vorhandene Einstellungsdialog öffnet sich direkt mit dem blauen Hinweis **Mit Nextcloud verbinden**, ohne vorgeschaltete Fehlermeldung. Das gilt auch für nicht verwaltete Installationen. Nur bei `ShowMainRibbonTab=false` sind die anderen Einstellungstabs nicht verfügbar; andernfalls ist der vollständige Dialog auch über **NC Connector -> Einstellungen** erreichbar.
 3. Den Nextcloud-Login-Flow abschließen oder das App-Passwort des Benutzers eingeben und speichern. Die Anmeldung muss erfolgreich geprüft sein, bevor diese Einrichtung gespeichert werden kann. Verwaltete URL und Sperre bleiben wirksam; vorhandene Einstellungen bleiben erhalten. Nach erfolgreichem Speichern wird die ursprüngliche Aktion fortgesetzt, sofern Mail oder Termin noch geöffnet sind (eine Inline-Antwort muss weiterhin aktiv sein). Abbrechen beendet die Aktion ohne weitere Meldung. Die Anmeldung allein lädt keine Dateien hoch und erstellt keinen Talk-Raum.
 4. Den Zugriff mit aktivem Seat prüfen; anschließend in einer Testumgebung die Meldungen für fehlenden Seat und fehlendes Backend getrennt prüfen. Abgelehnte Zugangsdaten öffnen die Anmeldung mit einem freundlichen Hinweis erneut; Verbindungsfehler bleiben davon unterscheidbar. Bei ausgeblendetem Haupttab bleiben die normalen Einstellungen dabei ausgeblendet. Backend- und Seat-Prüfung gelten auch nach der Anmeldung unverändert.
-5. Zum Einblenden von Tab und Einstellungen die wirksame Policy `ShowMainRibbonTab=false` entfernen oder auf `true` setzen und Outlook neu starten. Die verwaltete Zugriffsprüfung bleibt bestehen. Zum Verlassen des Modus alle acht Auslöser an allen zutreffenden Policy-Pfaden und Registry-Ansichten entfernen und Outlook neu starten. Gespeicherte Zugangsdaten und Einstellungen bleiben erhalten.
+5. Zum Einblenden von Tab und Einstellungen die wirksame Policy `ShowMainRibbonTab=false` entfernen oder auf `true` setzen und Outlook neu starten. Die verwaltete Zugriffsprüfung bleibt bestehen. Zum Verlassen des Modus alle neun Auslöser an allen zutreffenden Policy-Pfaden und Registry-Ansichten entfernen und Outlook neu starten. Gespeicherte Zugangsdaten und Einstellungen bleiben erhalten.
 
 Registry-Policies steuern den administrativen Rollout. Sie schützen nicht vor Benutzern, die diese Policy verändern oder das Add-in ersetzen können. Policy-Pfade und Berechtigungen zur Softwareverteilung entsprechend schützen.
 

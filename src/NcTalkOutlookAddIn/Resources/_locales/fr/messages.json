@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "Le paramètre central des notifications de mise à jour est invalide. Les notifications restent désactivées. Contactez votre administrateur."
+  },
   "options_logging_managed_hint": {
     "message": "Les paramètres de journalisation sont gérés par votre organisation et ne peuvent pas être modifiés ici."
   },

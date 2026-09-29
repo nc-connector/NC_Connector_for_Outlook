@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "集中設定的更新通知設定無效。通知將保持關閉。請聯絡管理員。"
+  },
   "options_logging_managed_hint": {
     "message": "記錄設定由您的組織集中管理，無法在此變更。"
   },

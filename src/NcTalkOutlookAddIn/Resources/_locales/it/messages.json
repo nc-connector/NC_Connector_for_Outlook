@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "L'impostazione centralizzata delle notifiche di aggiornamento non è valida. Le notifiche restano disattivate. Contatti l'amministratore."
+  },
   "options_logging_managed_hint": {
     "message": "Le impostazioni dei registri sono gestite dalla sua organizzazione e non possono essere modificate qui."
   },

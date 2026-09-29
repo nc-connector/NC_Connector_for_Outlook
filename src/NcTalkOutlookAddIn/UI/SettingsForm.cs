@@ -613,7 +613,10 @@ namespace NcTalkOutlookAddIn.UI
                 Result.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
                 Result.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
             }
-            Result.UpdateNotifyEnabled = _updateNotifyCheckBox.Checked;
+            if (!Result.HasManagedUpdateNotify)
+            {
+                Result.UpdateNotifyEnabled = _updateNotifyCheckBox.Checked;
+            }
             DialogResult = DialogResult.OK;
             Close();
         }
@@ -979,7 +982,13 @@ namespace NcTalkOutlookAddIn.UI
             _ifbCacheHoursLabel.Enabled = !_isBusy;
             UpdateLoggingOptionsState();
             _debugOpenLink.Enabled = !_isBusy;
-            _updateNotifyCheckBox.Enabled = !_isBusy;
+            bool managedUpdateNotify = Result != null && Result.HasManagedUpdateNotify;
+            _updateNotifyCheckBox.Enabled = !managedUpdateNotify && !_isBusy;
+            _disabledTooltipHints.Apply(_updateNotifyCheckBox,
+                managedUpdateNotify
+                    ? (Result.IsManagedUpdateNotifyValid ? Strings.PolicyAdminControlledTooltip : Strings.ManagedUpdateNotifyPolicyInvalid)
+                    : string.Empty,
+                managedUpdateNotify);
             _updateCheckButton.Enabled = !_isBusy;
             _updateDownloadLink.Enabled = !_isBusy && !string.IsNullOrWhiteSpace(_updateOpenUrl);
 

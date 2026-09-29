@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "De centraal ingestelde updatemelding is ongeldig. Meldingen blijven uitgeschakeld. Neem contact op met uw beheerder."
+  },
   "options_logging_managed_hint": {
     "message": "De loginstellingen worden beheerd door uw organisatie en kunnen hier niet worden gewijzigd."
   },

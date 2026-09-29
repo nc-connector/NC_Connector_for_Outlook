@@ -625,7 +625,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "TransportTlsUseSystemDefault", settings.LocalTransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable12", settings.LocalTransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable13", settings.LocalTransportTlsEnable13.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "UpdateNotifyEnabled", settings.UpdateNotifyEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "UpdateNotifyEnabled", settings.LocalUpdateNotifyEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "UpdateInstallId", Safe(settings.UpdateInstallId));
             AppendElement(document, root, "UpdateLastCheckedAtUtc", Safe(settings.UpdateLastCheckedAtUtc));
             AppendElement(document, root, "UpdateLatestVersion", Safe(settings.UpdateLatestVersion));

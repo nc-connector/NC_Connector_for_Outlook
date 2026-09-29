@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "Centralne ustawienie powiadomień o aktualizacjach jest nieprawidłowe. Powiadomienia pozostają wyłączone. Skontaktuj się z administratorem."
+  },
   "options_logging_managed_hint": {
     "message": "Ustawienia rejestrowania są zarządzane przez organizację i nie można ich tutaj zmienić."
   },

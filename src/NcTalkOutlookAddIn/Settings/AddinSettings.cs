@@ -24,6 +24,7 @@ namespace NcTalkOutlookAddIn.Settings
         private ManagedSetupPolicy _managedSetupPolicy;
         private bool _localDebugLoggingEnabled;
         private bool _localLogAnonymizationEnabled;
+        private bool _localUpdateNotifyEnabled;
         private bool _localTransportTlsUseSystemDefault;
         private bool _localTransportTlsEnable12;
         private bool _localTransportTlsEnable13;
@@ -128,7 +129,15 @@ namespace NcTalkOutlookAddIn.Settings
         internal bool HasManagedTransportTls { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasTransportTlsPolicy; } }
         internal bool IsManagedTransportTlsValid { get { return !HasManagedTransportTls || _managedSetupPolicy.IsTransportTlsPolicyValid; } }
 
-        public bool UpdateNotifyEnabled { get; set; }
+        public bool UpdateNotifyEnabled
+        {
+            get { return HasManagedUpdateNotify ? _managedSetupPolicy.UpdateNotifyEnabled : _localUpdateNotifyEnabled; }
+            set { _localUpdateNotifyEnabled = value; }
+        }
+
+        internal bool LocalUpdateNotifyEnabled { get { return _localUpdateNotifyEnabled; } }
+        internal bool HasManagedUpdateNotify { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasUpdateNotifyPolicy; } }
+        internal bool IsManagedUpdateNotifyValid { get { return !HasManagedUpdateNotify || _managedSetupPolicy.IsUpdateNotifyPolicyValid; } }
 
         public string UpdateInstallId { get; set; }
 

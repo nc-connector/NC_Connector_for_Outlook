@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "The centrally configured update notification setting is invalid. Notifications remain off. Please contact your administrator."
+  },
   "options_logging_managed_hint": {
     "message": "Logging settings are managed by your organization and cannot be changed here."
   },

@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "Centrální nastavení oznámení o aktualizacích je neplatné. Oznámení zůstávají vypnutá. Obraťte se na správce."
+  },
   "options_logging_managed_hint": {
     "message": "Nastavení protokolování spravuje vaše organizace a nelze je zde změnit."
   },

@@ -1118,15 +1118,103 @@ internal static class OutlookPolicyUiTests
     }
     private static object Managed(object url, object locked, object ribbon, string source)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, source);
     }
     private static object ManagedTls(object system, object tls12, object tls13, string source = "TLS test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, source);
     }
     private static object ManagedLogging(object debug, object anonymize, string source = "Logging test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, source);
+    }
+    private static object ManagedUpdateNotify(object value)
+    {
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, "Update notification test");
+    }
+    private static void TestManagedUpdateNotify(string root)
+    {
+        object[] inputs = { null, 0, 1, false, true, "false", "true", "", "bad", new byte[] { 1 } };
+        foreach (bool raw in new[] { false, true })
+        for (int index = 0; index < inputs.Length; index++)
+        {
+            object input = inputs[index];
+            bool present = input != null;
+            bool valid = index < 7;
+            bool effective = present ? (index == 2 || index == 4 || index == 6) : raw;
+            object policy = ManagedUpdateNotify(input);
+            Check((bool)Get(policy, "HasUpdateNotifyPolicy") == present && (bool)Get(policy, "IsEnterpriseRollout") == present, "Update notification presence including false or malformed activates rollout");
+            Check((bool)Get(policy, "IsUpdateNotifyPolicyValid") == valid, "Malformed update notification values retain a validity flag");
+            object local = New("Settings.AddinSettings");
+            Set(local, "UpdateNotifyEnabled", raw);
+            Call(local, "ApplyManagedSetupPolicy", policy);
+            Check((bool)Get(local, "UpdateNotifyEnabled") == effective && (bool)Get(local, "LocalUpdateNotifyEnabled") == raw, "Effective update notification overlay preserves local choice");
+            Check((bool)Get(local, "ShowMainRibbonTab") && !(bool)Get(local, "HasManagedLogging") && !(bool)Get(local, "HasManagedTransportTls"), "Update policy alone does not hide the ribbon or lock TLS/logging");
+            object clone = Call(local, "Clone");
+            Check((bool)Get(clone, "HasManagedUpdateNotify") == present && (bool)Get(clone, "IsManagedUpdateNotifyValid") == valid, "Clone retains update policy presence and validity");
+            Check((bool)Get(clone, "UpdateNotifyEnabled") == effective, "Clone uses effective update policy");
+            object restored = RoundTrip(local, root);
+            Check((bool)Get(restored, "UpdateNotifyEnabled") == raw && !(bool)Get(restored, "HasManagedUpdateNotify"), "XML roundtrip restores only the saved local preference");
+            Check(!Serialize(local).Contains("HasManagedUpdateNotify") && !Serialize(local).Contains("LocalUpdateNotify"), "Registry update metadata is not persisted");
+            Call(clone, "ApplyManagedSetupPolicy", (object)null);
+            Check((bool)Get(clone, "UpdateNotifyEnabled") == raw && (bool)Get(local, "HasManagedUpdateNotify") == present, "Policy removal restores local update choice without mutating the original");
+            object result = New("Models.UpdateCheckResult");
+            Set(result, "LatestVersion", "9.9.9"); Set(result, "UpdateAvailable", true);
+            Check((bool)Call(T("Services.UpdateCheckService"), "ShouldNotify", local, result) == effective, "Operative update notifications follow the effective policy");
+            Call(T("Services.UpdateCheckService"), "MarkNotified", local, result);
+            Check(!(bool)Call(T("Services.UpdateCheckService"), "ShouldNotify", local, result), "Policy does not bypass daily notification deduplication");
+            Check((bool)Get(local, "LocalUpdateNotifyEnabled") == raw, "Marking notifications does not persist the policy as a local choice");
+        }
+        for (int location = 0; location < 4; location++)
+        foreach (object value in new object[] { 0, 1, "bad" })
+        {
+            Array policies = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 4);
+            policies.SetValue(ManagedUpdateNotify(value), location);
+            for (int lower = location + 1; lower < 4; lower++) policies.SetValue(ManagedUpdateNotify(1), lower);
+            object selected = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+            Check((bool)Get(selected, "UpdateNotifyEnabled") == object.Equals(value, 1) && (bool)Get(selected, "IsUpdateNotifyPolicyValid") == (value is int), "First-present update policy wins even when false or invalid");
+        }
+        Array mixed = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 3);
+        mixed.SetValue(ManagedTls(1, null, null), 0);
+        mixed.SetValue(ManagedLogging(1, null), 1);
+        mixed.SetValue(ManagedUpdateNotify(1), 2);
+        object combined = Call(T("Settings.ManagedSetupPolicy"), "Resolve", mixed);
+        Check((bool)Get(combined, "HasTransportTlsPolicy") && (bool)Get(combined, "HasLoggingPolicy") && (bool)Get(combined, "UpdateNotifyEnabled"), "TLS, logging and update policies resolve independently across hives");
+        mixed.SetValue(ManagedUpdateNotify(1), 0); mixed.SetValue(ManagedUpdateNotify("bad"), 1);
+        combined = Call(T("Settings.ManagedSetupPolicy"), "Resolve", mixed);
+        Check((bool)Get(combined, "UpdateNotifyEnabled") && (bool)Get(combined, "IsUpdateNotifyPolicyValid"), "Ignored malformed lower update value cannot invalidate selected policy");
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (object value in new object[] { null, 0, 1, "bad" })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "UpdateNotifyEnabled", !object.Equals(value, 1));
+            Call(local, "ApplyManagedSetupPolicy", ManagedUpdateNotify(value));
+            object status = Status(D(), D(), true, mode, seat);
+            using (Form form = Settings(local, status))
+            {
+                var box = (CheckBox)Field(form, "_updateNotifyCheckBox");
+                foreach (bool busy in new[] { false, true, false })
+                {
+                    Call(form, "SetBusy", busy); Call(form, "UpdateControlState");
+                    Check(box.Enabled == (value == null && !busy) && box.Checked == (bool)Get(local, "UpdateNotifyEnabled"), "Update notification checkbox displays and locks effective policy across state refreshes");
+                    Check(((Button)Field(form, "_updateCheckButton")).Enabled == !busy, "Notification policy leaves manual update check available");
+                    Check(((CheckBox)Field(form, "_debugLogCheckBox")).Enabled == !busy, "Update-only policy does not lock unrelated logging controls");
+                }
+                string hint = ((ToolTip)Field(form, "_toolTip")).GetToolTip(box);
+                Check(string.IsNullOrEmpty(hint) == (value == null), "Update checkbox has a reachable managed tooltip");
+                if (value is string) Check(hint == (string)T("Utilities.Strings").GetProperty("ManagedUpdateNotifyPolicyInvalid", Flags).GetValue(null, null), "Malformed update policy has configuration guidance");
+                bool original = (bool)Get(local, "LocalUpdateNotifyEnabled");
+                if (value == null) box.Checked = !box.Checked;
+                Task save = (Task)Call(form, "SaveSettingsAsync");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+                while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(save.IsCompleted, "Update policy settings save completes without network"); save.GetAwaiter().GetResult();
+                Check((bool)Get(Get(form, "Result"), "LocalUpdateNotifyEnabled") == (value == null ? !original : original), "Actual save preserves managed raw choice and accepts an unmanaged user edit");
+            }
+            if (value != null) Check(RolloutNotice(local, status) == RolloutNotice(ManagedSettings(null, true), status), "Update-only rollout retains Community/Pro parity and personal access checks");
+        }
+        Console.WriteLine("[OK] Managed update notification presence, precedence, XML, UI, actual notification decisions and seat parity");
     }
     private static void TestManagedLogging(string root)
     {
@@ -1628,6 +1716,7 @@ internal static class OutlookPolicyUiTests
             TestConnectionOnboarding();
             TestManagedTls(root);
             TestManagedLogging(root);
+            TestManagedUpdateNotify(root);
             Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }

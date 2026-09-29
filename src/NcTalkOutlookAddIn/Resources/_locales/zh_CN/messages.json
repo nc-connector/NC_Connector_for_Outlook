@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "集中配置的更新通知设置无效。通知将保持关闭。请联系管理员。"
+  },
   "options_logging_managed_hint": {
     "message": "日志设置由您的组织统一管理，无法在此更改。"
   },

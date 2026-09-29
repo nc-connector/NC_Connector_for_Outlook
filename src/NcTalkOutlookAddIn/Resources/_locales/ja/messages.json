@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "組織が指定した更新通知の設定が無効です。通知は無効のままになります。管理者にお問い合わせください。"
+  },
   "options_logging_managed_hint": {
     "message": "ログ設定は組織によって管理されており、ここでは変更できません。"
   },

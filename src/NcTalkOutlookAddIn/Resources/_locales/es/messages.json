@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "La configuración centralizada de las notificaciones de actualización no es válida. Las notificaciones permanecen desactivadas. Póngase en contacto con su administrador."
+  },
   "options_logging_managed_hint": {
     "message": "Su organización administra la configuración de registros y no se puede cambiar aquí."
   },

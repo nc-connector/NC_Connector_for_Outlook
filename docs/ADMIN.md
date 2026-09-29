@@ -327,9 +327,25 @@ An unreadable value uses that field's default and shows a configuration hint in 
 
 On a pilot workstation, restart Outlook and check the effective values, both locks, and a support log. Saving other settings must not replace the user's local logging choices. To roll back, remove both values from every applicable hive/view and restart Outlook; previous local values return. Other rollout policies still apply. Logging policy alone does not hide the ribbon.
 
+### Managed update notifications
+
+Set `UpdateNotifyEnabled` as `REG_DWORD` at the same policy locations: `0` suppresses update notifications, `1` enables them. The first present value wins in the order HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. Its presence activates Enterprise Rollout even when false or malformed; prepare the backend and an active Community or Pro Seat before deployment.
+
+After restarting Outlook, the notification checkbox under **Settings -> Advanced** shows the effective value and is locked with an administrator tooltip. Daily update retrieval and **Check now** remain unchanged: this policy controls notifications, not network requests or automatic installation. An invalid selected value defaults to `0` and its tooltip asks the administrator to correct it; it does not fall through to a lower-priority entry or block connections.
+
+For example, from an elevated 64-bit PowerShell:
+
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name UpdateNotifyEnabled -PropertyType DWord -Value 0 -Force | Out-Null
+```
+
+On a pilot workstation, restart Outlook, verify the locked unchecked control, and run **Check now**. To roll back, remove this value from all applicable policy locations and restart Outlook. The user's saved preference returns, including after saving other settings with the policy active. With no saved preference, notifications default to off. Other rollout values remain effective; only `ShowMainRibbonTab=false` hides Settings.
+
 ### Enterprise Rollout
 
-The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, or `LogAnonymizationEnabled` enables Enterprise Rollout, including a value of `false`. An empty or invalid configured value still counts as present. With none of these eight values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
+The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled`, or `UpdateNotifyEnabled` enables Enterprise Rollout, including a value of `false`. An empty or invalid configured value still counts as present. With none of these nine values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
 
 **Upgrade impact:** An existing registry-based URL deployment also enables this mode after upgrading. Assign Seats and prepare the backend before rollout; an XML-preseeded URL alone does not enable it.
 
@@ -347,7 +363,7 @@ First sign-in and verification:
 2. Without credentials, click **Insert Nextcloud share** in a message or **Insert Talk link** in an appointment. The existing settings dialog opens directly with a blue **Connect to Nextcloud** invitation, without a preliminary error. This also applies to unmanaged installations. Only with `ShowMainRibbonTab=false` are the other settings tabs unavailable; otherwise the full dialog is also accessible through **NC Connector -> Settings**.
 3. Complete the Nextcloud login flow or enter the user's app password, then save. Authentication must succeed before this setup can be saved. The managed URL and its lock remain effective; existing preferences are preserved. After saving successfully, the original action continues if its message or appointment is still open (an inline reply must still be active). Cancelling ends the action quietly. Signing in alone does not upload files or create a Talk room.
 4. Verify access with an active Seat, then separately verify the missing-Seat and missing-backend messages in a test environment. Rejected credentials reopen sign-in with a friendly reminder; connection failures remain distinct. If the main tab is hidden, normal settings remain hidden too. The backend and Seat checks still apply after authentication.
-5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all eight trigger values from all applicable policy locations and registry views, then restart Outlook. Saved credentials and preferences remain.
+5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all nine trigger values from all applicable policy locations and registry views, then restart Outlook. Saved credentials and preferences remain.
 
 Registry policy is an administrator deployment control, not protection against a user who can change that policy or replace the add-in. Protect the policy keys and deployment permissions accordingly.
 

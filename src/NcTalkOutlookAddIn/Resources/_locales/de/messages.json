@@ -1,4 +1,7 @@
 {
+  "managed_update_notify_policy_invalid": {
+    "message": "Die zentrale Vorgabe für Update-Benachrichtigungen ist ungültig. Benachrichtigungen bleiben ausgeschaltet. Bitte wenden Sie sich an Ihren Administrator."
+  },
   "options_logging_managed_hint": {
     "message": "Die Logging-Einstellungen werden zentral durch Ihre Organisation vorgegeben und können hier nicht geändert werden."
   },
