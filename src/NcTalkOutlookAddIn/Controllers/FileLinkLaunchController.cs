@@ -32,17 +32,6 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 return;
             }
-            if (!_owner.SettingsAreComplete())
-            {
-                MessageBox.Show(
-                    Strings.ErrorMissingCredentials,
-                    Strings.DialogTitle,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                _owner.OnSettingsButtonPressed(control);
-                return;
-            }
-
             Outlook.MailItem mail = _owner.GetActiveMailItem();
             if (mail == null)
             {
@@ -54,86 +43,124 @@ namespace NcTalkOutlookAddIn.Controllers
                 return;
             }
 
-            bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
-            _owner.EnsureMailComposeSubscription(mail, isInlineResponse ? string.Empty : _owner.ResolveActiveInspectorIdentityKey(), isInlineResponse);
-            await RunFileLinkWizardForMailAsync(mail, null);
+            bool authenticationCompleted = false;
+            if (!_owner.SettingsAreComplete())
+            {
+                NextcloudTalkAddIn.LogFileLinkMessage("Sharing connection setup requested.");
+                authenticationCompleted = await _owner.OpenAuthenticationSettingsAsync().ConfigureAwait(false);
+                if (!authenticationCompleted)
+                {
+                    NextcloudTalkAddIn.LogFileLinkMessage("Sharing launch ended without saved authentication.");
+                    return;
+                }
+            }
+
+            bool canContinue = await _owner.RunOnOutlookUiThreadAsync(
+                () =>
+                {
+                    if (!_owner.IsItemOpenForRibbonAction(mail))
+                    {
+                        NextcloudTalkAddIn.LogFileLinkMessage("Sharing launch ended because the original compose item closed.");
+                        return false;
+                    }
+                    bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
+                    _owner.EnsureMailComposeSubscription(
+                        mail,
+                        isInlineResponse ? string.Empty : MailInteropController.ResolveMailInspectorIdentityKey(mail),
+                        isInlineResponse);
+                    return true;
+                }).ConfigureAwait(false);
+            if (canContinue)
+            {
+                await RunFileLinkWizardForMailAsync(mail, null, !authenticationCompleted).ConfigureAwait(false);
+            }
         }
 
-        internal async Task<bool> RunFileLinkWizardForMailAsync(Outlook.MailItem mail, FileLinkWizardLaunchOptions launchOptions)
+        internal async Task<bool> RunFileLinkWizardForMailAsync(
+            Outlook.MailItem mail,
+            FileLinkWizardLaunchOptions launchOptions,
+            bool allowAuthenticationRecovery = false)
         {
-            AddinSettings settings = _owner != null ? _owner.CurrentSettings : null;
-            if (_owner == null || mail == null || settings == null)
+            if (_owner == null || mail == null)
             {
                 return false;
             }
-            var configuration = new TalkServiceConfiguration(
-                settings.ServerUrl,
-                settings.Username,
-                settings.AppPassword);
-            Task<NextcloudCapabilitiesSnapshot> capabilitiesTask = Task.Run(
-                () => new NextcloudCapabilitiesService(configuration)
-                    .GetRequiredSnapshot(false, false));
-            Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => _owner.FetchBackendPolicyStatus(configuration, "sharing_wizard_open"));
-            Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => _owner.FetchPasswordPolicyForFileLinkWizard(configuration));
-            string launchFailureMessage = null;
-            MessageBoxIcon launchFailureIcon = MessageBoxIcon.Error;
-            try
+            for (int attempt = 0; attempt < 2; attempt++)
             {
-                await Task.WhenAll(
-                    capabilitiesTask,
-                    policyStatusTask,
-                    passwordPolicyTask).ConfigureAwait(false);
+                AddinSettings settings = await _owner.RunOnOutlookUiThreadAsync(
+                    () => _owner.IsItemOpenForRibbonAction(mail) ? _owner.CurrentSettings : null).ConfigureAwait(false);
+                if (settings == null)
+                {
+                    NextcloudTalkAddIn.LogFileLinkMessage("Sharing prefetch ended because the original compose item is unavailable.");
+                    return false;
+                }
+                var configuration = new TalkServiceConfiguration(
+                    settings.ServerUrl, settings.Username, settings.AppPassword);
+                Task<NextcloudCapabilitiesSnapshot> capabilitiesTask = Task.Run(
+                    () => new NextcloudCapabilitiesService(configuration).GetRequiredSnapshot(false, false));
+                Task<BackendPolicyStatus> policyStatusTask = Task.Run(() => settings.IsEnterpriseRollout
+                    ? _owner.FetchEnterpriseRolloutPolicyStatus(configuration, "sharing_wizard_open")
+                    : _owner.FetchBackendPolicyStatus(configuration, "sharing_wizard_open"));
+                Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => _owner.FetchPasswordPolicyForFileLinkWizard(configuration));
+                Exception launchFailure = null;
+                try
+                {
+                    await Task.WhenAll(capabilitiesTask, policyStatusTask, passwordPolicyTask).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    launchFailure = ex;
+                }
+                if (launchFailure != null)
+                {
+                    var serviceFailure = launchFailure as TalkServiceException;
+                    bool authenticationFailed = serviceFailure != null && serviceFailure.IsAuthenticationError;
+                    bool itemOpen = await _owner.RunOnOutlookUiThreadAsync(
+                        () => _owner.IsItemOpenForRibbonAction(mail)).ConfigureAwait(false);
+                    if (!itemOpen)
+                    {
+                        return false;
+                    }
+                    if (authenticationFailed && allowAuthenticationRecovery && attempt == 0)
+                    {
+                        NextcloudTalkAddIn.LogFileLinkMessage("Sharing credentials were rejected; connection setup requested.");
+                        if (!await _owner.OpenAuthenticationSettingsAsync(true).ConfigureAwait(false))
+                        {
+                            return false;
+                        }
+                        continue;
+                    }
+                    NextcloudTalkAddIn.LogFileLinkMessage("Sharing wizard connection check failed: " + launchFailure.Message);
+                    return await ShowLaunchFailureAsync(
+                        mail,
+                        authenticationFailed ? Strings.ConnectionSignInRequired
+                            : serviceFailure != null ? serviceFailure.Message
+                            : string.Format(CultureInfo.CurrentCulture, Strings.ErrorConnectionFailed, launchFailure.Message),
+                        authenticationFailed ? MessageBoxIcon.Warning : MessageBoxIcon.Error).ConfigureAwait(false);
+                }
+                NextcloudCapabilitiesSnapshot capabilities = await capabilitiesTask.ConfigureAwait(false);
+                BackendPolicyStatus policyStatus = await policyStatusTask.ConfigureAwait(false);
+                PasswordPolicyInfo passwordPolicy = await passwordPolicyTask.ConfigureAwait(false);
+                return await _owner.RunOnOutlookUiThreadAsync(
+                    () => RunFileLinkWizardOnUiThread(
+                        mail, launchOptions, settings, configuration,
+                        capabilities, policyStatus, passwordPolicy)).ConfigureAwait(false);
             }
-            catch (TalkServiceException ex)
-            {
-                NextcloudTalkAddIn.LogFileLinkMessage(
-                    "Sharing wizard capability check failed: " + ex.Message);
-                launchFailureMessage = ex.Message;
-                launchFailureIcon = ex.IsAuthenticationError
-                    ? MessageBoxIcon.Warning
-                    : MessageBoxIcon.Error;
-            }
-            catch (Exception ex)
-            {
-                NextcloudTalkAddIn.LogFileLinkMessage(
-                    "Sharing wizard capability check failed unexpectedly: "
-                    + ex.Message);
-                launchFailureMessage = string.Format(
-                    CultureInfo.CurrentCulture,
-                    Strings.ErrorConnectionFailed,
-                    ex.Message);
-            }
-            if (!string.IsNullOrWhiteSpace(launchFailureMessage))
-            {
-                return await ShowLaunchFailureAsync(
-                    launchFailureMessage,
-                    launchFailureIcon).ConfigureAwait(false);
-            }
-
-            NextcloudCapabilitiesSnapshot capabilities =
-                await capabilitiesTask.ConfigureAwait(false);
-            BackendPolicyStatus policyStatus =
-                await policyStatusTask.ConfigureAwait(false);
-            PasswordPolicyInfo passwordPolicy =
-                await passwordPolicyTask.ConfigureAwait(false);
-            return await _owner.RunOnOutlookUiThreadAsync(
-                () => RunFileLinkWizardOnUiThread(
-                    mail,
-                    launchOptions,
-                    settings,
-                    configuration,
-                    capabilities,
-                    policyStatus,
-                    passwordPolicy)).ConfigureAwait(false);
+            return false;
         }
 
         private Task<bool> ShowLaunchFailureAsync(
+            Outlook.MailItem mail,
             string message,
             MessageBoxIcon icon)
         {
             return _owner.RunOnOutlookUiThreadAsync(
                 () =>
                 {
+                    if (!_owner.IsItemOpenForRibbonAction(mail))
+                    {
+                        return false;
+                    }
                     MessageBox.Show(
                         message,
                         Strings.DialogTitle,
@@ -152,6 +179,17 @@ namespace NcTalkOutlookAddIn.Controllers
             BackendPolicyStatus policyStatus,
             PasswordPolicyInfo passwordPolicy)
         {
+            if (!_owner.IsItemOpenForRibbonAction(mail))
+            {
+                NextcloudTalkAddIn.LogFileLinkMessage("Sharing wizard ended because the original compose item closed during prefetch.");
+                return false;
+            }
+            string rolloutNotice = PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus);
+            if (!string.IsNullOrEmpty(rolloutNotice))
+            {
+                MessageBox.Show(rolloutNotice, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
             if (launchOptions != null
                 && launchOptions.PrepareInitialSelections != null
                 && !launchOptions.PrepareInitialSelections())
@@ -285,7 +323,7 @@ namespace NcTalkOutlookAddIn.Controllers
                             mail,
                             isInlineResponse
                                 ? string.Empty
-                                : _owner.ResolveActiveInspectorIdentityKey(),
+                                : MailInteropController.ResolveMailInspectorIdentityKey(mail),
                             isInlineResponse);
                     if (composeSubscription == null)
                     {

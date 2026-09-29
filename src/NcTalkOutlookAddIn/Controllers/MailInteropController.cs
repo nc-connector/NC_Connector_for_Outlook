@@ -244,6 +244,66 @@ namespace NcTalkOutlookAddIn.Controllers
             }
         }
 
+        internal bool IsItemOpenForRibbonAction(object item)
+        {
+            Outlook.Application application = _owner != null ? _owner.OutlookApplication : null;
+            if (item == null || application == null)
+            {
+                return false;
+            }
+
+            Outlook.Inspectors inspectors = null;
+            try
+            {
+                var mail = item as Outlook.MailItem;
+                if (mail != null && mail.Sent)
+                {
+                    return false;
+                }
+
+                // GetInspector can create a new surface for a closed item; only inspect live windows.
+                inspectors = application.Inspectors;
+                for (int i = 1; i <= inspectors.Count; i++)
+                {
+                    Outlook.Inspector inspector = null;
+                    object currentItem = null;
+                    try
+                    {
+                        inspector = inspectors[i];
+                        currentItem = inspector != null ? inspector.CurrentItem : null;
+                        if (ComInteropScope.AreSameObject(item, currentItem, LogCategories.Core, "Ribbon item", "Inspector item"))
+                        {
+                            return true;
+                        }
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(currentItem, item))
+                        {
+                            ComInteropScope.TryRelease(currentItem, LogCategories.Core, "Failed to release ribbon context item.");
+                        }
+                        ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release ribbon context Inspector.");
+                    }
+                }
+
+                if (mail == null)
+                {
+                    return false;
+                }
+                // Inline insertion uses the active Explorer editor; never target another surface.
+                return IsActiveInlineResponse(mail);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "The original ribbon item is no longer available.", ex);
+            }
+            finally
+            {
+                ComInteropScope.TryRelease(inspectors, LogCategories.Core, "Failed to release ribbon context Inspectors.");
+            }
+            return false;
+        }
+
     }
 }
 

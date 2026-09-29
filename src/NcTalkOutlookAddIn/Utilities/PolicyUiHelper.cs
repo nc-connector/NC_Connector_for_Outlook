@@ -7,12 +7,32 @@ using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Settings;
 
 namespace NcTalkOutlookAddIn.Utilities
 {
         // Shared backend-policy helpers for UI forms.
     internal static class PolicyUiHelper
     {
+        internal static string GetEnterpriseRolloutNotice(AddinSettings settings, BackendPolicyStatus status)
+        {
+            if (settings == null || !settings.IsEnterpriseRollout)
+            {
+                return string.Empty;
+            }
+            if (status == null || !status.FetchSucceeded)
+            {
+                return Strings.EnterpriseRolloutStatusUnavailable;
+            }
+            if (!status.EndpointAvailable)
+            {
+                return Strings.EnterpriseRolloutBackendRequired;
+            }
+            return HasBackendSeatEntitlement(status)
+                ? string.Empty
+                : Strings.EnterpriseRolloutSeatRequired;
+        }
+
         internal static bool ApplyPolicyWarningState(
             BackendPolicyStatus status,
             Panel panel,

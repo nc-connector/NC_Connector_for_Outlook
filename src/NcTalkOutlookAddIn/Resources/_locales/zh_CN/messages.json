@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – 设置"
   },
+  "connection_setup_title": {
+    "message": "连接到 Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "请将 NC Connector 连接到您的 Nextcloud 账号。请通过浏览器登录，或输入您的用户名和应用密码。"
+  },
+  "connection_sign_in_required": {
+    "message": "未能成功登录 Nextcloud。请重新登录。"
+  },
   "options_base_url_label": {
     "message": "Nextcloud 网址"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "此安装由组织集中管理，需要分配有效的 NC Connector 席位。"
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "此安装由组织集中管理。使用 NC Connector 前，必须在 Nextcloud 中安装并配置 NC Connector Backend。请联系您的管理员。"
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "此安装由组织集中管理。无法验证您使用 NC Connector 的权限。请检查连接后重试。"
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "Nextcloud URL 由你的组织管理。"
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "Nextcloud 服务器当前无法访问。请检查您的网络连接。"
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "凭据未被接受：$1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "连接 Nextcloud 服务器失败：$1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "无法验证凭据。"
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "无法验证凭据：$1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "无法启动 IFB：$1"

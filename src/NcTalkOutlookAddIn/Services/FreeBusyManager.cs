@@ -8,6 +8,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using NcTalkOutlookAddIn.Settings;
+using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
 
@@ -29,12 +30,13 @@ namespace NcTalkOutlookAddIn.Services
 
         internal FreeBusyManager(
             string dataDirectory,
-            string profileScope)
+            string profileScope,
+            Func<TalkServiceConfiguration, BackendPolicyStatus> fetchRolloutPolicy = null)
         {
             var addressBookCache = new IfbAddressBookCache(
                 dataDirectory,
                 profileScope);
-            _server = new FreeBusyServer(addressBookCache);
+            _server = new FreeBusyServer(addressBookCache, fetchRolloutPolicy);
             _registryOwnership =
                 new IfbRegistryOwnershipManager(
                     dataDirectory,
@@ -80,7 +82,8 @@ namespace NcTalkOutlookAddIn.Services
                 configuration,
                 settings.IfbDays,
                 settings.IfbCacheHours,
-                _requestSecret);
+                _requestSecret,
+                settings.IsEnterpriseRollout);
             int ifbPort =
                 AddinSettings.NormalizeIfbPort(settings.IfbPort);
             try

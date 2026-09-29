@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Nastavení"
   },
+  "connection_setup_title": {
+    "message": "Připojit k Nextcloudu"
+  },
+  "connection_setup_message": {
+    "message": "Připojte NC Connector ke svému účtu Nextcloud. Přihlaste se přes prohlížeč nebo zadejte své uživatelské jméno a heslo aplikace."
+  },
+  "connection_sign_in_required": {
+    "message": "Přihlášení do Nextcloudu se nezdařilo. Přihlaste se prosím znovu."
+  },
   "options_base_url_label": {
     "message": "URL Nextcloud"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Tato instalace je centrálně spravována a vyžaduje přidělené platné licenční místo NC Connector."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Tato instalace je centrálně spravována. Před použitím NC Connector je nutné v Nextcloudu nainstalovat a nastavit NC Connector Backend. Obraťte se prosím na svého správce."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Tato instalace je centrálně spravována. Oprávnění k používání NC Connector se nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "Adresa URL Nextcloudu je spravovana vasi organizaci."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "Server Nextcloud je momentálně nedostupný. Zkontrolujte prosím připojení k internetu."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Přihlašovací údaje nebyly přijaty: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Připojení k serveru Nextcloud se nezdařilo: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Přihlašovací údaje se nepodařilo ověřit."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Přihlašovací údaje se nepodařilo ověřit: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "IFB se nepodařilo spustit: $1"

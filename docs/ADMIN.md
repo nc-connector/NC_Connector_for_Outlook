@@ -53,7 +53,7 @@ The MSI registers both 64-bit and 32-bit Outlook views. A 32-bit Outlook install
 - Nextcloud Secrets plus NC Connector Backend for one-time Secret-link password delivery
 - the Nextcloud system address book for user search, participant defaults, and moderator selection
 
-The optional NC Connector Backend is not required for local sharing, Talk, or IFB. It is required for central policies, managed signatures, and separate password delivery.
+The optional NC Connector Backend is not required for local sharing, Talk, or IFB in an unmanaged installation. It is required for central policies, managed signatures, separate password delivery, and Enterprise Rollout.
 
 The Nextcloud Password Policy app is optional. When available, NC Connector reads its password requirements; otherwise it creates passwords with its local generator.
 
@@ -226,7 +226,7 @@ Logs and the IFB address-book cache are operating data, not required for configu
 
 ### Rollout and pre-seeding
 
-Use the managed registry policy below for the Nextcloud URL. Use the optional backend for central feature defaults and locks.
+Use the managed registry policy below for Enterprise Rollout. Deploy and configure the backend and assign each user an active Seat before enabling the rollout. Community and Pro Seats provide the same access.
 
 If a profile XML must be pre-seeded:
 
@@ -252,6 +252,7 @@ Values:
 
 - `NextcloudUrl` (`REG_SZ`): full public Nextcloud URL
 - `NextcloudUrlLocked` (`REG_DWORD` or string, optional): `1` or `true` locks the field
+- `ShowMainRibbonTab` (`REG_DWORD`, optional): `0` hides the main NC Connector tab, `1` allows it. The default when absent is `1`; string values `true` and `false` are also accepted.
 
 Example for a machine policy:
 
@@ -270,7 +271,31 @@ Priority and result:
 - A locked value is used for every profile and disables the URL field.
 - Credentials remain user-specific.
 
-After policy deployment, restart Outlook and verify the URL and lock state in **NC Connector -> Settings**.
+URL and ribbon values resolve independently, in order: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. The URL lock belongs to the selected URL entry. An invalid ribbon value keeps the visibility default of `true`; an invalid URL is not used as a server address.
+
+### Enterprise Rollout
+
+The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, or `ShowMainRibbonTab` enables Enterprise Rollout, including a lock or ribbon value of `false`. An empty or invalid configured value still counts as present. With none of these three values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
+
+**Upgrade impact:** An existing registry-based URL deployment also enables this mode after upgrading. Assign Seats and prepare the backend before rollout; an XML-preseeded URL alone does not enable it.
+
+- Only `ShowMainRibbonTab=false` hides the main Explorer tab together with its Settings button. With the value absent or `true`, both remain visible and the full settings dialog is available, including with a managed URL or URL lock.
+- The Share and Talk buttons remain in their existing mail and appointment tabs, including inline replies. Their visibility does not depend on `ShowMainRibbonTab`; there is no replacement or status button.
+- A confirmed, valid, personally active Seat enables NC Connector. A Community Seat is fully equivalent to a Pro Seat. Global overcapacity alone does not block an active Seat.
+- A confirmed missing backend shows an installation/configuration message. A missing, paused or invalid Seat shows the managed-installation Seat message. An unconfirmed connection or response error shows a verification message, not a false missing-backend or missing-Seat message.
+- Share, Talk, attachment automation, managed signatures and IFB require rollout access. Ordinary Outlook mail remains usable; this mode is not an Outlook send restriction or a data-loss prevention system.
+- An accepted last-success status can survive a temporary refresh failure under the existing cache rules. A newly confirmed refusal replaces it. An already-open wizard retains its opening snapshot.
+- Existing cleanup of newly created, abandoned artifacts and already accepted password follow-ups are not discarded. No existing files, shares or appointments are deleted because a Seat becomes unavailable.
+
+First sign-in and verification:
+
+1. Restart Outlook after deploying the registry values.
+2. Without credentials, click **Insert Nextcloud share** in a message or **Insert Talk link** in an appointment. The existing settings dialog opens directly with a blue **Connect to Nextcloud** invitation, without a preliminary error. This also applies to unmanaged installations. Only with `ShowMainRibbonTab=false` are the other settings tabs unavailable; otherwise the full dialog is also accessible through **NC Connector -> Settings**.
+3. Complete the Nextcloud login flow or enter the user's app password, then save. Authentication must succeed before this setup can be saved. The managed URL and its lock remain effective; existing preferences are preserved. After saving successfully, the original action continues if its message or appointment is still open (an inline reply must still be active). Cancelling ends the action quietly. Signing in alone does not upload files or create a Talk room.
+4. Verify access with an active Seat, then separately verify the missing-Seat and missing-backend messages in a test environment. Rejected credentials reopen sign-in with a friendly reminder; connection failures remain distinct. If the main tab is hidden, normal settings remain hidden too. The backend and Seat checks still apply after authentication.
+5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all three trigger values from all applicable policy locations and restart Outlook. Saved credentials and preferences remain.
+
+Registry policy is an administrator deployment control, not protection against a user who can change that policy or replace the add-in. Protect the policy keys and deployment permissions accordingly.
 
 ## Nextcloud server preparation
 
@@ -447,6 +472,8 @@ Official Nextcloud references:
 - [`dav:sync-system-addressbook`](https://docs.nextcloud.com/server/32/admin_manual/occ_command.html#sync-system-address-book)
 
 ## Optional NC Connector Backend
+
+The local fallbacks described in this section apply to unmanaged installations. With [Enterprise Rollout](#enterprise-rollout), the backend and an active assigned Seat are required; the managed-installation messages take precedence.
 
 ### Prerequisites and operating states
 
@@ -788,11 +815,11 @@ Run the [`/login` comparison](#quick-test). If only the `/index.php/login` URL w
 1. Confirm that `ncc_backend_4mc` is installed and enabled.
 2. Confirm that the affected Nextcloud user has an active assigned seat.
 3. Check client access to `/apps/ncc_backend_4mc/api/v1/status`.
-4. Open Settings and review the displayed backend or seat state.
+4. Open Settings and review the displayed backend or seat state. If `ShowMainRibbonTab=false` hides Settings, use the Share or Talk action to check the access message.
 5. Confirm whether the setting is a default or a locked value.
 6. Compare with another seat-assigned pilot user.
 
-Share and Talk can use local settings during a backend outage. Managed signatures and separate password delivery require a valid backend state.
+In unmanaged installations, Share and Talk can use local settings during a backend outage. Managed signatures and separate password delivery require a valid backend state. Enterprise Rollout requires confirmed access or a matching last-success snapshot as described above.
 
 ### Managed signature is missing or misplaced
 

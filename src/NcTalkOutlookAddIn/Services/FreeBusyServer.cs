@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NcTalkOutlookAddIn.Utilities;
+using NcTalkOutlookAddIn.Models;
 
 namespace NcTalkOutlookAddIn.Services
 {
@@ -27,6 +28,8 @@ namespace NcTalkOutlookAddIn.Services
 
         private readonly object _syncRoot = new object();
         private readonly IfbAddressBookCache _addressBookCache;
+        private readonly Func<TalkServiceConfiguration, BackendPolicyStatus> _fetchRolloutPolicy;
+        private bool _enterpriseRollout;
         private readonly SemaphoreSlim _requestSlots =
             new SemaphoreSlim(
                 MaxConcurrentRequests,
@@ -43,7 +46,8 @@ namespace NcTalkOutlookAddIn.Services
         private string _listenPrefix = BuildPrefix(DefaultPort);
         private string _requestSecret = string.Empty;
 
-        internal FreeBusyServer(IfbAddressBookCache addressBookCache)
+        internal FreeBusyServer(IfbAddressBookCache addressBookCache,
+            Func<TalkServiceConfiguration, BackendPolicyStatus> fetchRolloutPolicy = null)
         {
             if (addressBookCache == null)
             {
@@ -51,13 +55,15 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             _addressBookCache = addressBookCache;
+            _fetchRolloutPolicy = fetchRolloutPolicy;
         }
 
         internal void UpdateSettings(
             TalkServiceConfiguration configuration,
             int defaultDays,
             int cacheHours,
-            string requestSecret)
+            string requestSecret,
+            bool enterpriseRollout = false)
         {
             lock (_syncRoot)
             {
@@ -68,6 +74,7 @@ namespace NcTalkOutlookAddIn.Services
                         "requestSecret");
                 }
                 _configuration = configuration;
+                _enterpriseRollout = enterpriseRollout;
                 _defaultDays = defaultDays > 0 ? defaultDays : 30;
                 _cacheHours = cacheHours >= 1 ? cacheHours : 24;
                 _requestSecret = requestSecret.Trim();
@@ -274,6 +281,16 @@ namespace NcTalkOutlookAddIn.Services
                     if (parsedDays > 0 && parsedDays <= 365)
                     {
                         days = parsedDays;
+                    }
+                }
+                if (_enterpriseRollout)
+                {
+                    BackendPolicyStatus status = _fetchRolloutPolicy != null ? _fetchRolloutPolicy(_configuration) : null;
+                    if (status == null || !status.FetchSucceeded || !PolicyUiHelper.HasBackendSeatEntitlement(status))
+                    {
+                        DiagnosticsLogger.Log(LogCategory, "Managed rollout access unavailable; IFB request rejected.");
+                        WriteError(context, HttpStatusCode.Forbidden, "Managed rollout access unavailable.");
+                        return;
                     }
                 }
                 string uid;

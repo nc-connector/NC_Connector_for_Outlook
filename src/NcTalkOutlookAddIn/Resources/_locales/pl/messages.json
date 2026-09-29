@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Ustawienia"
   },
+  "connection_setup_title": {
+    "message": "Połącz z Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Połącz NC Connector ze swoim kontem Nextcloud. Zaloguj się przez przeglądarkę lub wpisz nazwę użytkownika i hasło aplikacji."
+  },
+  "connection_sign_in_required": {
+    "message": "Logowanie do Nextcloud nie powiodło się. Zaloguj się ponownie."
+  },
   "options_base_url_label": {
     "message": "URL Nextcloud"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Ta instalacja jest zarządzana centralnie i wymaga przydzielonej, ważnej licencji użytkownika NC Connector."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Ta instalacja jest zarządzana centralnie. Przed rozpoczęciem korzystania z NC Connector należy zainstalować i skonfigurować NC Connector Backend w Nextcloud. Skontaktuj się z administratorem."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Ta instalacja jest zarządzana centralnie. Nie udało się zweryfikować uprawnień do korzystania z NC Connector. Sprawdź połączenie i spróbuj ponownie."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "Adres URL Nextcloud jest zarządzany przez Twoją organizację."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "Serwer Nextcloud jest obecnie nieosiągalny. Sprawdź połączenie z Internetem."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Dane logowania nie zostały zaakceptowane: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Połączenie z serwerem Nextcloud nie powiodło się: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Nie można zweryfikować danych logowania."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Nie można zweryfikować danych logowania: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "Nie można uruchomić IFB: $1"

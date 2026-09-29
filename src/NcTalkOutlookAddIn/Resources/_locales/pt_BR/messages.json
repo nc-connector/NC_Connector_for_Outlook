@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Configurações"
   },
+  "connection_setup_title": {
+    "message": "Conectar ao Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Conecte o NC Connector à sua conta do Nextcloud. Entre pelo navegador ou digite seu nome de usuário e a senha do aplicativo."
+  },
+  "connection_sign_in_required": {
+    "message": "Não foi possível entrar no Nextcloud. Entre novamente."
+  },
   "options_base_url_label": {
     "message": "URL do Nextcloud"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Esta instalação é gerenciada centralmente e requer uma licença de usuário do NC Connector válida e atribuída."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Esta instalação é gerenciada centralmente. Antes de usar o NC Connector, é necessário instalar e configurar o NC Connector Backend no Nextcloud. Entre em contato com o administrador."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Esta instalação é gerenciada centralmente. Não foi possível verificar o acesso ao NC Connector. Verifique sua conexão e tente novamente."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "A URL do Nextcloud é gerenciada pela sua organização."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "O servidor Nextcloud está inacessível no momento. Verifique sua conexão com a Internet."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "As credenciais não foram aceitas: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Falha na conexão com o servidor Nextcloud: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Não foi possível verificar as credenciais."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Não foi possível verificar as credenciais: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "Não foi possível iniciar o IFB: $1"

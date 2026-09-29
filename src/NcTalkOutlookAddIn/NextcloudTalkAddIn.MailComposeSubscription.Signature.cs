@@ -317,6 +317,11 @@ namespace NcTalkOutlookAddIn
                 {
                     return EmailSignatureSuccess("not_compose");
                 }
+                if (!string.IsNullOrEmpty(
+                    PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus)))
+                {
+                    return ClearManagedEmailSignature("enterprise_rollout_unavailable");
+                }
                 if (policyStatus == null || !policyStatus.FetchSucceeded)
                 {
                     LogEmailSignature(
@@ -549,9 +554,27 @@ namespace NcTalkOutlookAddIn
                 }
 
                 BackendPolicyStatus policyStatus;
-                if (!_owner.TryGetCachedEmailSignaturePolicyStatus(
-                        configuration,
-                        out policyStatus)
+                bool hasPolicy = _owner.TryGetCachedEmailSignaturePolicyStatus(
+                    configuration,
+                    out policyStatus);
+                if (!string.IsNullOrEmpty(
+                    PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus)))
+                {
+                    // Disable managed insertion without making the rollout seat an Outlook send gate.
+                    EmailSignatureApplicationResult cleanup =
+                        ClearManagedEmailSignature("enterprise_rollout_unavailable:send");
+                    _emailSignatureStateStable = cleanup.Success;
+                    if (!cleanup.Success)
+                    {
+                        LogEmailSignature("Managed signature cleanup could not finish while rollout access is unavailable.");
+                    }
+                    if (!hasPolicy || policyStatus == null || !policyStatus.FetchSucceeded)
+                    {
+                        ScheduleEmailSignatureApplication("enterprise_rollout_access_retry");
+                    }
+                    return true;
+                }
+                if (!hasPolicy
                     || policyStatus == null
                     || !policyStatus.FetchSucceeded)
                 {

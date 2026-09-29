@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Instellingen"
   },
+  "connection_setup_title": {
+    "message": "Verbinden met Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Verbind NC Connector met uw Nextcloud-account. Log in via uw browser of voer uw gebruikersnaam en app-wachtwoord in."
+  },
+  "connection_sign_in_required": {
+    "message": "Het inloggen bij Nextcloud is niet gelukt. Log opnieuw in."
+  },
   "options_base_url_label": {
     "message": "Nextcloud-URL"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Deze installatie wordt centraal beheerd en vereist een toegewezen, geldige NC Connector-seat."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Deze installatie wordt centraal beheerd. Voordat u NC Connector kunt gebruiken, moet NC Connector Backend in Nextcloud worden geïnstalleerd en geconfigureerd. Neem contact op met uw beheerder."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Deze installatie wordt centraal beheerd. De toegang tot NC Connector kon niet worden geverifieerd. Controleer uw verbinding en probeer het opnieuw."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "De Nextcloud-URL wordt beheerd door uw organisatie."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "De Nextcloud-server is momenteel niet bereikbaar. Controleer uw internetverbinding."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Inloggegevens zijn niet geaccepteerd: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Verbinding met de Nextcloud-server mislukt: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Inloggegevens konden niet worden geverifieerd."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Inloggegevens konden niet worden geverifieerd: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "IFB kon niet worden gestart: $1"

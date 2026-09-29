@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Paramètres"
   },
+  "connection_setup_title": {
+    "message": "Se connecter à Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Veuillez connecter NC Connector à votre compte Nextcloud. Connectez-vous via votre navigateur ou saisissez votre nom d’utilisateur et votre mot de passe d’application."
+  },
+  "connection_sign_in_required": {
+    "message": "La connexion à Nextcloud a échoué. Veuillez vous reconnecter."
+  },
   "options_base_url_label": {
     "message": "URL Nextcloud"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Cette installation est gérée de manière centralisée et nécessite une licence utilisateur NC Connector valide et attribuée."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Cette installation est gérée de manière centralisée. NC Connector Backend doit être installé et configuré dans Nextcloud avant de pouvoir utiliser NC Connector. Veuillez contacter votre administrateur."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Cette installation est gérée de manière centralisée. L’accès à NC Connector n’a pas pu être vérifié. Veuillez vérifier votre connexion et réessayer."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "L’URL Nextcloud est gérée par votre organisation."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "Le serveur Nextcloud est actuellement injoignable. Veuillez vérifier votre connexion Internet."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Les identifiants n'ont pas été acceptés : $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "La connexion au serveur Nextcloud a échoué : $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Les identifiants n'ont pas pu être vérifiés."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Les identifiants n'ont pas pu être vérifiés : $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "Impossible de démarrer l'IFB : $1"

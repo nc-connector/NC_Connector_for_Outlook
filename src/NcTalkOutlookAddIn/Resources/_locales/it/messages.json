@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Impostazioni"
   },
+  "connection_setup_title": {
+    "message": "Connetti a Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Collega NC Connector al tuo account Nextcloud. Accedi tramite il browser oppure inserisci il nome utente e la password dell’app."
+  },
+  "connection_sign_in_required": {
+    "message": "L’accesso a Nextcloud non è riuscito. Accedi di nuovo."
+  },
   "options_base_url_label": {
     "message": "URL Nextcloud"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Questa installazione è gestita centralmente e richiede una licenza utente NC Connector valida e assegnata."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Questa installazione è gestita centralmente. Per utilizzare NC Connector è necessario prima installare e configurare NC Connector Backend in Nextcloud. Contattare l’amministratore."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Questa installazione è gestita centralmente. Non è stato possibile verificare l’accesso a NC Connector. Controllare la connessione e riprovare."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "L’URL di Nextcloud è gestito dalla tua organizzazione."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "Il server Nextcloud non è raggiungibile al momento. Controlla la connessione Internet."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Le credenziali non sono state accettate: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Connessione al server Nextcloud non riuscita: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Impossibile verificare le credenziali."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Impossibile verificare le credenziali: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "Impossibile avviare IFB: $1"

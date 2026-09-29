@@ -53,7 +53,7 @@ Die MSI registriert sowohl die 64-Bit- als auch die 32-Bit-Ansicht von Outlook. 
 - Nextcloud Secrets und NC Connector Backend für Passwortzustellung über einmalige Secret-Links
 - das Nextcloud-Systemadressbuch für Benutzersuche, Teilnehmervorgaben und Moderatorauswahl
 
-Das optionale NC Connector Backend wird für lokale Freigaben, Talk oder IFB nicht benötigt. Es ist für zentrale Policies, verwaltete Signaturen und separate Passwortzustellung erforderlich.
+Das optionale NC Connector Backend wird in einer nicht zentral verwalteten Installation für lokale Freigaben, Talk oder IFB nicht benötigt. Es ist für zentrale Policies, verwaltete Signaturen, separate Passwortzustellung und Enterprise Rollout erforderlich.
 
 Die Nextcloud-App Password Policy ist optional. Ist sie verfügbar, liest NC Connector ihre Passwortvorgaben; andernfalls erzeugt es Passwörter mit seinem lokalen Generator.
 
@@ -226,7 +226,7 @@ Logs und der IFB-Adressbuch-Cache sind Betriebsdaten und für die Wiederherstell
 
 ### Rollout und Vorbelegung
 
-Für die Nextcloud-URL die nachfolgende verwaltete Registry-Policy verwenden. Zentrale Funktionsvorgaben und Sperren über das optionale Backend verteilen.
+Für Enterprise Rollout die nachfolgende verwaltete Registry-Policy verwenden. Vor der Aktivierung das Backend installieren und einrichten sowie jedem Benutzer einen aktiven Seat zuweisen. Community- und Pro-Seats ermöglichen denselben Zugriff.
 
 Muss eine Profil-XML vorab verteilt werden:
 
@@ -252,6 +252,7 @@ Werte:
 
 - `NextcloudUrl` (`REG_SZ`): vollständige öffentliche Nextcloud-URL
 - `NextcloudUrlLocked` (`REG_DWORD` oder String, optional): `1` oder `true` sperrt das Feld
+- `ShowMainRibbonTab` (`REG_DWORD`, optional): `0` blendet den NC-Connector-Haupttab aus, `1` lässt ihn zu. Ohne Wert gilt `1`; die Stringwerte `true` und `false` werden ebenfalls akzeptiert.
 
 Beispiel für eine Computer-Policy:
 
@@ -270,7 +271,31 @@ Priorität und Ergebnis:
 - Ein gesperrter Wert wird für jedes Profil verwendet und deaktiviert das URL-Feld.
 - Zugangsdaten bleiben benutzerspezifisch.
 
-Nach dem Verteilen der Policy Outlook neu starten und URL sowie Sperrstatus unter **NC Connector -> Einstellungen** prüfen.
+URL und Ribbonwert werden unabhängig aufgelöst: HKLM 64-Bit, HKLM 32-Bit, HKCU 64-Bit, HKCU 32-Bit. Die URL-Sperre gehört zum ausgewählten URL-Eintrag. Ein ungültiger Ribbonwert behält den Sichtbarkeitsstandard `true`; eine ungültige URL wird nicht als Serveradresse verwendet.
+
+### Enterprise Rollout
+
+Sobald `NextcloudUrl`, `NextcloudUrlLocked` oder `ShowMainRibbonTab` vorhanden ist, gilt Enterprise Rollout, auch bei Sperr- oder Ribbonwert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle drei Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
+
+**Auswirkung beim Upgrade:** Auch eine bereits bestehende Registry-URL-Vorgabe aktiviert diesen Modus nach dem Update. Seats und Backend deshalb vor dem Rollout vorbereiten; eine ausschließlich per XML vorbelegte URL aktiviert ihn nicht.
+
+- Nur `ShowMainRibbonTab=false` blendet den Haupttab im Explorer samt Einstellungsbutton aus. Fehlt der Wert oder ist er `true`, bleiben beide sichtbar und der vollständige Einstellungsdialog verfügbar, auch bei verwalteter URL oder URL-Sperre.
+- Freigabe und Talk bleiben in ihren bisherigen Mail- und Terminbereichen erreichbar, einschließlich Inline-Antworten. Ihre Sichtbarkeit hängt nicht von `ShowMainRibbonTab` ab; es gibt keinen Ersatz- oder Statusbutton.
+- Ein bestätigter gültiger, persönlich aktiver Seat erlaubt NC Connector. Ein Community-Seat ist einem Pro-Seat vollständig gleichgestellt. Globale Überbelegung allein sperrt einen aktiven Seat nicht.
+- Ein bestätigt fehlendes Backend erzeugt den Installations-/Einrichtungshinweis. Ein fehlender, pausierter oder ungültiger Seat erzeugt den Seat-Hinweis zur zentral verwalteten Installation. Ein unbestätigter Verbindungs- oder Antwortfehler erzeugt einen Prüfhinweis, keine falsche Aussage über fehlendes Backend oder fehlenden Seat.
+- Freigaben, Talk, Anhangsautomatisierung, verwaltete Signaturen und IFB benötigen den Rollout-Zugriff. Normale Outlook-Mails bleiben nutzbar; der Modus ist keine allgemeine Outlook-Versandsperre oder Schutz gegen Datenabfluss.
+- Ein bestätigter letzter Status darf einen vorübergehenden Aktualisierungsfehler nach den bestehenden Cacheregeln überbrücken. Eine frisch bestätigte Ablehnung ersetzt ihn. Ein bereits geöffneter Assistent behält seinen beim Öffnen geladenen Status.
+- Die vorhandene Bereinigung neu erzeugter, verworfener Artefakte und bereits angenommene Passwort-Follow-ups werden nicht verworfen. Bestehende Dateien, Freigaben oder Termine werden nicht wegen eines fehlenden Seats gelöscht.
+
+Erstanmeldung und Prüfung:
+
+1. Nach dem Verteilen der Registry-Werte Outlook neu starten.
+2. Ohne Zugangsdaten in einer Mail **Nextcloud-Freigabe einfügen** oder in einem Termin **Talk-Link einfügen** anklicken. Der vorhandene Einstellungsdialog öffnet sich direkt mit dem blauen Hinweis **Mit Nextcloud verbinden**, ohne vorgeschaltete Fehlermeldung. Das gilt auch für nicht verwaltete Installationen. Nur bei `ShowMainRibbonTab=false` sind die anderen Einstellungstabs nicht verfügbar; andernfalls ist der vollständige Dialog auch über **NC Connector -> Einstellungen** erreichbar.
+3. Den Nextcloud-Login-Flow abschließen oder das App-Passwort des Benutzers eingeben und speichern. Die Anmeldung muss erfolgreich geprüft sein, bevor diese Einrichtung gespeichert werden kann. Verwaltete URL und Sperre bleiben wirksam; vorhandene Einstellungen bleiben erhalten. Nach erfolgreichem Speichern wird die ursprüngliche Aktion fortgesetzt, sofern Mail oder Termin noch geöffnet sind (eine Inline-Antwort muss weiterhin aktiv sein). Abbrechen beendet die Aktion ohne weitere Meldung. Die Anmeldung allein lädt keine Dateien hoch und erstellt keinen Talk-Raum.
+4. Den Zugriff mit aktivem Seat prüfen; anschließend in einer Testumgebung die Meldungen für fehlenden Seat und fehlendes Backend getrennt prüfen. Abgelehnte Zugangsdaten öffnen die Anmeldung mit einem freundlichen Hinweis erneut; Verbindungsfehler bleiben davon unterscheidbar. Bei ausgeblendetem Haupttab bleiben die normalen Einstellungen dabei ausgeblendet. Backend- und Seat-Prüfung gelten auch nach der Anmeldung unverändert.
+5. Zum Einblenden von Tab und Einstellungen die wirksame Policy `ShowMainRibbonTab=false` entfernen oder auf `true` setzen und Outlook neu starten. Die verwaltete Zugriffsprüfung bleibt bestehen. Zum Verlassen des Modus alle drei Auslöser an allen zutreffenden Policy-Pfaden entfernen und Outlook neu starten. Gespeicherte Zugangsdaten und Einstellungen bleiben erhalten.
+
+Registry-Policies steuern den administrativen Rollout. Sie schützen nicht vor Benutzern, die diese Policy verändern oder das Add-in ersetzen können. Policy-Pfade und Berechtigungen zur Softwareverteilung entsprechend schützen.
 
 ## Nextcloud-Server vorbereiten
 
@@ -447,6 +472,8 @@ Offizielle Nextcloud-Referenzen:
 - [`dav:sync-system-addressbook`](https://docs.nextcloud.com/server/32/admin_manual/occ_command.html#sync-system-address-book)
 
 ## Optionales NC Connector Backend
+
+Die lokalen Ausweichmöglichkeiten in diesem Abschnitt gelten für nicht zentral verwaltete Installationen. Bei [Enterprise Rollout](#enterprise-rollout) sind das Backend und ein aktiv zugewiesener Seat erforderlich; die Hinweise zur zentral verwalteten Installation haben Vorrang.
 
 ### Voraussetzungen und Betriebszustände
 
@@ -788,11 +815,11 @@ Den [`/login`-Vergleich](#kurztest) ausführen. Funktioniert nur die URL mit `/i
 1. Prüfen, ob `ncc_backend_4mc` installiert und aktiviert ist.
 2. Prüfen, ob dem betroffenen Nextcloud-Benutzer ein aktiver Seat zugewiesen ist.
 3. Client-Zugriff auf `/apps/ncc_backend_4mc/api/v1/status` prüfen.
-4. Einstellungen öffnen und den angezeigten Backend- oder Seat-Status kontrollieren.
+4. Einstellungen öffnen und den angezeigten Backend- oder Seat-Status kontrollieren. Wenn `ShowMainRibbonTab=false` die Einstellungen ausblendet, den Zugriffshinweis über Freigabe oder Talk prüfen.
 5. Prüfen, ob die Einstellung eine Vorgabe oder ein gesperrter Wert ist.
 6. Mit einem anderen Pilotbenutzer mit zugewiesenem Seat vergleichen.
 
-Freigaben und Talk können während eines Backend-Ausfalls lokale Einstellungen verwenden. Verwaltete Signaturen und separate Passwortzustellung benötigen einen gültigen Backend-Zustand.
+In nicht zentral verwalteten Installationen können Freigaben und Talk während eines Backend-Ausfalls lokale Einstellungen verwenden. Verwaltete Signaturen und separate Passwortzustellung benötigen einen gültigen Backend-Zustand. Enterprise Rollout benötigt bestätigten Zugriff oder einen passenden zuletzt erfolgreich bestätigten Status wie oben beschrieben.
 
 ### Verwaltete Signatur fehlt oder steht falsch
 

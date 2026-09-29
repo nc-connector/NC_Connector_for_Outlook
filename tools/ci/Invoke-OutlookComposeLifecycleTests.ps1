@@ -896,6 +896,8 @@ public static class AttachmentSendGateRegression
     }
     private sealed class TalkServiceConfiguration
     {
+        internal TalkServiceConfiguration() { }
+        internal TalkServiceConfiguration(string url, string username, string password) { }
         internal bool IsComplete() { return true; }
     }
     private sealed class BackendPolicyStatus
@@ -904,9 +906,15 @@ public static class AttachmentSendGateRegression
     }
     // The policy-mapping suite executes the real local-choice resolver.
     // This send-gate harness only carries the snapshot's local-settings reference.
-    private sealed class AddinSettings { }
+    private sealed class AddinSettings
+    {
+        internal bool IsEnterpriseRollout;
+        internal string ServerUrl, Username, AppPassword;
+    }
     private sealed class Owner
     {
+        internal AddinSettings _currentSettings;
+        internal BackendPolicyStatus Confirmed;
         internal bool SettingsComplete = true;
         internal bool GuardBlocks;
         internal int GuardCalls;
@@ -914,6 +922,10 @@ public static class AttachmentSendGateRegression
         internal bool SettingsAreComplete() { return SettingsComplete; }
         internal BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string stage)
         { return PolicyStatus; }
+        internal BackendPolicyStatus FetchEnterpriseRolloutPolicyStatus(TalkServiceConfiguration configuration, string stage)
+        { return PolicyStatus; }
+        internal bool TryGetCachedEmailSignaturePolicyStatus(TalkServiceConfiguration configuration, out BackendPolicyStatus status)
+        { status = Confirmed; return status != null; }
         internal bool TryGetAttachmentAutomationGuardState(
             string stage, string key, out OutlookAttachmentAutomationGuardService.GuardState state)
         {
@@ -945,6 +957,7 @@ public static class AttachmentSendGateRegression
         {
             _localSettings = new AttachmentAutomationSettings
             {
+                LocalSettings = new AddinSettings(),
                 AlwaysConnector = alwaysConnector,
                 OfferAboveEnabled = offerAboveEnabled,
                 ThresholdMb = 10,
@@ -964,7 +977,12 @@ public static class AttachmentSendGateRegression
             return TryValidateAttachmentPolicyBeforeSend(ref cancel);
         }
         internal void UseLocalNonRequiredPolicy()
-        { _localSettings = new AttachmentAutomationSettings(); }
+        { _localSettings = new AttachmentAutomationSettings { LocalSettings = new AddinSettings() }; }
+        internal void BlockRollout()
+        {
+            _localSettings.EnterpriseRolloutBlocked = true;
+            _owner._currentSettings = new AddinSettings { IsEnterpriseRollout = true };
+        }
         internal void HoldBackgroundRefresh()
         { _attachmentAutomationSettingsRefreshTask = new TaskCompletionSource<AttachmentAutomationSettings>().Task; }
         internal async Task<bool> ReadAlwaysAsync()
@@ -1108,6 +1126,15 @@ public static class AttachmentSendGateRegression
             Check(MessageBox.Notices.Count == 0 && noAccount.RefreshCalls == 1
                 && noAccount.LocalReads == (state == "missing" ? 1 : 0),
                 "An incomplete account no longer uses its cached policy or missing-policy local fallback.");
+        }
+
+        foreach (string state in new[] { "fresh", "stale", "missing" })
+        {
+            var blocked = new Subscription(true, false, state);
+            blocked.BlockRollout();
+            bool cancel = false;
+            Check(blocked.Validate(ref cancel) && !cancel && MessageBox.Notices.Count == 0,
+                "A blocked managed rollout must not block ordinary Outlook mail or show a routing notice.");
         }
 
         var disposed = new Subscription(true, false, "missing");

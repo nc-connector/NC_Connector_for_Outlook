@@ -59,7 +59,7 @@ namespace NcTalkOutlookAddIn.Controllers
             _outlookProfileScope = outlookProfileScope ?? string.Empty;
         }
 
-        internal async Task RunAsync()
+        internal async Task<bool> RunAsync(bool requireAuthentication = false, bool authenticationRejected = false)
         {
             AddinSettings currentSettings = ((_getCurrentSettings != null ? _getCurrentSettings() : null) ?? new AddinSettings()).Clone();
             currentSettings.ApplyManagedSetupPolicy(ManagedSetupPolicy.Load());
@@ -80,18 +80,18 @@ namespace NcTalkOutlookAddIn.Controllers
                 _dataDirectory,
                 _outlookProfileScope);
             Task<BackendPolicyStatus> policyStatusTask =
-                _fetchBackendPolicyStatus != null
+                configuration.IsComplete() && !requireAuthentication && _fetchBackendPolicyStatus != null
                     ? Task.Run(
                         () => _fetchBackendPolicyStatus(
                             configuration,
                             "settings_open_initial"))
                     : Task.FromResult<BackendPolicyStatus>(null);
             Task<IfbAddressBookCache.SystemAddressbookStatus> addressbookStatusTask =
-                Task.Run(
+                configuration.IsComplete() && !requireAuthentication ? Task.Run(
                     () => addressBookCache.GetSystemAddressbookStatus(
                         configuration,
                         currentSettings.IfbCacheHours,
-                        false));
+                        false)) : Task.FromResult<IfbAddressBookCache.SystemAddressbookStatus>(null);
             await Task.WhenAll(
                     policyStatusTask,
                     addressbookStatusTask)
@@ -106,19 +106,25 @@ namespace NcTalkOutlookAddIn.Controllers
                 throw new InvalidOperationException("The Outlook UI-thread dispatcher is unavailable.");
             }
 
+            bool saved = false;
             await _runOnOutlookUiThreadAsync(
-                () => RunSettingsDialogOnUiThread(
+                () => saved = RunSettingsDialogOnUiThread(
                     currentSettings,
                     initialPolicyStatus,
                     addressBookCache,
-                    initialAddressbookStatus)).ConfigureAwait(false);
+                    initialAddressbookStatus,
+                    requireAuthentication,
+                    authenticationRejected)).ConfigureAwait(false);
+            return saved;
         }
 
-        private void RunSettingsDialogOnUiThread(
+        private bool RunSettingsDialogOnUiThread(
             AddinSettings currentSettings,
             BackendPolicyStatus initialPolicyStatus,
             IfbAddressBookCache addressBookCache,
-            IfbAddressBookCache.SystemAddressbookStatus initialAddressbookStatus)
+            IfbAddressBookCache.SystemAddressbookStatus initialAddressbookStatus,
+            bool requireAuthentication,
+            bool authenticationRejected)
         {
             // SettingsForm owns Outlook COM references and async WinForms handlers, so its complete
             // modal lifetime must begin on the Outlook STA thread captured during add-in startup.
@@ -129,6 +135,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 addressBookCache,
                 initialAddressbookStatus))
             {
+                if (requireAuthentication)
+                {
+                    form.BeginAuthentication(authenticationRejected);
+                }
                 if (form.ShowDialog() == DialogResult.OK)
                 {
                     AddinSettings previousSettings = currentSettings.Clone();
@@ -137,7 +147,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     if (!ValidateTransportSecurityBeforeSave(previousSettings, nextSettings))
                     {
                         _logSettings("Settings save aborted because transport security settings could not be applied.");
-                        return;
+                        return false;
                     }
 
                     if (_persistSettings == null)
@@ -164,7 +174,7 @@ namespace NcTalkOutlookAddIn.Controllers
                             Strings.SettingsFormTitle,
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Error);
-                        return;
+                        return false;
                     }
 
                     ApplyRuntimeSettings(nextSettings);
@@ -188,7 +198,7 @@ namespace NcTalkOutlookAddIn.Controllers
                                 false);
                         }
                         _logSettings("Settings save reverted because transport security settings could not be committed.");
-                        return;
+                        return false;
                     }
 
                     if (_applyIfbSettings != null)
@@ -203,12 +213,14 @@ namespace NcTalkOutlookAddIn.Controllers
                         + ", Debug=" + nextSettings.DebugLoggingEnabled
                         + ", LogAnonymize=" + nextSettings.LogAnonymizationEnabled
                         + ").");
+                    return true;
                 }
                 else
                 {
                     _logSettings("Settings dialog closed without changes.");
                 }
             }
+            return false;
         }
 
         private bool ValidateTransportSecurityBeforeSave(

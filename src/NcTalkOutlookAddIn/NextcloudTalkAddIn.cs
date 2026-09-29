@@ -137,7 +137,7 @@ namespace NcTalkOutlookAddIn
                     @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
   <ribbon>
     <tabs>
-      <tab id='NcTalkExplorerTab' label='{0}' insertAfterMso='TabMail'>
+      <tab id='NcTalkExplorerTab' label='{0}' insertAfterMso='TabMail' getVisible='OnGetMainRibbonTabVisible'>
         <group id='NcTalkExplorerGroup' label='{1}'>
           <button id='NcTalkSettingsExplorerButton'
                   label='{2}'
@@ -233,6 +233,10 @@ namespace NcTalkOutlookAddIn
             try
             {
                 EnsureSettingsLoaded();
+                if (!_currentSettings.ShowMainRibbonTab)
+                {
+                    return;
+                }
                 await CreateSettingsWorkflowController().RunAsync();
             }
             catch (Exception ex)
@@ -273,6 +277,18 @@ namespace NcTalkOutlookAddIn
                     ? _settingsStorage.DataDirectory
                     : string.Empty,
                 OutlookProfileScope);
+        }
+
+        public bool OnGetMainRibbonTabVisible(IRibbonControl control)
+        {
+            EnsureSettingsLoaded();
+            return _currentSettings.ShowMainRibbonTab;
+        }
+
+        internal Task<bool> OpenAuthenticationSettingsAsync(bool authenticationRejected = false)
+        {
+            EnsureSettingsLoaded();
+            return CreateSettingsWorkflowController().RunAsync(true, authenticationRejected);
         }
 
         public stdole.IPictureDisp OnGetButtonImage(IRibbonControl control)
@@ -555,6 +571,11 @@ namespace NcTalkOutlookAddIn
         internal Outlook.MailItem GetActiveMailItem()
         {
             return _mailInteropController.GetActiveMailItem();
+        }
+
+        internal bool IsItemOpenForRibbonAction(object item)
+        {
+            return _mailInteropController.IsItemOpenForRibbonAction(item);
         }
 
         internal string ResolveActiveInspectorIdentityKey()

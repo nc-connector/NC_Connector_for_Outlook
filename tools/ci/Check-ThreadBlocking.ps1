@@ -98,8 +98,8 @@ Add-UiDialogBoundaryFailures `
 
 Add-UiDialogBoundaryFailures `
     -ControllerRelativePath "Controllers\SettingsWorkflowController.cs" `
-    -AsyncMethodPattern 'internal\s+async\s+Task\s+RunAsync' `
-    -UiMethodPattern 'private\s+void\s+RunSettingsDialogOnUiThread' `
+    -AsyncMethodPattern 'internal\s+async\s+Task<bool>\s+RunAsync' `
+    -UiMethodPattern 'private\s+bool\s+RunSettingsDialogOnUiThread' `
     -DispatcherPattern '_runOnOutlookUiThreadAsync\s*\(' `
     -DialogType "SettingsForm" `
     -FlowName "settings"

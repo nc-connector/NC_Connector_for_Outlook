@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Beállítások"
   },
+  "connection_setup_title": {
+    "message": "Csatlakozás a Nextcloudhoz"
+  },
+  "connection_setup_message": {
+    "message": "Csatlakoztassa az NC Connectort a Nextcloud-fiókjához. Jelentkezzen be böngészőn keresztül, vagy adja meg a felhasználónevét és az alkalmazásjelszavát."
+  },
+  "connection_sign_in_required": {
+    "message": "Nem sikerült bejelentkezni a Nextcloudba. Kérjük, jelentkezzen be újra."
+  },
   "options_base_url_label": {
     "message": "Nextcloud URL-cím"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Ez a telepítés központilag felügyelt, és hozzárendelt, érvényes NC Connector felhasználói licencet igényel."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Ez a telepítés központilag felügyelt. Az NC Connector használatához előbb telepíteni és konfigurálni kell az NC Connector Backend alkalmazást a Nextcloudban. Kérjük, forduljon a rendszergazdához."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Ez a telepítés központilag felügyelt. Az NC Connector használatára vonatkozó jogosultságot nem sikerült ellenőrizni. Kérjük, ellenőrizze a kapcsolatot, és próbálja újra."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "A Nextcloud URL-t a szervezet kezeli."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "A Nextcloud kiszolgáló jelenleg nem érhető el. Kérjük, ellenőrizze az internetkapcsolatot."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "A hitelesítő adatok nem lettek elfogadva: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "A Nextcloud kiszolgálóhoz való kapcsolódás sikertelen: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "A hitelesítő adatok nem ellenőrizhetők."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "A hitelesítő adatok nem ellenőrizhetők: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "Az IFB nem indítható el: $1"

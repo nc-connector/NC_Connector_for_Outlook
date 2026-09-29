@@ -57,6 +57,8 @@ namespace NcTalkOutlookAddIn.Settings
             ManagedNextcloudUrl = string.Empty;
             ManagedNextcloudUrlSource = string.Empty;
             ManagedNextcloudUrlLocked = false;
+            IsEnterpriseRollout = false;
+            ShowMainRibbonTab = true;
         }
 
         public string ServerUrl { get; set; }
@@ -252,6 +254,10 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal bool ManagedNextcloudUrlLocked { get; private set; }
 
+        internal bool IsEnterpriseRollout { get; private set; }
+
+        internal bool ShowMainRibbonTab { get; private set; }
+
         internal bool HasManagedNextcloudUrl
         {
             get { return !string.IsNullOrWhiteSpace(ManagedNextcloudUrl); }
@@ -380,6 +386,8 @@ namespace NcTalkOutlookAddIn.Settings
             ManagedNextcloudUrl = string.Empty;
             ManagedNextcloudUrlSource = string.Empty;
             ManagedNextcloudUrlLocked = false;
+            IsEnterpriseRollout = policy != null && policy.IsEnterpriseRollout;
+            ShowMainRibbonTab = policy == null || policy.ShowMainRibbonTab;
 
             if (policy == null || !policy.HasNextcloudUrl)
             {

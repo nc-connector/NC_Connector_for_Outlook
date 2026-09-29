@@ -78,6 +78,14 @@ namespace NcTalkOutlookAddIn
             }
         }
 
+        internal BackendPolicyStatus FetchEnterpriseRolloutPolicyStatus(
+            TalkServiceConfiguration configuration, string trigger)
+        {
+            // Called by background workers; never wait for HTTP from a ribbon or Send callback.
+            BackendPolicyStatus fetched = FetchBackendPolicyStatus(configuration, trigger);
+            return StoreBackendPolicySnapshot(configuration, fetched, trigger);
+        }
+
         internal bool TryGetCachedEmailSignaturePolicyStatus(
             TalkServiceConfiguration configuration,
             out BackendPolicyStatus status)
@@ -99,7 +107,22 @@ namespace NcTalkOutlookAddIn
         {
             BackendPolicyStatus fetched = await Task.Run(
                 () => FetchBackendPolicyStatus(configuration, trigger)).ConfigureAwait(false);
-            BackendPolicyStatus effective = fetched;
+            BackendPolicyStatus effective = StoreBackendPolicySnapshot(configuration, fetched, trigger);
+            lock (_emailSignaturePolicyCacheSync)
+            {
+                if (string.Equals(_emailSignaturePolicyFetchKey, cacheKey, StringComparison.Ordinal))
+                {
+                    _emailSignaturePolicyFetchTask = null;
+                    _emailSignaturePolicyFetchKey = string.Empty;
+                }
+            }
+            return effective;
+        }
+
+        private BackendPolicyStatus StoreBackendPolicySnapshot(
+            TalkServiceConfiguration configuration, BackendPolicyStatus fetched, string trigger)
+        {
+            string cacheKey = BuildEmailSignaturePolicyCacheKey(configuration);
             lock (_emailSignaturePolicyCacheSync)
             {
                 if (fetched != null && fetched.FetchSucceeded)
@@ -111,17 +134,11 @@ namespace NcTalkOutlookAddIn
                 else if (_emailSignaturePolicyCache != null
                          && string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal))
                 {
-                    effective = _emailSignaturePolicyCache;
                     LogCore("Email signature policy fetch failed; using last successful snapshot (trigger=" + (trigger ?? "n/a") + ").");
-                }
-
-                if (string.Equals(_emailSignaturePolicyFetchKey, cacheKey, StringComparison.Ordinal))
-                {
-                    _emailSignaturePolicyFetchTask = null;
-                    _emailSignaturePolicyFetchKey = string.Empty;
+                    return _emailSignaturePolicyCache;
                 }
             }
-            return effective;
+            return fetched;
         }
 
         private static string BuildEmailSignaturePolicyCacheKey(TalkServiceConfiguration configuration)

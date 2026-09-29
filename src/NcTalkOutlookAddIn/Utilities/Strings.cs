@@ -585,6 +585,9 @@ namespace NcTalkOutlookAddIn.Utilities
                     : "https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#system-address-book";
             }
         }
+        internal static string EnterpriseRolloutSeatRequired { get { return Get("enterprise_rollout_seat_required", "This installation is centrally managed and requires an assigned, valid NC Connector Seat."); } }
+        internal static string EnterpriseRolloutBackendRequired { get { return Get("enterprise_rollout_backend_required", "This installation is centrally managed. The NC Connector Backend must be installed and configured in Nextcloud before you can use NC Connector. Please contact your administrator."); } }
+        internal static string EnterpriseRolloutStatusUnavailable { get { return Get("enterprise_rollout_status_unavailable", "This installation is centrally managed. Access to NC Connector could not be verified. Please check your connection and try again."); } }
         internal static string PolicyWarningTitle { get { return Get("policy_warning_title", "NC Connector status"); } }
         internal static string PolicyWarningNoSeat { get { return Get("policy_warning_no_seat", "No NC Connector seat is assigned to your account. You can continue to use sharing and Talk with your local settings. Pro features require a seat assigned by your administrator."); } }
         internal static string PolicyWarningLicenseInvalid { get { return Get("policy_warning_license_invalid", "The backend could not confirm access to Pro features. Basic features remain available."); } }
@@ -753,6 +756,9 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string ConnectionFailureGenericGuidance { get { return Get("outlook_connection_failure_generic_guidance", "Check server reachability, certificate trust, proxy settings, and machine TLS policy."); } }
 
         internal static string ErrorMissingCredentials { get { return Get("error_credentials_missing", "Please configure server URL, username, and app password in the settings first."); } }
+        internal static string ConnectionSetupTitle { get { return Get("connection_setup_title", "Connect to Nextcloud"); } }
+        internal static string ConnectionSetupMessage { get { return Get("connection_setup_message", "Please connect NC Connector to your Nextcloud account. Sign in through your browser or enter your username and app password."); } }
+        internal static string ConnectionSignInRequired { get { return Get("connection_sign_in_required", "Sign-in to Nextcloud was not successful. Please sign in again."); } }
         internal static string ErrorNoAppointment { get { return Get("outlook_error_no_appointment", "Could not determine the current appointment item."); } }
         internal static string ConfirmReplaceRoom { get { return Get("outlook_confirm_replace_room", "A Talk room already exists for this appointment. Replace it?"); } }
         internal static string ErrorAttachRoomToAppointment { get { return Get("outlook_error_attach_room_to_appointment", "The Talk room could not be added to the appointment. The previous appointment content was kept."); } }
@@ -761,11 +767,9 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string InfoRoomCreated { get { return Get("ui_alert_room_created", "Talk room \"{0}\" has been created."); } }
         internal static string PromptOpenSettings { get { return Get("outlook_prompt_open_settings", "{0}\n\nOpen settings now?"); } }
         internal static string ErrorServerUnavailable { get { return Get("outlook_error_server_unavailable", "The Nextcloud server is currently unreachable. Please check your Internet connection."); } }
-        internal static string ErrorAuthenticationRejected { get { return Get("outlook_error_authentication_rejected_format", "Credentials were not accepted: {0}"); } }
         internal static string ErrorConnectionFailed { get { return Get("outlook_error_connection_failed_format", "Connection to the Nextcloud server failed: {0}"); } }
         internal static string ErrorUnknownAuthentication { get { return Get("outlook_error_unknown_authentication_format", "Unknown error during authentication: {0}"); } }
         internal static string ErrorCredentialsNotVerified { get { return Get("outlook_error_credentials_not_verified", "Credentials could not be verified."); } }
-        internal static string ErrorCredentialsNotVerifiedFormat { get { return Get("outlook_error_credentials_not_verified_format", "Credentials could not be verified: {0}"); } }
 
         internal static string WarningIfbStartFailed { get { return Get("outlook_warning_ifb_start_failed_format", "IFB could not be started: {0}"); } }
         internal static string WarningRoomDeleteFailed { get { return Get("error_room_delete_failed", "Room could not be deleted: {0}"); } }

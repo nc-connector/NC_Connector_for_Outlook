@@ -35,6 +35,7 @@ namespace NcTalkOutlookAddIn.Settings
 {
     internal sealed class AddinSettings
     {
+        internal bool IsEnterpriseRollout { get; set; }
         internal bool? EmailSignatureOnCompose { get; set; }
         internal bool? EmailSignatureOnReply { get; set; }
         internal bool? EmailSignatureOnForward { get; set; }
@@ -854,7 +855,7 @@ internal static class OutlookPolicyUiTests
     private static Type T(string name) { return Product.GetType("NcTalkOutlookAddIn." + name, true); }
     private static object New(string name, params object[] args)
     {
-        return T(name).GetConstructors(Flags).Single(c => c.GetParameters().Length == args.Length).Invoke(args);
+        return T(name).GetConstructors(Flags).Single(c => !c.IsStatic && c.GetParameters().Length == args.Length).Invoke(args);
     }
     private static MethodInfo Method(Type type, string name, int count)
     {
@@ -1114,6 +1115,228 @@ internal static class OutlookPolicyUiTests
         }
         Console.WriteLine("[OK] " + cases + " operative attachment combinations plus real threshold controls");
     }
+    private static object Managed(object url, object locked, object ribbon, string source)
+    {
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, source);
+    }
+    private static object ManagedSettings(object url, object ribbon, object locked = null)
+    {
+        object settings = New("Settings.AddinSettings");
+        Call(settings, "ApplyManagedSetupPolicy", Managed(url, locked, ribbon, "test"));
+        return settings;
+    }
+    private static string RolloutNotice(object settings, object status)
+    {
+        return (string)Call(T("Utilities.PolicyUiHelper"), "GetEnterpriseRolloutNotice", settings, status);
+    }
+    private static void TestEnterpriseRollout(string root)
+    {
+        foreach (object url in new object[] { null, "", "invalid url", "https://cloud.example.test/nextcloud" })
+        foreach (object locked in new object[] { null, true, false, 1, 0, "true", "false", "", "bad value" })
+        foreach (object ribbon in new object[] { null, true, false, 1, 0, "true", "false", "bad value" })
+        {
+            object local = ManagedSettings(url, ribbon, locked);
+            bool managed = url != null || locked != null || ribbon != null;
+            bool visible = !(object.Equals(ribbon, false) || object.Equals(ribbon, 0) || object.Equals(ribbon, "false"));
+            Check((bool)Get(local, "IsEnterpriseRollout") == managed, "Managed detection depends on presence");
+            Check((bool)Get(local, "ShowMainRibbonTab") == visible, "Ribbon visibility default and boolean value");
+            object cloned = Call(local, "Clone");
+            Check((bool)Get(cloned, "IsEnterpriseRollout") == managed && (bool)Get(cloned, "ShowMainRibbonTab") == visible, "Clone preserves registry state");
+            string xml = Serialize(local);
+            Check(!xml.Contains("IsEnterpriseRollout") && !xml.Contains("ShowMainRibbonTab"), "Managed flags cannot be persisted in profile XML");
+            object addin = New("NextcloudTalkAddIn");
+            addin.GetType().GetField("_currentSettings", Flags).SetValue(addin, local);
+            Check((bool)Call(addin, "OnGetMainRibbonTabVisible", (object)null) == visible, "Main tab callback follows policy");
+            string explorer = (string)Call(addin, "GetCustomUI", "Microsoft.Outlook.Explorer");
+            var doc = new XmlDocument(); doc.LoadXml(explorer);
+            var tab = (XmlElement)doc.SelectSingleNode("//*[local-name()='tab' and @id='NcTalkExplorerTab']");
+            var group = (XmlElement)tab.SelectSingleNode("*[local-name()='group' and @id='NcTalkExplorerGroup']");
+            var button = (XmlElement)group.SelectSingleNode("*[local-name()='button' and @id='NcTalkSettingsExplorerButton']");
+            Check(tab.GetAttribute("getVisible") == "OnGetMainRibbonTabVisible", "Main tab owns Settings visibility");
+            Check(!group.HasAttribute("getVisible") && !group.HasAttribute("visible") && !button.HasAttribute("getVisible") && !button.HasAttribute("visible"), "Visible main tab retains the Settings button without a separate visibility rule");
+            Check(button.GetAttribute("onAction") == "OnSettingsButtonPressed" && button.GetAttribute("getImage") == "OnGetButtonImage", "Settings action and icon remain wired");
+            Check(explorer.Contains("OnFileLinkButtonPressed") && !explorer.Contains("OnEnterpriseStatus"), "Inline action retained without replacement button");
+        }
+        for (int location = 0; location < 4; location++)
+        foreach (object locked in new object[] { true, false, 1, 0, "true", "false", "", "bad value" })
+        {
+            Array lockPolicies = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 4);
+            lockPolicies.SetValue(Managed(null, locked, null, "lock-only"), location);
+            object lockPolicy = Call(T("Settings.ManagedSetupPolicy"), "Resolve", lockPolicies);
+            object justLock = New("Settings.AddinSettings");
+            Set(justLock, "ServerUrl", "https://saved.example.test");
+            Call(justLock, "ApplyManagedSetupPolicy", lockPolicy);
+            Check((bool)Get(justLock, "IsEnterpriseRollout") && (bool)Get(justLock, "ShowMainRibbonTab"), "Lock-only policy activates rollout in every hive/view with visible tab default");
+            Check((string)Get(justLock, "ServerUrl") == "https://saved.example.test" && !(bool)Get(justLock, "ManagedNextcloudUrlLocked"), "Lock-only policy preserves the editable profile URL");
+        }
+        Array policies = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 3);
+        policies.SetValue(Managed(null, null, false, "HKLM64"), 0);
+        policies.SetValue(Managed("https://machine.example.test", 1, null, "HKLM32"), 1);
+        policies.SetValue(Managed("https://user.example.test", 0, true, "HKCU64"), 2);
+        object resolved = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+        Check((string)Get(resolved, "NextcloudUrl") == "https://machine.example.test" && (bool)Get(resolved, "NextcloudUrlLocked") && !(bool)Get(resolved, "ShowMainRibbonTab"), "Machine precedence resolved independently per setting");
+        policies.SetValue(Managed(null, 1, null, "HKLM64"), 0);
+        policies.SetValue(null, 1);
+        policies.SetValue(Managed("https://user.example.test", 0, false, "HKCU64"), 2);
+        resolved = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+        Check((bool)Get(resolved, "IsEnterpriseRollout") && (string)Get(resolved, "NextcloudUrl") == "https://user.example.test" && !(bool)Get(resolved, "NextcloudUrlLocked") && !(bool)Get(resolved, "ShowMainRibbonTab"), "Machine lock-only policy does not lock a separate user URL or discard its ribbon value");
+        policies.SetValue(Managed("https://machine.example.test", 0, null, "HKLM64"), 0);
+        policies.SetValue(Managed(null, 1, null, "HKCU64"), 2);
+        resolved = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+        Check((string)Get(resolved, "NextcloudUrl") == "https://machine.example.test" && !(bool)Get(resolved, "NextcloudUrlLocked"), "User lock-only policy cannot change the machine URL lock");
+        object clear = ManagedSettings(null, false);
+        Call(clear, "ApplyManagedSetupPolicy", (object)null);
+        Check(!(bool)Get(clear, "IsEnterpriseRollout") && (bool)Get(clear, "ShowMainRibbonTab"), "Removing registry policy restores defaults");
+
+        int states = 0;
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (bool managed in new[] { false, true })
+        foreach (bool lockOnly in new[] { false, true })
+        {
+            object local = ManagedSettings(null, managed && !lockOnly ? (object)true : null, managed && lockOnly ? (object)false : null);
+            object status = Status(D("attachments_always_via_ncconnector", true), D(), false, mode, seat);
+            bool blocked = managed && seat != "active";
+            Check(string.IsNullOrEmpty(RolloutNotice(local, status)) == !blocked, "Community/Pro personal rollout access " + states);
+            Type subscription = T("NextcloudTalkAddIn+MailComposeSubscription");
+            object snapshot = Call(subscription, "BuildAttachmentAutomationSettings", local, local);
+            object effective = Call(subscription, "ApplyAttachmentAutomationPolicy", snapshot, status);
+            Check((bool)Get(effective, "EnterpriseRolloutBlocked") == blocked, "Automation uses common rollout gate " + states);
+            if (blocked) Check(!(bool)Get(effective, "AlwaysConnector") && !(bool)Get(effective, "OfferAboveEnabled"), "Blocked automation leaves Outlook attachments alone");
+            states++;
+        }
+        object rollout = ManagedSettings(null, null, false);
+        object good = Status(D(), D(), true, "community", "active");
+        object missing = Status(D(), D(), true, "pro", "none");
+        Set(missing, "EndpointAvailable", false);
+        object unavailable = Status(D(), D(), true, "pro", "active");
+        Set(unavailable, "FetchSucceeded", false);
+        string backendMessage = RolloutNotice(rollout, missing);
+        string seatMessage = RolloutNotice(rollout, Status(D(), D(), true, "pro", "none"));
+        string connectionMessage = RolloutNotice(rollout, unavailable);
+        Check(backendMessage.Length > 0 && seatMessage.Length > 0 && connectionMessage.Length > 0 && backendMessage != seatMessage && backendMessage != connectionMessage && seatMessage != connectionMessage, "Missing backend, absent seat and connection error have distinct messages");
+        Check(RolloutNotice(rollout, null) == connectionMessage, "Unconfirmed state is not a missing backend or seat");
+        foreach (object status in new[] { good, missing, unavailable, null })
+            Check(RolloutNotice(New("Settings.AddinSettings"), status) == "", "Unmanaged installations unchanged");
+        foreach (object url in new object[] { null, "https://cloud.example.test" })
+        foreach (object locked in new object[] { null, true, false })
+        foreach (object ribbon in new object[] { null, true, false })
+        {
+            using (Form form = Settings(ManagedSettings(url, ribbon, locked), good))
+            {
+                var tabs = (TabControl)Field(form, "_tabControl");
+                bool hidden = object.Equals(ribbon, false);
+                Check(tabs.TabPages.Count == (hidden ? 1 : 8) && tabs.TabPages[0] == Field(form, "_generalTab"), "Only a hidden main tab restricts settings to authentication");
+                Check(!((Button)Field(form, "_loginFlowButton")).IsDisposed && !((Button)Field(form, "_saveButton")).IsDisposed, "Existing login and save controls retained");
+                var serverUrl = (TextBox)Field(form, "_serverUrlTextBox");
+                Check(serverUrl.Enabled == !(url != null && object.Equals(locked, true)), "URL editing follows its own lock, not ribbon visibility");
+            }
+        }
+        foreach (object ribbon in new object[] { null, true, false })
+        using (Form form = Settings(ManagedSettings(null, ribbon, false), good))
+        {
+            object result = Get(form, "Result");
+            bool originalDebug = (bool)Get(result, "DebugLoggingEnabled");
+            bool originalUpdate = (bool)Get(result, "UpdateNotifyEnabled");
+            ((TextBox)Field(form, "_usernameTextBox")).Text = "rollout-login";
+            ((CheckBox)Field(form, "_debugLogCheckBox")).Checked = !originalDebug;
+            ((CheckBox)Field(form, "_updateNotifyCheckBox")).Checked = !originalUpdate;
+            Task save = (Task)Call(form, "SaveSettingsAsync");
+            DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+            while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+            Check(save.IsCompleted, "Managed settings save completes without network credentials");
+            save.GetAwaiter().GetResult();
+            bool hidden = object.Equals(ribbon, false);
+            Check((form.DialogResult == DialogResult.OK) == !hidden, "Only authentication-only setup requires complete credentials before saving");
+            Check((bool)Get(result, "DebugLoggingEnabled") == (hidden ? originalDebug : !originalDebug) && (bool)Get(result, "UpdateNotifyEnabled") == (hidden ? originalUpdate : !originalUpdate), "Visible managed Settings saves non-authentication preferences");
+            Check((string)Get(result, "Username") == (hidden ? "" : "rollout-login"), "Incomplete hidden setup cannot replace credentials");
+        }
+        object owner = New("NextcloudTalkAddIn");
+        object config = New("Services.TalkServiceConfiguration", "https://cloud.example.test", "alice", "test-only");
+        Call(owner, "StoreBackendPolicySnapshot", config, good, "test");
+        DateTime previousSuccess = DateTime.UtcNow.AddMinutes(-30);
+        owner.GetType().GetField("_emailSignaturePolicyCacheFetchedAtUtc", Flags).SetValue(owner, previousSuccess);
+        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshot", config, unavailable, "test"), good), "Failed refresh retains confirmed snapshot");
+        Check((DateTime)Field(owner, "_emailSignaturePolicyCacheFetchedAtUtc") == previousSuccess, "Failed refresh does not mark the retained snapshot fresh");
+        Call(owner, "StoreBackendPolicySnapshot", config, missing, "test");
+        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshot", config, unavailable, "test"), missing), "Fresh refusal replaces previous success");
+        object other = New("Services.TalkServiceConfiguration", "https://cloud.example.test", "bob", "test-only");
+        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshot", other, unavailable, "test"), unavailable), "Rollout cache cannot cross account identity");
+        Set(rollout, "ServerUrl", "https://cloud.example.test");
+        Set(rollout, "Username", "alice");
+        Set(rollout, "AppPassword", "test-only");
+        owner.GetType().GetField("_currentSettings", Flags).SetValue(owner, rollout);
+        Type subscriptionType = T("NextcloudTalkAddIn+MailComposeSubscription");
+        object openCompose = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(subscriptionType);
+        subscriptionType.GetField("_owner", Flags).SetValue(openCompose, owner);
+        object oldRules = Call(subscriptionType, "BuildAttachmentAutomationSettings", rollout, rollout);
+        Set(oldRules, "AlwaysConnector", true);
+        subscriptionType.GetField("_attachmentAutomationSettingsSnapshot", Flags).SetValue(openCompose, oldRules);
+        subscriptionType.GetField("_attachmentAutomationSettingsSnapshotUtc", Flags).SetValue(openCompose, DateTime.UtcNow);
+        object newRules = Call(openCompose, "ReadAttachmentAutomationSettings");
+        Check((bool)Get(newRules, "EnterpriseRolloutBlocked") && !(bool)Get(newRules, "AlwaysConnector"), "Confirmed refusal immediately overrides an open compose's older routing rules");
+        Console.WriteLine("[OK] Enterprise presence, registry precedence, ribbon, onboarding, seat parity, automation and cache checks");
+    }
+    private static void TestConnectionOnboarding()
+    {
+        string title = (string)T("Utilities.Strings").GetProperty("ConnectionSetupTitle", Flags).GetValue(null, null);
+        string message = (string)T("Utilities.Strings").GetProperty("ConnectionSetupMessage", Flags).GetValue(null, null);
+        string rejected = (string)T("Utilities.Strings").GetProperty("ConnectionSignInRequired", Flags).GetValue(null, null);
+        foreach (object url in new object[] { null, "https://cloud.example.test" })
+        foreach (object ribbon in new object[] { null, true, false })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        {
+            object local = ManagedSettings(url, ribbon);
+            object status = Status(D(), D(), true, "community", seat);
+            using (Form form = Settings(local, status))
+            {
+                Check(((Label)Field(form, "_policyWarningTitleLabel")).Text == title, "Incomplete setup starts with a connection invitation, not a seat failure");
+                Check(((Label)Field(form, "_policyWarningTextLabel")).Text == message, "Managed and local setup share the friendly message");
+                Check(((LinkLabel)Field(form, "_policyWarningLinkLabel")).Tag == null, "Setup cannot expose a stale admin action");
+                Call(form, "BeginAuthentication", true);
+                Check(((Label)Field(form, "_policyWarningTextLabel")).Text == rejected, "Rejected authentication has specific guidance");
+                ((TextBox)Field(form, "_usernameTextBox")).Text = "onboarding-test";
+                Check(!(bool)Field(form, "_authenticationRejected") && (bool)Field(form, "_connectionSetupPending"), "Editing credentials clears rejection but still requires verification");
+                Check(((Label)Field(form, "_policyWarningTextLabel")).Text == message, "Editing credentials restores connection invitation");
+                Task save = (Task)Call(form, "SaveSettingsAsync");
+                Check(save.IsCompleted, "Incomplete onboarding save does not start network calls");
+                save.GetAwaiter().GetResult();
+                Check(form.DialogResult != DialogResult.OK && (string)Get(Get(form, "Result"), "Username") == "", "Incomplete onboarding cannot report or persist success");
+                Check(((TabControl)Field(form, "_tabControl")).TabPages.Count == (object.Equals(ribbon, false) ? 1 : 8), "Onboarding does not change ribbon-based settings visibility");
+                Check((bool)Get(Get(form, "Result"), "TransportTlsEnable12") == (bool)Get(local, "TransportTlsEnable12")
+                    && (bool)Get(Get(form, "Result"), "TransportTlsEnable13") == (bool)Get(local, "TransportTlsEnable13")
+                    && (bool)Get(Get(form, "Result"), "TransportTlsUseSystemDefault") == (bool)Get(local, "TransportTlsUseSystemDefault"), "Onboarding preserves configured TLS options");
+            }
+        }
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        {
+            object local = ManagedSettings("https://cloud.example.test", true);
+            Set(local, "Username", "onboarding-test");
+            Set(local, "AppPassword", "test-only");
+            object status = Status(D(), D(), true, mode, seat);
+            using (Form form = Settings(local, status))
+            {
+                Check(((Label)Field(form, "_policyWarningTextLabel")).Text == RolloutNotice(local, status), "Complete setup retains the actual backend/seat notice");
+                Call(form, "BeginAuthentication", false);
+                Check((bool)Field(form, "_connectionSetupPending"), "Explicit reauthentication requires a new verification");
+                object failure = New("Services.TalkServiceException", "test rejection", true, System.Net.HttpStatusCode.Unauthorized, "", false);
+                Call(form, "HandleServiceFailure", "{0}", failure);
+                Check((bool)Field(form, "_authenticationRejected") && Field(form, "_backendPolicyStatus") == null, "Authentication failure clears old account policy");
+                Check(((Label)Field(form, "_policyWarningTextLabel")).Text == rejected, "Authentication failure is not presented as a seat failure");
+                Call(form, "BeginAuthentication", false);
+                failure = New("Services.TalkServiceException", "server unavailable", false, System.Net.HttpStatusCode.ServiceUnavailable, "", false);
+                Call(form, "HandleServiceFailure", "{0}", failure);
+                Check(!(bool)Field(form, "_authenticationRejected"), "Server failure is not classified as rejected credentials");
+                form.Dispose();
+                Call(form, "SetBusy", false);
+                Call(form, "SetStatus", "late result", false);
+                Call(form, "HandleServiceFailure", "{0}", failure);
+                Check(form.IsDisposed, "Late network completion cannot reopen a cancelled settings form");
+            }
+        }
+        Console.WriteLine("[OK] Friendly managed/local onboarding, incomplete saves, credential changes, seat parity and closed-form callbacks");
+    }
     [STAThread]
     public static int Main(string[] args)
     {
@@ -1124,6 +1347,8 @@ internal static class OutlookPolicyUiTests
             TestWizards();
             TestSettingsEdits(root);
             TestAttachmentAutomation();
+            TestEnterpriseRollout(root);
+            TestConnectionOnboarding();
             Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
@@ -1135,6 +1360,120 @@ internal static class OutlookPolicyUiTests
     if ($LASTEXITCODE -ne 0) { throw 'Policy UI test harness compilation failed.' }
     & $uiExe (Join-Path $uiOutput 'NcTalkOutlookAddIn.dll') $TempRoot
     if ($LASTEXITCODE -ne 0) { throw 'Production policy/persistence/UI tests failed.' }
+
+    # Exercise the production workflow with dialog/network doubles; never touch a user's profile.
+    $workflowSource = Join-Path $TempRoot 'SettingsWorkflowTests.cs'
+    @'
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using NcTalkOutlookAddIn.Controllers;
+using NcTalkOutlookAddIn.Settings;
+using NcTalkOutlookAddIn.UI;
+using System.Windows.Forms;
+namespace Microsoft.Office.Interop.Outlook { public class Application {} }
+namespace NcTalkOutlookAddIn.Models { public class BackendPolicyStatus {} }
+namespace System.Windows.Forms {
+    public enum DialogResult { Cancel, OK }
+    public enum MessageBoxButtons { OK }
+    public enum MessageBoxIcon { Error }
+    public static class MessageBox {
+        public static int Calls;
+        public static void Show(object owner, string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon) { Calls++; }
+    }
+}
+namespace NcTalkOutlookAddIn.Settings {
+    public class AddinSettings {
+        public string ServerUrl = "https://example.test", Username = "old", AppPassword = "test-only";
+        public bool HasManagedNextcloudUrl, ManagedNextcloudUrlLocked, IfbEnabled, DebugLoggingEnabled, LogAnonymizationEnabled;
+        public string ManagedNextcloudUrlSource = "test", AuthMode = "manual";
+        public int IfbCacheHours = 24, IfbPort = 5000;
+        public AddinSettings Clone() { return (AddinSettings)MemberwiseClone(); }
+        public void ApplyManagedSetupPolicy(object policy) {}
+    }
+    public static class ManagedSetupPolicy { public static object Load() { return null; } }
+}
+namespace NcTalkOutlookAddIn.Services {
+    public class TalkServiceConfiguration {
+        private readonly bool complete;
+        public TalkServiceConfiguration(string url, string user, string password) { complete = url.Length > 0 && user.Length > 0 && password.Length > 0; }
+        public bool IsComplete() { return complete; }
+    }
+    public class IfbAddressBookCache {
+        public class SystemAddressbookStatus {}
+        public IfbAddressBookCache(string directory, string profile) {}
+        public SystemAddressbookStatus GetSystemAddressbookStatus(TalkServiceConfiguration config, int hours, bool force) { throw new Exception("Unexpected pre-authentication address-book request"); }
+    }
+}
+namespace NcTalkOutlookAddIn.Utilities {
+    public static class LogCategories { public const string Core = "core"; }
+    public static class DiagnosticsLogger { public static void LogException(string category, string message, Exception ex) {} }
+    public static class Strings { public const string SettingsSaveFailed = "save failed", SettingsFormTitle = "settings"; }
+}
+namespace NcTalkOutlookAddIn.UI {
+    public sealed class SettingsForm : IDisposable {
+        public static DialogResult NextResult;
+        public static bool AuthenticationStarted, Rejected, Disposed;
+        public AddinSettings Result;
+        public SettingsForm(AddinSettings current, object app, object policy, object cache, object book) {
+            Result = current.Clone(); Result.Username = "new";
+        }
+        public void BeginAuthentication(bool rejected) { AuthenticationStarted = true; Rejected = rejected; }
+        public DialogResult ShowDialog() { return NextResult; }
+        public void Dispose() { Disposed = true; }
+    }
+}
+internal static class SettingsWorkflowTests {
+    private static int checks;
+    private static void Check(bool value, string name) { checks++; if (!value) throw new Exception(name); }
+    public static int Main() {
+        try {
+            foreach (string scenario in new[] { "cancel", "save", "persist-failure", "validate-failure", "commit-failure", "incomplete-cancel" })
+            foreach (bool rejected in new[] { false, true }) {
+                var current = new AddinSettings();
+                bool requireAuth = scenario != "incomplete-cancel";
+                if (!requireAuth) current.AppPassword = "";
+                var events = new List<string>();
+                SettingsForm.NextResult = scenario.EndsWith("cancel") ? DialogResult.Cancel : DialogResult.OK;
+                SettingsForm.AuthenticationStarted = SettingsForm.Rejected = SettingsForm.Disposed = false;
+                MessageBox.Calls = 0;
+                var workflow = new SettingsWorkflowController(null,
+                    () => current,
+                    next => { events.Add("runtime:" + next.Username); current = next; },
+                    (config, source) => { throw new Exception("Unexpected pre-authentication backend request"); },
+                    next => events.Add("diagnostics"),
+                    (next, source, interactive) => {
+                        events.Add(source);
+                        return !(scenario == "validate-failure" && source == "settings_save_validate")
+                            && !(scenario == "commit-failure" && source == "settings_save_commit");
+                    },
+                    () => events.Add("ifb"),
+                    next => { events.Add("persist:" + next.Username); if (scenario == "persist-failure") throw new Exception("test write failure"); },
+                    action => { events.Add("dispatch"); action(); return Task.FromResult(0); },
+                    message => {}, "test-directory", "test-profile");
+                bool saved = workflow.RunAsync(requireAuth, rejected).GetAwaiter().GetResult();
+                Check(saved == (scenario == "save"), scenario + " success result");
+                Check(SettingsForm.AuthenticationStarted == requireAuth && SettingsForm.Rejected == (requireAuth && rejected), "Authentication context reaches dialog");
+                Check(SettingsForm.Disposed, "Dialog disposed on every outcome");
+                Check(current.Username == (saved ? "new" : "old"), "Runtime state follows successful persistence only");
+                Check(events.Contains("ifb") == saved, "IFB applies only after successful commit");
+                Check(MessageBox.Calls == (scenario == "persist-failure" ? 1 : 0), "Only a write error displays the persistence error");
+                if (scenario.EndsWith("cancel")) Check(events.Count == 1, "Cancellation has no persistence or runtime side effects");
+                if (scenario == "save") Check(events.IndexOf("persist:new") < events.IndexOf("runtime:new") && events.IndexOf("settings_save_commit") < events.IndexOf("ifb"), "Persistence precedes runtime and IFB");
+                if (scenario == "validate-failure") Check(!events.Contains("persist:new"), "Validation failure does not save");
+                if (scenario == "commit-failure") Check(events.Contains("persist:old") && events.Contains("settings_save_commit_revert"), "Failed commit restores previous settings");
+            }
+            Console.WriteLine("[OK] " + checks + " production settings-workflow save/cancel/failure assertions passed");
+            return 0;
+        } catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+}
+'@ | Set-Content -LiteralPath $workflowSource -Encoding UTF8
+    $workflowExe = Join-Path $TempRoot 'SettingsWorkflowTests.exe'
+    & $csc /noconfig /nologo /target:exe "/out:$workflowExe" /reference:System.dll /reference:System.Core.dll $workflowSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Controllers/SettingsWorkflowController.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Settings workflow test harness compilation failed.' }
+    & $workflowExe
+    if ($LASTEXITCODE -ne 0) { throw 'Production settings workflow tests failed.' }
 }
 finally {
     if (Test-Path $TempRoot) {

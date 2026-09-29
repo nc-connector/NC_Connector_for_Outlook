@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Ajustes"
   },
+  "connection_setup_title": {
+    "message": "Conectar con Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Conecta NC Connector con tu cuenta de Nextcloud. Inicia sesión a través del navegador o introduce tu nombre de usuario y contraseña de aplicación."
+  },
+  "connection_sign_in_required": {
+    "message": "No se ha podido iniciar sesión en Nextcloud. Vuelve a iniciar sesión."
+  },
   "options_base_url_label": {
     "message": "URL de Nextcloud"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Esta instalación se administra de forma centralizada y requiere una licencia de usuario de NC Connector válida y asignada."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Esta instalación se administra de forma centralizada. Antes de poder utilizar NC Connector, es necesario instalar y configurar NC Connector Backend en Nextcloud. Póngase en contacto con su administrador."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Esta instalación se administra de forma centralizada. No se ha podido verificar el acceso a NC Connector. Compruebe su conexión e inténtelo de nuevo."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "La URL de Nextcloud la gestiona tu organización."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "El servidor de Nextcloud no está accesible en este momento. Compruebe su conexión a Internet."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Las credenciales no fueron aceptadas: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "La conexión al servidor de Nextcloud falló: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "No se pudieron verificar las credenciales."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "No se pudieron verificar las credenciales: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "No se pudo iniciar IFB: $1"

@@ -14,11 +14,23 @@ namespace NcTalkOutlookAddIn.Settings
         private const string PolicyKeyPath = @"Software\Policies\NC Connector";
         private const string NextcloudUrlValueName = "NextcloudUrl";
         private const string NextcloudUrlLockedValueName = "NextcloudUrlLocked";
+        private const string ShowMainRibbonTabValueName = "ShowMainRibbonTab";
 
-        private ManagedSetupPolicy(string nextcloudUrl, bool nextcloudUrlLocked, string source)
+        private ManagedSetupPolicy(
+            object nextcloudUrlValue,
+            object nextcloudUrlLockedValue,
+            object showMainRibbonTabValue,
+            string source)
         {
-            NextcloudUrl = nextcloudUrl ?? string.Empty;
-            NextcloudUrlLocked = nextcloudUrlLocked;
+            HasNextcloudUrlValue = nextcloudUrlValue != null;
+            HasNextcloudUrlLockedValue = nextcloudUrlLockedValue != null;
+            HasShowMainRibbonTabValue = showMainRibbonTabValue != null;
+            NextcloudUrl = NormalizeNextcloudUrl(nextcloudUrlValue);
+            NextcloudUrlLocked = ReadBoolean(nextcloudUrlLockedValue);
+            bool showMainRibbonTab;
+            ShowMainRibbonTab = !TryReadBoolean(showMainRibbonTabValue, out showMainRibbonTab)
+                || showMainRibbonTab;
+            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue;
             Source = source ?? string.Empty;
         }
 
@@ -28,6 +40,16 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal string Source { get; private set; }
 
+        internal bool IsEnterpriseRollout { get; private set; }
+
+        internal bool ShowMainRibbonTab { get; private set; }
+
+        private bool HasNextcloudUrlValue { get; set; }
+
+        private bool HasNextcloudUrlLockedValue { get; set; }
+
+        private bool HasShowMainRibbonTabValue { get; set; }
+
         internal bool HasNextcloudUrl
         {
             get { return !string.IsNullOrWhiteSpace(NextcloudUrl); }
@@ -35,33 +57,47 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal static ManagedSetupPolicy Load()
         {
-            ManagedSetupPolicy machinePolicy = ReadFirstPolicy(RegistryHive.LocalMachine, "HKLM");
-            if (machinePolicy != null && machinePolicy.HasNextcloudUrl)
+            var policies = new List<ManagedSetupPolicy>();
+            foreach (RegistryHive hive in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
             {
-                return machinePolicy;
-            }
-
-            ManagedSetupPolicy userPolicy = ReadFirstPolicy(RegistryHive.CurrentUser, "HKCU");
-            if (userPolicy != null && userPolicy.HasNextcloudUrl)
-            {
-                return userPolicy;
-            }
-
-            return new ManagedSetupPolicy(string.Empty, false, string.Empty);
-        }
-
-        private static ManagedSetupPolicy ReadFirstPolicy(RegistryHive hive, string hiveName)
-        {
-            foreach (RegistryView view in GetRegistryViews())
-            {
-                ManagedSetupPolicy policy = ReadPolicy(hive, view, hiveName);
-                if (policy != null && policy.HasNextcloudUrl)
+                foreach (RegistryView view in GetRegistryViews())
                 {
-                    return policy;
+                    policies.Add(ReadPolicy(hive, view, hive == RegistryHive.LocalMachine ? "HKLM" : "HKCU"));
                 }
             }
+            return Resolve(policies);
+        }
 
-            return null;
+        internal static ManagedSetupPolicy Resolve(IEnumerable<ManagedSetupPolicy> policies)
+        {
+            var result = new ManagedSetupPolicy(null, null, null, string.Empty);
+            if (policies == null)
+            {
+                return result;
+            }
+
+            foreach (ManagedSetupPolicy policy in policies)
+            {
+                if (policy == null)
+                {
+                    continue;
+                }
+                result.IsEnterpriseRollout |= policy.IsEnterpriseRollout;
+                result.HasNextcloudUrlLockedValue |= policy.HasNextcloudUrlLockedValue;
+                if (!result.HasNextcloudUrlValue && policy.HasNextcloudUrlValue)
+                {
+                    result.HasNextcloudUrlValue = true;
+                    result.NextcloudUrl = policy.NextcloudUrl;
+                    result.NextcloudUrlLocked = policy.NextcloudUrlLocked;
+                    result.Source = policy.Source;
+                }
+                if (!result.HasShowMainRibbonTabValue && policy.HasShowMainRibbonTabValue)
+                {
+                    result.HasShowMainRibbonTabValue = true;
+                    result.ShowMainRibbonTab = policy.ShowMainRibbonTab;
+                }
+            }
+            return result;
         }
 
         private static IEnumerable<RegistryView> GetRegistryViews()
@@ -86,28 +122,34 @@ namespace NcTalkOutlookAddIn.Settings
                         return null;
                     }
 
-                    string nextcloudUrl = NormalizeNextcloudUrl(policyKey.GetValue(NextcloudUrlValueName));
-                    bool locked = ReadBoolean(policyKey.GetValue(NextcloudUrlLockedValueName));
+                    var policy = new ManagedSetupPolicy(
+                        policyKey.GetValue(NextcloudUrlValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        policyKey.GetValue(NextcloudUrlLockedValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        policyKey.GetValue(ShowMainRibbonTabValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        source);
 
-                    if (string.IsNullOrWhiteSpace(nextcloudUrl))
+                    if (!policy.IsEnterpriseRollout)
                     {
-                        DiagnosticsLogger.Log(
-                            LogCategories.Core,
-                            "Managed Nextcloud URL policy ignored because no valid URL is configured (source=" + source + ").");
                         return null;
                     }
 
                     DiagnosticsLogger.Log(
                         LogCategories.Core,
-                        "Managed Nextcloud URL policy loaded (source=" + source + ", locked=" + locked + ").");
-                    return new ManagedSetupPolicy(nextcloudUrl, locked, source);
+                        "Managed setup policy loaded (source=" + source
+                        + ", urlPresent=" + policy.HasNextcloudUrlValue
+                        + ", urlValid=" + policy.HasNextcloudUrl
+                        + ", urlLockValuePresent=" + policy.HasNextcloudUrlLockedValue
+                        + ", locked=" + policy.NextcloudUrlLocked
+                        + ", ribbonValuePresent=" + policy.HasShowMainRibbonTabValue
+                        + ", showMainRibbonTab=" + policy.ShowMainRibbonTab + ").");
+                    return policy;
                 }
             }
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(
                     LogCategories.Core,
-                    "Failed to read managed Nextcloud URL policy (source=" + source + ").",
+                    "Failed to read managed setup policy (source=" + source + ").",
                     ex);
                 return null;
             }
@@ -124,29 +166,44 @@ namespace NcTalkOutlookAddIn.Settings
 
         private static bool ReadBoolean(object rawValue)
         {
+            bool value;
+            return TryReadBoolean(rawValue, out value) && value;
+        }
+
+        private static bool TryReadBoolean(object rawValue, out bool value)
+        {
+            value = false;
             if (rawValue == null)
             {
                 return false;
             }
             if (rawValue is int)
             {
-                return (int)rawValue != 0;
+                value = (int)rawValue != 0;
+                return true;
             }
             if (rawValue is long)
             {
-                return (long)rawValue != 0L;
+                value = (long)rawValue != 0L;
+                return true;
             }
             if (rawValue is bool)
             {
-                return (bool)rawValue;
+                value = (bool)rawValue;
+                return true;
             }
 
             string converted = Convert.ToString(rawValue);
             string text = converted == null ? string.Empty : converted.Trim();
-            return string.Equals(text, "1", StringComparison.OrdinalIgnoreCase)
+            value = string.Equals(text, "1", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(text, "yes", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(text, "on", StringComparison.OrdinalIgnoreCase);
+            return value
+                || string.Equals(text, "0", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text, "false", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text, "no", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text, "off", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

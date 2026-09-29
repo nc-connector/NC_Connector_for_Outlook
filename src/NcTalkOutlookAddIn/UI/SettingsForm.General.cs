@@ -161,6 +161,10 @@ namespace NcTalkOutlookAddIn.UI
                 SetStatus(Strings.StatusLoginFlowBrowser, false);
 
                 var credentials = await Task.Run(() => flowService.CompleteLoginFlow(startInfo, TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(2)));
+                if (IsDisposed || Disposing)
+                {
+                    return;
+                }
                 _usernameTextBox.Text = credentials.LoginName ?? string.Empty;
                 _appPasswordTextBox.Text = credentials.AppPassword ?? string.Empty;
                 _loginFlowRadio.Checked = true;
@@ -170,6 +174,10 @@ namespace NcTalkOutlookAddIn.UI
                     _appPasswordTextBox.Text));
                 string versionResponse = string.Empty;
                 bool verified = await Task.Run(() => verificationService.VerifyConnection(out versionResponse));
+                if (IsDisposed || Disposing)
+                {
+                    return;
+                }
                 if (!verified)
                 {
                     string failureMessage = string.IsNullOrWhiteSpace(versionResponse)
@@ -188,6 +196,9 @@ namespace NcTalkOutlookAddIn.UI
                     return;
                 }
 
+                _connectionSetupPending = false;
+                _authenticationRejected = false;
+                ApplyBackendPolicyStatus("login_verified");
                 SetStatus(Strings.StatusLoginFlowSuccess, false);
             }
             catch (TalkServiceException ex)
@@ -207,16 +218,20 @@ namespace NcTalkOutlookAddIn.UI
                     RestoreTemporaryTls(previousSecurityProtocol, "settings_login_flow");
                 }
                 SetBusy(false);
-                UpdateControlState();
             }
         }
 
         // WinForms event handlers must stay async void; keep awaited flow inside this method-level try/catch.
         private async void OnTestButtonClick(object sender, EventArgs e)
         {
+            await TestConnectionAsync();
+        }
+
+        private async Task<bool> TestConnectionAsync()
+        {
             if (_isBusy)
             {
-                return;
+                return false;
             }
             string baseUrl = _serverUrlTextBox.Text.Trim();
             string user = _usernameTextBox.Text.Trim();
@@ -227,13 +242,13 @@ namespace NcTalkOutlookAddIn.UI
                 string.IsNullOrEmpty(appPassword))
             {
                 SetStatus(Strings.StatusMissingFields, true);
-                return;
+                return false;
             }
             string normalizedUrl;
             if (!NextcloudUriValidator.TryNormalizeBaseUrl(baseUrl, out normalizedUrl))
             {
                 SetStatus(Strings.StatusInvalidServerUrl, true);
-                return;
+                return false;
             }
             _serverUrlTextBox.Text = normalizedUrl;
 
@@ -251,13 +266,21 @@ namespace NcTalkOutlookAddIn.UI
                 var service = new TalkService(new TalkServiceConfiguration(normalizedUrl, user, appPassword));
                 string responseMessage = string.Empty;
                 bool success = await Task.Run(() => service.VerifyConnection(out responseMessage));
+                if (IsDisposed || Disposing)
+                {
+                    return false;
+                }
                 if (success)
                 {
+                    _connectionSetupPending = false;
+                    _authenticationRejected = false;
+                    ApplyBackendPolicyStatus("connection_verified");
                     DiagnosticsLogger.Log(LogCategories.Core, "Connection test succeeded (Response=" + (string.IsNullOrEmpty(responseMessage) ? "OK" : responseMessage) + ").");
                     string suffix = string.IsNullOrEmpty(responseMessage)
                         ? string.Empty
                         : " (" + string.Format(Strings.StatusTestSuccessVersionFormat, responseMessage) + ")";
                     SetStatus(string.Format(Strings.StatusTestSuccessFormat, suffix), false);
+                    return true;
                 }
                 else
                 {
@@ -285,8 +308,8 @@ namespace NcTalkOutlookAddIn.UI
                     RestoreTemporaryTls(previousSecurityProtocol, "settings_connection_test");
                 }
                 SetBusy(false);
-                UpdateControlState();
             }
+            return false;
         }
 
         private SecurityProtocolType ApplyTemporaryTlsForConnectivity(string source)
@@ -325,6 +348,19 @@ namespace NcTalkOutlookAddIn.UI
 
         private void HandleServiceFailure(string statusFormat, TalkServiceException ex)
         {
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+            if (ex != null && ex.IsAuthenticationError)
+            {
+                _connectionSetupPending = true;
+                _authenticationRejected = true;
+                _backendPolicyStatus = null;
+                ApplyBackendPolicyStatus("authentication_rejected");
+                SetStatus(Strings.ConnectionSignInRequired, true);
+                return;
+            }
             string message = ex != null && !string.IsNullOrWhiteSpace(ex.Message)
                 ? ex.Message.Trim()
                 : Strings.StatusTestFailureUnknown;
@@ -362,7 +398,15 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-
+            if (!_suppressImmediateTlsApply && Result != null
+                && (sender == _serverUrlTextBox || sender == _usernameTextBox || sender == _appPasswordTextBox))
+            {
+                _connectionSetupPending = true;
+                _authenticationRejected = false;
+                _backendPolicyStatus = null;
+                ApplyBackendPolicyStatus("credentials_changed");
+                return;
+            }
             UpdateControlState();
         }
 

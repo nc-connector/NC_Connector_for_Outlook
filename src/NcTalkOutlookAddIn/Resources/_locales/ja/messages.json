@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – 設定"
   },
+  "connection_setup_title": {
+    "message": "Nextcloud に接続"
+  },
+  "connection_setup_message": {
+    "message": "NC Connector を Nextcloud アカウントに接続してください。ブラウザーからログインするか、ユーザー名とアプリパスワードを入力してください。"
+  },
+  "connection_sign_in_required": {
+    "message": "Nextcloud へのログインに失敗しました。もう一度ログインしてください。"
+  },
   "options_base_url_label": {
     "message": "Nextcloud のURL"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "このインストールは一元管理されており、有効な NC Connector シートの割り当てが必要です。"
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "このインストールは一元管理されています。NC Connector を使用するには、Nextcloud に NC Connector Backend をインストールして設定する必要があります。管理者にお問い合わせください。"
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "このインストールは一元管理されています。NC Connector の利用権限を確認できませんでした。接続を確認して、もう一度お試しください。"
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "Nextcloud URL は組織によって管理されています。"
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "Nextcloud サーバーに接続できません。インターネット接続を確認してください。"
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "資格情報が受け入れられませんでした: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Nextcloud サーバーへの接続に失敗しました: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "資格情報を検証できませんでした。"
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "資格情報を検証できませんでした: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "IFB を開始できませんでした: $1"

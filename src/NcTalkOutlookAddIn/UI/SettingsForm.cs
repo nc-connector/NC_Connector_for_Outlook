@@ -138,6 +138,9 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Button _saveButton = new Button();
         private readonly Button _cancelButton = new Button();
         private bool _isBusy;
+        private bool _authenticationRequired;
+        private bool _authenticationRejected;
+        private bool _connectionSetupPending;
         private AddinSettings _result;
         private bool _applyingPolicyDefaults;
         private bool _initialIfbEnabled;
@@ -160,6 +163,14 @@ namespace NcTalkOutlookAddIn.UI
         {
             get { return _result; }
             private set { _result = value; }
+        }
+
+        internal void BeginAuthentication(bool authenticationRejected)
+        {
+            _authenticationRequired = true;
+            _authenticationRejected = authenticationRejected;
+            _connectionSetupPending = true;
+            ApplyBackendPolicyStatus("authentication_open");
         }
 
         internal SettingsForm(
@@ -189,6 +200,20 @@ namespace NcTalkOutlookAddIn.UI
             BrandedHeader.AttachToParent(_headerPanel, Controls, HeaderHeight);
             InitializeComponents();
             ApplySettings(settings);
+            if (!Result.ShowMainRibbonTab)
+            {
+                // Keep the existing authentication controls, not the normal settings menu.
+                _tabControl.TabPages.Clear();
+                _tabControl.TabPages.Add(_generalTab);
+                Disposed += (sender, args) =>
+                {
+                    foreach (TabPage page in new[] { _fileLinkTab, _talkTab, _signatureTab,
+                        _ifbTab, _advancedTab, _debugTab, _aboutTab })
+                    {
+                        page.Dispose();
+                    }
+                };
+            }
             TrackLocalPolicyChoices();
             UpdateControlState();
             ApplyResponsiveLayout(true);
@@ -398,6 +423,8 @@ namespace NcTalkOutlookAddIn.UI
                 _appPasswordTextBox.Text = Result.AppPassword;
                 _manualRadio.Checked = Result.AuthMode == AuthenticationMode.Manual;
                 _loginFlowRadio.Checked = !_manualRadio.Checked;
+                _connectionSetupPending = !new TalkServiceConfiguration(
+                    _serverUrlTextBox.Text, _usernameTextBox.Text, _appPasswordTextBox.Text).IsComplete();
                 _ifbEnabledCheckBox.Checked = Result.IfbEnabled;
                 SelectComboValue(_ifbDaysCombo, Result.IfbDays, 30);
                 _ifbPortUpDown.Value = Math.Max(
@@ -521,6 +548,21 @@ namespace NcTalkOutlookAddIn.UI
                 normalizedServerUrl,
                 _usernameTextBox.Text.Trim(),
                 _appPasswordTextBox.Text ?? string.Empty);
+            if ((_authenticationRequired || !Result.ShowMainRibbonTab) && !configuration.IsComplete())
+            {
+                ApplyBackendPolicyStatus("authentication_incomplete");
+                _tabControl.SelectedTab = _generalTab;
+                return;
+            }
+            if (_authenticationRequired && _connectionSetupPending
+                && !await TestConnectionAsync())
+            {
+                return;
+            }
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
             if (!await RefreshSettingsServerStateAsync(
                     configuration,
                     true,
@@ -544,6 +586,12 @@ namespace NcTalkOutlookAddIn.UI
             Result.Username = _usernameTextBox.Text.Trim();
             Result.AppPassword = _appPasswordTextBox.Text;
             Result.AuthMode = _loginFlowRadio.Checked ? AuthenticationMode.LoginFlow : AuthenticationMode.Manual;
+            if (!Result.ShowMainRibbonTab)
+            {
+                DialogResult = DialogResult.OK;
+                Close();
+                return;
+            }
             Result.IfbEnabled = _ifbEnabledCheckBox.Checked;
             Result.IfbUserDecisionRecorded = _ifbDefaultApplied;
             Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
@@ -627,6 +675,10 @@ namespace NcTalkOutlookAddIn.UI
                 }
 
                 _backendPolicyStatus = policyStatus;
+                if (configuration != null && configuration.IsComplete())
+                {
+                    _connectionSetupPending = false;
+                }
                 ApplyBackendPolicyStatus(trigger);
                 if (addressbookGeneration == _addressbookRefreshGeneration)
                 {
@@ -676,6 +728,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyBackendPolicyStatus(string trigger)
         {
+            _policyWarningTitleLabel.Text = "\u26a0 " + Strings.PolicyWarningTitle;
             bool warningVisible = PolicyUiHelper.ApplyPolicyWarningState(
                 _backendPolicyStatus,
                 _policyWarningPanel,
@@ -683,6 +736,32 @@ namespace NcTalkOutlookAddIn.UI
                 _policyWarningTitleLabel,
                 _policyWarningLinkLabel,
                 _serverUrlTextBox.Text);
+            bool credentialsMissing = !new TalkServiceConfiguration(
+                _serverUrlTextBox.Text, _usernameTextBox.Text, _appPasswordTextBox.Text).IsComplete();
+            if (_connectionSetupPending || credentialsMissing)
+            {
+                warningVisible = true;
+                _policyWarningPanel.Visible = true;
+                _policyWarningTitleLabel.Text = Strings.ConnectionSetupTitle;
+                _policyWarningTitleLabel.ForeColor = _authenticationRejected
+                    ? Color.FromArgb(156, 108, 0) : _themePalette.LinkText;
+                _policyWarningPanel.BackColor = Color.FromArgb(20, _policyWarningTitleLabel.ForeColor);
+                _policyWarningTextLabel.Text = _authenticationRejected
+                    ? Strings.ConnectionSignInRequired : Strings.ConnectionSetupMessage;
+                _policyWarningLinkLabel.Visible = false;
+                _policyWarningLinkLabel.Tag = null;
+            }
+            else if (Result.IsEnterpriseRollout)
+            {
+                string notice = _backendPolicyStatus == null
+                    ? string.Empty
+                    : PolicyUiHelper.GetEnterpriseRolloutNotice(Result, _backendPolicyStatus);
+                warningVisible = !string.IsNullOrEmpty(notice);
+                _policyWarningPanel.Visible = warningVisible;
+                _policyWarningTextLabel.Text = notice;
+                _policyWarningLinkLabel.Visible = false;
+                _policyWarningLinkLabel.Tag = null;
+            }
             ApplyPolicyDefaultsToControls();
 
             DiagnosticsLogger.Log(
@@ -1023,6 +1102,10 @@ namespace NcTalkOutlookAddIn.UI
         private void SetBusy(bool busy)
         {
             _isBusy = busy;
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
             Cursor.Current = busy ? Cursors.WaitCursor : Cursors.Default;
             _saveButton.Enabled = !busy;
             _cancelButton.Enabled = !busy;
@@ -1032,6 +1115,10 @@ namespace NcTalkOutlookAddIn.UI
 
         private void SetStatus(string message, bool isError)
         {
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
             _statusLabel.Text = message;
             _statusLabel.ForeColor = isError ? _themePalette.ErrorText : _themePalette.SuccessText;
             ApplyResponsiveLayout(false);

@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Настройки"
   },
+  "connection_setup_title": {
+    "message": "Подключиться к Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Подключите NC Connector к своей учётной записи Nextcloud. Войдите через браузер или введите имя пользователя и пароль приложения."
+  },
+  "connection_sign_in_required": {
+    "message": "Не удалось войти в Nextcloud. Пожалуйста, войдите снова."
+  },
   "options_base_url_label": {
     "message": "URL Nextcloud"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Эта установка управляется централизованно и требует назначенной действующей пользовательской лицензии NC Connector."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Эта установка управляется централизованно. Для использования NC Connector необходимо установить и настроить NC Connector Backend в Nextcloud. Обратитесь к администратору."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Эта установка управляется централизованно. Не удалось проверить право доступа к NC Connector. Проверьте подключение и повторите попытку."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "URL Nextcloud управляется вашей организацией."
@@ -584,9 +602,6 @@
   "outlook_error_server_unavailable": {
     "message": "Сервер Nextcloud сейчас недоступен. Проверьте подключение к Интернету."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Учётные данные не приняты: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Не удалось подключиться к серверу Nextcloud: $1"
   },
@@ -595,9 +610,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Не удалось проверить учётные данные."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Не удалось проверить учётные данные: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "Не удалось запустить IFB: $1"

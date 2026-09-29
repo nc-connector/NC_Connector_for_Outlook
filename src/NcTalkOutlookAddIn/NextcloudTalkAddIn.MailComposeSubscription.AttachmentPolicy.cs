@@ -39,6 +39,8 @@ namespace NcTalkOutlookAddIn
                 internal int ThresholdMb { get; set; }
 
                 internal long ThresholdBytes { get; set; }
+
+                internal bool EnterpriseRolloutBlocked { get; set; }
             }
 
             private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
@@ -50,9 +52,21 @@ namespace NcTalkOutlookAddIn
                     BeginAttachmentAutomationSettingsRefresh();
                 }
 
-                return snapshot
+                AttachmentAutomationSettings effective = snapshot
                        ?? _attachmentAutomationSettingsSnapshot
                        ?? ReadLocalAttachmentAutomationSettings();
+                AddinSettings current = _owner._currentSettings;
+                if (current != null && current.IsEnterpriseRollout)
+                {
+                    var configuration = new TalkServiceConfiguration(current.ServerUrl, current.Username, current.AppPassword);
+                    BackendPolicyStatus confirmed;
+                    if (_owner.TryGetCachedEmailSignaturePolicyStatus(configuration, out confirmed))
+                    {
+                        // A refusal confirmed by another action also applies to an already open compose window.
+                        effective = ApplyAttachmentAutomationPolicy(effective, confirmed);
+                    }
+                }
+                return effective;
             }
 
             private async Task<AttachmentAutomationSettings> ReadAttachmentAutomationSettingsAsync()
@@ -155,9 +169,9 @@ namespace NcTalkOutlookAddIn
                 if (configuration != null && configuration.IsComplete())
                 {
                     BackendPolicyStatus policyStatus = await Task.Run(
-                        () => _owner.FetchBackendPolicyStatus(
-                            configuration,
-                            "compose_attachment_evaluate")).ConfigureAwait(false);
+                        () => local.LocalSettings.IsEnterpriseRollout
+                            ? _owner.FetchEnterpriseRolloutPolicyStatus(configuration, "compose_attachment_evaluate")
+                            : _owner.FetchBackendPolicyStatus(configuration, "compose_attachment_evaluate")).ConfigureAwait(false);
                     if ((policyStatus == null || !policyStatus.FetchSucceeded)
                         && _attachmentAutomationSettingsSnapshot != null)
                     {
@@ -188,7 +202,9 @@ namespace NcTalkOutlookAddIn
                 _owner.EnsureSettingsLoaded();
 
                 AddinSettings settings = (_owner._currentSettings ?? new AddinSettings()).Clone();
-                return BuildAttachmentAutomationSettings(settings, settings);
+                return ApplyAttachmentAutomationPolicy(
+                    new AttachmentAutomationSettings { LocalSettings = settings },
+                    null);
             }
 
             private static AttachmentAutomationSettings ApplyAttachmentAutomationPolicy(
@@ -197,7 +213,16 @@ namespace NcTalkOutlookAddIn
             {
                 AddinSettings settings = local != null && local.LocalSettings != null
                     ? local.LocalSettings : new AddinSettings();
-                return BuildAttachmentAutomationSettings(settings.ResolvePolicyDefaults(policyStatus), settings);
+                AttachmentAutomationSettings resolved = BuildAttachmentAutomationSettings(
+                    settings.ResolvePolicyDefaults(policyStatus), settings);
+                resolved.EnterpriseRolloutBlocked = !string.IsNullOrEmpty(
+                    PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus));
+                if (resolved.EnterpriseRolloutBlocked)
+                {
+                    resolved.AlwaysConnector = false;
+                    resolved.OfferAboveEnabled = false;
+                }
+                return resolved;
             }
 
             private static AttachmentAutomationSettings BuildAttachmentAutomationSettings(
@@ -229,6 +254,17 @@ namespace NcTalkOutlookAddIn
                     return true;
                 }
 
+                AttachmentAutomationSettings settings = null;
+                if (_owner._currentSettings != null && _owner._currentSettings.IsEnterpriseRollout)
+                {
+                    settings = ReadAttachmentAutomationSettings();
+                    if (settings.EnterpriseRolloutBlocked)
+                    {
+                        // A missing rollout seat disables the add-in, not ordinary Outlook attachments.
+                        return true;
+                    }
+                }
+
                 if (_attachmentAutomationSettingsSnapshot == null
                     && _owner.SettingsAreComplete())
                 {
@@ -246,8 +282,7 @@ namespace NcTalkOutlookAddIn
                     return false;
                 }
 
-                AttachmentAutomationSettings settings =
-                    ReadAttachmentAutomationSettings();
+                settings = settings ?? ReadAttachmentAutomationSettings();
                 if (!settings.AlwaysConnector)
                 {
                     return true;

@@ -142,6 +142,18 @@ namespace NcTalkOutlookAddIn.Controllers
                 return result;
             }
 
+            AddinSettings settings = _owner.CurrentSettings;
+            if (settings != null && settings.IsEnterpriseRollout)
+            {
+                BackendPolicyStatus status = _owner.FetchEnterpriseRolloutPolicyStatus(
+                    snapshot.Configuration, "enterprise_talk_sync");
+                if (!string.IsNullOrEmpty(PolicyUiHelper.GetEnterpriseRolloutNotice(settings, status)))
+                {
+                    NextcloudTalkAddIn.LogTalkMessage("Managed rollout access unavailable; Talk update skipped.");
+                    return result;
+                }
+            }
+
             var service = new TalkService(snapshot.Configuration);
             ExecuteRoomNameSync(service, snapshot, result);
             ExecuteLobbySync(service, snapshot, result);

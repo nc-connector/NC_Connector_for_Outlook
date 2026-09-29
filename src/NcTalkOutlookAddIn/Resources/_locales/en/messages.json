@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook – Settings"
   },
+  "connection_setup_title": {
+    "message": "Connect to Nextcloud"
+  },
+  "connection_setup_message": {
+    "message": "Please connect NC Connector to your Nextcloud account. Sign in through your browser or enter your username and app password."
+  },
+  "connection_sign_in_required": {
+    "message": "Sign-in to Nextcloud was not successful. Please sign in again."
+  },
   "options_base_url_label": {
     "message": "Nextcloud URL"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "This installation is centrally managed and requires an assigned, valid NC Connector Seat."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "This installation is centrally managed. The NC Connector Backend must be installed and configured in Nextcloud before you can use NC Connector. Please contact your administrator."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "This installation is centrally managed. Access to NC Connector could not be verified. Please check your connection and try again."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "Nextcloud URL is managed by your organization."
@@ -605,9 +623,6 @@
   "outlook_error_server_unavailable": {
     "message": "The Nextcloud server is currently unreachable. Please check your Internet connection."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Credentials were not accepted: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Connection to the Nextcloud server failed: $1"
   },
@@ -616,9 +631,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Credentials could not be verified."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Credentials could not be verified: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "IFB could not be started: $1"

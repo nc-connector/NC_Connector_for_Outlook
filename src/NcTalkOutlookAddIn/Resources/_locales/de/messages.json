@@ -167,8 +167,26 @@
   "options_title": {
     "message": "NC Connector for Outlook - Einstellungen"
   },
+  "connection_setup_title": {
+    "message": "Mit Nextcloud verbinden"
+  },
+  "connection_setup_message": {
+    "message": "Bitte verbinden Sie NC Connector mit Ihrem Nextcloud-Konto. Melden Sie sich über den Browser an oder geben Sie Ihre Zugangsdaten mit App-Passwort ein."
+  },
+  "connection_sign_in_required": {
+    "message": "Die Anmeldung bei Nextcloud war nicht erfolgreich. Bitte melden Sie sich erneut an."
+  },
   "options_base_url_label": {
     "message": "Nextcloud-URL"
+  },
+  "enterprise_rollout_seat_required": {
+    "message": "Diese Installation wird zentral verwaltet und erfordert einen zugewiesenen, gültigen NC Connector Seat."
+  },
+  "enterprise_rollout_backend_required": {
+    "message": "Diese Installation wird zentral verwaltet. Bevor Sie NC Connector verwenden können, muss das NC Connector Backend in Nextcloud installiert und eingerichtet werden. Bitte wenden Sie sich an Ihren Administrator."
+  },
+  "enterprise_rollout_status_unavailable": {
+    "message": "Diese Installation wird zentral verwaltet. Die Berechtigung zur Nutzung von NC Connector konnte nicht überprüft werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
   },
   "options_managed_nextcloud_url_tooltip": {
     "message": "Die Nextcloud-URL wird von Ihrer Organisation vorgegeben."
@@ -605,9 +623,6 @@
   "outlook_error_server_unavailable": {
     "message": "Der Nextcloud-Server ist aktuell nicht erreichbar. Bitte Internetverbindung prüfen."
   },
-  "outlook_error_authentication_rejected_format": {
-    "message": "Anmeldedaten wurden nicht akzeptiert: $1"
-  },
   "outlook_error_connection_failed_format": {
     "message": "Verbindung zum Nextcloud-Server fehlgeschlagen: $1"
   },
@@ -616,9 +631,6 @@
   },
   "outlook_error_credentials_not_verified": {
     "message": "Anmeldedaten konnten nicht verifiziert werden."
-  },
-  "outlook_error_credentials_not_verified_format": {
-    "message": "Anmeldedaten konnten nicht verifiziert werden: $1"
   },
   "outlook_warning_ifb_start_failed_format": {
     "message": "IFB konnte nicht gestartet werden: $1"

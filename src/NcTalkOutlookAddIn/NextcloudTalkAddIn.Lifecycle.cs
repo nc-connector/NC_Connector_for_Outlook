@@ -43,7 +43,8 @@ namespace NcTalkOutlookAddIn
 
             _freeBusyManager = new FreeBusyManager(
                 _settingsStorage.DataDirectory,
-                outlookProfileName);
+                outlookProfileName,
+                configuration => FetchEnterpriseRolloutPolicyStatus(configuration, "enterprise_ifb_request"));
             _freeBusyManager.Initialize(_outlookApplication);
             InitializeTalkAppointmentSync(outlookProfileName);
             // Startup resumes durable deletion jobs. It does not enumerate calendars

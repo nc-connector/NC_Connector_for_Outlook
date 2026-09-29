@@ -196,6 +196,10 @@ namespace NcTalkOutlookAddIn.Services
             }
             catch (TalkServiceException ex)
             {
+                if (ex.IsAuthenticationError)
+                {
+                    throw;
+                }
                 message = ex.Message;
                 return false;
             }

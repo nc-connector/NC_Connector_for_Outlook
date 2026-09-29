@@ -548,6 +548,7 @@ public static class SignatureSendNoticeRegression
         __CACHE_KEY__
         __CACHE_READ__
         __CACHE_FETCH__
+        __CACHE_STORE__
         __BLOCK_SEND__
 
         internal void SeedExpiredSnapshot(TalkServiceConfiguration configuration, BackendPolicyStatus snapshot)
@@ -625,6 +626,7 @@ foreach ($method in @{
     '__CACHE_KEY__' = 'BuildEmailSignaturePolicyCacheKey'
     '__CACHE_READ__' = 'TryGetCachedEmailSignaturePolicyStatus'
     '__CACHE_FETCH__' = 'FetchAndCacheEmailSignaturePolicyStatusAsync'
+    '__CACHE_STORE__' = 'StoreBackendPolicySnapshot'
 }.GetEnumerator()) {
     $methodSource = Get-CSharpMethodBlock $PolicySource $method.Value
     if (-not $methodSource) {
