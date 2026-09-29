@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "As definições de registo são geridas pela sua organização e não podem ser alteradas aqui."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Um valor de registo configurado centralmente é inválido. Os valores inválidos usam as predefinições: registo de depuração desativado e anonimização de registos ativada. Contacte o administrador."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

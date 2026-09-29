@@ -21,12 +21,17 @@ namespace NcTalkOutlookAddIn.UI
 {
     internal sealed partial class SettingsForm
     {
+        private readonly Label _debugPolicyHintLabel = new Label();
+
         private void ApplyDebugTabLayout()
         {
             int rightMargin = ScaleLogical(24);
             _debugAnonymizeCheckBox.Location = new Point(_debugLogCheckBox.Left, _debugLogCheckBox.Bottom + ScaleLogical(8));
-            _debugPathLabel.Location = new Point(_debugPathLabel.Left, _debugAnonymizeCheckBox.Bottom + ScaleLogical(12));
             int width = Math.Max(ScaleLogical(220), _debugTab.ClientSize.Width - rightMargin - _debugPathLabel.Left);
+            _debugPolicyHintLabel.Location = new Point(_debugLogCheckBox.Left, _debugAnonymizeCheckBox.Bottom + ScaleLogical(12));
+            _debugPolicyHintLabel.MaximumSize = new Size(width, 0);
+            bool managed = Result != null && Result.HasManagedLogging;
+            _debugPathLabel.Location = new Point(_debugPathLabel.Left, (managed ? _debugPolicyHintLabel.Bottom : _debugAnonymizeCheckBox.Bottom) + ScaleLogical(12));
             _debugPathLabel.MaximumSize = new Size(width, 0);
             _debugPathLabel.AutoSize = true;
             _debugOpenLink.Location = new Point(_debugOpenLink.Left, _debugPathLabel.Bottom + ScaleLogical(10));
@@ -47,6 +52,9 @@ namespace NcTalkOutlookAddIn.UI
             _debugAnonymizeCheckBox.Location = new Point(24, 50);
             _debugTab.Controls.Add(_debugAnonymizeCheckBox);
 
+            _debugPolicyHintLabel.AutoSize = true;
+            _debugTab.Controls.Add(_debugPolicyHintLabel);
+
             _debugPathLabel.AutoSize = true;
             _debugPathLabel.Location = new Point(24, 90);
             _debugPathLabel.MaximumSize = new Size(420, 0);
@@ -59,6 +67,21 @@ namespace NcTalkOutlookAddIn.UI
             _debugTab.Controls.Add(_debugOpenLink);
 
             UpdateDebugPathLabel();
+        }
+
+        private void UpdateLoggingOptionsState()
+        {
+            bool managed = Result != null && Result.HasManagedLogging;
+            string hint = managed
+                ? (Result.IsManagedLoggingValid ? Strings.DebugManagedHint : Strings.ManagedLoggingPolicyInvalid)
+                : string.Empty;
+            _debugLogCheckBox.Enabled = !managed && !_isBusy;
+            _debugAnonymizeCheckBox.Enabled = !managed && !_isBusy;
+            _debugPolicyHintLabel.Text = hint;
+            _debugPolicyHintLabel.Visible = managed;
+            _disabledTooltipHints.Apply(_debugLogCheckBox, hint, managed);
+            _disabledTooltipHints.Apply(_debugAnonymizeCheckBox, hint, managed);
+            ApplyDebugTabLayout();
         }
 
         private void UpdateDebugPathLabel()

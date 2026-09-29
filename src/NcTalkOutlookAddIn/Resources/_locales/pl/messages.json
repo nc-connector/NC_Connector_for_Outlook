@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "Ustawienia rejestrowania są zarządzane przez organizację i nie można ich tutaj zmienić."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Centralnie ustawiona wartość rejestrowania jest nieprawidłowa. Nieprawidłowe wartości używają ustawień domyślnych: rejestrowanie debugowania wyłączone, anonimizacja dzienników włączona. Skontaktuj się z administratorem."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

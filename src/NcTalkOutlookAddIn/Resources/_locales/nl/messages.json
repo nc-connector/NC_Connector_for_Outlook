@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "De loginstellingen worden beheerd door uw organisatie en kunnen hier niet worden gewijzigd."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Een centraal ingestelde logwaarde is ongeldig. Ongeldige waarden gebruiken hun standaard: foutopsporingslogboek uit, loganonimisering aan. Neem contact op met uw beheerder."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

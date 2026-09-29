@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "Le impostazioni dei registri sono gestite dalla sua organizzazione e non possono essere modificate qui."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Un valore dei registri configurato centralmente non è valido. I valori non validi usano le impostazioni predefinite: registrazione di debug disattivata e anonimizzazione dei registri attivata. Contatti l'amministratore."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "Nastavení protokolování spravuje vaše organizace a nelze je zde změnit."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Centrálně nastavená hodnota protokolování je neplatná. Neplatné hodnoty používají výchozí nastavení: ladicí protokolování vypnuto, anonymizace protokolů zapnuta. Obraťte se na správce."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

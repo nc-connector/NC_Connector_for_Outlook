@@ -18,9 +18,13 @@ namespace NcTalkOutlookAddIn.Settings
         private const string TransportTlsUseSystemDefaultValueName = "TransportTlsUseSystemDefault";
         private const string TransportTlsEnable12ValueName = "TransportTlsEnable12";
         private const string TransportTlsEnable13ValueName = "TransportTlsEnable13";
+        private const string DebugLoggingEnabledValueName = "DebugLoggingEnabled";
+        private const string LogAnonymizationEnabledValueName = "LogAnonymizationEnabled";
         private bool _tlsSystemValueValid;
         private bool _tls12ValueValid;
         private bool _tls13ValueValid;
+        private bool _debugLoggingValueValid;
+        private bool _logAnonymizationValueValid;
 
         private ManagedSetupPolicy(
             object nextcloudUrlValue,
@@ -29,6 +33,8 @@ namespace NcTalkOutlookAddIn.Settings
             object transportTlsUseSystemDefaultValue,
             object transportTlsEnable12Value,
             object transportTlsEnable13Value,
+            object debugLoggingEnabledValue,
+            object logAnonymizationEnabledValue,
             string source)
         {
             HasNextcloudUrlValue = nextcloudUrlValue != null;
@@ -37,15 +43,23 @@ namespace NcTalkOutlookAddIn.Settings
             HasTransportTlsUseSystemDefaultValue = transportTlsUseSystemDefaultValue != null;
             HasTransportTlsEnable12Value = transportTlsEnable12Value != null;
             HasTransportTlsEnable13Value = transportTlsEnable13Value != null;
-            TransportTlsUseSystemDefault = ReadTlsBoolean(transportTlsUseSystemDefaultValue, false, out _tlsSystemValueValid);
-            TransportTlsEnable12 = ReadTlsBoolean(transportTlsEnable12Value, true, out _tls12ValueValid);
-            TransportTlsEnable13 = ReadTlsBoolean(transportTlsEnable13Value, false, out _tls13ValueValid);
+            HasDebugLoggingEnabledValue = debugLoggingEnabledValue != null;
+            HasLogAnonymizationEnabledValue = logAnonymizationEnabledValue != null;
+            TransportTlsUseSystemDefault = ReadPolicyBoolean(transportTlsUseSystemDefaultValue, false, out _tlsSystemValueValid);
+            TransportTlsEnable12 = ReadPolicyBoolean(transportTlsEnable12Value, true, out _tls12ValueValid);
+            TransportTlsEnable13 = ReadPolicyBoolean(transportTlsEnable13Value, false, out _tls13ValueValid);
+            DebugLoggingEnabled = ReadPolicyBoolean(debugLoggingEnabledValue, false, out _debugLoggingValueValid);
+            LogAnonymizationEnabled = ReadPolicyBoolean(logAnonymizationEnabledValue, true, out _logAnonymizationValueValid);
+            if (!_logAnonymizationValueValid)
+            {
+                LogAnonymizationEnabled = true;
+            }
             NextcloudUrl = NormalizeNextcloudUrl(nextcloudUrlValue);
             NextcloudUrlLocked = ReadBoolean(nextcloudUrlLockedValue);
             bool showMainRibbonTab;
             ShowMainRibbonTab = !TryReadBoolean(showMainRibbonTabValue, out showMainRibbonTab)
                 || showMainRibbonTab;
-            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy;
+            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy || HasLoggingPolicy;
             Source = source ?? string.Empty;
         }
 
@@ -68,6 +82,13 @@ namespace NcTalkOutlookAddIn.Settings
         private bool HasTransportTlsUseSystemDefaultValue { get; set; }
         private bool HasTransportTlsEnable12Value { get; set; }
         private bool HasTransportTlsEnable13Value { get; set; }
+        private bool HasDebugLoggingEnabledValue { get; set; }
+        private bool HasLogAnonymizationEnabledValue { get; set; }
+
+        internal bool DebugLoggingEnabled { get; private set; }
+        internal bool LogAnonymizationEnabled { get; private set; }
+        internal bool HasLoggingPolicy { get { return HasDebugLoggingEnabledValue || HasLogAnonymizationEnabledValue; } }
+        internal bool IsLoggingPolicyValid { get { return _debugLoggingValueValid && _logAnonymizationValueValid; } }
 
         internal bool TransportTlsUseSystemDefault { get; private set; }
         internal bool TransportTlsEnable12 { get; private set; }
@@ -107,7 +128,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal static ManagedSetupPolicy Resolve(IEnumerable<ManagedSetupPolicy> policies)
         {
-            var result = new ManagedSetupPolicy(null, null, null, null, null, null, string.Empty);
+            var result = new ManagedSetupPolicy(null, null, null, null, null, null, null, null, string.Empty);
             if (policies == null)
             {
                 return result;
@@ -151,6 +172,18 @@ namespace NcTalkOutlookAddIn.Settings
                     result.TransportTlsEnable13 = policy.TransportTlsEnable13;
                     result._tls13ValueValid = policy._tls13ValueValid;
                 }
+                if (!result.HasDebugLoggingEnabledValue && policy.HasDebugLoggingEnabledValue)
+                {
+                    result.HasDebugLoggingEnabledValue = true;
+                    result.DebugLoggingEnabled = policy.DebugLoggingEnabled;
+                    result._debugLoggingValueValid = policy._debugLoggingValueValid;
+                }
+                if (!result.HasLogAnonymizationEnabledValue && policy.HasLogAnonymizationEnabledValue)
+                {
+                    result.HasLogAnonymizationEnabledValue = true;
+                    result.LogAnonymizationEnabled = policy.LogAnonymizationEnabled;
+                    result._logAnonymizationValueValid = policy._logAnonymizationValueValid;
+                }
             }
             return result;
         }
@@ -184,6 +217,8 @@ namespace NcTalkOutlookAddIn.Settings
                         policyKey.GetValue(TransportTlsUseSystemDefaultValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         policyKey.GetValue(TransportTlsEnable12ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         policyKey.GetValue(TransportTlsEnable13ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        policyKey.GetValue(DebugLoggingEnabledValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        policyKey.GetValue(LogAnonymizationEnabledValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         source);
 
                     if (!policy.IsEnterpriseRollout)
@@ -201,7 +236,9 @@ namespace NcTalkOutlookAddIn.Settings
                         + ", ribbonValuePresent=" + policy.HasShowMainRibbonTabValue
                         + ", showMainRibbonTab=" + policy.ShowMainRibbonTab
                         + ", tlsPolicyPresent=" + policy.HasTransportTlsPolicy
-                        + ", tlsPolicyValid=" + policy.IsTransportTlsPolicyValid + ").");
+                        + ", tlsPolicyValid=" + policy.IsTransportTlsPolicyValid
+                        + ", loggingPolicyPresent=" + policy.HasLoggingPolicy
+                        + ", loggingPolicyValid=" + policy.IsLoggingPolicyValid + ").");
                     return policy;
                 }
             }
@@ -230,7 +267,7 @@ namespace NcTalkOutlookAddIn.Settings
             return TryReadBoolean(rawValue, out value) && value;
         }
 
-        private static bool ReadTlsBoolean(object rawValue, bool defaultValue, out bool valid)
+        private static bool ReadPolicyBoolean(object rawValue, bool defaultValue, out bool valid)
         {
             if (rawValue == null)
             {

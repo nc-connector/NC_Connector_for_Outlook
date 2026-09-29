@@ -602,8 +602,11 @@ namespace NcTalkOutlookAddIn.UI
             Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
             Result.IfbPort = AddinSettings.NormalizeIfbPort((int)_ifbPortUpDown.Value);
             Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
-            Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
-            Result.LogAnonymizationEnabled = _debugAnonymizeCheckBox.Checked;
+            if (!Result.HasManagedLogging)
+            {
+                Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
+                Result.LogAnonymizationEnabled = _debugAnonymizeCheckBox.Checked;
+            }
             if (!Result.HasManagedTransportTls)
             {
                 Result.TransportTlsUseSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
@@ -974,8 +977,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _ifbCacheHoursCombo.Enabled = !_isBusy;
             _ifbCacheHoursLabel.Enabled = !_isBusy;
-            _debugLogCheckBox.Enabled = !_isBusy;
-            _debugAnonymizeCheckBox.Enabled = !_isBusy;
+            UpdateLoggingOptionsState();
             _debugOpenLink.Enabled = !_isBusy;
             _updateNotifyCheckBox.Enabled = !_isBusy;
             _updateCheckButton.Enabled = !_isBusy;

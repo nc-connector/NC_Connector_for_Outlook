@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "A naplózási beállításokat a szervezete kezeli, és itt nem módosíthatók."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Egy központilag megadott naplózási érték érvénytelen. Az érvénytelen értékek az alapértéküket használják: hibakeresési naplózás kikapcsolva, naplók anonimizálása bekapcsolva. Forduljon a rendszergazdához."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

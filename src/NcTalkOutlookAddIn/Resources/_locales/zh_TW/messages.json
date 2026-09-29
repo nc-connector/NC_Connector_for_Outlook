@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "記錄設定由您的組織集中管理，無法在此變更。"
+  },
+  "managed_logging_policy_invalid": {
+    "message": "某個集中設定的記錄值無效。無效值將使用預設值：關閉偵錯記錄，開啟記錄匿名化。請聯絡管理員。"
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

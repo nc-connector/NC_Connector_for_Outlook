@@ -142,7 +142,7 @@ Key code locations:
   - `UI/NextcloudPickerPreview.cs` loads and decodes one file preview. Selection, cancellation generation, and displayed-image ownership remain with the form; requests still run through `FileLinkService`.
   - `UI/ScaledForm.cs` is the shared DPI-scaling base for forms that use logical pixel layout helpers.
 - `src/NcTalkOutlookAddIn/Settings/` — persisted settings model, storage, and managed setup policy
-  - `Settings/ManagedSetupPolicy.cs` reads the managed Nextcloud URL, ribbon visibility, and transport TLS policy from Windows policy registry keys.
+  - `Settings/ManagedSetupPolicy.cs` reads the managed Nextcloud URL, ribbon visibility, and transport TLS and logging policies from Windows policy registry keys.
   - `Settings/SettingsFileTransaction.cs` serializes profile writes through a named mutex and replaces a validated settings file while retaining its last valid backup.
 - `src/NcTalkOutlookAddIn/Utilities/` — logging, theming, i18n, small shared helpers
 - `src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs` — centralized HtmlSanitizer 9.0.892 policy for backend-provided share/talk HTML; active-content containers such as `template` are removed
@@ -237,7 +237,7 @@ Runtime rules:
 
 #### Enterprise Rollout
 
-`ManagedSetupPolicy` records registry-value presence separately from parsed values. Any present `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, or `TransportTlsEnable13` activates rollout, including `false`, empty, or invalid values. With all six absent, existing local behavior applies. `NextcloudUrl`, `ShowMainRibbonTab`, and each TLS value resolve independently by hive/view precedence; the URL lock still belongs to the selected URL entry, not a lock-only entry in another hive. `AddinSettings` carries `IsEnterpriseRollout`, `ShowMainRibbonTab`, and the managed TLS overlay as runtime-only state. Clones preserve it; XML never writes these administrative overrides. Rollout instructions, restart requirements, and removal of all six triggers are in [ADMIN.md](ADMIN.md#enterprise-rollout).
+`ManagedSetupPolicy` records registry-value presence separately from parsed values. Any present `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, or `LogAnonymizationEnabled` activates rollout, including `false`, empty, or invalid values. With all eight absent, existing local behavior applies. `NextcloudUrl`, `ShowMainRibbonTab`, and each TLS value resolve independently by hive/view precedence; the URL lock still belongs to the selected URL entry, not a lock-only entry in another hive. `AddinSettings` carries `IsEnterpriseRollout`, `ShowMainRibbonTab`, and the managed TLS/logging overlays as runtime-only state. Clones preserve it; XML never writes these administrative overrides. Rollout instructions, restart requirements, and removal of all eight triggers are in [ADMIN.md](ADMIN.md#enterprise-rollout).
 
 Only `ShowMainRibbonTab=false` hides the main tab and its Settings button and blocks the public Settings callback. `IsEnterpriseRollout` controls access checks, not settings visibility. With the tab visible, `SettingsForm` exposes all settings and saves non-authentication preferences normally; a TLS policy locks only the complete TLS group. Share and Talk use the internal `OpenAuthenticationSettingsAsync` path for initial authentication or credential recovery. With the tab hidden, the form exposes only General and saves only credentials/authentication changes; the existing workflow still persists before applying runtime settings. Managed TLS enforcement also applies to this authentication-only path and does not depend on credentials or an available backend/Seat response. A valid active Community Seat remains equivalent to a Pro Seat.
 
@@ -479,6 +479,10 @@ See `Translations.md` for the full language list and maintenance workflow.
 ## Logging
 
 Debug logging is optional and is intended to make support cases reproducible.
+
+`ManagedSetupPolicy` resolves `DebugLoggingEnabled` and `LogAnonymizationEnabled` independently by the existing registry precedence. Either present value activates Enterprise Rollout and locks the entire logging group. Missing siblings default to false/true. Malformed selected values use only their respective default, retain the management lock, and expose a configuration hint plus an always-written diagnostic; they do not create a network gate. Lower-priority invalid values are ignored when a higher-priority field was selected.
+
+`AddinSettings` exposes effective logging values through its existing getters while retaining raw local choices for XML persistence. Clones preserve the overlay, and removal restores the raw choices. `SettingsForm` displays both effective values but never saves a locked overlay back as a local choice. Busy-state changes keep the locks. The existing `ConfigureDiagnosticsLogger` path applies effective values at startup and after save/revert; mandatory secret masking and always-on exception logging remain unchanged. Production policy tests cover registry resolution, privacy defaults, XML, UI, and the runtime logger.
 
 - Enable: Settings → **Debug** → “Write debug log file”
 - Optional safety control (default on): “Anonymize logs”

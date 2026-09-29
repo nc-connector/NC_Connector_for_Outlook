@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "Die Logging-Einstellungen werden zentral durch Ihre Organisation vorgegeben und können hier nicht geändert werden."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Eine zentrale Logging-Vorgabe ist ungültig. Ungültige Werte verwenden ihren Standard: Debug-Logging aus, Log-Anonymisierung an. Bitte wenden Sie sich an Ihren Administrator."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

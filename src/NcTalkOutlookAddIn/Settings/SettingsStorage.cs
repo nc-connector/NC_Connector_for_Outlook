@@ -620,8 +620,8 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "IfbPort", AddinSettings.NormalizeIfbPort(settings.IfbPort).ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbPreviousFreeBusyPath", Safe(settings.IfbPreviousFreeBusyPath));
             AppendElement(document, root, "IfbUserDecisionRecorded", settings.IfbUserDecisionRecorded.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "DebugLoggingEnabled", settings.DebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "LogAnonymizationEnabled", settings.LogAnonymizationEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "DebugLoggingEnabled", settings.LocalDebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "LogAnonymizationEnabled", settings.LocalLogAnonymizationEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsUseSystemDefault", settings.LocalTransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable12", settings.LocalTransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsEnable13", settings.LocalTransportTlsEnable13.ToString(CultureInfo.InvariantCulture));

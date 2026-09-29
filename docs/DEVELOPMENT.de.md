@@ -160,7 +160,7 @@ Controller:
 - `src/NcTalkOutlookAddIn/Controllers/ManagedEmailSignatureController.cs` (gemeinsamer WordEditor-Signatur-Slot-Reconciler)
 - `src/NcTalkOutlookAddIn/Controllers/AppointmentHtmlBodyWriter.cs` (HTML-zu-RTF-Brücke für Termine)
 - `src/NcTalkOutlookAddIn/Models/SeparatePasswordDispatchEntry.cs` (gemeinsames Queue-Modell fuer separaten Passwort-Follow-up)
-- `src/NcTalkOutlookAddIn/Settings/ManagedSetupPolicy.cs` (verwaltete Nextcloud-URL, Ribbon-Sichtbarkeit und Transport-TLS-Policy aus Registry/GPO)
+- `src/NcTalkOutlookAddIn/Settings/ManagedSetupPolicy.cs` (verwaltete Nextcloud-URL, Ribbon-Sichtbarkeit sowie Transport-TLS- und Logging-Policies aus Registry/GPO)
 - `src/NcTalkOutlookAddIn/Settings/SettingsFileTransaction.cs` (serialisiert Profil-Schreibvorgänge über einen benannten Mutex, ersetzt nur validierte Dateien und behält die letzte gültige Sicherung)
 
 Services:
@@ -274,7 +274,7 @@ Runtime-Regeln:
 
 #### Enterprise Rollout
 
-`ManagedSetupPolicy` erfasst die Existenz der Registry-Werte getrennt von ihren interpretierten Werten. Jeder vorhandene Wert `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12` oder `TransportTlsEnable13` aktiviert den Rollout, auch `false`, leere oder ungültige Werte. Fehlen alle sechs Werte, gilt das bisherige lokale Verhalten. `NextcloudUrl`, `ShowMainRibbonTab` und jeder TLS-Wert werden unabhängig nach Hive-/View-Priorität aufgelöst; die URL-Sperre gehört weiterhin zum ausgewählten URL-Eintrag, nicht zu einem alleinstehenden Sperrwert in einem anderen Hive. `AddinSettings` führt `IsEnterpriseRollout`, `ShowMainRibbonTab` und die verwaltete TLS-Überlagerung ausschließlich zur Laufzeit. Klone übernehmen diesen Zustand; XML schreibt diese administrativen Vorgaben nie. Rollout, Neustartanforderungen und das Entfernen aller sechs Auslöser stehen in [ADMIN.de.md](ADMIN.de.md#enterprise-rollout).
+`ManagedSetupPolicy` erfasst die Existenz der Registry-Werte getrennt von ihren interpretierten Werten. Jeder vorhandene Wert `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled` oder `LogAnonymizationEnabled` aktiviert den Rollout, auch `false`, leere oder ungültige Werte. Fehlen alle acht Werte, gilt das bisherige lokale Verhalten. `NextcloudUrl`, `ShowMainRibbonTab` und jeder TLS-Wert werden unabhängig nach Hive-/View-Priorität aufgelöst; die URL-Sperre gehört weiterhin zum ausgewählten URL-Eintrag, nicht zu einem alleinstehenden Sperrwert in einem anderen Hive. `AddinSettings` führt `IsEnterpriseRollout`, `ShowMainRibbonTab` und die verwalteten TLS-/Logging-Überlagerungen ausschließlich zur Laufzeit. Klone übernehmen diesen Zustand; XML schreibt diese administrativen Vorgaben nie. Rollout, Neustartanforderungen und das Entfernen aller acht Auslöser stehen in [ADMIN.de.md](ADMIN.de.md#enterprise-rollout).
 
 Nur `ShowMainRibbonTab=false` blendet den Haupttab samt Einstellungsbutton aus und sperrt den öffentlichen Settings-Callback. `IsEnterpriseRollout` steuert die Zugriffsprüfung, nicht die Sichtbarkeit der Einstellungen. Bei sichtbarem Tab zeigt `SettingsForm` alle Einstellungen und speichert auch Einstellungen außerhalb der Anmeldung regulär; eine TLS-Policy sperrt dabei nur die vollständige TLS-Gruppe. Freigabe und Talk verwenden für Erstanmeldung oder erneute Anmeldung den internen Pfad `OpenAuthenticationSettingsAsync`. Bei ausgeblendetem Tab zeigt der Dialog nur Allgemein und speichert nur Änderungen der Zugangsdaten/Anmeldeart; der bestehende Workflow persistiert weiterhin vor der Laufzeitübernahme. Die verwaltete TLS-Prüfung gilt auch für diesen reinen Anmeldepfad und hängt weder von Zugangsdaten noch von einer verfügbaren Backend-/Seat-Antwort ab. Ein gültiger aktiver Community-Seat bleibt einem Pro-Seat gleichgestellt.
 
@@ -462,6 +462,10 @@ Updateprüfung:
 Die vollständige Sprachliste und der Pflegeablauf stehen in `Translations.md`.
 
 ## Logging
+
+`ManagedSetupPolicy` löst `DebugLoggingEnabled` und `LogAnonymizationEnabled` unabhängig nach der vorhandenen Registry-Priorität auf. Bereits ein vorhandener Wert aktiviert Enterprise Rollout und sperrt die gesamte Logging-Gruppe. Fehlende Geschwisterwerte verwenden false/true. Fehlerhafte ausgewählte Werte verwenden nur ihren jeweiligen Standard, behalten die Verwaltungssperre und erzeugen einen Konfigurationshinweis sowie einen immer geschriebenen Diagnoseeintrag; sie führen keine Netzwerksperre ein. Nachrangige ungültige Werte werden ignoriert, wenn ein höherrangiges Feld ausgewählt wurde.
+
+`AddinSettings` liefert über die vorhandenen Getter effektive Logging-Werte und behält die ursprünglichen lokalen Werte für XML-Persistenz. Klone übernehmen die Überlagerung; nach deren Entfernung gelten wieder die lokalen Werte. `SettingsForm` zeigt die effektiven Werte an, schreibt aber keine gesperrte Vorgabe als lokale Auswahl zurück. Busy-State-Änderungen erhalten die Sperren. Der vorhandene Pfad `ConfigureDiagnosticsLogger` übernimmt die effektiven Werte beim Start sowie nach Speichern/Zurücknehmen; verpflichtende Geheimnis-Maskierung und immer aktive Fehlerprotokollierung bleiben unverändert. Produktive Policy-Tests prüfen Registry-Auflösung, datensparsame Defaults, XML, UI und den Laufzeitlogger.
 
 - Aktivierung: **Einstellungen -> Debuggen -> Debug-Logdatei schreiben**
 - Option (Standard aktiv): **Logs anonymisieren**

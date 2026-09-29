@@ -960,6 +960,11 @@ namespace NcTalkOutlookAddIn
 
             DiagnosticsLogger.SetEnabled(debugEnabled);
             DiagnosticsLogger.SetAnonymization(anonymizationEnabled, serverUrl);
+            if (settings != null && !settings.IsManagedLoggingValid)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core,
+                    "Invalid managed logging value. Invalid DebugLoggingEnabled defaults to false; invalid LogAnonymizationEnabled defaults to true.", null);
+            }
         }
 
         private bool TryApplyTransportSecurityFromSettings(string source, bool showWarning)

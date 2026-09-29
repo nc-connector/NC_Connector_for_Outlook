@@ -1118,11 +1118,114 @@ internal static class OutlookPolicyUiTests
     }
     private static object Managed(object url, object locked, object ribbon, string source)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, source);
     }
     private static object ManagedTls(object system, object tls12, object tls13, string source = "TLS test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, source);
+    }
+    private static object ManagedLogging(object debug, object anonymize, string source = "Logging test")
+    {
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, source);
+    }
+    private static void TestManagedLogging(string root)
+    {
+        string[] properties = { "DebugLoggingEnabled", "LogAnonymizationEnabled" };
+        string[] controls = { "_debugLogCheckBox", "_debugAnonymizeCheckBox" };
+        foreach (object debug in new object[] { null, 0, 1, "invalid", new byte[] { 1 } })
+        foreach (object anonymize in new object[] { null, 0, 1, "invalid", new byte[] { 1 } })
+        foreach (bool rawDebug in new[] { false, true })
+        foreach (bool rawAnonymize in new[] { false, true })
+        {
+            bool present = debug != null || anonymize != null;
+            bool valid = (debug == null || debug is int) && (anonymize == null || anonymize is int);
+            bool[] raw = { rawDebug, rawAnonymize };
+            bool[] effective = { present ? object.Equals(debug, 1) : rawDebug, present ? !object.Equals(anonymize, 0) : rawAnonymize };
+            object policy = ManagedLogging(debug, anonymize);
+            Check((bool)Get(policy, "HasLoggingPolicy") == present && (bool)Get(policy, "IsEnterpriseRollout") == present, "Logging presence controls managed mode, including false and malformed values");
+            Check((bool)Get(policy, "IsLoggingPolicyValid") == valid, "Only malformed values invalidate logging; both false is valid");
+            object local = New("Settings.AddinSettings");
+            Set(local, properties[0], rawDebug); Set(local, properties[1], rawAnonymize);
+            Call(local, "ApplyManagedSetupPolicy", policy);
+            object clone = Call(local, "Clone");
+            object restored = RoundTrip(local, root);
+            var xml = new XmlDocument(); xml.LoadXml(Serialize(local));
+            Check((bool)Get(clone, "HasManagedLogging") == present && (bool)Get(clone, "IsManagedLoggingValid") == valid, "Clone preserves logging management and validity");
+            Check((bool)Get(local, "ShowMainRibbonTab") && !(bool)Get(local, "HasManagedTransportTls"), "Logging-only policy does not hide the ribbon or manage TLS");
+            for (int i = 0; i < 2; i++)
+            {
+                Check((bool)Get(local, properties[i]) == effective[i] && (bool)Get(clone, properties[i]) == effective[i], "Logging getters expose managed values and missing sibling defaults");
+                Check((bool)Get(local, "Local" + properties[i]) == raw[i] && (bool)Get(restored, properties[i]) == raw[i], "Logging raw values survive application and XML roundtrip");
+                Check(bool.Parse(xml.DocumentElement[properties[i]].InnerText) == raw[i], "Existing XML logging elements persist local values, not registry overlay");
+            }
+            Check(!Serialize(local).Contains("HasManagedLogging") && !Serialize(local).Contains("LocalDebugLogging"), "Runtime logging policy is not serialized");
+            Call(clone, "ApplyManagedSetupPolicy", (object)null);
+            for (int i = 0; i < 2; i++) Check((bool)Get(clone, properties[i]) == raw[i], "Policy removal restores local logging choices");
+            Check((bool)Get(local, "HasManagedLogging") == present, "Removing a clone policy does not alter the original");
+        }
+        for (int field = 0; field < 2; field++)
+        for (int location = 0; location < 4; location++)
+        foreach (object selected in new object[] { 0, 1, "bad", "", new byte[] { 1 } })
+        {
+            Array policies = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 4);
+            policies.SetValue(ManagedLogging(field == 0 ? selected : null, field == 1 ? selected : null), location);
+            for (int lower = location + 1; lower < 4; lower++) policies.SetValue(ManagedLogging(1, 0), lower);
+            object resolved = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+            bool expected = selected is int ? object.Equals(selected, 1) : field == 1;
+            Check((bool)Get(resolved, properties[field]) == expected, "First present logging field wins across all registry views, even false or malformed");
+            Check((bool)Get(resolved, "IsLoggingPolicyValid") == (selected is int), "Lower registry value cannot hide a selected malformed logging policy");
+        }
+        Array mixed = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 3);
+        mixed.SetValue(ManagedLogging(0, null), 0);
+        mixed.SetValue(ManagedLogging(null, 0), 1);
+        mixed.SetValue(ManagedLogging("bad", "bad"), 2);
+        object merged = Call(T("Settings.ManagedSetupPolicy"), "Resolve", mixed);
+        Check(!(bool)Get(merged, properties[0]) && !(bool)Get(merged, properties[1]) && (bool)Get(merged, "IsLoggingPolicyValid"), "Fields merge independently; ignored malformed lower values do not invalidate logging");
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (object[] values in new[] { new object[] { null, null }, new object[] { 0, null }, new object[] { 1, 0 }, new object[] { "bad", "bad" } })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, properties[0], true); Set(local, properties[1], false);
+            Call(local, "ApplyManagedSetupPolicy", ManagedLogging(values[0], values[1]));
+            bool managed = (bool)Get(local, "HasManagedLogging");
+            object status = Status(D(), D(), true, mode, seat);
+            using (Form form = Settings(local, status))
+            {
+                foreach (bool busy in new[] { false, true, false })
+                {
+                    Call(form, "SetBusy", busy);
+                    Call(form, "UpdateControlState");
+                    for (int i = 0; i < 2; i++)
+                    {
+                        var box = (CheckBox)Field(form, controls[i]);
+                        Check(box.Enabled == (!managed && !busy) && box.Checked == (bool)Get(local, properties[i]), "Logging UI shows effective values and stays locked across state refreshes for both seat types");
+                    }
+                }
+                string hint = ((Label)Field(form, "_debugPolicyHintLabel")).Text;
+                Check(string.IsNullOrEmpty(hint) == !managed, "Logging management is explained in the Debug tab");
+                if (!(bool)Get(local, "IsManagedLoggingValid"))
+                    Check(hint == (string)T("Utilities.Strings").GetProperty("ManagedLoggingPolicyInvalid", Flags).GetValue(null, null), "Malformed logging uses the configuration hint");
+                Task save = (Task)Call(form, "SaveSettingsAsync");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+                while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(save.IsCompleted, "Managed logging settings save completes without network access");
+                save.GetAwaiter().GetResult();
+                object result = Get(form, "Result");
+                Check((bool)Get(result, "LocalDebugLoggingEnabled") && !(bool)Get(result, "LocalLogAnonymizationEnabled"), "Actual settings save does not bake managed logging into local preferences");
+            }
+            if (managed) Check(RolloutNotice(local, status) == RolloutNotice(ManagedSettings(null, true), status), "Logging-only rollout retains existing Community/Pro access rules without a new logging network gate");
+        }
+        object managedSettings = New("Settings.AddinSettings");
+        foreach (object[] values in new[] { new object[] { 0, 1 }, new object[] { 1, 0 } })
+        {
+            Call(managedSettings, "ApplyManagedSetupPolicy", ManagedLogging(values[0], values[1]));
+            Call(T("NextcloudTalkAddIn"), "ConfigureDiagnosticsLogger", managedSettings);
+            Check((bool)T("Utilities.DiagnosticsLogger").GetProperty("IsEnabled", Flags).GetValue(null, null) == (bool)Get(managedSettings, properties[0]), "Runtime logger uses effective debug policy");
+            Check((bool)T("Utilities.DiagnosticsLogger").GetField("_anonymizationEnabled", Flags).GetValue(null) == (bool)Get(managedSettings, properties[1]), "Runtime logger uses effective anonymization policy");
+        }
+        Call(T("NextcloudTalkAddIn"), "ConfigureDiagnosticsLogger", New("Settings.AddinSettings"));
+        Console.WriteLine("[OK] Managed logging priority, defaults, privacy, persistence, runtime logger, UI and seat parity");
     }
     private static readonly string[] TlsProperties = {
         "TransportTlsUseSystemDefault", "TransportTlsEnable12", "TransportTlsEnable13"
@@ -1524,6 +1627,7 @@ internal static class OutlookPolicyUiTests
             TestEnterpriseRollout(root);
             TestConnectionOnboarding();
             TestManagedTls(root);
+            TestManagedLogging(root);
             Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }

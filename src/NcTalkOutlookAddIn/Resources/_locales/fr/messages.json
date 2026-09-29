@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "Les paramètres de journalisation sont gérés par votre organisation et ne peuvent pas être modifiés ici."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Une valeur de journalisation définie par votre organisation est invalide. Les valeurs invalides utilisent leurs valeurs par défaut : journalisation de débogage désactivée, anonymisation des journaux activée. Contactez votre administrateur."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

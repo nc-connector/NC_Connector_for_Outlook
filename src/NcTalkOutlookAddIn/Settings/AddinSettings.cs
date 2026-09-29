@@ -22,6 +22,8 @@ namespace NcTalkOutlookAddIn.Settings
 
         private Dictionary<string, object> _localPolicyValues = new Dictionary<string, object>(StringComparer.Ordinal);
         private ManagedSetupPolicy _managedSetupPolicy;
+        private bool _localDebugLoggingEnabled;
+        private bool _localLogAnonymizationEnabled;
         private bool _localTransportTlsUseSystemDefault;
         private bool _localTransportTlsEnable12;
         private bool _localTransportTlsEnable13;
@@ -85,9 +87,22 @@ namespace NcTalkOutlookAddIn.Settings
 
         public bool IfbUserDecisionRecorded { get; set; }
 
-        public bool DebugLoggingEnabled { get; set; }
+        public bool DebugLoggingEnabled
+        {
+            get { return HasManagedLogging ? _managedSetupPolicy.DebugLoggingEnabled : _localDebugLoggingEnabled; }
+            set { _localDebugLoggingEnabled = value; }
+        }
 
-        public bool LogAnonymizationEnabled { get; set; }
+        public bool LogAnonymizationEnabled
+        {
+            get { return HasManagedLogging ? _managedSetupPolicy.LogAnonymizationEnabled : _localLogAnonymizationEnabled; }
+            set { _localLogAnonymizationEnabled = value; }
+        }
+
+        internal bool LocalDebugLoggingEnabled { get { return _localDebugLoggingEnabled; } }
+        internal bool LocalLogAnonymizationEnabled { get { return _localLogAnonymizationEnabled; } }
+        internal bool HasManagedLogging { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasLoggingPolicy; } }
+        internal bool IsManagedLoggingValid { get { return !HasManagedLogging || _managedSetupPolicy.IsLoggingPolicyValid; } }
 
         public bool TransportTlsUseSystemDefault
         {

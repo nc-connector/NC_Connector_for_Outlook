@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "Logging settings are managed by your organization and cannot be changed here."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "A centrally configured logging value is invalid. Invalid values use their defaults: debug logging off, log anonymization on. Please contact your administrator."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

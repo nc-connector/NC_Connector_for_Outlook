@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "As configurações de registro são gerenciadas pela sua organização e não podem ser alteradas aqui."
+  },
+  "managed_logging_policy_invalid": {
+    "message": "Um valor de registro configurado centralmente é inválido. Valores inválidos usam seus padrões: registro de depuração desativado e anonimização de registros ativada. Entre em contato com o administrador."
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

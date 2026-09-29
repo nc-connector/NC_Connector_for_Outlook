@@ -308,9 +308,28 @@ Abnahme auf einem Pilotarbeitsplatz:
 3. In einer Testverteilung einen ungültigen TLS-Wert oder `0 / 0 / 0` setzen. Den sichtbaren Konfigurationsfehler prüfen und sicherstellen, dass ein Verbindungstest keine NC-Connector-Serveranfrage sendet. Das darf nicht als falsches Passwort oder fehlender Seat gemeldet werden. Vor weiteren Tests eine gültige Policy wiederherstellen und Outlook neu starten.
 4. Zum Zurücknehmen alle drei TLS-Wertnamen aus sämtlichen zutreffenden Hives und Registry-Ansichten entfernen und Outlook neu starten. Wird nur ein höherrangiger Eintrag entfernt, kann ein nachrangiger Wert wirksam werden. Die vorherigen lokalen TLS-Einstellungen des Benutzers gelten wieder, auch nach dem Speichern der Einstellungen während einer aktiven Policy; Policy-Werte ersetzen diese gespeicherten Einstellungen nicht. Gab es keine lokale Auswahl, gelten die lokalen Produktstandards. Andere gesetzte Rollout-Werte halten Enterprise Rollout weiterhin aktiv.
 
+### Verwaltetes Logging
+
+`DebugLoggingEnabled` und `LogAnonymizationEnabled` an denselben Policy-Pfaden setzen, vorzugsweise als `REG_DWORD` (`0` aus, `1` an). Jeder Wert wird unabhängig aufgelöst: HKLM 64-Bit, HKLM 32-Bit, HKCU 64-Bit, HKCU 32-Bit; der erste vorhandene Eintrag gewinnt.
+
+Bereits einer der Werte aktiviert Enterprise Rollout und sperrt beide Felder unter **Einstellungen -> Debuggen**, auch bei false oder fehlerhaftem Inhalt. Zuvor Backend bereitstellen und einen aktiven Seat zuweisen; Community- und Pro-Seats haben denselben Zugriff. Fehlende Werte einer aktiven Logging-Policy verwenden die Produktstandards: Debug-Logging aus, Anonymisierung an. Ohne beide Vorgaben gelten gespeicherte lokale Einstellungen oder bei einer Neuinstallation dieselben Standards.
+
+Beispiel: anonymisierte Support-Logs zentral aktivieren, danach Outlook neu starten:
+
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name DebugLoggingEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name LogAnonymizationEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+```
+
+Ein nicht lesbarer Wert verwendet den Standard dieses Felds und zeigt im Debug-Tab einen Konfigurationshinweis; ein Diagnoseeintrag wird auch bei ausgeschaltetem Debug-Logging geschrieben. Gültige Vorgaben im anderen Feld bleiben wirksam. Ungültige höherrangige Einträge geben keine nachrangigen Werte frei. Beide Werte auf `0` ist gültig. Ein Logging-Konfigurationsfehler blockiert keine Netzwerkanfragen. Passwort-/Token-Maskierung bleibt auch ohne Anonymisierung aktiv; Laufzeitfehler werden auch bei deaktiviertem Debug-Logging protokolliert.
+
+Auf einem Pilotarbeitsplatz nach Outlook-Neustart die effektiven Werte, beide Sperren und ein Support-Log prüfen. Das Speichern anderer Einstellungen darf lokale Logging-Werte nicht ersetzen. Zum Zurücknehmen beide Werte aus allen zutreffenden Hives/Ansichten entfernen und Outlook neu starten; vorherige lokale Werte gelten wieder. Andere Rollout-Policies bleiben wirksam. Eine reine Logging-Policy blendet das Ribbon nicht aus.
+
 ### Enterprise Rollout
 
-Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12` oder `TransportTlsEnable13` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle sechs Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
+Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled` oder `LogAnonymizationEnabled` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle acht Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
 
 **Auswirkung beim Upgrade:** Auch eine bereits bestehende Registry-URL-Vorgabe aktiviert diesen Modus nach dem Update. Seats und Backend deshalb vor dem Rollout vorbereiten; eine ausschließlich per XML vorbelegte URL aktiviert ihn nicht.
 
@@ -328,7 +347,7 @@ Erstanmeldung und Prüfung:
 2. Ohne Zugangsdaten in einer Mail **Nextcloud-Freigabe einfügen** oder in einem Termin **Talk-Link einfügen** anklicken. Der vorhandene Einstellungsdialog öffnet sich direkt mit dem blauen Hinweis **Mit Nextcloud verbinden**, ohne vorgeschaltete Fehlermeldung. Das gilt auch für nicht verwaltete Installationen. Nur bei `ShowMainRibbonTab=false` sind die anderen Einstellungstabs nicht verfügbar; andernfalls ist der vollständige Dialog auch über **NC Connector -> Einstellungen** erreichbar.
 3. Den Nextcloud-Login-Flow abschließen oder das App-Passwort des Benutzers eingeben und speichern. Die Anmeldung muss erfolgreich geprüft sein, bevor diese Einrichtung gespeichert werden kann. Verwaltete URL und Sperre bleiben wirksam; vorhandene Einstellungen bleiben erhalten. Nach erfolgreichem Speichern wird die ursprüngliche Aktion fortgesetzt, sofern Mail oder Termin noch geöffnet sind (eine Inline-Antwort muss weiterhin aktiv sein). Abbrechen beendet die Aktion ohne weitere Meldung. Die Anmeldung allein lädt keine Dateien hoch und erstellt keinen Talk-Raum.
 4. Den Zugriff mit aktivem Seat prüfen; anschließend in einer Testumgebung die Meldungen für fehlenden Seat und fehlendes Backend getrennt prüfen. Abgelehnte Zugangsdaten öffnen die Anmeldung mit einem freundlichen Hinweis erneut; Verbindungsfehler bleiben davon unterscheidbar. Bei ausgeblendetem Haupttab bleiben die normalen Einstellungen dabei ausgeblendet. Backend- und Seat-Prüfung gelten auch nach der Anmeldung unverändert.
-5. Zum Einblenden von Tab und Einstellungen die wirksame Policy `ShowMainRibbonTab=false` entfernen oder auf `true` setzen und Outlook neu starten. Die verwaltete Zugriffsprüfung bleibt bestehen. Zum Verlassen des Modus alle sechs Auslöser an allen zutreffenden Policy-Pfaden und Registry-Ansichten entfernen und Outlook neu starten. Gespeicherte Zugangsdaten und Einstellungen bleiben erhalten.
+5. Zum Einblenden von Tab und Einstellungen die wirksame Policy `ShowMainRibbonTab=false` entfernen oder auf `true` setzen und Outlook neu starten. Die verwaltete Zugriffsprüfung bleibt bestehen. Zum Verlassen des Modus alle acht Auslöser an allen zutreffenden Policy-Pfaden und Registry-Ansichten entfernen und Outlook neu starten. Gespeicherte Zugangsdaten und Einstellungen bleiben erhalten.
 
 Registry-Policies steuern den administrativen Rollout. Sie schützen nicht vor Benutzern, die diese Policy verändern oder das Add-in ersetzen können. Policy-Pfade und Berechtigungen zur Softwareverteilung entsprechend schützen.
 
@@ -771,7 +790,7 @@ Nach einem Update von Add-in, Outlook, Proxy, Zertifikat oder Nextcloud:
 
 ### Logs
 
-Logging unter **NC Connector -> Einstellungen -> Debuggen** aktivieren. **Logs anonymisieren** aktiviert lassen, sofern der Support nicht ausdrücklich andere Daten anfordert.
+Logging unter **NC Connector -> Einstellungen -> Debuggen** aktivieren. **Logs anonymisieren** aktiviert lassen, sofern der Support nicht ausdrücklich andere Daten anfordert. Organisationsvorgaben können beide Felder sperren; siehe [Verwaltetes Logging](#verwaltetes-logging).
 
 Tägliche Dateien:
 

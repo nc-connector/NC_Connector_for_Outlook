@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "ログ設定は組織によって管理されており、ここでは変更できません。"
+  },
+  "managed_logging_policy_invalid": {
+    "message": "組織が指定したログ設定の値が無効です。無効な値には既定値が適用されます。デバッグログは無効、ログの匿名化は有効です。管理者にお問い合わせください。"
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },

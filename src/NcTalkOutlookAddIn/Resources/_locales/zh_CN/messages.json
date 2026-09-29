@@ -1,4 +1,10 @@
 {
+  "options_logging_managed_hint": {
+    "message": "日志设置由您的组织统一管理，无法在此更改。"
+  },
+  "managed_logging_policy_invalid": {
+    "message": "某个集中配置的日志设置值无效。无效值将使用默认值：关闭调试日志，开启日志匿名化。请联系管理员。"
+  },
   "extName": {
     "message": "NC Connector for Outlook"
   },
