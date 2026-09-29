@@ -622,9 +622,9 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "IfbUserDecisionRecorded", settings.IfbUserDecisionRecorded.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "DebugLoggingEnabled", settings.DebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "LogAnonymizationEnabled", settings.LogAnonymizationEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TransportTlsUseSystemDefault", settings.TransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TransportTlsEnable12", settings.TransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "TransportTlsEnable13", settings.TransportTlsEnable13.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "TransportTlsUseSystemDefault", settings.LocalTransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "TransportTlsEnable12", settings.LocalTransportTlsEnable12.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "TransportTlsEnable13", settings.LocalTransportTlsEnable13.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "UpdateNotifyEnabled", settings.UpdateNotifyEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "UpdateInstallId", Safe(settings.UpdateInstallId));
             AppendElement(document, root, "UpdateLastCheckedAtUtc", Safe(settings.UpdateLastCheckedAtUtc));

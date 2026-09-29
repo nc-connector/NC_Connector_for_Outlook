@@ -273,9 +273,44 @@ Priority and result:
 
 URL and ribbon values resolve independently, in order: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. The URL lock belongs to the selected URL entry. An invalid ribbon value keeps the visibility default of `true`; an invalid URL is not used as a server address.
 
+### Managed transport security (TLS)
+
+The same policy locations also accept these TLS values. Use `REG_DWORD` with `0` for disabled and `1` for enabled:
+
+| Value | Meaning | Default when absent from an active TLS policy |
+| --- | --- | --- |
+| `TransportTlsUseSystemDefault` | Let Windows select the TLS protocols | `0` |
+| `TransportTlsEnable12` | Allow TLS 1.2 in custom mode | `1` |
+| `TransportTlsEnable13` | Allow TLS 1.3 in custom mode | `0` |
+
+Each TLS value resolves independently in this order: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. The first present entry wins, even if invalid; an invalid higher-priority entry does not fall through to a lower-priority entry.
+
+The presence of any one TLS value activates Enterprise Rollout and locks the entire TLS group in **Settings -> Advanced -> Transport security (TLS)**, including when the value is `0`, empty, or invalid. Missing TLS values use the product defaults in the table, not the user's saved choices. With `TransportTlsUseSystemDefault=1`, Windows selects the protocols and the two explicit version selections have no effect, as in the local settings dialog. The TLS policy does not hide Settings; only `ShowMainRibbonTab=false` does that.
+
+Example: require TLS 1.2 using a computer policy. Run from an elevated 64-bit PowerShell on 64-bit Windows, then restart Outlook:
+
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name TransportTlsUseSystemDefault -PropertyType DWord -Value 0 -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name TransportTlsEnable12 -PropertyType DWord -Value 1 -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name TransportTlsEnable13 -PropertyType DWord -Value 0 -Force | Out-Null
+```
+
+Deploy the backend and assign active Seats before applying even a TLS-only policy. A valid active Community Seat provides the same access as a Pro Seat.
+
+TLS policy is enforced at startup and before login, authentication tests, and backend/Seat checks. An invalid effective TLS value or the combination `0 / 0 / 0` shows a configuration error and blocks NC Connector's server HTTP requests, including update checks. It does not silently enable TLS 1.2. In particular, setting only `TransportTlsEnable12=0` produces that invalid combination because the two missing values default to `0`. Select system-default mode or explicitly enable at least one TLS version. A TLS 1.3 selection rejected by the runtime also fails without automatic fallback. Correct the policy and restart Outlook; changing credentials or Seats does not repair a TLS configuration error.
+
+Acceptance checks on a pilot workstation:
+
+1. Restart Outlook after every registry change. With the example above, confirm that all three TLS controls are locked and show system default off, TLS 1.2 on, and TLS 1.3 off; the remaining settings stay accessible unless the ribbon policy hides them.
+2. Run the connection test and complete login with an active Seat. Check Community and Pro Seats separately; neither requires different TLS values.
+3. In a test deployment, use an invalid TLS value or `0 / 0 / 0`. Confirm the visible configuration error and that a connection test sends no NC Connector server request; this must not appear as an incorrect-password or missing-Seat diagnosis. Restore a valid policy and restart Outlook before continuing.
+4. For rollback, remove all three TLS value names from every applicable hive and registry view, then restart Outlook. Removing only one higher-priority entry can expose a lower-priority value. The user's previous local TLS choices return, including after settings were saved while the policy was active; policy values do not replace those saved choices. If no local choice existed, the local product defaults apply. Other configured rollout values still keep Enterprise Rollout active.
+
 ### Enterprise Rollout
 
-The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, or `ShowMainRibbonTab` enables Enterprise Rollout, including a lock or ribbon value of `false`. An empty or invalid configured value still counts as present. With none of these three values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
+The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, or `TransportTlsEnable13` enables Enterprise Rollout, including a value of `false`. An empty or invalid configured value still counts as present. With none of these six values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
 
 **Upgrade impact:** An existing registry-based URL deployment also enables this mode after upgrading. Assign Seats and prepare the backend before rollout; an XML-preseeded URL alone does not enable it.
 
@@ -293,7 +328,7 @@ First sign-in and verification:
 2. Without credentials, click **Insert Nextcloud share** in a message or **Insert Talk link** in an appointment. The existing settings dialog opens directly with a blue **Connect to Nextcloud** invitation, without a preliminary error. This also applies to unmanaged installations. Only with `ShowMainRibbonTab=false` are the other settings tabs unavailable; otherwise the full dialog is also accessible through **NC Connector -> Settings**.
 3. Complete the Nextcloud login flow or enter the user's app password, then save. Authentication must succeed before this setup can be saved. The managed URL and its lock remain effective; existing preferences are preserved. After saving successfully, the original action continues if its message or appointment is still open (an inline reply must still be active). Cancelling ends the action quietly. Signing in alone does not upload files or create a Talk room.
 4. Verify access with an active Seat, then separately verify the missing-Seat and missing-backend messages in a test environment. Rejected credentials reopen sign-in with a friendly reminder; connection failures remain distinct. If the main tab is hidden, normal settings remain hidden too. The backend and Seat checks still apply after authentication.
-5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all three trigger values from all applicable policy locations and restart Outlook. Saved credentials and preferences remain.
+5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all six trigger values from all applicable policy locations and registry views, then restart Outlook. Saved credentials and preferences remain.
 
 Registry policy is an administrator deployment control, not protection against a user who can change that policy or replace the add-in. Protect the policy keys and deployment permissions accordingly.
 
@@ -783,7 +818,7 @@ If the add-in still does not load, collect the MSI log, Windows Event Viewer ent
 1. Open the configured base URL from the affected workstation.
 2. Check DNS, system time, certificate trust, proxy authentication, and TLS inspection.
 3. Confirm that the URL contains the public subpath but not `/index.php`.
-4. In **Settings -> Advanced -> Transport security (TLS)**, test the organization-approved mode.
+4. In **Settings -> Advanced -> Transport security (TLS)**, test the organization-approved mode. If the TLS group is locked, review the [managed TLS policy](#managed-transport-security-tls) instead; correct invalid values at their effective registry location and restart Outlook. A TLS policy configuration error must be resolved before authentication or Seat checks can run.
 5. Run the connection test again.
 6. Compare the result from a workstation outside the affected proxy segment.
 

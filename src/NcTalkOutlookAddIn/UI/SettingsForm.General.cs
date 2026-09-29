@@ -148,7 +148,7 @@ namespace NcTalkOutlookAddIn.UI
 
             try
             {
-                previousSecurityProtocol = ApplyTemporaryTlsForConnectivity("settings_login_flow");
+                previousSecurityProtocol = ApplySelectedTransportSecurity("settings_login_flow");
                 temporaryTlsApplied = true;
 
                 var flowService = new TalkLoginFlowService(normalizedUrl);
@@ -260,7 +260,7 @@ namespace NcTalkOutlookAddIn.UI
 
             try
             {
-                previousSecurityProtocol = ApplyTemporaryTlsForConnectivity("settings_connection_test");
+                previousSecurityProtocol = ApplySelectedTransportSecurity("settings_connection_test");
                 temporaryTlsApplied = true;
 
                 var service = new TalkService(new TalkServiceConfiguration(normalizedUrl, user, appPassword));
@@ -312,16 +312,19 @@ namespace NcTalkOutlookAddIn.UI
             return false;
         }
 
-        private SecurityProtocolType ApplyTemporaryTlsForConnectivity(string source)
+        private SecurityProtocolType ApplySelectedTransportSecurity(string source)
         {
             SecurityProtocolType previous = ServicePointManager.SecurityProtocol;
             try
             {
-                TransportSecurityConfigurator.Apply(
-                    _tlsUseSystemDefaultCheckBox.Checked,
-                    _tlsEnable12CheckBox.Checked,
-                    _tlsEnable13CheckBox.Checked,
-                    source);
+                AddinSettings selected = Result.Clone();
+                if (!selected.HasManagedTransportTls)
+                {
+                    selected.TransportTlsUseSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
+                    selected.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
+                    selected.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
+                }
+                TransportSecurityConfigurator.ApplyFromSettings(selected, source);
             }
             catch (Exception ex)
             {
@@ -336,7 +339,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private static void RestoreTemporaryTls(SecurityProtocolType previous, string source)
         {
-            ServicePointManager.SecurityProtocol = previous;
+            TransportSecurityConfigurator.Restore(previous);
             DiagnosticsLogger.Log(
                 LogCategories.Core,
                 "Transport security restored after temporary settings operation (source="

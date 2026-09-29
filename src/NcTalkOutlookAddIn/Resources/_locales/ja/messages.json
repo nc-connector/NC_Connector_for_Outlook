@@ -983,6 +983,12 @@
   "options_tls_hint": {
     "message": "無効の場合、NC Connector はアドイン実行時に選択した TLS バージョンを強制します。"
   },
+  "options_tls_managed_hint": {
+    "message": "TLS 設定は組織によって一元管理されており、ここでは変更できません。"
+  },
+  "managed_tls_policy_invalid": {
+    "message": "組織が一元管理する TLS 設定が無効です。管理者にお問い合わせください。NC Connector はこの設定ではサーバーに接続しません。"
+  },
   "options_tls_apply_failed": {
     "message": "選択した TLS 設定を適用できませんでした: {0}"
   },

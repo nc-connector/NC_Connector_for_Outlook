@@ -983,6 +983,12 @@
   "options_tls_hint": {
     "message": "Je-li vypnuto, NC Connector vynutí vybrané verze TLS za běhu doplňku."
   },
+  "options_tls_managed_hint": {
+    "message": "Nastavení TLS spravuje centrálně vaše organizace a nelze je zde změnit."
+  },
+  "managed_tls_policy_invalid": {
+    "message": "Centrálně určené nastavení TLS je neplatné. Obraťte se prosím na svého správce. NC Connector se s touto konfigurací nepřipojí k serveru."
+  },
   "options_tls_apply_failed": {
     "message": "Vybraná nastavení TLS nebylo možné použít: {0}"
   },

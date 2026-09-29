@@ -36,6 +36,7 @@ namespace NcTalkOutlookAddIn.Settings
     internal sealed class AddinSettings
     {
         internal bool IsEnterpriseRollout { get; set; }
+        internal bool IsManagedTransportTlsValid { get { return true; } }
         internal bool? EmailSignatureOnCompose { get; set; }
         internal bool? EmailSignatureOnReply { get; set; }
         internal bool? EmailSignatureOnForward { get; set; }
@@ -1117,7 +1118,180 @@ internal static class OutlookPolicyUiTests
     }
     private static object Managed(object url, object locked, object ribbon, string source)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, source);
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, source);
+    }
+    private static object ManagedTls(object system, object tls12, object tls13, string source = "TLS test")
+    {
+        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, source);
+    }
+    private static readonly string[] TlsProperties = {
+        "TransportTlsUseSystemDefault", "TransportTlsEnable12", "TransportTlsEnable13"
+    };
+    private static void CheckTls(object target, bool system, bool tls12, bool tls13, string message, bool raw = false)
+    {
+        bool[] expected = { system, tls12, tls13 };
+        for (int i = 0; i < TlsProperties.Length; i++)
+            Check((bool)Get(target, (raw ? "Local" : "") + TlsProperties[i]) == expected[i], message + ": " + TlsProperties[i]);
+    }
+    private static void TestManagedTls(string root)
+    {
+        CheckTls(New("Settings.AddinSettings"), false, true, false, "Unmanaged TLS product defaults are unchanged");
+        foreach (object system in new object[] { null, 0, 1 })
+        foreach (object tls12 in new object[] { null, 0, 1 })
+        foreach (object tls13 in new object[] { null, 0, 1 })
+        {
+            bool present = system != null || tls12 != null || tls13 != null;
+            bool expectedSystem = object.Equals(system, 1);
+            bool expected12 = tls12 == null || object.Equals(tls12, 1);
+            bool expected13 = object.Equals(tls13, 1);
+            bool valid = expectedSystem || expected12 || expected13;
+            object policy = ManagedTls(system, tls12, tls13);
+            Check((bool)Get(policy, "HasTransportTlsPolicy") == present && (bool)Get(policy, "IsEnterpriseRollout") == present,
+                "TLS policy presence, including zero, controls enterprise rollout");
+            Check((bool)Get(policy, "IsTransportTlsPolicyValid") == valid, "All-false managed TLS is invalid; missing siblings use product defaults");
+            CheckTls(policy, expectedSystem, expected12, expected13, "Managed TLS maps missing/zero/one independently");
+            object local = New("Settings.AddinSettings");
+            Set(local, TlsProperties[0], !expectedSystem);
+            Set(local, TlsProperties[1], !expected12);
+            Set(local, TlsProperties[2], !expected13);
+            Call(local, "ApplyManagedSetupPolicy", policy);
+            Check((bool)Get(local, "HasManagedTransportTls") == present && (bool)Get(local, "IsManagedTransportTlsValid") == valid,
+                "Settings preserve managed TLS presence and validity");
+            CheckTls(local, present ? expectedSystem : !expectedSystem, present ? expected12 : !expected12,
+                present ? expected13 : !expected13, "Policy overlay uses product defaults, not local siblings");
+            CheckTls(local, !expectedSystem, !expected12, !expected13, "Applying TLS policy retains local choices", true);
+            object clone = Call(local, "Clone");
+            Check((bool)Get(clone, "HasManagedTransportTls") == present && (bool)Get(clone, "IsManagedTransportTlsValid") == valid,
+                "Clone retains managed TLS state including invalid policy");
+            CheckTls(clone, !expectedSystem, !expected12, !expected13, "Clone retains raw TLS choices", true);
+            Call(clone, "ApplyManagedSetupPolicy", (object)null);
+            Check(!(bool)Get(clone, "HasManagedTransportTls") && (bool)Get(clone, "IsManagedTransportTlsValid"), "Removing TLS policy clears validity failure");
+            CheckTls(clone, !expectedSystem, !expected12, !expected13, "Removing TLS policy restores all local values");
+            Check((bool)Get(local, "HasManagedTransportTls") == present, "Removing policy from clone does not mutate original");
+        }
+
+        string[] sources = { "HKLM64", "HKLM32", "HKCU64", "HKCU32" };
+        for (int field = 0; field < 3; field++)
+        for (int location = 0; location < sources.Length; location++)
+        foreach (object selected in new object[] { 0, 1, "malformed" })
+        {
+            Array policies = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 4);
+            object[] values = { null, null, null };
+            values[field] = selected;
+            policies.SetValue(ManagedTls(values[0], values[1], values[2], sources[location]), location);
+            for (int lower = location + 1; lower < sources.Length; lower++)
+                policies.SetValue(ManagedTls(1, 1, 1, sources[lower]), lower);
+            object resolved = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+            Check((bool)Get(resolved, "HasTransportTlsPolicy") && (bool)Get(resolved, "IsEnterpriseRollout"), "Any TLS value in each hive/view activates enterprise rollout");
+            if (selected is string)
+                Check(!(bool)Get(resolved, "IsTransportTlsPolicyValid"), "Malformed first-present TLS cannot fall through to a lower-priority valid value");
+            else
+                Check((bool)Get(resolved, TlsProperties[field]) == object.Equals(selected, 1), "First-present TLS wins even when zero: " + sources[location] + "/" + TlsProperties[field]);
+        }
+        Array mixed = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 4);
+        mixed.SetValue(ManagedTls(0, null, null, "HKLM64"), 0);
+        mixed.SetValue(ManagedTls(null, 0, null, "HKLM32"), 1);
+        mixed.SetValue(ManagedTls(null, null, 1, "HKCU64"), 2);
+        mixed.SetValue(ManagedTls(1, 1, 0, "HKCU32"), 3);
+        object mixedPolicy = Call(T("Settings.ManagedSetupPolicy"), "Resolve", mixed);
+        CheckTls(mixedPolicy, false, false, true, "TLS fields resolve independently across all four registry locations");
+        Check((bool)Get(mixedPolicy, "IsTransportTlsPolicyValid"), "Resolved TLS validity uses the merged group");
+        mixed.SetValue(ManagedTls(0, 1, 0, "HKLM64"), 0);
+        mixed.SetValue(ManagedTls("bad", "bad", "bad", "HKLM32"), 1);
+        mixedPolicy = Call(T("Settings.ManagedSetupPolicy"), "Resolve", mixed);
+        CheckTls(mixedPolicy, false, true, false, "Lower-priority malformed TLS cannot replace selected valid fields");
+        Check((bool)Get(mixedPolicy, "IsTransportTlsPolicyValid"), "Only selected malformed values invalidate TLS policy");
+        for (int field = 0; field < 3; field++)
+        foreach (object malformed in new object[] { "", "garbage", new byte[] { 1, 2 } })
+        {
+            object[] values = { 1, 1, 1 };
+            values[field] = malformed;
+            object policy = ManagedTls(values[0], values[1], values[2]);
+            Check((bool)Get(policy, "HasTransportTlsPolicy") && (bool)Get(policy, "IsEnterpriseRollout")
+                && !(bool)Get(policy, "IsTransportTlsPolicyValid"), "Malformed TLS is managed and invalid even if another protocol or system default is enabled");
+        }
+
+        for (int rawBits = 0; rawBits < 8; rawBits++)
+        {
+            object local = New("Settings.AddinSettings");
+            bool[] raw = { (rawBits & 1) != 0, (rawBits & 2) != 0, (rawBits & 4) != 0 };
+            for (int field = 0; field < 3; field++) Set(local, TlsProperties[field], raw[field]);
+            Call(local, "ApplyManagedSetupPolicy", ManagedTls(1, 0, 0));
+            string xml = Serialize(local);
+            var doc = new XmlDocument(); doc.LoadXml(xml);
+            for (int field = 0; field < 3; field++)
+                Check(bool.Parse(doc.DocumentElement[TlsProperties[field]].InnerText) == raw[field], "XML writes raw TLS under the existing element name");
+            Check(!xml.Contains("HasManagedTransportTls") && !xml.Contains("IsManagedTransportTlsValid")
+                && !xml.Contains("LocalTransportTls") && !xml.Contains("IsEnterpriseRollout"), "Registry TLS state is never serialized into user XML");
+            object loaded = RoundTrip(local, root);
+            Check(!(bool)Get(loaded, "HasManagedTransportTls"), "Loading XML alone cannot create a registry TLS policy");
+            CheckTls(loaded, raw[0], raw[1], raw[2], "XML round trip retains the user's TLS values");
+            object clone = Call(local, "Clone");
+            for (int field = 0; field < 3; field++) Set(clone, TlsProperties[field], !raw[field]);
+            CheckTls(clone, true, false, false, "Setters cannot bypass managed TLS getters");
+            CheckTls(clone, !raw[0], !raw[1], !raw[2], "Setters retain local choices while managed", true);
+            CheckTls(local, raw[0], raw[1], raw[2], "Clone edits do not alter original local TLS values", true);
+            Call(clone, "ApplyManagedSetupPolicy", Managed(null, null, null, "empty"));
+            CheckTls(clone, !raw[0], !raw[1], !raw[2], "An empty policy restores updated local TLS choices");
+        }
+
+        TestManagedTlsUi();
+        Console.WriteLine("[OK] Registry TLS presence, validity, per-field priority, overlay, clone, XML and locked UI regressions");
+    }
+    private static void TestManagedTlsUi()
+    {
+        string hint = (string)T("Utilities.Strings").GetProperty("AdvancedTlsManagedHint", Flags).GetValue(null, null);
+        string invalid = (string)T("Utilities.Strings").GetProperty("ManagedTlsPolicyInvalid", Flags).GetValue(null, null);
+        string[] controls = { "_tlsUseSystemDefaultCheckBox", "_tlsEnable12CheckBox", "_tlsEnable13CheckBox" };
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (object[] values in new[] {
+            new object[] { null, null, null }, new object[] { 0, null, null },
+            new object[] { 1, 0, 0 }, new object[] { 0, 0, 0 }, new object[] { "bad", 1, 0 }
+        })
+        {
+            object local = New("Settings.AddinSettings");
+            object policy = ManagedTls(values[0], values[1], values[2]);
+            Call(local, "ApplyManagedSetupPolicy", policy);
+            // Complete credentials avoid onboarding taking precedence over policy warning tests.
+            Set(local, "ServerUrl", "https://cloud.example.test");
+            Set(local, "Username", "tls-policy-test");
+            Set(local, "AppPassword", "test-only");
+            object status = Status(D(), D(), true, mode, seat);
+            bool managed = (bool)Get(local, "HasManagedTransportTls");
+            bool valid = (bool)Get(local, "IsManagedTransportTlsValid");
+            using (Form form = Settings(local, status))
+            {
+                for (int field = 0; field < 3; field++)
+                    Check(((CheckBox)Field(form, controls[field])).Checked == (bool)Get(local, TlsProperties[field]), "UI displays effective TLS including invalid all-false policy");
+                foreach (bool busy in new[] { false, true, false })
+                {
+                    Call(form, "SetBusy", busy);
+                    Call(form, "UpdateControlState");
+                    Call(form, "UpdateTlsOptionsState");
+                    for (int field = 0; field < 3; field++)
+                    {
+                        bool enabled = !managed && !busy && (field == 0 || !(bool)Get(local, TlsProperties[0]));
+                        Check(((CheckBox)Field(form, controls[field])).Enabled == enabled, "Every TLS control remains locked across state/busy updates: " + mode + "/" + seat);
+                    }
+                }
+                Check(((Label)Field(form, "_tlsHintLabel")).Text.Contains(hint) == managed, "TLS hint identifies organization management only when policy exists");
+                if (managed && !valid)
+                {
+                    Check(((Label)Field(form, "_policyWarningTextLabel")).Text.Contains(invalid), "Invalid managed TLS has an actionable banner independent of mode or seat");
+                    Check(RolloutNotice(local, status) == invalid && RolloutNotice(local, null) == invalid,
+                        "Invalid TLS takes priority over cached backend/seat state and missing backend status");
+                }
+                CheckTls(Get(form, "Result"), false, true, false, "Opening settings and updating controls retain raw local TLS choices", true);
+                CheckTls(local, false, true, false, "Opening settings does not mutate original raw TLS choices", true);
+                var persisted = new XmlDocument(); persisted.LoadXml(Serialize(Get(form, "Result")));
+                Check(!bool.Parse(persisted.DocumentElement[TlsProperties[0]].InnerText)
+                    && bool.Parse(persisted.DocumentElement[TlsProperties[1]].InnerText)
+                    && !bool.Parse(persisted.DocumentElement[TlsProperties[2]].InnerText), "Settings result persists raw TLS rather than its managed display");
+                if (managed && valid)
+                    Check(RolloutNotice(local, status) == RolloutNotice(ManagedSettings(null, true), status), "TLS-only enterprise rollout retains Community/Pro personal-seat rules");
+            }
+        }
     }
     private static object ManagedSettings(object url, object ribbon, object locked = null)
     {
@@ -1349,6 +1523,7 @@ internal static class OutlookPolicyUiTests
             TestAttachmentAutomation();
             TestEnterpriseRollout(root);
             TestConnectionOnboarding();
+            TestManagedTls(root);
             Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }

@@ -62,6 +62,7 @@ namespace NcTalkOutlookAddIn.UI
             _tlsSettingsGroup.SetBounds(left, tlsTop, groupWidth, ScaleLogical(134));
             _tlsHintLabel.MaximumSize = new Size(Math.Max(ScaleLogical(200), _tlsSettingsGroup.ClientSize.Width - ScaleLogical(20)), 0);
             _tlsHintLabel.AutoSize = true;
+            _tlsSettingsGroup.Height = Math.Max(ScaleLogical(134), _tlsHintLabel.Bottom + ScaleLogical(12));
         }
 
         private void InitializeAdvancedTab()
@@ -284,11 +285,19 @@ namespace NcTalkOutlookAddIn.UI
 
         private void UpdateTlsOptionsState()
         {
+            bool managed = Result != null && Result.HasManagedTransportTls;
             bool useSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
-            bool allowCustom = !useSystemDefault && !_isBusy;
+            bool allowCustom = !managed && !useSystemDefault && !_isBusy;
 
+            _tlsUseSystemDefaultCheckBox.Enabled = !managed && !_isBusy;
             _tlsEnable12CheckBox.Enabled = allowCustom;
             _tlsEnable13CheckBox.Enabled = allowCustom;
+            _tlsHintLabel.Text = managed ? Strings.AdvancedTlsManagedHint : Strings.AdvancedTlsHint;
+            foreach (Control control in new Control[] { _tlsUseSystemDefaultCheckBox, _tlsEnable12CheckBox, _tlsEnable13CheckBox })
+            {
+                _disabledTooltipHints.Apply(control, managed ? Strings.AdvancedTlsManagedHint : string.Empty, managed);
+            }
+            _toolTip.SetToolTip(_tlsHintLabel, managed ? Strings.AdvancedTlsManagedHint : string.Empty);
         }
 
         private void OnTlsSelectionChanged(object sender, EventArgs e)
@@ -299,7 +308,7 @@ namespace NcTalkOutlookAddIn.UI
 
         private void ApplyTlsRuntimePreview(string source)
         {
-            if (_suppressImmediateTlsApply)
+            if (_suppressImmediateTlsApply || (Result != null && Result.HasManagedTransportTls))
             {
                 return;
             }
@@ -312,11 +321,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             try
             {
-                TransportSecurityConfigurator.Apply(
-                    _tlsUseSystemDefaultCheckBox.Checked,
-                    _tlsEnable12CheckBox.Checked,
-                    _tlsEnable13CheckBox.Checked,
-                    source);
+                ApplySelectedTransportSecurity(source);
                 SetStatus(string.Empty, false);
             }
             catch (Exception ex)

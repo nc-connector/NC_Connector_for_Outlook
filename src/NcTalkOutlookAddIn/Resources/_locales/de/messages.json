@@ -278,6 +278,12 @@
   "options_tls_hint": {
     "message": "Wenn deaktiviert, erzwingt NC Connector die ausgewählten TLS-Versionen zur Laufzeit im Add-in."
   },
+  "options_tls_managed_hint": {
+    "message": "Die TLS-Einstellungen werden zentral durch Ihre Organisation vorgegeben und können hier nicht geändert werden."
+  },
+  "managed_tls_policy_invalid": {
+    "message": "Die zentral vorgegebenen TLS-Einstellungen sind ungültig. Bitte wenden Sie sich an Ihren Administrator. NC Connector stellt mit dieser Konfiguration keine Serververbindung her."
+  },
   "options_tls_apply_failed": {
     "message": "Die ausgewählten TLS-Einstellungen konnten nicht angewendet werden: {0}"
   },

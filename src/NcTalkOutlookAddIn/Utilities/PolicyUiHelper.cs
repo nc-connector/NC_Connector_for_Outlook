@@ -20,6 +20,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return string.Empty;
             }
+            if (!settings.IsManagedTransportTlsValid)
+            {
+                return Strings.ManagedTlsPolicyInvalid;
+            }
             if (status == null || !status.FetchSucceeded)
             {
                 return Strings.EnterpriseRolloutStatusUnavailable;

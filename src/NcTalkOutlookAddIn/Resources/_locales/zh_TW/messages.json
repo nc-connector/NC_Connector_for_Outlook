@@ -983,6 +983,12 @@
   "options_tls_hint": {
     "message": "若停用此選項，NC Connector 會在增益集執行階段強制使用所選 TLS 版本。"
   },
+  "options_tls_managed_hint": {
+    "message": "TLS 設定由您的組織集中管理，無法在此處變更。"
+  },
+  "managed_tls_policy_invalid": {
+    "message": "集中配置的 TLS 設定無效。請聯絡您的管理員。在此設定下，NC Connector 不會連線至伺服器。"
+  },
   "options_tls_apply_failed": {
     "message": "無法套用所選 TLS 設定：{0}"
   },

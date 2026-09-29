@@ -983,6 +983,12 @@
   "options_tls_hint": {
     "message": "Ha ki van kapcsolva, az NC Connector a kijelölt TLS-verziókat a bővítmény futásidejében kényszeríti."
   },
+  "options_tls_managed_hint": {
+    "message": "A TLS-beállításokat központilag a szervezete kezeli, és itt nem módosíthatók."
+  },
+  "managed_tls_policy_invalid": {
+    "message": "A központilag megadott TLS-beállítások érvénytelenek. Kérjük, forduljon a rendszergazdájához. Az NC Connector ezzel a konfigurációval nem csatlakozik a kiszolgálóhoz."
+  },
   "options_tls_apply_failed": {
     "message": "A kijelölt TLS-beállításokat nem sikerült alkalmazni: {0}"
   },

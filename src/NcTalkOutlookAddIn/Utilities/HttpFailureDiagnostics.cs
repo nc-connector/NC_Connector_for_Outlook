@@ -247,54 +247,107 @@ namespace NcTalkOutlookAddIn.Utilities
         private const string EnableStrongCryptoSwitch =
             "Switch.System.Net.DontEnableSchUseStrongCrypto";
         private const SecurityProtocolType Tls13Protocol = (SecurityProtocolType)12288;
+        private const int NoManagedTlsProtocol = -1;
+        private const int InvalidManagedTlsProtocol = -2;
+        private static readonly object TlsSync = new object();
+        private static int _managedTlsProtocol = NoManagedTlsProtocol;
 
         internal static SecurityProtocolType ApplyFromSettings(AddinSettings settings, string source)
         {
             bool useSystemDefault = settings != null && settings.TransportTlsUseSystemDefault;
             bool enableTls12 = settings == null || settings.TransportTlsEnable12;
             bool enableTls13 = settings != null && settings.TransportTlsEnable13;
-            return Apply(useSystemDefault, enableTls12, enableTls13, source);
+            int managedProtocol = NoManagedTlsProtocol;
+            if (settings != null && settings.HasManagedTransportTls)
+            {
+                managedProtocol = settings.IsManagedTransportTlsValid
+                    ? (int)BuildProtocol(useSystemDefault, enableTls12, enableTls13)
+                    : InvalidManagedTlsProtocol;
+            }
+            lock (TlsSync)
+            {
+                _managedTlsProtocol = managedProtocol;
+                return Apply(useSystemDefault, enableTls12, enableTls13, source);
+            }
+        }
+
+        internal static HttpWebRequest CreateRequest(string url)
+        {
+            lock (TlsSync)
+            {
+                if (_managedTlsProtocol == InvalidManagedTlsProtocol)
+                {
+                    throw new InvalidOperationException(Strings.ManagedTlsPolicyInvalid);
+                }
+                if (_managedTlsProtocol != NoManagedTlsProtocol)
+                {
+                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)_managedTlsProtocol;
+                }
+                // .NET Framework captures SecurityProtocol in the request constructor.
+                return (HttpWebRequest)WebRequest.Create(url);
+            }
+        }
+
+        internal static void Restore(SecurityProtocolType previous)
+        {
+            lock (TlsSync)
+            {
+                if (_managedTlsProtocol == NoManagedTlsProtocol)
+                {
+                    ServicePointManager.SecurityProtocol = previous;
+                }
+            }
         }
 
         internal static SecurityProtocolType Apply(bool useSystemDefault, bool enableTls12, bool enableTls13, string source)
         {
-            AppContext.SetSwitch(EnableSystemDefaultTlsSwitch, false);
-            AppContext.SetSwitch(EnableStrongCryptoSwitch, false);
+            lock (TlsSync)
+            {
+                AppContext.SetSwitch(EnableSystemDefaultTlsSwitch, false);
+                AppContext.SetSwitch(EnableStrongCryptoSwitch, false);
 
-            SecurityProtocolType protocol = BuildProtocol(useSystemDefault, enableTls12, enableTls13);
-            try
-            {
-                ServicePointManager.SecurityProtocol = protocol;
-            }
-            catch (Exception ex)
-            {
-                if ((protocol & Tls13Protocol) == Tls13Protocol)
+                int managedProtocol = _managedTlsProtocol;
+                if (managedProtocol == InvalidManagedTlsProtocol)
                 {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.Core,
-                        "TLS 1.3 protocol flag was selected but rejected by this runtime. No auto-fallback is applied.",
-                        ex);
-                    throw new InvalidOperationException(
-                        "TLS 1.3 was selected but is not supported by this runtime. NC Connector does not auto-fallback to TLS 1.2.",
-                        ex);
+                    throw new InvalidOperationException(Strings.ManagedTlsPolicyInvalid);
                 }
+                SecurityProtocolType protocol = managedProtocol == NoManagedTlsProtocol
+                    ? BuildProtocol(useSystemDefault, enableTls12, enableTls13)
+                    : (SecurityProtocolType)managedProtocol;
+                try
+                {
+                    ServicePointManager.SecurityProtocol = protocol;
+                }
+                catch (Exception ex)
+                {
+                    if ((protocol & Tls13Protocol) == Tls13Protocol)
+                    {
+                        DiagnosticsLogger.LogException(
+                            LogCategories.Core,
+                            "TLS 1.3 protocol flag was selected but rejected by this runtime. No auto-fallback is applied.",
+                            ex);
+                        throw new InvalidOperationException(
+                            "TLS 1.3 was selected but is not supported by this runtime. NC Connector does not auto-fallback to TLS 1.2.",
+                            ex);
+                    }
 
-                throw;
+                    throw;
+                }
+                DiagnosticsLogger.Log(
+                    LogCategories.Core,
+                    "Transport security applied (source="
+                    + (source ?? string.Empty)
+                    + ", useSystemDefault="
+                    + useSystemDefault.ToString(CultureInfo.InvariantCulture)
+                    + ", enableTls12="
+                    + enableTls12.ToString(CultureInfo.InvariantCulture)
+                    + ", enableTls13="
+                    + enableTls13.ToString(CultureInfo.InvariantCulture)
+                    + ", securityProtocol="
+                    + protocol
+                    + ").");
+                return protocol;
             }
-            DiagnosticsLogger.Log(
-                LogCategories.Core,
-                "Transport security applied (source="
-                + (source ?? string.Empty)
-                + ", useSystemDefault="
-                + useSystemDefault.ToString(CultureInfo.InvariantCulture)
-                + ", enableTls12="
-                + enableTls12.ToString(CultureInfo.InvariantCulture)
-                + ", enableTls13="
-                + enableTls13.ToString(CultureInfo.InvariantCulture)
-                + ", securityProtocol="
-                + protocol
-                + ").");
-            return protocol;
         }
 
         internal static SecurityProtocolType BuildProtocol(bool useSystemDefault, bool enableTls12, bool enableTls13)

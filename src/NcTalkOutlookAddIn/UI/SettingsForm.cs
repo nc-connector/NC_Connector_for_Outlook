@@ -532,6 +532,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
+            if (!Result.IsManagedTransportTlsValid)
+            {
+                SetStatus(Strings.ManagedTlsPolicyInvalid, true);
+                return;
+            }
             string requestedServerUrl = Result.ManagedNextcloudUrlLocked
                 ? Result.ManagedNextcloudUrl
                 : _serverUrlTextBox.Text.Trim();
@@ -599,9 +604,12 @@ namespace NcTalkOutlookAddIn.UI
             Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
             Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
             Result.LogAnonymizationEnabled = _debugAnonymizeCheckBox.Checked;
-            Result.TransportTlsUseSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
-            Result.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
-            Result.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
+            if (!Result.HasManagedTransportTls)
+            {
+                Result.TransportTlsUseSystemDefault = _tlsUseSystemDefaultCheckBox.Checked;
+                Result.TransportTlsEnable12 = _tlsEnable12CheckBox.Checked;
+                Result.TransportTlsEnable13 = _tlsEnable13CheckBox.Checked;
+            }
             Result.UpdateNotifyEnabled = _updateNotifyCheckBox.Checked;
             DialogResult = DialogResult.OK;
             Close();
@@ -738,7 +746,17 @@ namespace NcTalkOutlookAddIn.UI
                 _serverUrlTextBox.Text);
             bool credentialsMissing = !new TalkServiceConfiguration(
                 _serverUrlTextBox.Text, _usernameTextBox.Text, _appPasswordTextBox.Text).IsComplete();
-            if (_connectionSetupPending || credentialsMissing)
+            if (!Result.IsManagedTransportTlsValid)
+            {
+                warningVisible = true;
+                _policyWarningPanel.Visible = true;
+                _policyWarningTitleLabel.ForeColor = _themePalette.ErrorText;
+                _policyWarningPanel.BackColor = Color.FromArgb(20, _themePalette.ErrorText);
+                _policyWarningTextLabel.Text = Strings.ManagedTlsPolicyInvalid;
+                _policyWarningLinkLabel.Visible = false;
+                _policyWarningLinkLabel.Tag = null;
+            }
+            else if (_connectionSetupPending || credentialsMissing)
             {
                 warningVisible = true;
                 _policyWarningPanel.Visible = true;
@@ -896,7 +914,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             try
             {
-                ServicePointManager.SecurityProtocol = _runtimeSecurityProtocolAtOpen;
+                TransportSecurityConfigurator.Restore(_runtimeSecurityProtocolAtOpen);
                 DiagnosticsLogger.Log(
                     LogCategories.Core,
                     "Transport security restored after settings dialog cancel/close (securityProtocol="
@@ -959,7 +977,6 @@ namespace NcTalkOutlookAddIn.UI
             _debugLogCheckBox.Enabled = !_isBusy;
             _debugAnonymizeCheckBox.Enabled = !_isBusy;
             _debugOpenLink.Enabled = !_isBusy;
-            _tlsUseSystemDefaultCheckBox.Enabled = !_isBusy;
             _updateNotifyCheckBox.Enabled = !_isBusy;
             _updateCheckButton.Enabled = !_isBusy;
             _updateDownloadLink.Enabled = !_isBusy && !string.IsNullOrWhiteSpace(_updateOpenUrl);

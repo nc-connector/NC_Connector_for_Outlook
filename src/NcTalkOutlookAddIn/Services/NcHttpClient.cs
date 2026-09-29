@@ -117,7 +117,7 @@ namespace NcTalkOutlookAddIn.Services
 
             try
             {
-                request = (HttpWebRequest)WebRequest.Create(options.Url);
+                request = TransportSecurityConfigurator.CreateRequest(options.Url);
                 request.Method = method;
                 request.Accept = string.IsNullOrWhiteSpace(options.Accept)
                     ? "application/json, text/plain, */*"

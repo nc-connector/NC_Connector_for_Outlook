@@ -987,7 +987,7 @@ namespace NcTalkOutlookAddIn
                     "Failed to apply transport security settings (source=" + (source ?? string.Empty) + ").",
                     ex);
 
-                if (showWarning)
+                if (showWarning || (source == "startup" && settings != null && settings.HasManagedTransportTls))
                 {
                     ShowWarning(string.Format(
                         CultureInfo.CurrentCulture,

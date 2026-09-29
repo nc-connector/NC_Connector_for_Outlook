@@ -278,6 +278,12 @@
   "options_tls_hint": {
     "message": "If disabled, NC Connector enforces the selected TLS versions in add-in runtime."
   },
+  "options_tls_managed_hint": {
+    "message": "TLS settings are managed by your organization and cannot be changed here."
+  },
+  "managed_tls_policy_invalid": {
+    "message": "The centrally configured TLS settings are invalid. Please contact your administrator. NC Connector will not connect to the server with this configuration."
+  },
   "options_tls_apply_failed": {
     "message": "The selected TLS settings could not be applied: {0}"
   },

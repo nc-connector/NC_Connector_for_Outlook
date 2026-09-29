@@ -11,8 +11,10 @@ try {
     $testSource = Join-Path $TempRoot "OutlookSecurityRegressionTests.cs"
     @'
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using NcTalkOutlookAddIn.Models;
@@ -58,6 +60,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string ConnectionFailureTlsGuidance { get { return "tls guidance"; } }
         internal static string ConnectionFailureGenericSummary { get { return "generic"; } }
         internal static string ConnectionFailureGenericGuidance { get { return "generic guidance"; } }
+        internal static string ManagedTlsPolicyInvalid { get { return "Managed TLS policy is invalid."; } }
     }
 }
 
@@ -65,6 +68,7 @@ namespace NcTalkOutlookAddIn.Settings
 {
     internal sealed class AddinSettings
     {
+        internal AddinSettings() { IsManagedTransportTlsValid = true; }
         internal bool UpdateNotifyEnabled { get; set; }
         internal string UpdateInstallId { get; set; }
         internal string UpdateLastCheckedAtUtc { get; set; }
@@ -79,6 +83,8 @@ namespace NcTalkOutlookAddIn.Settings
         internal bool TransportTlsUseSystemDefault { get; set; }
         internal bool TransportTlsEnable12 { get; set; }
         internal bool TransportTlsEnable13 { get; set; }
+        internal bool HasManagedTransportTls { get; set; }
+        internal bool IsManagedTransportTlsValid { get; set; }
     }
 }
 
@@ -267,6 +273,11 @@ internal static class OutlookSecurityRegressionTests
     private static void TestTransportSecurityConfigurator()
     {
         SecurityProtocolType previous = ServicePointManager.SecurityProtocol;
+        var previousSnapshot = new Dictionary<FieldInfo, object>();
+        foreach (FieldInfo field in typeof(TransportSecurityConfigurator).GetFields(BindingFlags.Static | BindingFlags.NonPublic))
+        {
+            if (!field.IsLiteral && !field.IsInitOnly) previousSnapshot[field] = field.GetValue(null);
+        }
         try
         {
             var settings = new AddinSettings
@@ -305,11 +316,100 @@ internal static class OutlookSecurityRegressionTests
             Check(
                 "TLS 1.3 selection keeps its runtime protocol flag",
                 (int)TransportSecurityConfigurator.BuildProtocol(false, false, true) == 12288);
+
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.SystemDefault;
+            var unmanagedRequest = TransportSecurityConfigurator.CreateRequest("https://example.invalid/");
+            Check("Unmanaged request creation keeps the existing runtime protocol", ServicePointManager.SecurityProtocol == SecurityProtocolType.SystemDefault);
+            unmanagedRequest.Abort();
+            TransportSecurityConfigurator.Restore(SecurityProtocolType.Tls12);
+            Check("Unmanaged cancellation restores the previous runtime protocol", ServicePointManager.SecurityProtocol == SecurityProtocolType.Tls12);
+
+            settings.HasManagedTransportTls = true;
+            TransportSecurityConfigurator.ApplyFromSettings(settings, "managed_tls12_test");
+            settings.TransportTlsUseSystemDefault = true;
+            settings.TransportTlsEnable12 = false;
+            settings.TransportTlsEnable13 = true;
+            settings.HasManagedTransportTls = false;
+            settings.IsManagedTransportTlsValid = false;
+            applied = TransportSecurityConfigurator.Apply(true, false, false, "managed_preview_test");
+            Check("Preview cannot replace the immutable managed TLS snapshot",
+                applied == SecurityProtocolType.Tls12 && ServicePointManager.SecurityProtocol == SecurityProtocolType.Tls12);
+            TransportSecurityConfigurator.Restore(SecurityProtocolType.SystemDefault);
+            Check("Cancellation cannot undo a managed TLS 1.2 snapshot", ServicePointManager.SecurityProtocol == SecurityProtocolType.Tls12);
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.SystemDefault;
+            var managedRequest = TransportSecurityConfigurator.CreateRequest("https://example.invalid/");
+            Check("Managed TLS 1.2 is reasserted before request construction", ServicePointManager.SecurityProtocol == SecurityProtocolType.Tls12);
+            managedRequest.Abort();
+
+            settings.HasManagedTransportTls = true;
+            settings.IsManagedTransportTlsValid = true;
+            settings.TransportTlsEnable13 = false;
+            applied = TransportSecurityConfigurator.ApplyFromSettings(settings, "managed_system_default_test");
+            Check("Managed system default overrides explicit preview values",
+                applied == SecurityProtocolType.SystemDefault
+                    && TransportSecurityConfigurator.Apply(false, true, false, "managed_system_preview_test") == SecurityProtocolType.SystemDefault);
+            TransportSecurityConfigurator.Restore(SecurityProtocolType.Tls12);
+            Check("Cancellation cannot undo managed OS-default TLS", ServicePointManager.SecurityProtocol == SecurityProtocolType.SystemDefault);
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            managedRequest = TransportSecurityConfigurator.CreateRequest("https://example.invalid/");
+            Check("Managed system default is reasserted before request construction", ServicePointManager.SecurityProtocol == SecurityProtocolType.SystemDefault);
+            managedRequest.Abort();
+
+            settings.IsManagedTransportTlsValid = false;
+            settings.TransportTlsUseSystemDefault = false;
+            settings.TransportTlsEnable12 = false;
+            SecurityProtocolType beforeInvalid = ServicePointManager.SecurityProtocol;
+            ExpectInvalidManagedTls("Invalid managed policy rejects startup application", delegate {
+                TransportSecurityConfigurator.ApplyFromSettings(settings, "invalid_managed_test");
+            });
+            Check("Invalid managed policy does not silently apply a fallback", ServicePointManager.SecurityProtocol == beforeInvalid);
+            ExpectInvalidManagedTls("Invalid managed policy cannot be bypassed by preview", delegate {
+                TransportSecurityConfigurator.Apply(false, true, false, "invalid_managed_preview_test");
+            });
+            TransportSecurityConfigurator.Restore(SecurityProtocolType.Tls12);
+            Check("Cancellation cannot substitute a protocol for invalid managed policy", ServicePointManager.SecurityProtocol == beforeInvalid);
+            ExpectInvalidManagedTls("Invalid policy rejects before URL parsing or request construction", delegate {
+                TransportSecurityConfigurator.CreateRequest("not a valid absolute request URL");
+            });
+
+            // A live loopback listener proves the request guard itself never opens a connection.
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            try
+            {
+                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                managedRequest = null;
+                ExpectInvalidManagedTls("Invalid managed policy rejects requests before network I/O", delegate {
+                    managedRequest = TransportSecurityConfigurator.CreateRequest("https://127.0.0.1:" + port + "/");
+                });
+                Check("Invalid managed policy does not construct a request", managedRequest == null);
+                Check("Invalid managed request does not contact the network", !listener.Pending());
+                Check("Invalid managed request does not get a fallback protocol", ServicePointManager.SecurityProtocol == beforeInvalid);
+                if (managedRequest != null) managedRequest.Abort();
+            }
+            finally { listener.Stop(); }
+
+            settings.HasManagedTransportTls = false;
+            settings.IsManagedTransportTlsValid = true;
+            settings.TransportTlsEnable12 = true;
+            TransportSecurityConfigurator.ApplyFromSettings(settings, "managed_policy_removed_test");
+            TransportSecurityConfigurator.Restore(SecurityProtocolType.SystemDefault);
+            Check("Removing policy allows ordinary cancellation restoration again", ServicePointManager.SecurityProtocol == SecurityProtocolType.SystemDefault);
+            unmanagedRequest = TransportSecurityConfigurator.CreateRequest("https://example.invalid/");
+            Check("Removing policy clears the request override and invalid snapshot", ServicePointManager.SecurityProtocol == SecurityProtocolType.SystemDefault);
+            unmanagedRequest.Abort();
         }
         finally
         {
+            foreach (KeyValuePair<FieldInfo, object> entry in previousSnapshot) entry.Key.SetValue(null, entry.Value);
             ServicePointManager.SecurityProtocol = previous;
         }
+    }
+
+    private static void ExpectInvalidManagedTls(string name, Action action)
+    {
+        try { action(); Check(name, false, "No exception was thrown."); }
+        catch (InvalidOperationException ex) { Check(name, ex.Message == Strings.ManagedTlsPolicyInvalid, ex.Message); }
     }
 
     private static void Write(Stream stream, string content)
@@ -353,6 +453,24 @@ internal static class OutlookSecurityRegressionTests
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
+
+    foreach ($clientFile in @('NcHttpClient.cs', 'UpdateCheckService.cs')) {
+        $clientSource = Get-Content -LiteralPath (Join-Path $ProjectRoot ("src\NcTalkOutlookAddIn\Services\" + $clientFile)) -Raw
+        $guard = [regex]::Match($clientSource, '\bTransportSecurityConfigurator\s*\.\s*CreateRequest\s*\(')
+        if (-not $guard.Success -or $clientSource -match '\b(?:Http)?WebRequest\s*\.\s*Create(?:Http)?\s*\(') {
+            throw "$clientFile must create every request through the central managed TLS guard."
+        }
+        $networkCalls = [regex]::Matches($clientSource, '\brequest\s*\.\s*(?:GetRequestStream(?:Async)?|GetResponse(?:Async)?)\s*\(')
+        if ($networkCalls.Count -eq 0) {
+            throw "$clientFile network-call checks no longer match the production request path."
+        }
+        foreach ($networkCall in $networkCalls) {
+            if ($networkCall.Index -lt $guard.Index) {
+                throw "$clientFile can contact the network before enforcing managed TLS policy."
+            }
+        }
+    }
+    Write-Host "[OK] Nextcloud and update HTTP paths enforce the central managed TLS guard before network I/O"
 
     $settingsFormPath = Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\UI\SettingsForm.cs"
     $settingsFormSource = Get-Content -LiteralPath $settingsFormPath -Raw

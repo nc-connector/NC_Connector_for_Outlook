@@ -21,6 +21,10 @@ namespace NcTalkOutlookAddIn.Settings
         internal const int DefaultSharingAttachmentsOfferAboveMb = 20;
 
         private Dictionary<string, object> _localPolicyValues = new Dictionary<string, object>(StringComparer.Ordinal);
+        private ManagedSetupPolicy _managedSetupPolicy;
+        private bool _localTransportTlsUseSystemDefault;
+        private bool _localTransportTlsEnable12;
+        private bool _localTransportTlsEnable13;
 
         public AddinSettings()
         {
@@ -85,11 +89,29 @@ namespace NcTalkOutlookAddIn.Settings
 
         public bool LogAnonymizationEnabled { get; set; }
 
-        public bool TransportTlsUseSystemDefault { get; set; }
+        public bool TransportTlsUseSystemDefault
+        {
+            get { return HasManagedTransportTls ? _managedSetupPolicy.TransportTlsUseSystemDefault : _localTransportTlsUseSystemDefault; }
+            set { _localTransportTlsUseSystemDefault = value; }
+        }
 
-        public bool TransportTlsEnable12 { get; set; }
+        public bool TransportTlsEnable12
+        {
+            get { return HasManagedTransportTls ? _managedSetupPolicy.TransportTlsEnable12 : _localTransportTlsEnable12; }
+            set { _localTransportTlsEnable12 = value; }
+        }
 
-        public bool TransportTlsEnable13 { get; set; }
+        public bool TransportTlsEnable13
+        {
+            get { return HasManagedTransportTls ? _managedSetupPolicy.TransportTlsEnable13 : _localTransportTlsEnable13; }
+            set { _localTransportTlsEnable13 = value; }
+        }
+
+        internal bool LocalTransportTlsUseSystemDefault { get { return _localTransportTlsUseSystemDefault; } }
+        internal bool LocalTransportTlsEnable12 { get { return _localTransportTlsEnable12; } }
+        internal bool LocalTransportTlsEnable13 { get { return _localTransportTlsEnable13; } }
+        internal bool HasManagedTransportTls { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasTransportTlsPolicy; } }
+        internal bool IsManagedTransportTlsValid { get { return !HasManagedTransportTls || _managedSetupPolicy.IsTransportTlsPolicyValid; } }
 
         public bool UpdateNotifyEnabled { get; set; }
 
@@ -383,6 +405,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal void ApplyManagedSetupPolicy(ManagedSetupPolicy policy)
         {
+            _managedSetupPolicy = policy;
             ManagedNextcloudUrl = string.Empty;
             ManagedNextcloudUrlSource = string.Empty;
             ManagedNextcloudUrlLocked = false;

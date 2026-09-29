@@ -983,6 +983,12 @@
   "options_tls_hint": {
     "message": "Als dit is uitgeschakeld, dwingt NC Connector de geselecteerde TLS-versies af tijdens de runtime van de invoegtoepassing."
   },
+  "options_tls_managed_hint": {
+    "message": "De TLS-instellingen worden centraal beheerd door uw organisatie en kunnen hier niet worden gewijzigd."
+  },
+  "managed_tls_policy_invalid": {
+    "message": "De centraal ingestelde TLS-instellingen zijn ongeldig. Neem contact op met uw beheerder. NC Connector maakt met deze configuratie geen verbinding met de server."
+  },
   "options_tls_apply_failed": {
     "message": "De geselecteerde TLS-instellingen konden niet worden toegepast: {0}"
   },

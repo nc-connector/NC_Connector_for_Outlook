@@ -983,6 +983,12 @@
   "options_tls_hint": {
     "message": "Si cette option est désactivée, NC Connector applique les versions TLS sélectionnées dans le runtime du complément."
   },
+  "options_tls_managed_hint": {
+    "message": "Les paramètres TLS sont gérés de manière centralisée par votre organisation et ne peuvent pas être modifiés ici."
+  },
+  "managed_tls_policy_invalid": {
+    "message": "Les paramètres TLS définis de manière centralisée ne sont pas valides. Veuillez contacter votre administrateur. NC Connector ne se connectera pas au serveur avec cette configuration."
+  },
   "options_tls_apply_failed": {
     "message": "Impossible d'appliquer les paramètres TLS sélectionnés : {0}"
   },

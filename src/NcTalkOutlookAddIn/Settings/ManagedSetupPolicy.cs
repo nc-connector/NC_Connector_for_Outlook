@@ -15,22 +15,37 @@ namespace NcTalkOutlookAddIn.Settings
         private const string NextcloudUrlValueName = "NextcloudUrl";
         private const string NextcloudUrlLockedValueName = "NextcloudUrlLocked";
         private const string ShowMainRibbonTabValueName = "ShowMainRibbonTab";
+        private const string TransportTlsUseSystemDefaultValueName = "TransportTlsUseSystemDefault";
+        private const string TransportTlsEnable12ValueName = "TransportTlsEnable12";
+        private const string TransportTlsEnable13ValueName = "TransportTlsEnable13";
+        private bool _tlsSystemValueValid;
+        private bool _tls12ValueValid;
+        private bool _tls13ValueValid;
 
         private ManagedSetupPolicy(
             object nextcloudUrlValue,
             object nextcloudUrlLockedValue,
             object showMainRibbonTabValue,
+            object transportTlsUseSystemDefaultValue,
+            object transportTlsEnable12Value,
+            object transportTlsEnable13Value,
             string source)
         {
             HasNextcloudUrlValue = nextcloudUrlValue != null;
             HasNextcloudUrlLockedValue = nextcloudUrlLockedValue != null;
             HasShowMainRibbonTabValue = showMainRibbonTabValue != null;
+            HasTransportTlsUseSystemDefaultValue = transportTlsUseSystemDefaultValue != null;
+            HasTransportTlsEnable12Value = transportTlsEnable12Value != null;
+            HasTransportTlsEnable13Value = transportTlsEnable13Value != null;
+            TransportTlsUseSystemDefault = ReadTlsBoolean(transportTlsUseSystemDefaultValue, false, out _tlsSystemValueValid);
+            TransportTlsEnable12 = ReadTlsBoolean(transportTlsEnable12Value, true, out _tls12ValueValid);
+            TransportTlsEnable13 = ReadTlsBoolean(transportTlsEnable13Value, false, out _tls13ValueValid);
             NextcloudUrl = NormalizeNextcloudUrl(nextcloudUrlValue);
             NextcloudUrlLocked = ReadBoolean(nextcloudUrlLockedValue);
             bool showMainRibbonTab;
             ShowMainRibbonTab = !TryReadBoolean(showMainRibbonTabValue, out showMainRibbonTab)
                 || showMainRibbonTab;
-            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue;
+            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy;
             Source = source ?? string.Empty;
         }
 
@@ -49,6 +64,28 @@ namespace NcTalkOutlookAddIn.Settings
         private bool HasNextcloudUrlLockedValue { get; set; }
 
         private bool HasShowMainRibbonTabValue { get; set; }
+
+        private bool HasTransportTlsUseSystemDefaultValue { get; set; }
+        private bool HasTransportTlsEnable12Value { get; set; }
+        private bool HasTransportTlsEnable13Value { get; set; }
+
+        internal bool TransportTlsUseSystemDefault { get; private set; }
+        internal bool TransportTlsEnable12 { get; private set; }
+        internal bool TransportTlsEnable13 { get; private set; }
+
+        internal bool HasTransportTlsPolicy
+        {
+            get { return HasTransportTlsUseSystemDefaultValue || HasTransportTlsEnable12Value || HasTransportTlsEnable13Value; }
+        }
+
+        internal bool IsTransportTlsPolicyValid
+        {
+            get
+            {
+                return _tlsSystemValueValid && _tls12ValueValid && _tls13ValueValid
+                    && (TransportTlsUseSystemDefault || TransportTlsEnable12 || TransportTlsEnable13);
+            }
+        }
 
         internal bool HasNextcloudUrl
         {
@@ -70,7 +107,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal static ManagedSetupPolicy Resolve(IEnumerable<ManagedSetupPolicy> policies)
         {
-            var result = new ManagedSetupPolicy(null, null, null, string.Empty);
+            var result = new ManagedSetupPolicy(null, null, null, null, null, null, string.Empty);
             if (policies == null)
             {
                 return result;
@@ -95,6 +132,24 @@ namespace NcTalkOutlookAddIn.Settings
                 {
                     result.HasShowMainRibbonTabValue = true;
                     result.ShowMainRibbonTab = policy.ShowMainRibbonTab;
+                }
+                if (!result.HasTransportTlsUseSystemDefaultValue && policy.HasTransportTlsUseSystemDefaultValue)
+                {
+                    result.HasTransportTlsUseSystemDefaultValue = true;
+                    result.TransportTlsUseSystemDefault = policy.TransportTlsUseSystemDefault;
+                    result._tlsSystemValueValid = policy._tlsSystemValueValid;
+                }
+                if (!result.HasTransportTlsEnable12Value && policy.HasTransportTlsEnable12Value)
+                {
+                    result.HasTransportTlsEnable12Value = true;
+                    result.TransportTlsEnable12 = policy.TransportTlsEnable12;
+                    result._tls12ValueValid = policy._tls12ValueValid;
+                }
+                if (!result.HasTransportTlsEnable13Value && policy.HasTransportTlsEnable13Value)
+                {
+                    result.HasTransportTlsEnable13Value = true;
+                    result.TransportTlsEnable13 = policy.TransportTlsEnable13;
+                    result._tls13ValueValid = policy._tls13ValueValid;
                 }
             }
             return result;
@@ -126,6 +181,9 @@ namespace NcTalkOutlookAddIn.Settings
                         policyKey.GetValue(NextcloudUrlValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         policyKey.GetValue(NextcloudUrlLockedValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         policyKey.GetValue(ShowMainRibbonTabValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        policyKey.GetValue(TransportTlsUseSystemDefaultValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        policyKey.GetValue(TransportTlsEnable12ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        policyKey.GetValue(TransportTlsEnable13ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         source);
 
                     if (!policy.IsEnterpriseRollout)
@@ -141,7 +199,9 @@ namespace NcTalkOutlookAddIn.Settings
                         + ", urlLockValuePresent=" + policy.HasNextcloudUrlLockedValue
                         + ", locked=" + policy.NextcloudUrlLocked
                         + ", ribbonValuePresent=" + policy.HasShowMainRibbonTabValue
-                        + ", showMainRibbonTab=" + policy.ShowMainRibbonTab + ").");
+                        + ", showMainRibbonTab=" + policy.ShowMainRibbonTab
+                        + ", tlsPolicyPresent=" + policy.HasTransportTlsPolicy
+                        + ", tlsPolicyValid=" + policy.IsTransportTlsPolicyValid + ").");
                     return policy;
                 }
             }
@@ -168,6 +228,18 @@ namespace NcTalkOutlookAddIn.Settings
         {
             bool value;
             return TryReadBoolean(rawValue, out value) && value;
+        }
+
+        private static bool ReadTlsBoolean(object rawValue, bool defaultValue, out bool valid)
+        {
+            if (rawValue == null)
+            {
+                valid = true;
+                return defaultValue;
+            }
+            bool value;
+            valid = TryReadBoolean(rawValue, out value);
+            return value;
         }
 
         private static bool TryReadBoolean(object rawValue, out bool value)

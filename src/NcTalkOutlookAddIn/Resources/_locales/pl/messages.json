@@ -983,6 +983,12 @@
   "options_tls_hint": {
     "message": "Jeśli wyłączone, NC Connector wymusza wybrane wersje TLS w czasie działania dodatku."
   },
+  "options_tls_managed_hint": {
+    "message": "Ustawienia TLS są zarządzane centralnie przez Twoją organizację i nie można ich tutaj zmienić."
+  },
+  "managed_tls_policy_invalid": {
+    "message": "Centralnie skonfigurowane ustawienia TLS są nieprawidłowe. Skontaktuj się z administratorem. NC Connector nie połączy się z serwerem przy tej konfiguracji."
+  },
   "options_tls_apply_failed": {
     "message": "Nie udało się zastosować wybranych ustawień TLS: {0}"
   },

@@ -151,7 +151,7 @@ namespace NcTalkOutlookAddIn.Services
         private static async Task<string> FetchStringAsync(string requestUrl)
         {
             // Public homepage check: keep this async and separate from the authenticated Nextcloud OCS client.
-            var request = (HttpWebRequest)WebRequest.Create(requestUrl);
+            var request = TransportSecurityConfigurator.CreateRequest(requestUrl);
             request.Method = "GET";
             request.Accept = "application/json";
             request.UserAgent = "NC-Connector-Outlook/" + (AddinVersionInfo.GetVersion() ?? string.Empty);
