@@ -648,6 +648,8 @@ Die Meldung unterscheidet eine noch nicht verfügbare Signaturrichtlinie von ein
 
 ### Freigaben und Uploads
 
+Die Sprache des Freigabe-HTML-Blocks wird unter **Einstellungen -> Freigabe** unterhalb der Freigabevorgaben gewählt. Vorhandene Auswahlen bleiben erhalten; eine vom Backend gesperrte Sprache bleibt schreibgeschützt.
+
 Der Freigabe-Assistent akzeptiert lokale Dateien und Ordner sowie vorhandene Inhalte aus der eigenen Nextcloud des konfigurierten Benutzers. Die Warteschlange zeigt den vollständigen Zielpfad, gruppiert beide Quellen und nennt Einträge, Quellenanzahl, Gesamtgröße und Nextcloud-Speicherstatus. Der Picker **Meine Nextcloud** bietet Explorer-artige Schaltflächen für Zurück, Vorwärts, Hoch und Aktualisieren, klickbare Pfadsegmente, Filter, vertraute Dateisymbole, Dateidetails, einen eindeutigen Status bei Mehrfachauswahl, Speicherinformationen und bei Bedarf geladene Vorschauen für Bilder und vom Nextcloud-Server unterstützte Dokumente. Dokumentvorschauen, etwa für PDF- oder Office-Dateien, hängen von den auf dem Server aktivierten Vorschau-Anbietern ab. Diese Quelle funktioniert ohne NC Connector Backend.
 
 Ausgewählte Nextcloud-Inhalte werden innerhalb desselben Kontos in den neuen Freigabeordner kopiert. Das Original bleibt unverändert und wird für die Übertragung nicht nach Outlook heruntergeladen. Für eine Vorschau fordert Outlook zuerst ein größenbegrenztes, von Nextcloud erzeugtes Bild an. Hat der Server für eine unterstützte Bilddatei keine erzeugte Vorschau, kann Outlook vorübergehend das Originalbild bis 5 MiB laden. Andere Originaldateien werden für Vorschauen nicht heruntergeladen. Lokale Inhalte verwenden weiterhin die vom Server und den ausgewählten Dateien unterstützte Uploadmethode. Implementierungsdetails stehen in [DEVELOPMENT.de.md](DEVELOPMENT.de.md#filelink-upload-architektur).
@@ -706,6 +708,8 @@ Separate Passwortzustellung benötigt NC Connector Backend und einen aktiven Sea
 - Eine passende Backend-Signatur wird nur eingefügt, wenn auch der Follow-up-Absender mit der zugewiesenen Signaturadresse übereinstimmt.
 
 ### Talk-Raum-Lebenszyklus
+
+Die Sprache des Talk-Beschreibungstextes wird unter **Einstellungen -> Talk-Link** unterhalb der Talk-Vorgaben gewählt, nicht mehr unter Erweitert. Vorhandene Auswahlen und Backend-Sperren bleiben unverändert.
 
 Das Löschen eines gespeicherten Outlook-Termins entfernt den zugehörigen entfernten Talk-Raum nur, wenn die Einstellung ausdrücklich aktiviert ist und der Termin NC Connector-Raummetadaten enthält. Die Einstellung ist standardmäßig deaktiviert. Ein in Ort oder Nachrichtentext kopierter Talk-Link reicht für eine entfernte Löschung nicht aus.
 

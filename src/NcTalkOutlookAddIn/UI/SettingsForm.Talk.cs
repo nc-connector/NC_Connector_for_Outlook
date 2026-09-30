@@ -58,6 +58,15 @@ namespace NcTalkOutlookAddIn.UI
             _talkDeleteRoomOnEventDeleteCheckBox.Location = new Point(innerPadding, y);
             y = _talkDeleteRoomOnEventDeleteCheckBox.Bottom + rowGap;
 
+            _eventDescriptionLangLabel.MaximumSize = new Size(contentWidth, 0);
+            _eventDescriptionLangLabel.Location = new Point(innerPadding, y);
+            _eventDescriptionLangCombo.SetBounds(
+                innerPadding,
+                _eventDescriptionLangLabel.Bottom + ScaleLogical(6),
+                contentWidth,
+                Math.Max(_eventDescriptionLangCombo.Height, _eventDescriptionLangCombo.PreferredHeight + ScaleLogical(2)));
+            y = _eventDescriptionLangCombo.Bottom + rowGap;
+
             int addressbookWarningHeight = WarningPanelUiHelper.Layout(
                 _talkAddressbookWarningPanel,
                 _talkAddressbookWarningTitleLabel,
@@ -137,6 +146,18 @@ namespace NcTalkOutlookAddIn.UI
             _talkDeleteRoomOnEventDeleteCheckBox.AutoSize = true;
             _talkDeleteRoomOnEventDeleteCheckBox.Location = new Point(12, 180);
             _talkDefaultsGroup.Controls.Add(_talkDeleteRoomOnEventDeleteCheckBox);
+
+            _eventDescriptionLangLabel.Text = Strings.AdvancedEventDescriptionLangLabel;
+            _eventDescriptionLangLabel.AutoSize = true;
+            _talkDefaultsGroup.Controls.Add(_eventDescriptionLangLabel);
+
+            _eventDescriptionLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _eventDescriptionLangCombo.DrawMode = DrawMode.OwnerDrawFixed;
+            _eventDescriptionLangCombo.IntegralHeight = false;
+            _eventDescriptionLangCombo.DrawItem += HandleLanguageComboDrawItem;
+            _eventDescriptionLangCombo.SelectionChangeCommitted += HandleLanguageComboSelectionCommitted;
+            PopulateLanguageOverrideCombo(_eventDescriptionLangCombo, "talk");
+            _talkDefaultsGroup.Controls.Add(_eventDescriptionLangCombo);
 
             WarningPanelUiHelper.Initialize(
                 _talkAddressbookWarningPanel,

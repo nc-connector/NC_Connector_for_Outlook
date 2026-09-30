@@ -1080,6 +1080,78 @@ internal static class OutlookPolicyUiTests
         }
         Console.WriteLine("[OK] User edits, lock/unlock, XML persistence and actual credentials-only save");
     }
+    private static void TestSettingsLanguageControls(string root)
+    {
+        string[][] bindings = {
+            new[] { "_shareBlockLangCombo", "_shareBlockLangLabel", "_fileLinkTab", "ShareBlockLang", "en", "fr", "nl" },
+            new[] { "_eventDescriptionLangCombo", "_eventDescriptionLangLabel", "_talkTab", "EventDescriptionLang", "de", "it", "es" }
+        };
+        foreach (string mode in new[] { "community", "pro" })
+        {
+            object local = New("Settings.AddinSettings");
+            foreach (string[] binding in bindings) Set(local, binding[3], binding[4]);
+            object editable = Status(D("language_share_html_block", "fr"), D("language_talk_description", "it"), true, mode, "active");
+            object locked = Status(D("language_share_html_block", "fr"), D("language_talk_description", "it"), false, mode, "active");
+            using (Form options = Settings(local, editable))
+            {
+                object result = Get(options, "Result");
+                var advanced = (Control)Field(options, "_advancedTab");
+                foreach (string[] binding in bindings)
+                {
+                    var combo = (ComboBox)Field(options, binding[0]);
+                    var label = (Label)Field(options, binding[1]);
+                    var tab = (Control)Field(options, binding[2]);
+                    Check(tab.Contains(combo) && tab.Contains(label), "Language controls belong to their feature tab: " + binding[3]);
+                    Check(!advanced.Contains(combo) && !advanced.Contains(label), "Advanced no longer owns language controls: " + binding[3]);
+                    Check(combo.Enabled && (string)Call(T("UI.SettingsForm"), "GetSelectedLanguageChoice", combo) == binding[4], "Moved language control loads the local choice: " + binding[3]);
+                }
+                foreach (int width in new[] { 800, 1100 })
+                {
+                    options.ClientSize = new System.Drawing.Size(width, options.ClientSize.Height);
+                    Call(options, "ApplyResponsiveLayout", false);
+                    foreach (string[] binding in bindings)
+                    {
+                        var combo = (ComboBox)Field(options, binding[0]);
+                        var label = (Label)Field(options, binding[1]);
+                        Check(label.Bottom < combo.Top && combo.Right <= combo.Parent.ClientSize.Width,
+                            "Language label and selection fit without overlap: " + binding[3]);
+                    }
+                    Check(((Control)Field(options, "_shareBlockLangCombo")).Bottom < ((Control)Field(options, "_sharingAttachmentAutomationGroup")).Top,
+                        "Sharing language stays above attachment automation");
+                    Check(((Control)Field(options, "_eventDescriptionLangCombo")).Bottom < ((Control)Field(options, "_talkDefaultsGroup")).ClientSize.Height,
+                        "Talk defaults include the complete language selection");
+                }
+                options.GetType().GetField("_backendPolicyStatus", Flags).SetValue(options, locked);
+                Call(options, "ApplyBackendPolicyStatus", "language_test_lock");
+                foreach (string[] binding in bindings)
+                {
+                    var combo = (ComboBox)Field(options, binding[0]);
+                    Check(!combo.Enabled && (string)Call(T("UI.SettingsForm"), "GetSelectedLanguageChoice", combo) == binding[5], "Moved language control retains its policy lock: " + binding[3]);
+                    Check((string)Get(result, binding[3]) == binding[4], "Language policy overlay preserves the saved local choice: " + binding[3]);
+                }
+                options.GetType().GetField("_backendPolicyStatus", Flags).SetValue(options, editable);
+                Call(options, "ApplyBackendPolicyStatus", "language_test_unlock");
+                foreach (string[] binding in bindings)
+                {
+                    var combo = (ComboBox)Field(options, binding[0]);
+                    Check(combo.Enabled && (string)Call(T("UI.SettingsForm"), "GetSelectedLanguageChoice", combo) == binding[4], "Language unlock restores the local choice: " + binding[3]);
+                    Call(T("UI.SettingsForm"), "SelectLanguageChoice", combo, binding[6]);
+                    Call(combo, "OnSelectionChangeCommitted", EventArgs.Empty);
+                    Check((string)Get(result, binding[3]) == binding[6], "Moved language control records committed selection: " + binding[3]);
+                }
+                Task save = (Task)Call(options, "SaveSettingsAsync");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+                while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(save.IsCompleted, "Language-only settings save completes without a configured server");
+                save.GetAwaiter().GetResult();
+                Check(options.DialogResult == DialogResult.OK, "Language-only settings save succeeds");
+                object restored = RoundTrip(result, root);
+                foreach (string[] binding in bindings)
+                    Check((string)Get(restored, binding[3]) == binding[6], "Moved language choice survives settings save and XML round-trip: " + binding[3]);
+            }
+        }
+        Console.WriteLine("[OK] Talk and Sharing language placement, local selections, policy locks and settings save");
+    }
     private static void TestAttachmentAutomation()
     {
         Type subscription = T("NextcloudTalkAddIn+MailComposeSubscription");
@@ -1711,6 +1783,7 @@ internal static class OutlookPolicyUiTests
             TestLocalChoices(root);
             TestWizards();
             TestSettingsEdits(root);
+            TestSettingsLanguageControls(root);
             TestAttachmentAutomation();
             TestEnterpriseRollout(root);
             TestConnectionOnboarding();

@@ -199,6 +199,7 @@ UI:
 
 - `src/NcTalkOutlookAddIn/UI/SettingsForm.cs`
   Die Partials `General`, `Sharing`, `Talk`, `Signature`, `Ifb`, `Advanced`, `Debug` und `About` enthalten Layout und Aktionen ihres Tabs. Control-Erzeugung, gemeinsame Speichervalidierung, Backend-Policy-Zustand und tabübergreifende Control-Aktualisierung bleiben in der Hauptform; das bestehende `Language`-Partial enthält weiterhin die Lokalisierung.
+  Die Sprachauswahl des Freigabeblocks gehört zu `Sharing`, die Sprache des Talk-Beschreibungstextes zu `Talk`. Beide verwenden die bisherigen Auswahlhandler, Policy-Sperren und gespeicherten Werte; `Advanced` enthält und positioniert keine Sprachauswahl mehr.
 - `src/NcTalkOutlookAddIn/UI/TalkLinkForm.cs`
 - `src/NcTalkOutlookAddIn/UI/FileLinkWizardForm.cs`
 - `src/NcTalkOutlookAddIn/UI/NextcloudFilePickerForm.cs` (Datei- und Ordnerauswahl für **Meine Nextcloud**)

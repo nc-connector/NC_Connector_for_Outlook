@@ -207,6 +207,7 @@ Runtime rules:
 - **UI**
   - `UI/SettingsForm.cs` configures base URL, authentication, sharing defaults, IFB, and debug logging.
     The `General`, `Sharing`, `Talk`, `Signature`, `Ifb`, `Advanced`, `Debug`, and `About` partials own their tab layout and actions. Control construction, shared save validation, backend policy state, and cross-tab control updates remain in the main form; the existing `Language` partial keeps localization.
+    The sharing-block language control belongs to `Sharing`, and the Talk-description language control to `Talk`. Both reuse the existing selection handlers, policy locks and persisted values; `Advanced` no longer contains or lays out language controls.
   - `UI/TalkLinkForm.cs` is the Talk wizard.
   - `UI/FileLinkWizardForm.cs` is the sharing wizard.
   - `UI/BrandedHeader.cs` is the shared header banner control and provides `AttachToParent(...)` for consistent form header setup.

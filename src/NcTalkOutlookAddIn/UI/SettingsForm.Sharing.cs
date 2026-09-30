@@ -59,8 +59,15 @@ namespace NcTalkOutlookAddIn.UI
             _sharingPasswordDeliveryModeCombo.Location = new Point(rightColumnX, _sharingPasswordDeliveryModeLabel.Bottom + ScaleLogical(6));
 
             int columnsBottom = Math.Max(_sharingDefaultPermDeleteCheckBox.Bottom, _sharingPasswordDeliveryModeCombo.Bottom);
-            int automationTop = columnsBottom + ScaleLogical(18);
             int automationWidth = Math.Max(ScaleLogical(320), groupWidth - ScaleLogical(24));
+            _shareBlockLangLabel.MaximumSize = new Size(automationWidth, 0);
+            _shareBlockLangLabel.Location = new Point(ScaleLogical(12), columnsBottom + ScaleLogical(18));
+            _shareBlockLangCombo.SetBounds(
+                ScaleLogical(12),
+                _shareBlockLangLabel.Bottom + ScaleLogical(6),
+                automationWidth,
+                Math.Max(_shareBlockLangCombo.Height, _shareBlockLangCombo.PreferredHeight + ScaleLogical(2)));
+            int automationTop = _shareBlockLangCombo.Bottom + ScaleLogical(18);
             _sharingAttachmentAutomationGroup.SetBounds(ScaleLogical(12), automationTop, automationWidth, _sharingAttachmentAutomationGroup.Height);
             int lockTextWidth = Math.Max(ScaleLogical(180), automationWidth - ScaleLogical(24));
             _sharingAttachmentLockHintLabel.MaximumSize = new Size(lockTextWidth, 0);
@@ -322,6 +329,18 @@ namespace NcTalkOutlookAddIn.UI
             _sharingDefaultExpireDaysUpDown.Location = new Point(260, 240);
             _sharingDefaultExpireDaysUpDown.Width = 90;
             _sharingDefaultsGroup.Controls.Add(_sharingDefaultExpireDaysUpDown);
+
+            _shareBlockLangLabel.Text = Strings.AdvancedShareBlockLangLabel;
+            _shareBlockLangLabel.AutoSize = true;
+            _sharingDefaultsGroup.Controls.Add(_shareBlockLangLabel);
+
+            _shareBlockLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _shareBlockLangCombo.DrawMode = DrawMode.OwnerDrawFixed;
+            _shareBlockLangCombo.IntegralHeight = false;
+            _shareBlockLangCombo.DrawItem += HandleLanguageComboDrawItem;
+            _shareBlockLangCombo.SelectionChangeCommitted += HandleLanguageComboSelectionCommitted;
+            PopulateLanguageOverrideCombo(_shareBlockLangCombo, "share");
+            _sharingDefaultsGroup.Controls.Add(_shareBlockLangCombo);
 
             _sharingAttachmentAutomationGroup.Text = Strings.SharingAttachmentAutomationHeading;
             _sharingAttachmentAutomationGroup.Location = new Point(12, 230);

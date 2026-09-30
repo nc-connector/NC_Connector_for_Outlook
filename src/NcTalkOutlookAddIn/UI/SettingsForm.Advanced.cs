@@ -25,27 +25,15 @@ namespace NcTalkOutlookAddIn.UI
         {
             int left = ScaleLogical(24);
             int labelToComboGap = ScaleLogical(16);
-            int comboLeft = left + Math.Max(_ifbCacheHoursLabel.PreferredSize.Width, Math.Max(_shareBlockLangLabel.PreferredSize.Width, _eventDescriptionLangLabel.PreferredSize.Width)) + labelToComboGap;
+            int comboLeft = left + _ifbCacheHoursLabel.PreferredSize.Width + labelToComboGap;
             int rightMargin = ScaleLogical(24);
-            int comboWidth = Math.Max(ScaleLogical(160), _advancedTab.ClientSize.Width - comboLeft - rightMargin);
             int rowTop = ScaleLogical(24);
-            int rowGap = ScaleLogical(34);
 
             int ifbComboHeight = Math.Max(_ifbCacheHoursCombo.Height, _ifbCacheHoursCombo.PreferredHeight + ScaleLogical(2));
             _ifbCacheHoursLabel.Location = new Point(left, rowTop);
             _ifbCacheHoursCombo.SetBounds(comboLeft, rowTop - ScaleLogical(2), Math.Max(ScaleLogical(90), _ifbCacheHoursCombo.Width), ifbComboHeight);
 
-            int shareLabelTop = rowTop + rowGap + ScaleLogical(12);
-            int shareComboHeight = Math.Max(_shareBlockLangCombo.Height, _shareBlockLangCombo.PreferredHeight + ScaleLogical(2));
-            _shareBlockLangLabel.Location = new Point(left, shareLabelTop);
-            _shareBlockLangCombo.SetBounds(comboLeft, shareLabelTop - ScaleLogical(2), comboWidth, shareComboHeight);
-
-            int eventLabelTop = _shareBlockLangLabel.Bottom + rowGap;
-            int eventComboHeight = Math.Max(_eventDescriptionLangCombo.Height, _eventDescriptionLangCombo.PreferredHeight + ScaleLogical(2));
-            _eventDescriptionLangLabel.Location = new Point(left, eventLabelTop);
-            _eventDescriptionLangCombo.SetBounds(comboLeft, eventLabelTop - ScaleLogical(2), comboWidth, eventComboHeight);
-
-            int groupTop = _eventDescriptionLangCombo.Bottom + ScaleLogical(14);
+            int groupTop = Math.Max(_ifbCacheHoursLabel.Bottom, _ifbCacheHoursCombo.Bottom) + ScaleLogical(20);
             int groupWidth = Math.Max(ScaleLogical(320), _advancedTab.ClientSize.Width - left - rightMargin);
             _updateSettingsGroup.SetBounds(left, groupTop, groupWidth, ScaleLogical(286));
             int updateInnerWidth = Math.Max(ScaleLogical(220), _updateSettingsGroup.ClientSize.Width - ScaleLogical(24));
@@ -86,40 +74,8 @@ namespace NcTalkOutlookAddIn.UI
             }
             _advancedTab.Controls.Add(_ifbCacheHoursCombo);
 
-            int langTop = 70;
-
-            _shareBlockLangLabel.Text = Strings.AdvancedShareBlockLangLabel;
-            _shareBlockLangLabel.Location = new Point(24, langTop);
-            _shareBlockLangLabel.AutoSize = true;
-            _advancedTab.Controls.Add(_shareBlockLangLabel);
-
-            _shareBlockLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            _shareBlockLangCombo.DrawMode = DrawMode.OwnerDrawFixed;
-            _shareBlockLangCombo.IntegralHeight = false;
-            _shareBlockLangCombo.Location = new Point(260, langTop - 2);
-            _shareBlockLangCombo.Width = 240;
-            _shareBlockLangCombo.DrawItem += HandleLanguageComboDrawItem;
-            _shareBlockLangCombo.SelectionChangeCommitted += HandleLanguageComboSelectionCommitted;
-            PopulateLanguageOverrideCombo(_shareBlockLangCombo, "share");
-            _advancedTab.Controls.Add(_shareBlockLangCombo);
-
-            _eventDescriptionLangLabel.Text = Strings.AdvancedEventDescriptionLangLabel;
-            _eventDescriptionLangLabel.Location = new Point(24, langTop + 32);
-            _eventDescriptionLangLabel.AutoSize = true;
-            _advancedTab.Controls.Add(_eventDescriptionLangLabel);
-
-            _eventDescriptionLangCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            _eventDescriptionLangCombo.DrawMode = DrawMode.OwnerDrawFixed;
-            _eventDescriptionLangCombo.IntegralHeight = false;
-            _eventDescriptionLangCombo.Location = new Point(260, langTop + 30);
-            _eventDescriptionLangCombo.Width = 240;
-            _eventDescriptionLangCombo.DrawItem += HandleLanguageComboDrawItem;
-            _eventDescriptionLangCombo.SelectionChangeCommitted += HandleLanguageComboSelectionCommitted;
-            PopulateLanguageOverrideCombo(_eventDescriptionLangCombo, "talk");
-            _advancedTab.Controls.Add(_eventDescriptionLangCombo);
-
             _updateSettingsGroup.Text = Strings.UpdateSettingsHeading;
-            _updateSettingsGroup.Location = new Point(24, langTop + 72);
+            _updateSettingsGroup.Location = new Point(24, 70);
             _updateSettingsGroup.Size = new Size(520, 286);
             _advancedTab.Controls.Add(_updateSettingsGroup);
 
@@ -169,7 +125,7 @@ namespace NcTalkOutlookAddIn.UI
             _updateSettingsGroup.Controls.Add(_updateChangelogTextBox);
 
             _tlsSettingsGroup.Text = Strings.AdvancedTlsHeading;
-            _tlsSettingsGroup.Location = new Point(24, langTop + 372);
+            _tlsSettingsGroup.Location = new Point(24, 370);
             _tlsSettingsGroup.Size = new Size(520, 132);
             _advancedTab.Controls.Add(_tlsSettingsGroup);
 
