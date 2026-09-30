@@ -36,7 +36,9 @@ namespace NcTalkOutlookAddIn.Models
             string licenseActivationState = null,
             bool licenseConnectionError = false,
             string licenseLastSyncAtIso = null,
-            string licenseOfflineUntilIso = null)
+            string licenseOfflineUntilIso = null,
+            string defaultsSource = null,
+            bool defaultsSourceEditable = false)
         {
             EndpointAvailable = endpointAvailable;
             FetchSucceeded = fetchSucceeded;
@@ -60,6 +62,8 @@ namespace NcTalkOutlookAddIn.Models
             LicenseConnectionError = licenseConnectionError;
             LicenseLastSyncAtIso = licenseLastSyncAtIso ?? string.Empty;
             LicenseOfflineUntilIso = licenseOfflineUntilIso ?? string.Empty;
+            DefaultsSource = NormalizeDefaultsSource(defaultsSource);
+            DefaultsSourceEditable = DefaultsSource != null && defaultsSourceEditable;
         }
 
         internal bool EndpointAvailable { get; private set; }
@@ -77,6 +81,20 @@ namespace NcTalkOutlookAddIn.Models
         internal bool IsValid { get; private set; }
 
         internal string SeatState { get; private set; }
+
+        internal string DefaultsSource { get; private set; }
+
+        internal bool DefaultsSourceEditable { get; private set; }
+
+        internal static string NormalizeDefaultsSource(string value)
+        {
+            string normalized = (value ?? string.Empty).Trim();
+            if (string.Equals(normalized, "local", StringComparison.OrdinalIgnoreCase))
+            {
+                return "local";
+            }
+            return string.Equals(normalized, "backend", StringComparison.OrdinalIgnoreCase) ? "backend" : null;
+        }
 
         // License metadata describes server state; it does not grant access.
         internal string LicenseStatus { get; private set; }

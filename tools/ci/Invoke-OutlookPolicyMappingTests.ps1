@@ -40,6 +40,15 @@ namespace NcTalkOutlookAddIn.Settings
         internal bool? EmailSignatureOnCompose { get; set; }
         internal bool? EmailSignatureOnReply { get; set; }
         internal bool? EmailSignatureOnForward { get; set; }
+        internal string ResolveDefaultsSource(BackendPolicyStatus status) { return "local"; }
+        internal AddinSettings ResolvePolicyDefaults(BackendPolicyStatus status)
+        {
+            return new AddinSettings {
+                EmailSignatureOnCompose = EmailSignaturePolicyService.ResolveFlag(status, "email_signature_on_compose", EmailSignatureOnCompose),
+                EmailSignatureOnReply = EmailSignaturePolicyService.ResolveFlag(status, "email_signature_on_reply", EmailSignatureOnReply),
+                EmailSignatureOnForward = EmailSignaturePolicyService.ResolveFlag(status, "email_signature_on_forward", EmailSignatureOnForward)
+            };
+        }
     }
 }
 
@@ -882,14 +891,18 @@ internal static class OutlookPolicyUiTests
         for (int i = 0; i < pairs.Length; i += 2) result[(string)pairs[i]] = pairs[i + 1];
         return result;
     }
-    private static object Status(Dictionary<string, object> share, Dictionary<string, object> talk, bool editable, string mode, string seat)
+    private static object Status(Dictionary<string, object> share, Dictionary<string, object> talk, bool editable, string mode, string seat,
+        object defaultsSource = null, object defaultsSourceEditable = null, Dictionary<string, object> signature = null)
     {
         var shareEdit = share.ToDictionary(p => p.Key, p => (object)editable);
         var talkEdit = talk.ToDictionary(p => p.Key, p => (object)editable);
-        return Call(T("Services.BackendPolicyService"), "ParseStatus", D(
+        var payload = D(
             "status", D("is_valid", seat != "invalid", "seat_assigned", seat != "none", "seat_state", seat == "paused" ? "suspended_overlimit" : "active", "mode", mode, "overlicensed", true),
-            "policy", D("share", share, "talk", talk),
-            "policy_editable", D("share", shareEdit, "talk", talkEdit)));
+            "policy", D("share", share, "talk", talk, "email_signature", signature),
+            "policy_editable", D("share", shareEdit, "talk", talkEdit, "email_signature", signature == null ? null : signature.ToDictionary(p => p.Key, p => (object)editable)));
+        if (defaultsSource != null) payload["defaults_source"] = defaultsSource;
+        if (defaultsSourceEditable != null) payload["defaults_source_editable"] = defaultsSourceEditable;
+        return Call(T("Services.BackendPolicyService"), "ParseStatus", payload);
     }
     private static string Serialize(object settings)
     {
@@ -917,6 +930,219 @@ internal static class OutlookPolicyUiTests
     private static Form Talk(object local, object status)
     {
         return (Form)New("UI.TalkLinkForm", local, Configuration(), null, status, null, Addressbook(), "Meeting", DateTime.Today.AddDays(1), DateTime.Today.AddDays(1).AddHours(1));
+    }
+    private static void TestDefaultsSourceMetadata()
+    {
+        foreach (bool wrapped in new[] { false, true })
+        foreach (object source in new object[] { null, "inherit", "unknown", "", "local", "backend", true, 1 })
+        foreach (object editable in new object[] { null, false, true, "true", 1 })
+        {
+            var payload = D("status", D("is_valid", true, "seat_assigned", true, "seat_state", "active", "mode", "community"),
+                "policy", D("share", D()), "policy_editable", D("share", D()), "defaults_source", source, "defaults_source_editable", editable);
+            object status = Call(T("Services.BackendPolicyService"), "ParseStatus", wrapped ? D("ocs", D("data", payload)) : payload);
+            string expected = object.Equals(source, "local") || object.Equals(source, "backend") ? (string)source : null;
+            Check(object.Equals(Get(status, "DefaultsSource"), expected), "Only explicit valid top-level defaults source is retained");
+            Check((bool)Get(status, "DefaultsSourceEditable") == (expected != null && object.Equals(editable, true)), "Only a boolean source permission accompanies a valid source");
+            Check((bool)Get(status, "PolicyActive"), "Optional source metadata does not change seat access");
+        }
+        object nested = Call(T("Services.BackendPolicyService"), "ParseStatus", D("status", D("is_valid", true, "seat_assigned", true,
+            "seat_state", "active", "mode", "pro", "defaults_source", "backend", "defaults_source_editable", false), "policy", D("share", D())));
+        Check(Get(nested, "DefaultsSource") == null && !(bool)Get(nested, "DefaultsSourceEditable"), "Nested source metadata does not replace the top-level API fields");
+        object legacy = Status(D(), D(), true, "pro", "active");
+        Check(Get(legacy, "DefaultsSource") == null && !(bool)Get(legacy, "DefaultsSourceEditable"), "Old backend responses retain the local source default");
+        Console.WriteLine("[OK] Optional top-level source metadata, legacy payloads and plain/OCS parsing");
+    }
+    private static void TestDefaultsSourcePrecedence(string root)
+    {
+        int cases = 0;
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (string registry in new string[] { null, "local", "backend", "invalid", "" })
+        foreach (string backend in new string[] { null, "inherit", "unknown", "local", "backend" })
+        foreach (bool editable in new[] { false, true })
+        foreach (string user in new string[] { null, "local", "backend" })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "DefaultsSource", user);
+            Call(local, "ApplyManagedSetupPolicy", ManagedDefaultsSource(registry));
+            object status = Status(D(), D(), true, mode, seat, backend, editable);
+            bool hasBackend = backend == "local" || backend == "backend";
+            string expected = seat != "active" ? "local" : hasBackend ? (editable && user != null ? user : backend)
+                : registry != null ? (registry == "backend" ? "backend" : "local") : user ?? "local";
+            bool canEdit = seat == "active" && (hasBackend ? editable : registry == null);
+            Check((string)Call(local, "ResolveDefaultsSource", status) == expected, "Source precedence case " + cases);
+            Check((bool)Call(local, "CanEditDefaultsSource", status) == canEdit, "Source permission case " + cases);
+            Check(object.Equals(Get(local, "DefaultsSource"), user), "Source resolution preserves raw user preference");
+            Check((bool)Get(local, "HasManagedDefaultsSource") == (registry != null), "Registry presence is independent of source validity");
+            Check((bool)Get(local, "IsEnterpriseRollout") == (registry != null), "Every present source policy activates rollout");
+            cases++;
+        }
+        object active = Status(D(), D(), true, "community", "active");
+        foreach (string user in new string[] { null, "local", "backend" })
+        foreach (string registry in new string[] { null, "local", "backend", "bad" })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "DefaultsSource", user);
+            Call(local, "ApplyManagedSetupPolicy", ManagedDefaultsSource(registry));
+            string xml = Serialize(local);
+            Check(user == null ? !xml.Contains("<DefaultsSource") : xml.Contains("<DefaultsSource>" + user + "</DefaultsSource>"), "XML writes only the explicit user source");
+            Check(!xml.Contains("ManagedDefaultsSource") && !xml.Contains("EnterpriseRollout"), "XML omits managed source state");
+            object clone = Call(local, "Clone");
+            Check(Serialize(clone) == xml && object.Equals(Get(clone, "DefaultsSource"), user)
+                && (bool)Get(clone, "HasManagedDefaultsSource") == (registry != null), "Clone retains source overlay and raw preference separately");
+            Check((bool)Get(clone, "IsManagedDefaultsSourceValid") == (registry != "bad"), "Clone retains managed source validity");
+            object restored = RoundTrip(local, root);
+            Check(object.Equals(Get(restored, "DefaultsSource"), user) && !(bool)Get(restored, "HasManagedDefaultsSource"), "XML reload never turns managed source into user choice");
+            Call(clone, "ApplyManagedSetupPolicy", (object)null);
+            Check((string)Call(clone, "ResolveDefaultsSource", active) == (user ?? "local") && !(bool)Get(clone, "HasManagedDefaultsSource"), "Policy removal restores the raw user source");
+            Check((bool)Get(local, "HasManagedDefaultsSource") == (registry != null), "Removing a cloned policy does not alter its original");
+            Check((string)Call(local, "ResolveDefaultsSource", (object)null) == "local" && !(bool)Call(local, "CanEditDefaultsSource", (object)null), "Missing backend falls back locally without granting source access");
+        }
+        Console.WriteLine("[OK] " + cases + " source precedence/seat combinations plus raw XML, clone and removal checks");
+    }
+    private static void TestDefaultsSourceValues()
+    {
+        object zip = Enum.Parse(T("Models.AttachmentLinkTarget"), "ZipDownload");
+        object sharePage = Enum.Parse(T("Models.AttachmentLinkTarget"), "SharePage");
+        foreach (string source in new[] { "local", "backend" })
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (bool editable in new[] { false, true })
+        foreach (bool backend in new[] { false, true })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "DefaultsSource", source);
+            foreach (string name in new[] { "SharingDefaultPermCreate", "TalkDefaultLobbyEnabled", "EmailSignatureOnCompose", "EmailSignatureOnReply", "EmailSignatureOnForward" }) Set(local, name, !backend);
+            Set(local, "SharingDefaultExpireDays", 0);
+            Set(local, "SharingAttachmentLinkTarget", zip);
+            Set(local, "ShareBlockLang", "de");
+            Set(local, "EventDescriptionLang", "en");
+            object status = Status(D("share_permission_upload", backend, "share_expire_days", 19, "attachment_link_target", "share_page", "language_share_html_block", "fr"),
+                D("talk_lobby_active", backend, "language_talk_description", "it"), editable, mode, seat, null, null,
+                D("email_signature_on_compose", backend, "email_signature_on_reply", backend, "email_signature_on_forward", backend,
+                    "email_signature_template", "<p>Test signature</p>", "user_email", "user@example.test"));
+            string before = Serialize(local);
+            bool useBackend = seat == "active" && (!editable || source == "backend");
+            object effective = Resolve(local, status);
+            Check((bool)Get(effective, "SharingDefaultPermCreate") == (useBackend ? backend : !backend)
+                && (bool)Get(effective, "TalkDefaultLobbyEnabled") == (useBackend ? backend : !backend), "Backend preference retains explicit false and locked-value precedence");
+            Check((int)Get(effective, "SharingDefaultExpireDays") == (useBackend ? 19 : 0), "Local source preserves explicit zero expiration");
+            Check(object.Equals(Get(effective, "SharingAttachmentLinkTarget"), useBackend ? sharePage : zip), "Attachment target uses the selected source and existing field lock");
+            Check((string)Get(effective, "ShareBlockLang") == (useBackend ? "fr" : "de")
+                && (string)Get(effective, "EventDescriptionLang") == (useBackend ? "it" : "en"), "Generated block languages share source resolution");
+            object signature = Call(New("Services.EmailSignaturePolicyService", status, local), "Resolve");
+            foreach (string name in new[] { "OnCompose", "OnReply", "OnForward" })
+                Check((bool)Get(signature, name) == (seat == "active" && (useBackend ? backend : !backend)), "Signature flag source/seat parity: " + name);
+            Check((bool)Get(signature, "Active") == (seat == "active" && (useBackend ? backend : !backend)), "Source metadata never grants inactive-seat signatures");
+            Check(Serialize(local) == before, "Effective source values never replace raw false/zero/language settings");
+            object missing = Resolve(local, Status(D(), D(), true, mode, "active"));
+            Check((int)Get(missing, "SharingDefaultExpireDays") == 0 && (bool)Get(missing, "SharingDefaultPermCreate") == !backend,
+                "Backend preference falls back to local when a value is absent");
+        }
+        Console.WriteLine("[OK] Source-aware false/zero values, field locks, signatures, attachment targets and languages");
+    }
+    private static void TestDefaultsSourceUi(string root, string previewPath)
+    {
+        string[] blockedTabs = { "_fileLinkTab", "_talkTab", "_signatureTab" };
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (string source in new[] { "local", "backend" })
+        foreach (bool editable in new[] { false, true })
+        {
+            object local = New("Settings.AddinSettings");
+            object status = Status(D("share_permission_upload", true), D("talk_lobby_active", true), true, mode, seat, source, editable);
+            string before = Serialize(local);
+            using (Form options = Settings(local, status))
+            {
+                var combo = (ComboBox)Field(options, "_defaultsSourceCombo");
+                var tabs = (TabControl)Field(options, "_tabControl");
+                var advanced = (TabPage)Field(options, "_advancedTab");
+                bool backend = seat == "active" && source == "backend";
+                Check(advanced.Contains(combo) && advanced.Contains((Control)Field(options, "_defaultsSourceLabel"))
+                    && advanced.Contains((Control)Field(options, "_defaultsSourceHintLabel")), "Advanced owns the source selector and explanation");
+                Check(combo.Items.Count == 2 && combo.SelectedIndex == (backend ? 1 : 0)
+                    && combo.Enabled == (seat == "active" && editable), "Source selector shows effective source and personal edit permission");
+                Check(!string.IsNullOrWhiteSpace(((Label)Field(options, "_defaultsSourceHintLabel")).Text), "Source selection has a visible reason/help hint");
+                foreach (string name in blockedTabs)
+                {
+                    var page = (TabPage)Field(options, name);
+                    Check(page.Enabled == !backend, "Only backend defaults disable the defaults tab: " + name);
+                    var selecting = new TabControlCancelEventArgs(page, tabs.TabPages.IndexOf(page), false, TabControlAction.Selecting);
+                    Call(tabs, "OnSelecting", selecting);
+                    Check(selecting.Cancel == backend, "Mouse/keyboard/programmatic tab selection shares the disabled-tab guard");
+                    if (backend) Check(!string.IsNullOrWhiteSpace(page.ToolTipText) && page.AccessibleDescription == page.ToolTipText, "Disabled tabs expose tooltip and accessible reason");
+                }
+                foreach (TabPage page in tabs.TabPages)
+                    if (!blockedTabs.Any(name => ReferenceEquals(page, Field(options, name)))) Check(page.Enabled, "Source policy leaves other settings tabs accessible");
+                Check(tabs.DrawMode == (backend ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal), "Only disabled defaults tabs need gray header drawing");
+                Call(options, "SetBusy", true);
+                Check(!combo.Enabled, "Busy source control is disabled");
+                Call(options, "SetBusy", false);
+                Check(combo.Enabled == (seat == "active" && editable), "Busy changes preserve the source lock");
+                Check(Serialize(Get(options, "Result")) == before && Serialize(local) == before, "Opening source controls never stores effective defaults");
+            }
+        }
+        foreach (string registry in new[] { "backend", "bad" })
+        {
+            object local = New("Settings.AddinSettings");
+            Call(local, "ApplyManagedSetupPolicy", ManagedDefaultsSource(registry));
+            using (Form options = Settings(local, Status(D(), D(), true, "pro", "active", "inherit", true)))
+                Check(!((ComboBox)Field(options, "_defaultsSourceCombo")).Enabled, "Inherit metadata cannot unlock valid or invalid registry policy");
+        }
+        foreach (string mode in new[] { "community", "pro" })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "SharingDefaultPermCreate", false);
+            Set(local, "SharingDefaultExpireDays", 0);
+            Set(local, "TalkDefaultLobbyEnabled", false);
+            Set(local, "EmailSignatureOnCompose", false);
+            Set(local, "ShareBlockLang", "de");
+            object status = Status(D("share_permission_upload", true, "share_expire_days", 19, "language_share_html_block", "fr"),
+                D("talk_lobby_active", true), true, mode, "active", "backend", true);
+            using (Form options = Settings(local, status))
+            {
+                object result = Get(options, "Result");
+                var combo = (ComboBox)Field(options, "_defaultsSourceCombo");
+                var tabs = (TabControl)Field(options, "_tabControl");
+                tabs.SelectedTab = (TabPage)Field(options, "_advancedTab");
+                foreach (int index in new[] { 0, 1, 0, 1 })
+                {
+                    combo.SelectedIndex = index;
+                    Call(combo, "OnSelectionChangeCommitted", EventArgs.Empty);
+                    Check((string)Get(result, "DefaultsSource") == (index == 1 ? "backend" : "local"), "Committed source selection records only the raw source choice");
+                    Check(((CheckBox)Field(options, "_sharingDefaultPermCreateCheckBox")).Checked == (index == 1)
+                        && ((CheckBox)Field(options, "_talkDefaultLobbyCheckBox")).Checked == (index == 1), "Source selection refreshes visible defaults immediately");
+                    Check((string)Call(T("UI.SettingsForm"), "GetSelectedLanguageChoice", Field(options, "_shareBlockLangCombo")) == (index == 1 ? "fr" : "de"), "Source selection refreshes language defaults immediately");
+                    Check(!(bool)Get(result, "SharingDefaultPermCreate") && (int)Get(result, "SharingDefaultExpireDays") == 0
+                        && !(bool)Get(result, "TalkDefaultLobbyEnabled") && !(bool)Get(result, "EmailSignatureOnCompose"), "Toggling source preserves raw false and zero choices");
+                    foreach (string name in blockedTabs) Check(((TabPage)Field(options, name)).Enabled == (index == 0), "Source selection immediately changes tab availability");
+                }
+                Task save = (Task)Call(options, "SaveSettingsAsync");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+                while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(save.IsCompleted, "Source-only save completes without a configured server");
+                save.GetAwaiter().GetResult();
+                Check(options.DialogResult == DialogResult.OK, "Source-only save succeeds");
+                object restored = RoundTrip(result, root);
+                Check((string)Get(restored, "DefaultsSource") == "backend" && !(bool)Get(restored, "SharingDefaultPermCreate")
+                    && (int)Get(restored, "SharingDefaultExpireDays") == 0 && !(bool)Get(restored, "EmailSignatureOnCompose"), "Saving source preserves dormant raw local defaults");
+                Set(restored, "DefaultsSource", "local");
+                Check(!(bool)Get(Resolve(restored, status), "SharingDefaultPermCreate") && (int)Get(Resolve(restored, status), "SharingDefaultExpireDays") == 0,
+                    "Returning to local after save restores false and zero values");
+            }
+        }
+        using (Form preview = Settings(New("Settings.AddinSettings"), Status(D(), D(), true, "community", "active", "backend", true)))
+        {
+            ((TabControl)Field(preview, "_tabControl")).SelectedTab = (TabPage)Field(preview, "_advancedTab");
+            Directory.CreateDirectory(Path.GetDirectoryName(previewPath));
+            preview.Show(); Application.DoEvents();
+            using (var bitmap = new System.Drawing.Bitmap(preview.Width, preview.Height))
+            {
+                preview.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height));
+                bitmap.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+            }
+        }
+        Console.WriteLine("[OK] Real source controls, tab guards/tooltips, live switching and raw-value save; preview: " + previewPath);
     }
     private static void TestLocalChoices(string root)
     {
@@ -946,6 +1172,7 @@ internal static class OutlookPolicyUiTests
             new object[] { "talk", "talk_room_type", "TalkDefaultRoomType", "group", roomEvent, roomGroup }
         };
         foreach (object[] binding in bindings)
+        foreach (string source in new[] { "local", "backend" })
         foreach (string mode in new[] { "community", "pro" })
         foreach (string seat in new[] { "active", "none", "paused", "invalid" })
         foreach (bool editable in new[] { false, true })
@@ -953,14 +1180,15 @@ internal static class OutlookPolicyUiTests
         {
             string property = (string)binding[2];
             object local = New("Settings.AddinSettings");
+            Set(local, "DefaultsSource", source);
             object productDefault = Get(local, property);
             if (explicitChoice) Set(local, property, binding[4]);
             string saved = Serialize(local);
             var policy = D(binding[1], binding[3]);
             object status = Status((string)binding[0] == "share" ? policy : D(), (string)binding[0] == "talk" ? policy : D(), editable, mode, seat);
             object effective = Resolve(local, status);
-            object expected = seat == "active" && (!editable || !explicitChoice) ? binding[5] : explicitChoice ? binding[4] : productDefault;
-            Check(object.Equals(Get(effective, property), expected), "Resolver precedence: " + property + "/" + mode + "/" + seat + "/" + editable + "/" + explicitChoice);
+            object expected = seat == "active" && (!editable || !explicitChoice || source == "backend") ? binding[5] : explicitChoice ? binding[4] : productDefault;
+            Check(object.Equals(Get(effective, property), expected), "Resolver precedence: " + property + "/" + source + "/" + mode + "/" + seat + "/" + editable + "/" + explicitChoice);
             Check(Serialize(local) == saved, "Resolution must not modify persisted choices: " + property);
             object reloaded = RoundTrip(local, root);
             Check((bool)Call(reloaded, "HasLocalValue", property) == explicitChoice, "Round-trip retains presence: " + property);
@@ -1156,6 +1384,7 @@ internal static class OutlookPolicyUiTests
     {
         Type subscription = T("NextcloudTalkAddIn+MailComposeSubscription");
         int cases = 0;
+        foreach (string source in new[] { "local", "backend" })
         foreach (string mode in new[] { "community", "pro" })
         foreach (string seat in new[] { "active", "none", "paused", "invalid" })
         foreach (bool editable in new[] { false, true })
@@ -1164,6 +1393,7 @@ internal static class OutlookPolicyUiTests
         foreach (object threshold in new object[] { null, 0, 1, 19, 10240 })
         {
             object local = New("Settings.AddinSettings");
+            Set(local, "DefaultsSource", source);
             if (explicitChoice) {
                 Set(local, "SharingAttachmentsAlwaysConnector", false);
                 Set(local, "SharingAttachmentsOfferAboveEnabled", false);
@@ -1172,7 +1402,7 @@ internal static class OutlookPolicyUiTests
             object status = Status(D("attachments_always_via_ncconnector", always, "attachments_min_size_mb", threshold), D(), editable, mode, seat);
             object snapshot = Call(subscription, "BuildAttachmentAutomationSettings", local, local);
             object actual = Call(subscription, "ApplyAttachmentAutomationPolicy", snapshot, status);
-            bool useBackend = seat == "active" && (!editable || !explicitChoice);
+            bool useBackend = seat == "active" && (!editable || !explicitChoice || source == "backend");
             bool expectedAlways = useBackend && always;
             bool expectedEnabled = !expectedAlways && (useBackend ? threshold != null : !explicitChoice);
             int expectedThreshold = useBackend && threshold != null ? ((int)threshold == 0 ? 5 : (int)threshold) : 20;
@@ -1190,23 +1420,27 @@ internal static class OutlookPolicyUiTests
     }
     private static object Managed(object url, object locked, object ribbon, string source)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedTls(object system, object tls12, object tls13, string source = "TLS test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedLogging(object debug, object anonymize, string source = "Logging test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, null, null, null, null, null, source);
     }
     private static object ManagedUpdateNotify(object value)
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, null, null, null, null, "Update notification test");
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, null, null, null, null, null, "Update notification test");
     }
     private static object ManagedIfb(object enabled, object days, object cacheHours, object port, string source = "IFB test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, enabled, days, cacheHours, port, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, enabled, days, cacheHours, port, null, source);
+    }
+    private static object ManagedDefaultsSource(object value)
+    {
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, null, null, null, null, value, "Defaults source test");
     }
     private static readonly string[] IfbProperties = { "IfbEnabled", "IfbDays", "IfbCacheHours", "IfbPort" };
     private static void CheckIfb(object target, object[] values, string message, bool raw = false)
@@ -1960,6 +2194,9 @@ internal static class OutlookPolicyUiTests
         Product = Assembly.LoadFrom(args[0]);
         string root = args[1];
         try {
+            TestDefaultsSourceMetadata();
+            TestDefaultsSourcePrecedence(root);
+            TestDefaultsSourceValues();
             TestLocalChoices(root);
             TestWizards();
             TestSettingsEdits(root);
@@ -1971,6 +2208,7 @@ internal static class OutlookPolicyUiTests
             TestManagedLogging(root);
             TestManagedUpdateNotify(root);
             TestManagedIfb(root);
+            TestDefaultsSourceUi(root, args[2]);
             Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
@@ -1980,7 +2218,7 @@ internal static class OutlookPolicyUiTests
     $uiExe = Join-Path $TempRoot 'OutlookPolicyUiTests.exe'
     & $csc /nologo /target:exe "/out:$uiExe" /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Windows.Forms.dll $uiSource
     if ($LASTEXITCODE -ne 0) { throw 'Policy UI test harness compilation failed.' }
-    & $uiExe (Join-Path $uiOutput 'NcTalkOutlookAddIn.dll') $TempRoot
+    & $uiExe (Join-Path $uiOutput 'NcTalkOutlookAddIn.dll') $TempRoot (Join-Path $ProjectRoot '.tmp/defaults-source-settings.png')
     if ($LASTEXITCODE -ne 0) { throw 'Production policy/persistence/UI tests failed.' }
 
     # Compile the production registry reader and IFB manager against in-memory platform doubles.
@@ -2012,7 +2250,6 @@ namespace Microsoft.Win32 {
     }
 }
 namespace Microsoft.Office.Interop.Outlook { public sealed class Application { public string Version { get { return "16.0"; } } } }
-namespace NcTalkOutlookAddIn.Models { internal sealed class BackendPolicyStatus {} }
 namespace NcTalkOutlookAddIn.Settings {
     internal sealed class AddinSettings {
         internal const int DefaultIfbDays = 30, DefaultIfbCacheHours = 24, DefaultIfbPort = 7777, MinIfbPort = 1024, MaxIfbPort = 49151;
@@ -2114,6 +2351,35 @@ internal static class ManagedIfbRuntimeTests {
         Check(!mixed.IfbEnabled && mixed.IfbCacheHours == 3 && mixed.IfbDays == 30 && mixed.IfbPort == 7777 && mixed.IsIfbPolicyValid,
             "Managed false masks lower enabled while siblings resolve independently");
     }
+    private static void TestDefaultsSourceRegistry() {
+        RegistryKey.Fixtures.Clear();
+        ManagedSetupPolicy absent = ManagedSetupPolicy.Load();
+        Check(!absent.HasDefaultsSourcePolicy && !absent.IsEnterpriseRollout, "Absent source registry value leaves rollout inactive");
+        foreach (RegistryValueKind kind in new[] { RegistryValueKind.String, RegistryValueKind.ExpandString, RegistryValueKind.MultiString,
+            RegistryValueKind.DWord, RegistryValueKind.QWord, RegistryValueKind.Binary, RegistryValueKind.None, RegistryValueKind.Unknown })
+        foreach (object source in new object[] { "local", "backend", "invalid", "inherit", "", null, 0, false })
+        for (int location = 0; location < Locations().Length; location++) {
+            RegistryKey.Fixtures.Clear();
+            Put(location, "defaultssource", source, kind);
+            for (int lower = location + 1; lower < Locations().Length; lower++) Put(lower, "DefaultsSource", "backend", RegistryValueKind.String);
+            ManagedSetupPolicy policy = ManagedSetupPolicy.Load();
+            bool valid = kind == RegistryValueKind.String && (object.Equals(source, "local") || object.Equals(source, "backend"));
+            Check(policy.HasDefaultsSourcePolicy && policy.IsEnterpriseRollout && policy.IsDefaultsSourcePolicyValid == valid,
+                "Only REG_SZ local/backend is valid; all present values activate rollout: " + kind + "/" + source + "/" + location);
+            Check(policy.DefaultsSource == (valid ? (string)source : "local"), "Invalid first-present source masks lower-priority source and falls back locally");
+        }
+        RegistryKey.Fixtures.Clear();
+        Put(0, "DefaultsSource", "local", RegistryValueKind.String);
+        Put(Locations().Length - 1, "DefaultsSource", "backend", RegistryValueKind.String);
+        Put(Locations().Length - 1, "IfbCacheHours", 3, RegistryValueKind.DWord);
+        Put(Locations().Length - 1, "ShowMainRibbonTab", 0, RegistryValueKind.DWord);
+        ManagedSetupPolicy mixed = ManagedSetupPolicy.Load();
+        Check(mixed.DefaultsSource == "local" && mixed.IfbCacheHours == 3 && !mixed.ShowMainRibbonTab,
+            "Defaults source, IFB and ribbon values retain independent per-value precedence");
+        RegistryKey.Fixtures.Clear();
+        Check(!ManagedSetupPolicy.Load().HasDefaultsSourcePolicy && !ManagedSetupPolicy.Load().IsEnterpriseRollout,
+            "Removing the last source trigger removes its managed state and rollout");
+    }
     private static void TestManager() {
         RegistryKey.Fixtures.Clear(); Put(0, "IfbEnabled", 1, RegistryValueKind.DWord);
         Put(0, "IfbDays", 60, RegistryValueKind.DWord); Put(0, "IfbCacheHours", 6, RegistryValueKind.DWord); Put(0, "IfbPort", 8888, RegistryValueKind.DWord);
@@ -2148,13 +2414,13 @@ internal static class ManagedIfbRuntimeTests {
         Check(FreeBusyServer.Stops > 0 && IfbRegistryOwnershipManager.Restores > 0, "Manager disposal stops and restores without rewriting managed enabled");
     }
     public static int Main() {
-        try { TestRegistryKindsAndPrecedence(); TestManager(); Console.WriteLine("[OK] " + checks + " in-memory production IFB registry/manager assertions passed"); return 0; }
+        try { TestRegistryKindsAndPrecedence(); TestDefaultsSourceRegistry(); TestManager(); Console.WriteLine("[OK] " + checks + " in-memory production IFB/defaults-source registry/manager assertions passed"); return 0; }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
 }
 '@ | Set-Content -LiteralPath $ifbSource -Encoding UTF8
     $ifbExe = Join-Path $TempRoot 'ManagedIfbRuntimeTests.exe'
-    & $csc /noconfig /nologo /nowarn:0436 /target:exe "/out:$ifbExe" /reference:System.dll /reference:System.Core.dll $ifbSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Settings/ManagedSetupPolicy.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Services/FreeBusyManager.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Utilities/NextcloudUriValidator.cs')
+    & $csc /noconfig /nologo /nowarn:0436 /target:exe "/out:$ifbExe" /reference:System.dll /reference:System.Core.dll $ifbSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Settings/ManagedSetupPolicy.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Models/BackendPolicyStatus.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Services/FreeBusyManager.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Utilities/NextcloudUriValidator.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Managed IFB runtime test harness compilation failed.' }
     & $ifbExe
     if ($LASTEXITCODE -ne 0) { throw 'Production managed IFB registry/runtime tests failed.' }

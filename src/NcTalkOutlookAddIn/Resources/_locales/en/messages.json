@@ -1,4 +1,28 @@
 {
+  "options_defaults_source_label": {
+    "message": "Default values source"
+  },
+  "options_defaults_source_local": {
+    "message": "Local settings"
+  },
+  "options_defaults_source_backend": {
+    "message": "NC Connector Backend"
+  },
+  "options_defaults_source_help": {
+    "message": "Choose which source supplies editable defaults. Locked policies still apply."
+  },
+  "options_defaults_source_managed_tooltip": {
+    "message": "Your administrator controls the default values source."
+  },
+  "options_defaults_source_tabs_tooltip": {
+    "message": "The backend supplies these defaults. Saved local settings are preserved."
+  },
+  "options_defaults_source_seat_required_tooltip": {
+    "message": "Selecting the default values source requires the backend and a valid, active assigned NC Connector Seat."
+  },
+  "managed_defaults_source_invalid": {
+    "message": "The centrally configured default values source is invalid. Local defaults apply. Please contact your administrator."
+  },
   "managed_ifb_policy_invalid": {
     "message": "A centrally managed IFB setting is invalid. IFB remains disabled. Please contact your administrator."
   },

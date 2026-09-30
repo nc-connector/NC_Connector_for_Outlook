@@ -1,4 +1,28 @@
 {
+  "options_defaults_source_label": {
+    "message": "Origen de los valores predeterminados"
+  },
+  "options_defaults_source_local": {
+    "message": "Configuración local"
+  },
+  "options_defaults_source_backend": {
+    "message": "NC Connector Backend"
+  },
+  "options_defaults_source_help": {
+    "message": "Elija el origen de los valores predeterminados editables. Las políticas bloqueadas siguen vigentes."
+  },
+  "options_defaults_source_managed_tooltip": {
+    "message": "Su administrador controla el origen de los valores predeterminados."
+  },
+  "options_defaults_source_tabs_tooltip": {
+    "message": "El backend proporciona estos valores predeterminados. Se conserva la configuración local guardada."
+  },
+  "options_defaults_source_seat_required_tooltip": {
+    "message": "Seleccionar el origen de los valores predeterminados requiere el backend y una licencia de usuario de NC Connector válida, activa y asignada."
+  },
+  "managed_defaults_source_invalid": {
+    "message": "El origen de los valores predeterminados configurado de forma centralizada no es válido. Se aplican los valores locales. Póngase en contacto con su administrador."
+  },
   "managed_ifb_policy_invalid": {
     "message": "Una opción de IFB administrada centralmente no es válida. IFB permanece desactivado. Póngase en contacto con su administrador."
   },

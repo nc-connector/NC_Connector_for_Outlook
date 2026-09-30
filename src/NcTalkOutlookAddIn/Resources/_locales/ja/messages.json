@@ -1,4 +1,28 @@
 {
+  "options_defaults_source_label": {
+    "message": "既定値の取得元"
+  },
+  "options_defaults_source_local": {
+    "message": "ローカル設定"
+  },
+  "options_defaults_source_backend": {
+    "message": "NC Connector Backend"
+  },
+  "options_defaults_source_help": {
+    "message": "変更可能な既定値の取得元を選択します。ロックされたポリシーは引き続き適用されます。"
+  },
+  "options_defaults_source_managed_tooltip": {
+    "message": "既定値の取得元は管理者が指定しています。"
+  },
+  "options_defaults_source_tabs_tooltip": {
+    "message": "これらの既定値はバックエンドから取得します。保存済みのローカル設定は保持されます。"
+  },
+  "options_defaults_source_seat_required_tooltip": {
+    "message": "既定値の取得元を選択するには、バックエンドと、割り当て済みで有効かつアクティブな NC Connector シートが必要です。"
+  },
+  "managed_defaults_source_invalid": {
+    "message": "一元設定された既定値の取得元が無効です。ローカルの既定値が適用されます。管理者にお問い合わせください。"
+  },
   "managed_ifb_policy_invalid": {
     "message": "一元管理されている IFB 設定が無効です。IFB は無効のままになります。管理者にお問い合わせください。"
   },

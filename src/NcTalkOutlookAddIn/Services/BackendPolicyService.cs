@@ -109,6 +109,10 @@ namespace NcTalkOutlookAddIn.Services
                                     && status.TryGetValue("can_manage_license", out rawCanManageLicense)
                                     && rawCanManageLicense is bool
                                     && (bool)rawCanManageLicense;
+            object rawDefaultsSourceEditable;
+            bool defaultsSourceEditable = normalized.TryGetValue("defaults_source_editable", out rawDefaultsSourceEditable)
+                                          && rawDefaultsSourceEditable is bool
+                                          && (bool)rawDefaultsSourceEditable;
 
             bool seatUsable = seatAssigned
                               && isValid
@@ -140,7 +144,9 @@ namespace NcTalkOutlookAddIn.Services
                 licenseActivationState: NcJson.GetStringOrEmpty(licenseActivation, "state"),
                 licenseConnectionError: GetBool(status, "license_connection_error"),
                 licenseLastSyncAtIso: NcJson.GetStringOrEmpty(status, "license_last_sync_at_iso"),
-                licenseOfflineUntilIso: NcJson.GetStringOrEmpty(status, "license_offline_until_iso"));
+                licenseOfflineUntilIso: NcJson.GetStringOrEmpty(status, "license_offline_until_iso"),
+                defaultsSource: NcJson.GetStringOrEmpty(normalized, "defaults_source"),
+                defaultsSourceEditable: defaultsSourceEditable);
             return normalizedStatus;
         }
 

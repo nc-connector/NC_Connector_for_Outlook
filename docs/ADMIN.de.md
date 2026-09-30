@@ -275,6 +275,31 @@ Priorität und Ergebnis:
 
 URL und Ribbonwert werden unabhängig aufgelöst: HKLM 64-Bit, HKLM 32-Bit, HKCU 64-Bit, HKCU 32-Bit. Die URL-Sperre gehört zum ausgewählten URL-Eintrag. Ein ungültiger Ribbonwert behält den Sichtbarkeitsstandard `true`; eine ungültige URL wird nicht als Serveradresse verwendet.
 
+### Quelle der Standardwerte
+
+Unter **Einstellungen -> Erweitert -> Quelle der Standardwerte** können Benutzer mit bestätigt gültigem Zugriff und aktiv zugewiesenem Community- oder Pro-Seat zwischen **Lokale Einstellungen** und **NC Connector Backend** wählen, sofern der Administrator die Quelle nicht sperrt. Ohne Vorgabe gilt **Lokale Einstellungen**. Ohne nutzbaren Seat sind Backend-Standardwerte nicht verfügbar und die Auswahl ist deaktiviert; die Zugriffsanforderungen von Enterprise Rollout bleiben bestehen.
+
+Die Quelle steuert editierbare Standardwerte für Freigaben, Talk, Anhangsautomatisierung, Sprachen erzeugter Texte und die Signaturschalter. Eine gesperrte einzelne Backend-Policy gewinnt bei beiden Quellen immer. **Lokale Einstellungen** bevorzugt gespeicherte lokale Entscheidungen und verwendet editierbare Backend-Startwerte für Optionen ohne gespeicherte Auswahl. **NC Connector Backend** bevorzugt vorhandene Backend-Standardwerte und verwendet bei fehlenden Werten die lokale Auswahl. Editierbare Vorgaben werden dadurch nicht zu Pflichtwerten: Im Freigabe- und Talk-Assistenten bleiben sie für die einzelne Aktion änderbar. Die Signaturvorlage selbst stammt immer aus dem Backend.
+
+Die Quelle zentral verwalten:
+
+1. Vor dem Verteilen eines Registry-Werts Backend-Zugriff vorbereiten und aktive Seats zuweisen.
+2. `DefaultsSource` (`REG_SZ`) mit `local` oder `backend` an den [verwalteten Policy-Pfaden](#verwaltete-nextcloud-url) setzen. Der erste vorhandene Wert gewinnt: HKLM 64-Bit, HKLM 32-Bit, HKCU 64-Bit, HKCU 32-Bit. Seine Existenz aktiviert Enterprise Rollout, auch bei leerem oder ungültigem Inhalt. Eine Registry-Vorgabe sperrt die Quellenauswahl, sofern keine ausdrückliche Backend-Vorgabe sie ersetzt.
+3. Alternativ kann ein vollständiger Nextcloud-Administrator die installationsweite Quelle im NC Connector Backend unter **Gruppeneinstellungen -> Standardeinstellungen -> Allgemein** konfigurieren. Delegierte Administratoren dürfen diese Vorgabe nicht ändern. Eine ausdrückliche Backend-Quelle hat Vorrang vor der Registry einschließlich ihrer Sperre. Erlaubt das Backend Benutzeränderungen, gewinnt eine gespeicherte Benutzerauswahl gegenüber der vorgeschlagenen Backend-Quelle; andernfalls ist die Backend-Quelle fest vorgegeben. **Keine Vorgabe** überlässt die Entscheidung der Registry oder, ohne Registry-Wert, der Benutzerauswahl.
+4. Nach Registry-Änderungen Outlook neu starten. Nach Backend-Änderungen die Backend-Verbindung aktualisieren oder die Einstellungen erneut öffnen. Bei effektiver Quelle **NC Connector Backend** sind die Einstellungstabs **Freigabe**, **Talk-Link** und **Signatur** ausgegraut und nicht auswählbar. Der Tooltip der Quellenauswahl nennt eine Administratorsperre; bei editierbarer Quelle stellt der Wechsel zu **Lokale Einstellungen** die Tabs wieder bereit.
+
+Beispiel: Backend-Standardwerte über eine erhöhte 64-Bit-PowerShell verteilen:
+
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name DefaultsSource -PropertyType String -Value "backend" -Force | Out-Null
+```
+
+Ein ungültiger effektiver Registry-Wert verwendet `local`, behält die Sperre und zeigt einen Konfigurationshinweis für den Administrator. Den Eintrag korrigieren und Outlook neu starten. Nachrangige Registry-Werte werden nicht ersatzweise verwendet. Eine ausdrückliche Backend-Quelle hat weiterhin Vorrang.
+
+**Benutzerauswahl wiederherstellen:** Die Backend-Quelle auf **Keine Vorgabe** setzen, `DefaultsSource` aus allen zutreffenden Registry-Pfaden und Ansichten entfernen und Outlook neu starten. Gespeicherte Quellenauswahl und einzelne lokale Einstellungen bleiben während einer Übersteuerung erhalten und gelten nach deren Entfernung wieder. Andere Registry-Policies aktivieren Enterprise Rollout weiterhin. Ältere Backends ohne Quellenvorgabe verhalten sich wie **Keine Vorgabe**; ältere Clients ignorieren die neue Backend-Vorgabe und benötigen für deren Nutzung ein Update.
+
 ### Verwaltete Transportsicherheit (TLS)
 
 Dieselben Policy-Pfade unterstützen auch diese TLS-Werte. Dafür `REG_DWORD` mit `0` für deaktiviert und `1` für aktiviert verwenden:
@@ -383,7 +408,7 @@ Hat ein ausgewählter Wert einen ungültigen Typ oder Inhalt, bleibt die gesamte
 
 ### Enterprise Rollout
 
-Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled`, `UpdateNotifyEnabled`, `IfbEnabled`, `IfbDays`, `IfbCacheHours` oder `IfbPort` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle dreizehn Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
+Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `DefaultsSource`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled`, `UpdateNotifyEnabled`, `IfbEnabled`, `IfbDays`, `IfbCacheHours` oder `IfbPort` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle vierzehn Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
 
 **Auswirkung beim Upgrade:** Auch eine bereits bestehende Registry-URL-Vorgabe aktiviert diesen Modus nach dem Update. Seats und Backend deshalb vor dem Rollout vorbereiten; eine ausschließlich per XML vorbelegte URL aktiviert ihn nicht.
 
@@ -595,9 +620,9 @@ Backendverwaltete Funktionen benötigen:
 Beobachtbares Verhalten je Zustand:
 
 - **Keine Backend-Konfiguration:** Freigaben, Talk und IFB verwenden lokale Einstellungen. Zentrale Signaturen und separate Passwortzustellung sind nicht verfügbar.
-- **Erreichbares Backend mit aktivem Seat:** Gespeicherte Outlook-Werte gelten für editierbare Felder. Gesperrte Backend-Werte überschreiben den lokalen Wert und können in Outlook nicht geändert werden.
+- **Erreichbares Backend mit aktivem Seat:** Die [Quelle der Standardwerte](#quelle-der-standardwerte) bestimmt den Vorrang lokaler oder zentraler Vorgaben für editierbare Felder. Gesperrte Backend-Werte haben immer Vorrang und können in Outlook nicht geändert werden.
 - **Erreichbares Backend ohne nutzbaren Seat:** Freigaben und Talk verwenden lokale Einstellungen; Outlook zeigt den Seat- oder Lizenzstatus. Zentrale Signaturen und separate Passwortzustellung sind nicht verfügbar.
-- **Backend vorübergehend nicht erreichbar:** Freigaben und Talk verwenden gespeicherte lokale Einstellungen. Eine passende Mail mit verpflichtender zentraler Signatur kann geöffnet und ungesendet bleiben, bis die Signatur-Policy wieder geprüft werden kann.
+- **Backend vorübergehend nicht erreichbar:** Ein zuvor bestätigter Status für dasselbe Konto kann Standardwertequelle und Policies beibehalten. Ohne nutzbaren bestätigten Status verwenden Freigaben und Talk bei nicht verwalteten Installationen lokale Einstellungen. Eine passende Mail mit verpflichtender zentraler Signatur kann geöffnet und ungesendet bleiben, bis die Signatur-Policy wieder geprüft werden kann.
 - **Backend ohne Signatur-Domain:** Freigabe- und Talk-Policies funktionieren weiter. Zentrale Signaturen bleiben deaktiviert und Outlook zeigt einen Update-Hinweis.
 
 ### Lizenzhinweise in Outlook
@@ -626,9 +651,9 @@ Das Backend kann verwalten:
 - separate Passwortzustellung und optionale Secret-Links
 - zentrale Signaturzuweisung sowie getrennte Schalter für neue Mail, Antwort und Weiterleitung
 
-Werte editierbar lassen, wenn Benutzer ihre gespeicherte Outlook-Einstellung behalten oder ändern dürfen. Nur Einstellungen sperren, die Benutzer nicht ändern dürfen. Vor dem breiten Rollout sowohl einen Benutzer mit aktivem Seat als auch einen Benutzer ohne Seat testen.
+Werte editierbar lassen, wenn Benutzer sie für eine einzelne Aktion anpassen dürfen. Die [Quelle der Standardwerte](#quelle-der-standardwerte) bestimmt lokale oder zentrale Startwerte; einzelne Einstellungen nur sperren, wenn Benutzer sie nicht ändern dürfen. Vor dem breiten Rollout sowohl einen Benutzer mit aktivem Seat als auch einen Benutzer ohne Seat testen.
 
-Einstellungen, Freigabe- und Talk-Assistent sowie Anhangsautomatisierung verwenden dieselbe Reihenfolge: gesperrte Backend-Vorgabe, sonst gespeicherte lokale Auswahl, sonst editierbarer Backend-Startwert, zuletzt Produktstandard. Auch ein ausdrücklich gespeichertes `false` oder ein Wert gleich dem Produktstandard bleibt eine Benutzerentscheidung. Das bloße Speichern der Zugangsdaten legt unberührte Optionen nicht fest. Gesperrte Backend-Werte überschreiben die lokale Auswahl nicht dauerhaft; nach dem Entsperren gilt sie wieder. Ohne nutzbaren Seat bleiben lokale Einstellungen verfügbar; Seat-Funktionen bleiben eingeschränkt.
+Einstellungen, Freigabe- und Talk-Assistent, Anhangsautomatisierung und Signaturschalter verwenden die ausgewählte Quelle, ohne einzelne Policy-Sperren zu verändern. Auch ein ausdrücklich gespeichertes `false` oder ein Wert gleich dem Produktstandard bleibt eine Benutzerentscheidung. Das bloße Speichern der Zugangsdaten legt unberührte Optionen nicht fest. Administrative Übersteuerungen überschreiben die gespeicherte lokale Auswahl nie; sie gilt wieder, sobald lokale Standardwerte wirksam sind und das Feld entsperrt ist. Ohne nutzbaren Seat bleiben lokale Einstellungen bei nicht verwalteten Installationen verfügbar; Seat-Funktionen bleiben eingeschränkt.
 
 Neue Backend-Ablaufvorgaben beginnen bei einem Tag. Eine Null-Tage-Vorgabe älterer Backends wird einheitlich als ein Tag interpretiert. Bestehende Freigaben und eine lokal gespeicherte Deaktivierung des Ablaufdatums bleiben unverändert. Anhangsschwellen liegen bei 1–10240 MB; ein ausdrückliches Backend-`null` deaktiviert die Schwelle, eine alte Backend-Null behält die etablierte Bedeutung von 5 MB.
 

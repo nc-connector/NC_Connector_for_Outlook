@@ -24,6 +24,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         private Dictionary<string, object> _localPolicyValues = new Dictionary<string, object>(StringComparer.Ordinal);
         private ManagedSetupPolicy _managedSetupPolicy;
+        private string _defaultsSource;
         private bool _localDebugLoggingEnabled;
         private bool _localLogAnonymizationEnabled;
         private bool _localUpdateNotifyEnabled;
@@ -81,6 +82,37 @@ namespace NcTalkOutlookAddIn.Settings
         public string AppPassword { get; set; }
 
         public AuthenticationMode AuthMode { get; set; }
+
+        public string DefaultsSource
+        {
+            get { return _defaultsSource; }
+            set { _defaultsSource = BackendPolicyStatus.NormalizeDefaultsSource(value); }
+        }
+
+        internal bool HasManagedDefaultsSource { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasDefaultsSourcePolicy; } }
+        internal bool IsManagedDefaultsSourceValid { get { return !HasManagedDefaultsSource || _managedSetupPolicy.IsDefaultsSourcePolicyValid; } }
+
+        internal string ResolveDefaultsSource(BackendPolicyStatus status)
+        {
+            if (status == null || !status.FetchSucceeded || !PolicyUiHelper.HasBackendSeatEntitlement(status))
+            {
+                return "local";
+            }
+            if (status.DefaultsSource != null)
+            {
+                return status.DefaultsSourceEditable && DefaultsSource != null ? DefaultsSource : status.DefaultsSource;
+            }
+            return HasManagedDefaultsSource ? _managedSetupPolicy.DefaultsSource : DefaultsSource ?? "local";
+        }
+
+        internal bool CanEditDefaultsSource(BackendPolicyStatus status)
+        {
+            if (status == null || !status.FetchSucceeded || !PolicyUiHelper.HasBackendSeatEntitlement(status))
+            {
+                return false;
+            }
+            return status.DefaultsSource != null ? status.DefaultsSourceEditable : !HasManagedDefaultsSource;
+        }
 
         public bool IfbEnabled
         {
@@ -365,6 +397,7 @@ namespace NcTalkOutlookAddIn.Settings
         internal AddinSettings ResolvePolicyDefaults(BackendPolicyStatus status)
         {
             AddinSettings resolved = Clone();
+            bool preferBackendDefaults = ResolveDefaultsSource(status) == "backend";
             ApplyStringPolicy(resolved, status, "share", "share_base_directory", "FileLinkBasePath");
             ApplyStringPolicy(resolved, status, "share", "share_name_template", "SharingDefaultShareName");
             ApplyBoolPolicy(resolved, status, "share", "share_permission_upload", "SharingDefaultPermCreate");
@@ -392,8 +425,14 @@ namespace NcTalkOutlookAddIn.Settings
             if (ShouldApplyPolicy(status, "share", "share_send_password_mode", "SharingDefaultPasswordDeliveryMode")
                 && status.HasPolicyKey("share", "share_send_password_mode"))
             {
-                resolved.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryPolicy.ParseMode(
-                    status.GetPolicyString("share", "share_send_password_mode"));
+                string mode = status.GetPolicyString("share", "share_send_password_mode");
+                if (status.IsLocked("share", "share_send_password_mode")
+                    || !HasLocalValue("SharingDefaultPasswordDeliveryMode")
+                    || string.Equals(mode, "plain", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(mode, "secrets", StringComparison.OrdinalIgnoreCase))
+                {
+                    resolved.SharingDefaultPasswordDeliveryMode = SharePasswordDeliveryPolicy.ParseMode(mode);
+                }
             }
             if (ShouldApplyPolicy(status, "talk", "talk_room_type", "TalkDefaultRoomType"))
             {
@@ -409,7 +448,7 @@ namespace NcTalkOutlookAddIn.Settings
             bool hasLocalThreshold = HasLocalValue("SharingAttachmentsOfferAboveEnabled")
                                      || HasLocalValue("SharingAttachmentsOfferAboveMb");
             if (status != null && status.IsDomainActive("share")
-                && (status.IsLocked("share", "attachments_min_size_mb") || !hasLocalThreshold)
+                && (status.IsLocked("share", "attachments_min_size_mb") || preferBackendDefaults || !hasLocalThreshold)
                 && status.HasPolicyKey("share", "attachments_min_size_mb"))
             {
                 int threshold;
@@ -425,13 +464,21 @@ namespace NcTalkOutlookAddIn.Settings
                     resolved.SharingAttachmentsOfferAboveEnabled = false;
                 }
             }
+            resolved.SharingAttachmentLinkTarget = AttachmentLinkTargetPolicy.Resolve(
+                SharingAttachmentLinkTarget, status, preferBackendDefaults);
+            resolved.EmailSignatureOnCompose = EmailSignaturePolicyService.ResolveFlag(
+                status, "email_signature_on_compose", EmailSignatureOnCompose, preferBackendDefaults);
+            resolved.EmailSignatureOnReply = EmailSignaturePolicyService.ResolveFlag(
+                status, "email_signature_on_reply", EmailSignatureOnReply, preferBackendDefaults);
+            resolved.EmailSignatureOnForward = EmailSignaturePolicyService.ResolveFlag(
+                status, "email_signature_on_forward", EmailSignatureOnForward, preferBackendDefaults);
             return resolved;
         }
 
         private bool ShouldApplyPolicy(BackendPolicyStatus status, string domain, string key, string propertyName)
         {
             return status != null && status.IsDomainActive(domain)
-                   && (status.IsLocked(domain, key) || !HasLocalValue(propertyName));
+                   && (status.IsLocked(domain, key) || ResolveDefaultsSource(status) == "backend" || !HasLocalValue(propertyName));
         }
 
         private void ApplyBoolPolicy(AddinSettings resolved, BackendPolicyStatus status, string domain, string key, string propertyName)

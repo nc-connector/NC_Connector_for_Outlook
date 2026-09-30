@@ -57,14 +57,10 @@ namespace NcTalkOutlookAddIn.Services
                 return Inactive("signature_user_email_missing");
             }
 
-            bool backendOnReply;
-            bool backendOnForward;
-            _status.TryGetPolicyBool(Domain, KeyOnReply, out backendOnReply);
-            _status.TryGetPolicyBool(Domain, KeyOnForward, out backendOnForward);
-
-            bool onCompose = ResolveFlag(_status, KeyOnCompose, _settings.EmailSignatureOnCompose, backendOnCompose);
-            bool onReply = ResolveFlag(_status, KeyOnReply, _settings.EmailSignatureOnReply, backendOnReply);
-            bool onForward = ResolveFlag(_status, KeyOnForward, _settings.EmailSignatureOnForward, backendOnForward);
+            AddinSettings effective = _settings.ResolvePolicyDefaults(_status);
+            bool onCompose = effective.EmailSignatureOnCompose.GetValueOrDefault();
+            bool onReply = effective.EmailSignatureOnReply.GetValueOrDefault();
+            bool onForward = effective.EmailSignatureOnForward.GetValueOrDefault();
 
             return new EmailSignaturePolicy
             {
@@ -93,23 +89,19 @@ namespace NcTalkOutlookAddIn.Services
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
         }
 
-        internal static bool ResolveFlag(BackendPolicyStatus status, string key, bool? localValue)
-        {
-            bool backendValue;
-            if (status == null || !status.TryGetPolicyBool(Domain, key, out backendValue))
-            {
-                backendValue = false;
-            }
-            return ResolveFlag(status, key, localValue, backendValue);
-        }
-
-        private static bool ResolveFlag(
+        internal static bool ResolveFlag(
             BackendPolicyStatus status,
             string key,
             bool? localValue,
-            bool backendValue)
+            bool preferBackendDefaults = false)
         {
+            bool backendValue = false;
+            bool hasBackendValue = status != null && status.TryGetPolicyBool(Domain, key, out backendValue);
             if (status != null && status.IsLocked(Domain, key))
+            {
+                return backendValue;
+            }
+            if (preferBackendDefaults && hasBackendValue && status.IsDomainActive(Domain))
             {
                 return backendValue;
             }
@@ -119,6 +111,7 @@ namespace NcTalkOutlookAddIn.Services
         private string ResolveComposeInactiveReason(bool backendValue)
         {
             if (_status.IsLocked(Domain, KeyOnCompose)
+                || _settings.ResolveDefaultsSource(_status) == "backend"
                 || (!backendValue && !_settings.EmailSignatureOnCompose.HasValue))
             {
                 return "signature_disabled_by_backend";

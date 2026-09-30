@@ -275,6 +275,31 @@ Priority and result:
 
 URL and ribbon values resolve independently, in order: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. The URL lock belongs to the selected URL entry. An invalid ribbon value keeps the visibility default of `true`; an invalid URL is not used as a server address.
 
+### Default values source
+
+Under **Settings -> Advanced -> Default values source**, users with confirmed valid access and an active assigned Community or Pro Seat can choose **Local settings** or **NC Connector Backend**, unless the source is locked by an administrator. Without a source setting, **Local settings** applies. Without usable Seat access, backend defaults are unavailable and the selector is disabled; Enterprise Rollout access requirements still apply.
+
+The source controls editable defaults for sharing, Talk, attachment automation, generated text languages, and signature insertion switches. A locked individual backend policy always wins with either source. **Local settings** prefers saved local choices, then editable backend defaults for options without a saved choice. **NC Connector Backend** prefers available backend defaults, falling back to local choices for missing values. It does not turn editable defaults into mandatory rules: users can still adjust editable values for an individual action in the Sharing and Talk wizards. The signature template itself always comes from the backend.
+
+To manage the source centrally:
+
+1. Prepare backend access and assign active Seats before deploying a registry value.
+2. Set `DefaultsSource` (`REG_SZ`) to `local` or `backend` at the [managed policy locations](#managed-nextcloud-url). The first present value wins: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. Its presence, including an empty or invalid value, enables Enterprise Rollout. Registry configuration locks the source selector unless an explicit backend source setting supersedes it.
+3. Alternatively, a full Nextcloud administrator can configure the installation-wide source under **Group settings -> Default settings -> General** in the NC Connector Backend. Delegated administrators cannot change this setting. An explicit backend source takes precedence over the registry, including its lock. If the backend permits user changes, a saved user selection takes precedence over the backend's proposed source; otherwise the backend source is fixed. **No preset** leaves the registry or, without a registry value, the user's choice in control.
+4. Restart Outlook after registry changes. Refresh the backend connection or reopen Settings after backend changes. With **NC Connector Backend** effective, the **Sharing**, **Talk Link**, and **Signature** settings tabs are greyed out and cannot be selected. The source selector's tooltip identifies an administrative lock; with an editable source, switching to **Local settings** restores the tabs.
+
+Example: deploy backend defaults from an elevated 64-bit PowerShell:
+
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name DefaultsSource -PropertyType String -Value "backend" -Force | Out-Null
+```
+
+An invalid effective registry value falls back to `local`, retains the lock, and shows an administrator configuration hint; correct that entry and restart Outlook. It does not fall through to a lower-priority registry value. An explicit backend source still takes precedence.
+
+To return control to users, set the backend source to **No preset**, remove `DefaultsSource` from every applicable registry location and view, and restart Outlook. Saved source choices and individual local settings are retained while an override is active; removing it restores them. Other registry policies continue to enable Enterprise Rollout. Older backends without source settings behave like **No preset**; older clients ignore the new backend setting and need an update to use it.
+
 ### Managed transport security (TLS)
 
 The same policy locations also accept these TLS values. Use `REG_DWORD` with `0` for disabled and `1` for enabled:
@@ -383,7 +408,7 @@ To remove the IFB policy, delete all four value names from every applicable hive
 
 ### Enterprise Rollout
 
-The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled`, `UpdateNotifyEnabled`, `IfbEnabled`, `IfbDays`, `IfbCacheHours`, or `IfbPort` enables Enterprise Rollout, including a value of `false`. An empty or invalid configured value still counts as present. With none of these thirteen values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
+The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `DefaultsSource`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled`, `UpdateNotifyEnabled`, `IfbEnabled`, `IfbDays`, `IfbCacheHours`, or `IfbPort` enables Enterprise Rollout, including a value of `false`. An empty or invalid configured value still counts as present. With none of these fourteen values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
 
 **Upgrade impact:** An existing registry-based URL deployment also enables this mode after upgrading. Assign Seats and prepare the backend before rollout; an XML-preseeded URL alone does not enable it.
 
@@ -401,7 +426,7 @@ First sign-in and verification:
 2. Without credentials, click **Insert Nextcloud share** in a message or **Insert Talk link** in an appointment. The existing settings dialog opens directly with a blue **Connect to Nextcloud** invitation, without a preliminary error. This also applies to unmanaged installations. Only with `ShowMainRibbonTab=false` are the other settings tabs unavailable; otherwise the full dialog is also accessible through **NC Connector -> Settings**.
 3. Complete the Nextcloud login flow or enter the user's app password, then save. Authentication must succeed before this setup can be saved. The managed URL and its lock remain effective; existing preferences are preserved. After saving successfully, the original action continues if its message or appointment is still open (an inline reply must still be active). Cancelling ends the action quietly. Signing in alone does not upload files or create a Talk room.
 4. Verify access with an active Seat, then separately verify the missing-Seat and missing-backend messages in a test environment. Rejected credentials reopen sign-in with a friendly reminder; connection failures remain distinct. If the main tab is hidden, normal settings remain hidden too. The backend and Seat checks still apply after authentication.
-5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all thirteen trigger values from all applicable policy locations and registry views, then restart Outlook. Saved credentials and preferences remain.
+5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all fourteen trigger values from all applicable policy locations and registry views, then restart Outlook. Saved credentials and preferences remain.
 
 Registry policy is an administrator deployment control, not protection against a user who can change that policy or replace the add-in. Protect the policy keys and deployment permissions accordingly.
 
@@ -595,9 +620,9 @@ Backend-managed functions require:
 Observed behavior by state:
 
 - **No backend configuration:** Sharing, Talk, and IFB use local settings. Central signatures and separate password delivery are unavailable.
-- **Reachable backend with active seat:** Saved Outlook values control editable fields. Locked backend values override the local value and cannot be changed in Outlook.
+- **Reachable backend with active seat:** The [default values source](#default-values-source) controls whether local or backend defaults take precedence for editable fields. Locked backend values always take precedence and cannot be changed in Outlook.
 - **Reachable backend without a usable seat:** Sharing and Talk use local settings; Outlook displays the seat or license state. Central signatures and separate password delivery are unavailable.
-- **Backend temporarily unreachable:** Sharing and Talk use saved local settings. A matching message that requires a central signature can remain open and unsent until the signature policy can be checked.
+- **Backend temporarily unreachable:** A previously confirmed status for the same account can retain the defaults source and policies. Without a usable confirmed status, Sharing and Talk use local settings in unmanaged installations. A matching message that requires a central signature can remain open and unsent until the signature policy can be checked.
 - **Backend lacks the signature domain:** Share and Talk policies continue to work. Central signatures stay disabled and Outlook displays an update notice.
 
 ### License notices in Outlook
@@ -626,9 +651,9 @@ The backend can manage:
 - separate password delivery and optional Secret links
 - central signature assignment and separate switches for new mail, reply, and forward
 
-Keep values editable when users may retain or change their saved Outlook setting. Lock only settings that users must not change. Test both a user with an active seat and a user without one before broad rollout.
+Keep values editable when users may adjust them for an individual action. Use the [default values source](#default-values-source) to choose between local and backend defaults; lock individual settings only when users must not change them. Test both a user with an active seat and a user without one before broad rollout.
 
-Settings, the Sharing and Talk wizards, and attachment automation use the same order: a locked backend value wins; otherwise a saved local choice wins; otherwise the editable backend default is used; finally the product default applies. An explicit local `false` or a saved product-default value remains a user choice. Saving credentials alone does not select untouched options. Locked backend values do not overwrite the local choice, so it returns when the administrator unlocks the field. Without usable seat access, local settings remain available; seat-only functions remain restricted.
+Settings, the Sharing and Talk wizards, attachment automation, and signature switches use the selected source without changing individual policy locks. An explicit local `false` or a saved product-default value remains a user choice. Saving credentials alone does not select untouched options. Administrative overrides never overwrite the saved local choice; it returns when local defaults apply again and the field is unlocked. Without usable Seat access, local settings remain available in unmanaged installations; Seat-only functions remain restricted.
 
 New backend share lifetimes start at one day. A zero-day value from an older backend is interpreted consistently as one day. This does not alter existing shares or a locally saved choice to disable expiration. Attachment thresholds use 1–10240 MB; an explicit backend `null` disables the threshold, while a legacy backend zero retains the established 5 MB behavior.
 

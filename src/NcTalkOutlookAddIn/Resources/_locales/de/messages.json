@@ -1,4 +1,28 @@
 {
+  "options_defaults_source_label": {
+    "message": "Quelle der Standardwerte"
+  },
+  "options_defaults_source_local": {
+    "message": "Lokale Einstellungen"
+  },
+  "options_defaults_source_backend": {
+    "message": "NC Connector Backend"
+  },
+  "options_defaults_source_help": {
+    "message": "Wählen Sie die Quelle für editierbare Standardwerte. Gesperrte Richtlinien gelten weiterhin."
+  },
+  "options_defaults_source_managed_tooltip": {
+    "message": "Die Quelle der Standardwerte wird von Ihrem Administrator vorgegeben."
+  },
+  "options_defaults_source_tabs_tooltip": {
+    "message": "Das Backend liefert diese Standardwerte. Gespeicherte lokale Einstellungen bleiben erhalten."
+  },
+  "options_defaults_source_seat_required_tooltip": {
+    "message": "Die Auswahl der Standardwertequelle erfordert das Backend und einen gültigen, aktiv zugewiesenen NC Connector Seat."
+  },
+  "managed_defaults_source_invalid": {
+    "message": "Die zentral konfigurierte Quelle der Standardwerte ist ungültig. Lokale Standardwerte gelten. Bitte wenden Sie sich an Ihren Administrator."
+  },
   "managed_ifb_policy_invalid": {
     "message": "Eine zentral verwaltete IFB-Einstellung ist ungültig. IFB bleibt deaktiviert. Bitte wenden Sie sich an Ihren Administrator."
   },

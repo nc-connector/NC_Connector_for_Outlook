@@ -3,6 +3,7 @@
 // See LICENSE.txt for details.
 
 using System;
+using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Utilities;
@@ -16,6 +17,53 @@ namespace NcTalkOutlookAddIn.UI
     internal sealed class SettingsTabControl : TabControl
     {
         private const int TcmAdjustRect = 0x1328;
+        private readonly UiThemePalette _palette = UiThemeManager.DetectPalette();
+
+        internal bool HasUnavailableTabs
+        {
+            get
+            {
+                foreach (TabPage page in TabPages)
+                {
+                    if (!page.Enabled) return true;
+                }
+                return false;
+            }
+        }
+
+        internal void SetTabAvailability(TabPage page, bool available, string hint)
+        {
+            page.Enabled = available;
+            page.ToolTipText = hint ?? string.Empty;
+            page.AccessibleDescription = hint ?? string.Empty;
+            ShowToolTips = true;
+            TabDrawMode mode = HasUnavailableTabs ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal;
+            if (DrawMode != mode) DrawMode = mode;
+            Invalidate();
+        }
+
+        protected override void OnSelecting(TabControlCancelEventArgs e)
+        {
+            base.OnSelecting(e);
+            if (e.TabPage != null && !e.TabPage.Enabled) e.Cancel = true;
+        }
+
+        protected override void OnDrawItem(DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Index >= TabPages.Count) return;
+            TabPage page = TabPages[e.Index];
+            bool selected = e.Index == SelectedIndex;
+            Color background = selected ? _palette.ControlBackground : _palette.WindowBackground;
+            using (var brush = new SolidBrush(background))
+            {
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+            TextRenderer.DrawText(e.Graphics, page.Text, Font, e.Bounds,
+                page.Enabled ? _palette.Text : _palette.DisabledText,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            if (selected && Focused) e.DrawFocusRectangle();
+            base.OnDrawItem(e);
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct Rect

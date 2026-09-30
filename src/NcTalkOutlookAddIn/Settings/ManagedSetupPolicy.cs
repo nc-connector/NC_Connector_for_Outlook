@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Win32;
+using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Settings
@@ -25,6 +26,7 @@ namespace NcTalkOutlookAddIn.Settings
         private const string IfbDaysValueName = "IfbDays";
         private const string IfbCacheHoursValueName = "IfbCacheHours";
         private const string IfbPortValueName = "IfbPort";
+        private const string DefaultsSourceValueName = "DefaultsSource";
         private static readonly object InvalidRegistryValue = new object();
         private bool _tlsSystemValueValid;
         private bool _tls12ValueValid;
@@ -36,6 +38,7 @@ namespace NcTalkOutlookAddIn.Settings
         private bool _ifbDaysValueValid;
         private bool _ifbCacheHoursValueValid;
         private bool _ifbPortValueValid;
+        private bool _defaultsSourceValueValid;
 
         private ManagedSetupPolicy(
             object nextcloudUrlValue,
@@ -51,6 +54,7 @@ namespace NcTalkOutlookAddIn.Settings
             object ifbDaysValue,
             object ifbCacheHoursValue,
             object ifbPortValue,
+            object defaultsSourceValue,
             string source)
         {
             HasNextcloudUrlValue = nextcloudUrlValue != null;
@@ -66,6 +70,10 @@ namespace NcTalkOutlookAddIn.Settings
             HasIfbDaysValue = ifbDaysValue != null;
             HasIfbCacheHoursValue = ifbCacheHoursValue != null;
             HasIfbPortValue = ifbPortValue != null;
+            HasDefaultsSourcePolicy = defaultsSourceValue != null;
+            string defaultsSource = BackendPolicyStatus.NormalizeDefaultsSource(defaultsSourceValue as string);
+            _defaultsSourceValueValid = defaultsSourceValue == null || defaultsSource != null;
+            DefaultsSource = defaultsSource ?? "local";
             IfbEnabled = ReadPolicyBoolean(ifbEnabledValue, false, out _ifbEnabledValueValid);
             IfbDays = ReadPolicyDword(ifbDaysValue, AddinSettings.DefaultIfbDays,
                 value => value == 10 || value == 30 || value == 60 || value == 90, out _ifbDaysValueValid);
@@ -88,7 +96,7 @@ namespace NcTalkOutlookAddIn.Settings
             bool showMainRibbonTab;
             ShowMainRibbonTab = !TryReadBoolean(showMainRibbonTabValue, out showMainRibbonTab)
                 || showMainRibbonTab;
-            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy || HasLoggingPolicy || HasUpdateNotifyPolicy || HasIfbPolicy;
+            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy || HasLoggingPolicy || HasUpdateNotifyPolicy || HasIfbPolicy || HasDefaultsSourcePolicy;
             Source = source ?? string.Empty;
         }
 
@@ -125,6 +133,10 @@ namespace NcTalkOutlookAddIn.Settings
         internal bool UpdateNotifyEnabled { get; private set; }
         internal bool HasUpdateNotifyPolicy { get; private set; }
         internal bool IsUpdateNotifyPolicyValid { get { return _updateNotifyValueValid; } }
+
+        internal string DefaultsSource { get; private set; }
+        internal bool HasDefaultsSourcePolicy { get; private set; }
+        internal bool IsDefaultsSourcePolicyValid { get { return _defaultsSourceValueValid; } }
 
         internal bool IfbEnabled { get; private set; }
         internal int IfbDays { get; private set; }
@@ -177,7 +189,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal static ManagedSetupPolicy Resolve(IEnumerable<ManagedSetupPolicy> policies)
         {
-            var result = new ManagedSetupPolicy(null, null, null, null, null, null, null, null, null, null, null, null, null, string.Empty);
+            var result = new ManagedSetupPolicy(null, null, null, null, null, null, null, null, null, null, null, null, null, null, string.Empty);
             if (policies == null)
             {
                 return result;
@@ -263,6 +275,12 @@ namespace NcTalkOutlookAddIn.Settings
                     result.IfbPort = policy.IfbPort;
                     result._ifbPortValueValid = policy._ifbPortValueValid;
                 }
+                if (!result.HasDefaultsSourcePolicy && policy.HasDefaultsSourcePolicy)
+                {
+                    result.HasDefaultsSourcePolicy = true;
+                    result.DefaultsSource = policy.DefaultsSource;
+                    result._defaultsSourceValueValid = policy._defaultsSourceValueValid;
+                }
             }
             return result;
         }
@@ -303,6 +321,7 @@ namespace NcTalkOutlookAddIn.Settings
                         ReadIfbPolicyValue(policyKey, IfbDaysValueName, true),
                         ReadIfbPolicyValue(policyKey, IfbCacheHoursValueName, true),
                         ReadIfbPolicyValue(policyKey, IfbPortValueName, true),
+                        ReadDefaultsSourcePolicyValue(policyKey),
                         source);
 
                     if (!policy.IsEnterpriseRollout)
@@ -326,7 +345,9 @@ namespace NcTalkOutlookAddIn.Settings
                         + ", updateNotifyPolicyPresent=" + policy.HasUpdateNotifyPolicy
                         + ", updateNotifyPolicyValid=" + policy.IsUpdateNotifyPolicyValid
                         + ", ifbPolicyPresent=" + policy.HasIfbPolicy
-                        + ", ifbPolicyValid=" + policy.IsIfbPolicyValid + ").");
+                        + ", ifbPolicyValid=" + policy.IsIfbPolicyValid
+                        + ", defaultsSourcePolicyPresent=" + policy.HasDefaultsSourcePolicy
+                        + ", defaultsSourcePolicyValid=" + policy.IsDefaultsSourcePolicyValid + ").");
                     return policy;
                 }
             }
@@ -364,6 +385,20 @@ namespace NcTalkOutlookAddIn.Settings
                 return InvalidRegistryValue;
             }
             return policyKey.GetValue(valueName, InvalidRegistryValue, RegistryValueOptions.DoNotExpandEnvironmentNames)
+                ?? InvalidRegistryValue;
+        }
+
+        private static object ReadDefaultsSourcePolicyValue(RegistryKey policyKey)
+        {
+            if (!Array.Exists(policyKey.GetValueNames(), name => string.Equals(name, DefaultsSourceValueName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return null;
+            }
+            if (policyKey.GetValueKind(DefaultsSourceValueName) != RegistryValueKind.String)
+            {
+                return InvalidRegistryValue;
+            }
+            return policyKey.GetValue(DefaultsSourceValueName, InvalidRegistryValue, RegistryValueOptions.DoNotExpandEnvironmentNames)
                 ?? InvalidRegistryValue;
         }
 

@@ -168,9 +168,13 @@ else {
     }
 }
 
-if ($settings -notmatch 'status\.IsLocked\(domain, key\)\s*\|\|\s*!HasLocalValue\(propertyName\)' -or
+if ($settings -notmatch 'status\.IsLocked\(domain, key\)\s*\|\|\s*ResolveDefaultsSource\(status\)\s*==\s*"backend"\s*\|\|\s*!HasLocalValue\(propertyName\)' -or
     $storage -notmatch 'if\s*\(settings\.HasLocalValue\(name\)\)') {
     $failures.Add('Policy resolution and XML persistence must retain the distinction between missing and explicit local choices.')
+}
+if ($storage -notmatch 'if\s*\(settings\.DefaultsSource\s*!=\s*null\)\s*\{\s*AppendElement\(document, root, "DefaultsSource", settings\.DefaultsSource\);' -or
+    $storage -match 'AppendElement\([^\r\n]*(ResolveDefaultsSource|HasManagedDefaultsSource|IsManagedDefaultsSourceValid)') {
+    $failures.Add('Defaults source persistence must write only an explicit raw user choice, never the effective managed source.')
 }
 if ($settingsForm -notmatch 'TrackLocalPolicyChoices\(\)' -or $settingsForm -notmatch '!_applyingPolicyDefaults') {
     $failures.Add('Settings must track user choices without persisting programmatic backend overlays.')

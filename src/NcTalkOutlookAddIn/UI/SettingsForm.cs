@@ -26,7 +26,7 @@ namespace NcTalkOutlookAddIn.UI
         private const int HeaderHeight = 48;
         private readonly UiThemePalette _themePalette = UiThemeManager.DetectPalette();
 
-        private readonly TabControl _tabControl = new SettingsTabControl();
+        private readonly SettingsTabControl _tabControl = new SettingsTabControl();
         private readonly TabPage _generalTab = new TabPage(Strings.TabGeneral);
         private readonly TabPage _ifbTab = new TabPage(Strings.TabIfb);
         private readonly TabPage _advancedTab = new TabPage(Strings.TabAdvanced);
@@ -841,27 +841,16 @@ namespace NcTalkOutlookAddIn.UI
                     _sharingAttachmentsOfferAboveMbUpDown.Minimum,
                     Math.Min(_sharingAttachmentsOfferAboveMbUpDown.Maximum, (decimal)offerAboveMb));
                 _sharingAttachmentsOfferAboveMbUpDown.Value = clampedOfferAbove;
-                SelectAttachmentLinkTarget(AttachmentLinkTargetPolicy.Resolve(
-                    Result.SharingAttachmentLinkTarget,
-                    _backendPolicyStatus));
+                SelectAttachmentLinkTarget(effective.SharingAttachmentLinkTarget.GetValueOrDefault());
                 _talkDefaultPasswordCheckBox.Checked = effective.TalkDefaultPasswordEnabled;
                 _talkDefaultAddUsersCheckBox.Checked = effective.TalkDefaultAddUsers;
                 _talkDefaultAddGuestsCheckBox.Checked = effective.TalkDefaultAddGuests;
                 _talkDefaultLobbyCheckBox.Checked = effective.TalkDefaultLobbyEnabled;
                 _talkDefaultSearchCheckBox.Checked = effective.TalkDefaultSearchVisible;
                 _talkDeleteRoomOnEventDeleteCheckBox.Checked = effective.TalkDeleteRoomOnEventDelete;
-                _emailSignatureOnComposeCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
-                    _backendPolicyStatus,
-                    "email_signature_on_compose",
-                    Result.EmailSignatureOnCompose);
-                _emailSignatureOnReplyCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
-                    _backendPolicyStatus,
-                    "email_signature_on_reply",
-                    Result.EmailSignatureOnReply);
-                _emailSignatureOnForwardCheckBox.Checked = EmailSignaturePolicyService.ResolveFlag(
-                    _backendPolicyStatus,
-                    "email_signature_on_forward",
-                    Result.EmailSignatureOnForward);
+                _emailSignatureOnComposeCheckBox.Checked = effective.EmailSignatureOnCompose.GetValueOrDefault();
+                _emailSignatureOnReplyCheckBox.Checked = effective.EmailSignatureOnReply.GetValueOrDefault();
+                _emailSignatureOnForwardCheckBox.Checked = effective.EmailSignatureOnForward.GetValueOrDefault();
                 TalkRoomTypeComboHelper.Select(
                     _talkDefaultRoomTypeCombo,
                     effective.TalkDefaultRoomType);
@@ -960,6 +949,7 @@ namespace NcTalkOutlookAddIn.UI
                 !string.IsNullOrEmpty(_appPasswordTextBox.Text);
 
             UpdateIfbOptionsState(credentialsAvailable);
+            UpdateDefaultsSourceState();
             UpdateLoggingOptionsState();
             _debugOpenLink.Enabled = !_isBusy;
             bool managedUpdateNotify = Result != null && Result.HasManagedUpdateNotify;

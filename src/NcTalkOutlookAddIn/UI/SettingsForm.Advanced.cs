@@ -21,13 +21,66 @@ namespace NcTalkOutlookAddIn.UI
 {
     internal sealed partial class SettingsForm
     {
+        private readonly Label _defaultsSourceLabel = new Label();
+        private readonly ComboBox _defaultsSourceCombo = new ComboBox();
+        private readonly Label _defaultsSourceHintLabel = new Label();
+
+        private void OnDefaultsSourceChanged(object sender, EventArgs e)
+        {
+            if (Result == null || _isBusy || !Result.CanEditDefaultsSource(_backendPolicyStatus))
+            {
+                return;
+            }
+            Result.DefaultsSource = _defaultsSourceCombo.SelectedIndex == 1 ? "backend" : "local";
+            ApplyPolicyDefaultsToControls();
+            UpdateControlState();
+        }
+
+        private void UpdateDefaultsSourceState()
+        {
+            if (Result == null)
+            {
+                return;
+            }
+            bool entitled = _backendPolicyStatus != null && _backendPolicyStatus.FetchSucceeded
+                && PolicyUiHelper.HasBackendSeatEntitlement(_backendPolicyStatus);
+            bool editable = Result.CanEditDefaultsSource(_backendPolicyStatus);
+            bool backendDefaults = Result.ResolveDefaultsSource(_backendPolicyStatus) == "backend";
+            bool backendSourceSpecified = entitled && !string.IsNullOrEmpty(_backendPolicyStatus.DefaultsSource);
+            bool invalidRegistry = !backendSourceSpecified && Result.HasManagedDefaultsSource && !Result.IsManagedDefaultsSourceValid;
+            string hint = !entitled ? Strings.DefaultsSourceSeatRequiredTooltip
+                : invalidRegistry ? Strings.ManagedDefaultsSourceInvalid
+                : !editable ? Strings.DefaultsSourceManagedTooltip : Strings.DefaultsSourceHelp;
+            _defaultsSourceCombo.SelectedIndex = backendDefaults ? 1 : 0;
+            _defaultsSourceCombo.Enabled = editable && !_isBusy;
+            _defaultsSourceHintLabel.Text = hint;
+            _toolTip.SetToolTip(_defaultsSourceLabel, Strings.DefaultsSourceHelp);
+            _disabledTooltipHints.Apply(_defaultsSourceCombo, hint, !editable, _defaultsSourceLabel);
+            foreach (TabPage page in new[] { _fileLinkTab, _talkTab, _signatureTab })
+            {
+                if (backendDefaults && _tabControl.SelectedTab == page)
+                {
+                    _tabControl.SelectedTab = _advancedTab;
+                }
+                _tabControl.SetTabAvailability(page, !backendDefaults,
+                    backendDefaults ? Strings.DefaultsSourceTabsTooltip : string.Empty);
+            }
+            ApplyAdvancedTabLayout();
+        }
+
         private void ApplyAdvancedTabLayout()
         {
             int left = ScaleLogical(24);
             int labelToComboGap = ScaleLogical(Result != null && Result.HasManagedIfb ? 28 : 16);
             int comboLeft = left + _ifbCacheHoursLabel.PreferredSize.Width + labelToComboGap;
             int rightMargin = ScaleLogical(24);
-            int rowTop = ScaleLogical(24);
+            int width = Math.Max(ScaleLogical(220), _advancedTab.ClientSize.Width - left - rightMargin);
+            _defaultsSourceLabel.Location = new Point(left, ScaleLogical(24));
+            _defaultsSourceCombo.SetBounds(left, _defaultsSourceLabel.Bottom + ScaleLogical(6),
+                Math.Min(ScaleLogical(360), width), _defaultsSourceCombo.PreferredHeight);
+            _defaultsSourceHintLabel.MaximumSize = new Size(width, 0);
+            _defaultsSourceHintLabel.Location = new Point(left, _defaultsSourceCombo.Bottom + ScaleLogical(8));
+            int rowTop = _defaultsSourceHintLabel.Bottom + ScaleLogical(20);
 
             int ifbComboHeight = Math.Max(_ifbCacheHoursCombo.Height, _ifbCacheHoursCombo.PreferredHeight + ScaleLogical(2));
             _ifbCacheHoursLabel.Location = new Point(left, rowTop);
@@ -57,6 +110,16 @@ namespace NcTalkOutlookAddIn.UI
         {
             _advancedTab.AutoScroll = true;
             _advancedTab.Padding = new Padding(12);
+
+            _defaultsSourceLabel.Text = Strings.DefaultsSourceLabel;
+            _defaultsSourceLabel.AutoSize = true;
+            _advancedTab.Controls.Add(_defaultsSourceLabel);
+            _defaultsSourceCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _defaultsSourceCombo.Items.AddRange(new object[] { Strings.DefaultsSourceLocal, Strings.DefaultsSourceBackend });
+            _defaultsSourceCombo.SelectionChangeCommitted += OnDefaultsSourceChanged;
+            _advancedTab.Controls.Add(_defaultsSourceCombo);
+            _defaultsSourceHintLabel.AutoSize = true;
+            _advancedTab.Controls.Add(_defaultsSourceHintLabel);
 
             _ifbCacheHoursLabel.Text = Strings.LabelIfbCacheHours;
             _ifbCacheHoursLabel.Location = new Point(24, 24);

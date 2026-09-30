@@ -19,7 +19,8 @@ namespace NcTalkOutlookAddIn.Models
 
         internal static AttachmentLinkTarget Resolve(
             AttachmentLinkTarget? localValue,
-            BackendPolicyStatus status)
+            BackendPolicyStatus status,
+            bool preferBackendDefaults = false)
         {
             AttachmentLinkTarget backendValue = AttachmentLinkTarget.ZipDownload;
             bool hasBackendValue = status != null
@@ -30,6 +31,10 @@ namespace NcTalkOutlookAddIn.Models
             if (status != null && status.IsLocked(Domain, Key))
             {
                 return hasBackendValue ? backendValue : AttachmentLinkTarget.ZipDownload;
+            }
+            if (preferBackendDefaults && hasBackendValue)
+            {
+                return backendValue;
             }
             if (localValue.HasValue)
             {

@@ -872,9 +872,12 @@ namespace NcTalkOutlookAddIn.Utilities
             int padX = Math.Max(8, (int)Math.Round(12f * (dpi / 96f)));
             int padY = Math.Max(4, (int)Math.Round(7f * (dpi / 96f)));
 
-            if (control.DrawMode != TabDrawMode.Normal)
+            SettingsTabControl settingsTabs = control as SettingsTabControl;
+            TabDrawMode drawMode = settingsTabs != null && settingsTabs.HasUnavailableTabs
+                ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal;
+            if (control.DrawMode != drawMode)
             {
-                control.DrawMode = TabDrawMode.Normal;
+                control.DrawMode = drawMode;
             }
             if (control.SizeMode != TabSizeMode.Normal)
             {

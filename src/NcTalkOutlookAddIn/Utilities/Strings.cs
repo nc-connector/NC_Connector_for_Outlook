@@ -506,6 +506,14 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string AdvancedShareBlockLangLabel { get { return Get("options_share_block_lang_label", "Language for sharing HTML block"); } }
         internal static string AdvancedEventDescriptionLangLabel { get { return Get("options_event_description_lang_label", "Language for Talk description text"); } }
+        internal static string DefaultsSourceLabel { get { return Get("options_defaults_source_label", "Default values source"); } }
+        internal static string DefaultsSourceLocal { get { return Get("options_defaults_source_local", "Local settings"); } }
+        internal static string DefaultsSourceBackend { get { return Get("options_defaults_source_backend", "NC Connector Backend"); } }
+        internal static string DefaultsSourceHelp { get { return Get("options_defaults_source_help", "Choose which source supplies editable defaults. Locked policies still apply."); } }
+        internal static string DefaultsSourceManagedTooltip { get { return Get("options_defaults_source_managed_tooltip", "Your administrator controls the default values source."); } }
+        internal static string DefaultsSourceTabsTooltip { get { return Get("options_defaults_source_tabs_tooltip", "The backend supplies these defaults. Saved local settings are preserved."); } }
+        internal static string DefaultsSourceSeatRequiredTooltip { get { return Get("options_defaults_source_seat_required_tooltip", "Selecting the default values source requires the backend and a valid, active assigned NC Connector Seat."); } }
+        internal static string ManagedDefaultsSourceInvalid { get { return Get("managed_defaults_source_invalid", "The centrally configured default values source is invalid. Local defaults apply. Please contact your administrator."); } }
         internal static string AdvancedTlsHeading { get { return Get("options_tls_heading", "Transport security (TLS)"); } }
         internal static string AdvancedTlsUseSystemDefaultLabel { get { return Get("options_tls_use_system_default_label", "Use OS default TLS policy"); } }
         internal static string AdvancedTlsEnable12Label { get { return Get("options_tls_enable_12_label", "Enable TLS 1.2"); } }

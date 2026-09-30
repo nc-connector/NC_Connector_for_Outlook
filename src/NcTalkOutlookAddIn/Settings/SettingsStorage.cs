@@ -614,6 +614,10 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "Username", Safe(settings.Username));
             AppendElement(document, root, "AppPasswordProtected", ProtectPassword(settings.AppPassword));
             AppendElement(document, root, "AuthMode", settings.AuthMode.ToString());
+            if (settings.DefaultsSource != null)
+            {
+                AppendElement(document, root, "DefaultsSource", settings.DefaultsSource);
+            }
             AppendElement(document, root, "IfbEnabled", settings.LocalIfbEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbDays", settings.LocalIfbDays.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbCacheHours", settings.LocalIfbCacheHours.ToString(CultureInfo.InvariantCulture));
@@ -719,6 +723,9 @@ namespace NcTalkOutlookAddIn.Settings
                     {
                         settings.AuthMode = mode;
                     }
+                    break;
+                case "DefaultsSource":
+                    settings.DefaultsSource = value;
                     break;
                 case "IfbEnabled":
                     bool ifbEnabled;
