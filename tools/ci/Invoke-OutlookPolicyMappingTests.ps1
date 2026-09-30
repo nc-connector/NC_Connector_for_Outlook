@@ -495,7 +495,7 @@ internal static class OutlookPolicyMappingTests
         Check("Actual suspended seat has explicit suspended notice", PolicyUiHelper.GetPolicyWarningMessage(suspended).StartsWith(Strings.PolicyWarningSeatSuspended, StringComparison.Ordinal));
         Check("Actual suspended seat tooltip agrees with notice", PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(suspended) == PolicyUiHelper.GetPolicyWarningMessage(suspended));
         CheckLicenseNotice("Expired license on suspended seat reports license first", ParseLicense("EXPIRED", "EXPIRED", false, true, "suspended_overlimit"), Strings.PolicyLicenseExpired);
-        foreach (string state in new[] { "pending", "revoked", "suspended", "", "unknown" })
+        foreach (string state in new[] { "pending", "revoked", "suspended", "unknown" })
         {
             BackendPolicyStatus unavailable = ParseLicense("ACTIVE", "ACTIVE", true, true, state);
             string message = PolicyUiHelper.GetPolicyWarningMessage(unavailable);
@@ -503,6 +503,10 @@ internal static class OutlookPolicyMappingTests
                 && !message.Contains(Strings.PolicyWarningSeatSuspended)
                 && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(unavailable) == message);
         }
+
+        BackendPolicyStatus emptySeatState = ParseLicense("ACTIVE", "ACTIVE", true, true, "");
+        Check("Empty seat state is an invalid response, not a confirmed seat refusal", !emptySeatState.FetchSucceeded
+            && emptySeatState.Reason == "invalid_payload" && !PolicyUiHelper.HasBackendSeatEntitlement(emptySeatState));
 
         NcHttpClient.NextResponse = new NcHttpResponse { HasHttpResponse = true, StatusCode = HttpStatusCode.NotFound };
         BackendPolicyStatus missingBackend = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();

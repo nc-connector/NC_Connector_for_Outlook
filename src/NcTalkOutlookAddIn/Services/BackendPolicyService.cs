@@ -46,34 +46,44 @@ namespace NcTalkOutlookAddIn.Services
             HttpStatusCode statusCode;
             bool httpOk = ExecuteJsonRequest(endpointUrl, out statusCode, out payload);
 
-            if (!httpOk)
+            // Some installations return this endpoint's valid JSON with HTTP 404.
+            IDictionary<string, object> normalized = NormalizePayload(payload);
+            if (httpOk || (statusCode == HttpStatusCode.NotFound
+                && normalized != null && normalized.ContainsKey("status")))
             {
-                if (statusCode == HttpStatusCode.NotFound)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.Core, "Policy status endpoint missing: " + endpointUrl, null);
-                    return BuildLocalStatus(
-                        endpointAvailable: false,
-                        fetchSucceeded: true,
-                        reason: "endpoint_missing");
-                }
-
-                DiagnosticsLogger.LogException(LogCategories.Core, "Policy status endpoint unavailable (status=" + (int)statusCode + ").", null);
-                return BuildLocalStatus(
-                    endpointAvailable: true,
-                    fetchSucceeded: false,
-                    reason: "endpoint_unavailable");
+                return ParseStatus(payload);
             }
 
-            return ParseStatus(payload);
+            if (statusCode == HttpStatusCode.NotFound)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Policy status endpoint missing: " + endpointUrl, null);
+                return BuildLocalStatus(
+                    endpointAvailable: false,
+                    fetchSucceeded: true,
+                    reason: "endpoint_missing");
+            }
+
+            DiagnosticsLogger.LogException(LogCategories.Core, "Policy status endpoint unavailable (status=" + (int)statusCode + ").", null);
+            return BuildLocalStatus(
+                endpointAvailable: true,
+                fetchSucceeded: false,
+                reason: "endpoint_unavailable");
         }
 
         internal static BackendPolicyStatus ParseStatus(IDictionary<string, object> payload)
         {
             IDictionary<string, object> normalized = NormalizePayload(payload);
             IDictionary<string, object> status = NcJson.GetDictionary(normalized, "status");
-            if (status == null)
+            object rawSeatAssigned;
+            object rawIsValid;
+            object rawSeatState;
+            if (status == null
+                || !status.TryGetValue("seat_assigned", out rawSeatAssigned) || !(rawSeatAssigned is bool)
+                || !status.TryGetValue("is_valid", out rawIsValid) || !(rawIsValid is bool)
+                || !status.TryGetValue("seat_state", out rawSeatState) || !(rawSeatState is string)
+                || string.IsNullOrWhiteSpace((string)rawSeatState))
             {
-                DiagnosticsLogger.LogException(LogCategories.Core, "Policy status response has no status object.", null);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Policy status response has missing or invalid personal status fields.", null);
                 return BuildLocalStatus(
                     endpointAvailable: true,
                     fetchSucceeded: false,
@@ -101,9 +111,9 @@ namespace NcTalkOutlookAddIn.Services
                 sharePolicy["share_expire_days"] = 1;
             }
 
-            bool seatAssigned = GetBool(status, "seat_assigned");
-            bool isValid = GetBool(status, "is_valid");
-            string seatState = NcJson.GetStringOrEmpty(status, "seat_state");
+            bool seatAssigned = (bool)rawSeatAssigned;
+            bool isValid = (bool)rawIsValid;
+            string seatState = ((string)rawSeatState).Trim();
             object rawCanManageLicense;
             bool canManageLicense = status != null
                                     && status.TryGetValue("can_manage_license", out rawCanManageLicense)
@@ -198,13 +208,8 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             statusCode = response.StatusCode;
-            if ((int)statusCode < 200 || (int)statusCode >= 300)
-            {
-                return false;
-            }
-
             parsed = response.ParsedJson;
-            return parsed != null;
+            return (int)statusCode >= 200 && (int)statusCode < 300;
         }
 
         private static IDictionary<string, object> NormalizePayload(IDictionary<string, object> payload)

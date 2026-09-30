@@ -88,6 +88,36 @@ namespace NcTalkOutlookAddIn.Settings
     }
 }
 
+namespace NcTalkOutlookAddIn.Services
+{
+    internal sealed class NcHttpRequestOptions
+    {
+        internal string Method, Url;
+        internal int TimeoutMs;
+        internal bool IncludeAuthHeader, IncludeOcsApiHeader, ParseJson;
+    }
+
+    internal sealed class NcHttpResponse
+    {
+        internal bool HasHttpResponse;
+        internal HttpStatusCode StatusCode;
+        internal Exception TransportException;
+        internal IDictionary<string, object> ParsedJson;
+    }
+
+    internal sealed class NcHttpClient
+    {
+        internal static NcHttpResponse NextResponse;
+        internal static NcHttpRequestOptions LastRequest;
+        internal NcHttpClient(TalkServiceConfiguration configuration) { }
+        internal NcHttpResponse Send(NcHttpRequestOptions options)
+        {
+            LastRequest = options;
+            return NextResponse;
+        }
+    }
+}
+
 internal static class OutlookSecurityRegressionTests
 {
     private static int failures;
@@ -111,6 +141,7 @@ internal static class OutlookSecurityRegressionTests
         TestUpdateTargetPolicy();
         TestAtomicSettingsTransaction();
         TestTransportSecurityConfigurator();
+        TestBackendStatusResponseValidation();
 
         if (failures > 0)
         {
@@ -120,6 +151,128 @@ internal static class OutlookSecurityRegressionTests
 
         Console.WriteLine("All Outlook security regression tests passed.");
         return 0;
+    }
+
+    private static void TestBackendStatusResponseValidation()
+    {
+        foreach (int code in new[] { 200, 404 })
+        foreach (bool wrapped in new[] { false, true })
+        foreach (string mode in new[] { "community", "pro" })
+        {
+            string context = "HTTP " + code + (wrapped ? " OCS " : " plain ") + mode;
+            string payload = StatusPayload(true, true, "active", mode);
+            if (wrapped) payload = "{\"ocs\":{\"data\":" + payload + "}}";
+            BackendPolicyStatus active = FetchBackendStatus(code, payload);
+            Check(context + " accepts valid personal status", active.FetchSucceeded && active.EndpointAvailable
+                && active.SeatAssigned && active.IsValid && active.SeatState == "active" && active.PolicyActive);
+            Check(context + " retains independent policy domains", active.IsDomainActive("share")
+                && active.IsDomainActive("talk") && active.IsDomainActive("email_signature"));
+            Check(context + " does not require optional license metadata", active.LicenseStatus == string.Empty
+                && active.AccessStatus == string.Empty && !active.CanManageLicense && active.DefaultsSource == null);
+
+            BackendPolicyStatus unassigned = FetchBackendStatus(code, StatusPayload(false, true, "none", mode));
+            Check(context + " explicit missing seat remains a successful refusal", unassigned.FetchSucceeded
+                && unassigned.EndpointAvailable && !unassigned.SeatAssigned && unassigned.IsValid && !unassigned.PolicyActive);
+            BackendPolicyStatus paused = FetchBackendStatus(code, StatusPayload(true, true, "suspended_overlimit", mode));
+            Check(context + " personal suspension remains a successful refusal", paused.FetchSucceeded
+                && paused.SeatAssigned && paused.IsValid && !paused.PolicyActive);
+            BackendPolicyStatus invalidLicense = FetchBackendStatus(code, StatusPayload(true, false, "active", mode));
+            Check(context + " invalid access remains a successful refusal", invalidLicense.FetchSucceeded
+                && invalidLicense.SeatAssigned && !invalidLicense.IsValid && !invalidLicense.PolicyActive);
+        }
+
+        foreach (int code in new[] { 200, 404 })
+        {
+            BackendPolicyStatus oldBackend = FetchBackendStatus(code,
+                "{\"status\":{\"seat_assigned\":true,\"is_valid\":true,\"seat_state\":\"active\"}}");
+            Check("HTTP " + code + " accepts older backend without policy domains", oldBackend.FetchSucceeded
+                && oldBackend.SeatAssigned && oldBackend.IsValid && !oldBackend.PolicyActive
+                && oldBackend.Reason == "policy_domains_unavailable");
+            BackendPolicyStatus unknownSeat = FetchBackendStatus(code, StatusPayload(true, true, "future_state", "community"));
+            Check("HTTP " + code + " unknown seat state stays confirmed but cannot grant access", unknownSeat.FetchSucceeded
+                && unknownSeat.SeatState == "future_state" && !unknownSeat.PolicyActive);
+
+            foreach (string field in new[] { "seat_assigned", "is_valid", "seat_state" })
+            {
+                string[] invalidValues = field == "seat_state"
+                    ? new[] { "null", "true", "1", "{}", "[]", "\"\"", "\"   \"" }
+                    : new[] { "null", "\"true\"", "\"false\"", "1", "0", "{}", "[]" };
+                foreach (string value in invalidValues)
+                {
+                    IDictionary<string, object> payload = NcJson.DeserializeObject(StatusPayload(true, true, "active", "community"));
+                    NcJson.GetDictionary(payload, "status")[field] = NcJson.DeserializeObject("{\"value\":" + value + "}")["value"];
+                    CheckInvalidBackendStatus("HTTP " + code + " invalid " + field + "=" + value,
+                        FetchBackendStatus(code, NcJson.Serialize(payload)));
+                }
+                IDictionary<string, object> missing = NcJson.DeserializeObject(StatusPayload(true, true, "active", "pro"));
+                NcJson.GetDictionary(missing, "status").Remove(field);
+                CheckInvalidBackendStatus("HTTP " + code + " missing " + field,
+                    FetchBackendStatus(code, NcJson.Serialize(missing)));
+            }
+
+            foreach (string statusValue in new[] { "{}", "null", "[]", "\"broken\"" })
+            foreach (bool wrapped in new[] { false, true })
+            {
+                string invalid = "{\"status\":" + statusValue + "}";
+                if (wrapped) invalid = "{\"ocs\":{\"data\":" + invalid + "}}";
+                CheckInvalidBackendStatus("HTTP " + code + " invalid status " + statusValue + " wrapped=" + wrapped,
+                    FetchBackendStatus(code, invalid));
+            }
+        }
+
+        foreach (string body in new[] { "", "<html>Not found</html>", "{\"status\":", "{}", "{\"ocs\":{\"data\":{}}}" })
+        {
+            CheckInvalidBackendStatus("Successful HTTP requires a complete status payload", FetchBackendStatus(200, body));
+            BackendPolicyStatus missing = FetchBackendStatus(404, body);
+            Check("Ordinary HTTP 404 without backend status remains endpoint missing", missing.FetchSucceeded
+                && !missing.EndpointAvailable && !missing.PolicyActive && missing.Reason == "endpoint_missing");
+        }
+
+        foreach (int code in new[] { 301, 400, 401, 403, 409, 429, 500, 503 })
+        {
+            BackendPolicyStatus rejected = FetchBackendStatus(code, StatusPayload(true, true, "active", "pro"));
+            Check("HTTP " + code + " cannot be rescued by a valid-looking body", !rejected.FetchSucceeded
+                && rejected.EndpointAvailable && !rejected.PolicyActive && rejected.Reason == "endpoint_unavailable");
+        }
+        NcHttpClient.NextResponse = new NcHttpResponse { TransportException = new IOException("Simulated offline transport") };
+        BackendPolicyStatus offline = new BackendPolicyService(new TalkServiceConfiguration("https://cloud.example.test", "test-user", "test-only")).FetchStatus();
+        Check("Transport failure is not a confirmed backend absence or refusal", !offline.FetchSucceeded
+            && offline.EndpointAvailable && offline.Reason == "endpoint_unavailable");
+    }
+
+    private static string StatusPayload(bool assigned, bool valid, string seatState, string mode)
+    {
+        return "{\"status\":{\"seat_assigned\":" + (assigned ? "true" : "false")
+            + ",\"is_valid\":" + (valid ? "true" : "false") + ",\"seat_state\":\"" + seatState
+            + "\",\"mode\":\"" + mode + "\",\"overlicensed\":true},"
+            + "\"policy\":{\"share\":{},\"talk\":{},\"email_signature\":{}},"
+            + "\"policy_editable\":{\"share\":{},\"talk\":{},\"email_signature\":{}}}";
+    }
+
+    private static BackendPolicyStatus FetchBackendStatus(int code, string body)
+    {
+        IDictionary<string, object> parsed = null;
+        try { parsed = NcJson.DeserializeObject(body); }
+        catch (ArgumentException) { }
+        NcHttpClient.NextResponse = new NcHttpResponse
+        {
+            HasHttpResponse = true,
+            StatusCode = (HttpStatusCode)code,
+            ParsedJson = parsed
+        };
+        BackendPolicyStatus status = new BackendPolicyService(new TalkServiceConfiguration(
+            "https://cloud.example.test/nextcloud", "test-user", "test-only")).FetchStatus();
+        Check("Backend request retains authenticated status endpoint", NcHttpClient.LastRequest.Method == "GET"
+            && NcHttpClient.LastRequest.Url == "https://cloud.example.test/nextcloud/apps/ncc_backend_4mc/api/v1/status"
+            && NcHttpClient.LastRequest.IncludeAuthHeader && NcHttpClient.LastRequest.IncludeOcsApiHeader
+            && NcHttpClient.LastRequest.ParseJson && NcHttpClient.LastRequest.TimeoutMs == 45000);
+        return status;
+    }
+
+    private static void CheckInvalidBackendStatus(string name, BackendPolicyStatus status)
+    {
+        Check(name, !status.FetchSucceeded && status.EndpointAvailable && !status.PolicyActive
+            && !status.SeatAssigned && status.Reason == "invalid_payload");
     }
 
     private static void TestNextcloudUriBoundary()
@@ -427,7 +580,10 @@ internal static class OutlookSecurityRegressionTests
 
     $sources = @(
         $testSource,
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\BackendPolicyStatus.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\UpdateCheckResult.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\BackendPolicyService.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceConfiguration.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\UpdateCheckService.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Settings\SettingsFileTransaction.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\DiagnosticsLogger.cs"),
