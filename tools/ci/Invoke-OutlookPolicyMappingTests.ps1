@@ -924,7 +924,21 @@ internal static class OutlookPolicyUiTests
     }
     private static object Addressbook() { return New("Services.IfbAddressBookCache+SystemAddressbookStatus", true, 1, ""); }
     private static object Configuration() { return New("Services.TalkServiceConfiguration", "", "", ""); }
-    private static Form Settings(object local, object status) { return (Form)New("UI.SettingsForm", local, null, status, null, Addressbook()); }
+    private static object PolicyFetcher(object status, object owner = null)
+    {
+        return typeof(OutlookPolicyUiTests).GetMethod("TypedPolicyFetcher", BindingFlags.Static | BindingFlags.NonPublic)
+            .MakeGenericMethod(T("Services.TalkServiceConfiguration"), T("Models.BackendPolicyStatus"))
+            .Invoke(null, new[] { status, owner });
+    }
+    private static object TypedPolicyFetcher<TConfig, TStatus>(object status, object owner)
+    {
+        return new Func<TConfig, string, TStatus>((configuration, trigger) => {
+            if (owner != null && status != null && (bool)Get(status, "FetchSucceeded"))
+                Call(owner, "StoreBackendPolicySnapshot", configuration, status, trigger);
+            return (TStatus)status;
+        });
+    }
+    private static Form Settings(object local, object status) { return (Form)New("UI.SettingsForm", local, null, status, null, Addressbook(), PolicyFetcher(status)); }
     private static Form Share(object local, object status, bool attachment)
     {
         object launch = New("Models.FileLinkWizardLaunchOptions");
@@ -2333,6 +2347,35 @@ internal static class OutlookPolicyUiTests
         }
         Console.WriteLine("[OK] Friendly managed/local onboarding, incomplete saves, credential changes, seat parity and closed-form callbacks");
     }
+    private static void TestSettingsRefreshSnapshot()
+    {
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "none", "paused", "invalid" })
+        {
+            object owner = New("NextcloudTalkAddIn");
+            object local = New("Settings.AddinSettings");
+            Set(local, "ServerUrl", "https://cloud.example.test/subpath");
+            Set(local, "Username", "snapshot-test"); Set(local, "AppPassword", "test-only");
+            object config = New("Services.TalkServiceConfiguration", Get(local, "ServerUrl"), Get(local, "Username"), Get(local, "AppPassword"));
+            object good = Status(D(), D(), true, mode, "active");
+            object denied = Status(D(), D(), true, mode, seat);
+            Call(owner, "StoreBackendPolicySnapshot", config, good, "test_seed");
+            using (Form form = (Form)New("UI.SettingsForm", local, null, good, null, Addressbook(), PolicyFetcher(denied, owner)))
+            {
+                var refresh = (System.Threading.Tasks.Task<bool>)Call(form, "RefreshSettingsServerStateAsync", config, false, "test_refresh");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+                while (!refresh.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(refresh.IsCompleted && refresh.GetAwaiter().GetResult(), "Settings refresh completes using the supplied shared fetch path");
+                Check(object.ReferenceEquals(Field(form, "_backendPolicyStatus"), denied), "Settings display the newly confirmed refusal");
+                form.Close();
+            }
+            Check(object.ReferenceEquals(Field(owner, "_emailSignaturePolicyCache"), denied), "Cancelled settings still update the account snapshot after confirmed refusal");
+            var next = (System.Threading.Tasks.Task)Call(owner, "GetEmailSignaturePolicyStatusAsync", config, "new_compose");
+            Check(next.IsCompleted && object.ReferenceEquals(next.GetType().GetProperty("Result").GetValue(next, null), denied),
+                "New compose uses refusal already received in Settings without another fetch");
+        }
+        Console.WriteLine("[OK] Settings refresh shares the account snapshot for subsequent compose actions after cancellation");
+    }
     [STAThread]
     public static int Main(string[] args)
     {
@@ -2351,6 +2394,7 @@ internal static class OutlookPolicyUiTests
             TestAttachmentAutomation();
             TestEnterpriseRollout(root);
             TestConnectionOnboarding();
+            TestSettingsRefreshSnapshot();
             TestManagedTls(root);
             TestManagedLogging(root);
             TestManagedUpdateNotify(root);
@@ -2612,6 +2656,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NcTalkOutlookAddIn.Controllers;
+using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.UI;
 using System.Windows.Forms;
@@ -2659,7 +2705,9 @@ namespace NcTalkOutlookAddIn.UI {
         public static DialogResult NextResult;
         public static bool AuthenticationStarted, Rejected, Disposed;
         public AddinSettings Result;
-        public SettingsForm(AddinSettings current, object app, object policy, object cache, object book) {
+        public SettingsForm(AddinSettings current, object app, object policy, object cache, object book,
+            Func<TalkServiceConfiguration, string, BackendPolicyStatus> fetch) {
+            if (fetch == null) throw new Exception("Settings refresh callback missing");
             Result = current.Clone(); Result.Username = "new";
         }
         public void BeginAuthentication(bool rejected) { AuthenticationStarted = true; Rejected = rejected; }

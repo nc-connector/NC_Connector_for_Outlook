@@ -133,7 +133,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 _outlookApplication,
                 initialPolicyStatus,
                 addressBookCache,
-                initialAddressbookStatus))
+                initialAddressbookStatus,
+                _fetchBackendPolicyStatus))
             {
                 if (requireAuthentication)
                 {

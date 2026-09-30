@@ -157,6 +157,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly SecurityProtocolType _runtimeSecurityProtocolAtOpen;
         private readonly IfbAddressBookCache _addressBookCache;
         private readonly IfbAddressBookCache.SystemAddressbookStatus _initialAddressbookStatus;
+        private readonly Func<TalkServiceConfiguration, string, BackendPolicyStatus> _fetchBackendPolicyStatus;
         private BackendPolicyStatus _backendPolicyStatus;
         private string _updateOpenUrl = string.Empty;
 
@@ -180,12 +181,18 @@ namespace NcTalkOutlookAddIn.UI
             Outlook.Application outlookApplication,
             BackendPolicyStatus initialPolicyStatus,
             IfbAddressBookCache addressBookCache,
-            IfbAddressBookCache.SystemAddressbookStatus initialAddressbookStatus)
+            IfbAddressBookCache.SystemAddressbookStatus initialAddressbookStatus,
+            Func<TalkServiceConfiguration, string, BackendPolicyStatus> fetchBackendPolicyStatus)
         {
+            if (fetchBackendPolicyStatus == null)
+            {
+                throw new ArgumentNullException("fetchBackendPolicyStatus");
+            }
             _outlookApplication = outlookApplication;
             _backendPolicyStatus = initialPolicyStatus;
             _addressBookCache = addressBookCache;
             _initialAddressbookStatus = initialAddressbookStatus;
+            _fetchBackendPolicyStatus = fetchBackendPolicyStatus;
             _runtimeSecurityProtocolAtOpen = ServicePointManager.SecurityProtocol;
             _disabledTooltipHints = new DisabledControlTooltipHintHelper(_toolTip);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -691,7 +698,7 @@ namespace NcTalkOutlookAddIn.UI
             try
             {
                 Task<BackendPolicyStatus> policyTask = Task.Run(
-                    () => new BackendPolicyService(configuration).FetchStatus());
+                    () => _fetchBackendPolicyStatus(configuration, trigger));
                 Task<IfbAddressBookCache.SystemAddressbookStatus> addressbookTask =
                     _addressBookCache != null
                         ? Task.Run(

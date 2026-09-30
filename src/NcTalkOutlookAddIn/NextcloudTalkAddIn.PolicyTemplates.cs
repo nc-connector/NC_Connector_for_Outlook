@@ -28,6 +28,11 @@ namespace NcTalkOutlookAddIn
             {
                 var service = new BackendPolicyService(configuration);
                 BackendPolicyStatus status = service.FetchStatus();
+                if (status != null && status.FetchSucceeded)
+                {
+                    // Every confirmed response updates the shared account snapshot, including refusals.
+                    StoreBackendPolicySnapshot(configuration, status, trigger);
+                }
                 LogCore(
                     "Backend policy status fetched (trigger=" + (trigger ?? "n/a")
                     + ", active=" + (status != null && status.PolicyActive)
@@ -83,7 +88,9 @@ namespace NcTalkOutlookAddIn
         {
             // Called by background workers; never wait for HTTP from a ribbon or Send callback.
             BackendPolicyStatus fetched = FetchBackendPolicyStatus(configuration, trigger);
-            return StoreBackendPolicySnapshot(configuration, fetched, trigger);
+            return fetched != null && fetched.FetchSucceeded
+                ? fetched
+                : StoreBackendPolicySnapshot(configuration, fetched, trigger);
         }
 
         internal bool TryGetCachedEmailSignaturePolicyStatus(
@@ -107,7 +114,9 @@ namespace NcTalkOutlookAddIn
         {
             BackendPolicyStatus fetched = await Task.Run(
                 () => FetchBackendPolicyStatus(configuration, trigger)).ConfigureAwait(false);
-            BackendPolicyStatus effective = StoreBackendPolicySnapshot(configuration, fetched, trigger);
+            BackendPolicyStatus effective = fetched != null && fetched.FetchSucceeded
+                ? fetched
+                : StoreBackendPolicySnapshot(configuration, fetched, trigger);
             lock (_emailSignaturePolicyCacheSync)
             {
                 if (string.Equals(_emailSignaturePolicyFetchKey, cacheKey, StringComparison.Ordinal))

@@ -521,6 +521,17 @@ public static class SignatureSendNoticeRegression
     private sealed class BackendPolicyStatus
     {
         internal bool FetchSucceeded;
+        internal bool PolicyActive { get { return false; } }
+        internal string AccessStatus = "test", Mode = "local", Reason = "test";
+        internal bool IsDomainActive(string domain) { return false; }
+    }
+    private static class LogCategories { internal const string Core = "core"; }
+    private static class DiagnosticsLogger { internal static void LogException(string category, string text, Exception ex) {} }
+    private sealed class BackendPolicyService
+    {
+        internal static BackendPolicyStatus Result;
+        internal BackendPolicyService(TalkServiceConfiguration configuration) {}
+        internal BackendPolicyStatus FetchStatus() { return Result; }
     }
     private sealed class TalkServiceConfiguration
     {
@@ -538,12 +549,14 @@ public static class SignatureSendNoticeRegression
         private Task<BackendPolicyStatus> _emailSignaturePolicyFetchTask;
         private string _emailSignaturePolicyFetchKey = string.Empty;
         private bool _emailSignatureStateStable = true;
-        internal BackendPolicyStatus FetchResult;
+        internal BackendPolicyStatus FetchResult { get { return BackendPolicyService.Result; } set { BackendPolicyService.Result = value; } }
+        internal DateTime SnapshotTime { get { return _emailSignaturePolicyCacheFetchedAtUtc; } }
         internal readonly List<string> Log = new List<string>();
         private void LogCore(string text) { Log.Add(text); }
         private void LogEmailSignature(string text) { Log.Add(text); }
-        private BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
-        { return FetchResult; }
+        __DIRECT_FETCH__
+        __ENTERPRISE_FETCH__
+        __CACHED_FETCH__
 
         __CACHE_KEY__
         __CACHE_READ__
@@ -619,10 +632,31 @@ public static class SignatureSendNoticeRegression
         Check(runtime.TryGetCachedEmailSignaturePolicyStatus(configuration, out cached)
             && object.ReferenceEquals(cached, updatedSnapshot),
             "A fresh successful response, including an access refusal, must replace the old snapshot.");
+        foreach (string trigger in new[] { "settings_open_initial", "settings_save", "sharing_wizard_open", "talk_wizard_open", "compose_attachment_evaluate" })
+        {
+            var refusal = new BackendPolicyStatus { FetchSucceeded = true };
+            runtime.FetchResult = refusal;
+            Check(object.ReferenceEquals(runtime.FetchBackendPolicyStatus(configuration, trigger), refusal),
+                "Normal fetch must return its actual confirmed result.");
+            Check(object.ReferenceEquals(runtime.GetEmailSignaturePolicyStatusAsync(configuration, "new_compose").GetAwaiter().GetResult(), refusal),
+                "New signature action must use a refusal already received by " + trigger);
+            DateTime confirmedAt = runtime.SnapshotTime;
+            var failure = new BackendPolicyStatus { FetchSucceeded = false };
+            runtime.FetchResult = failure;
+            Check(object.ReferenceEquals(runtime.FetchBackendPolicyStatus(configuration, trigger), failure),
+                "Unmanaged callers retain their actual failed-fetch result, not an added cache fallback.");
+            Check(runtime.TryGetCachedEmailSignaturePolicyStatus(configuration, out cached) && object.ReferenceEquals(cached, refusal)
+                && runtime.SnapshotTime == confirmedAt, "Failed normal fetch preserves confirmed cache and timestamp.");
+            Check(object.ReferenceEquals(runtime.FetchEnterpriseRolloutPolicyStatus(configuration, trigger), refusal)
+                && runtime.SnapshotTime == confirmedAt, "Managed failures retain the existing matching fallback without marking it fresh.");
+        }
     }
 }
 '@
 foreach ($method in @{
+    '__DIRECT_FETCH__' = 'FetchBackendPolicyStatus'
+    '__ENTERPRISE_FETCH__' = 'FetchEnterpriseRolloutPolicyStatus'
+    '__CACHED_FETCH__' = 'GetEmailSignaturePolicyStatusAsync'
     '__CACHE_KEY__' = 'BuildEmailSignaturePolicyCacheKey'
     '__CACHE_READ__' = 'TryGetCachedEmailSignaturePolicyStatus'
     '__CACHE_FETCH__' = 'FetchAndCacheEmailSignaturePolicyStatusAsync'
