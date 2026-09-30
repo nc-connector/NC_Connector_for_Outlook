@@ -1420,27 +1420,168 @@ internal static class OutlookPolicyUiTests
     }
     private static object Managed(object url, object locked, object ribbon, string source)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedTls(object system, object tls12, object tls13, string source = "TLS test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedLogging(object debug, object anonymize, string source = "Logging test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, null, null, null, null, null, null, source);
     }
     private static object ManagedUpdateNotify(object value)
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, null, null, null, null, null, "Update notification test");
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, null, null, null, null, null, null, "Update notification test");
     }
     private static object ManagedIfb(object enabled, object days, object cacheHours, object port, string source = "IFB test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, enabled, days, cacheHours, port, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, enabled, days, cacheHours, port, null, null, source);
     }
     private static object ManagedDefaultsSource(object value)
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, null, null, null, null, value, "Defaults source test");
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, null, null, null, null, value, null, "Defaults source test");
+    }
+    private static object ManagedAuthMode(object value, object url = null, object locked = null, object ribbon = null)
+    {
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, value, "Authentication mode test");
+    }
+    private static void TestManagedAuthMode(string root)
+    {
+        object loginFlow = Enum.Parse(T("Settings.AuthenticationMode"), "LoginFlow");
+        object manual = Enum.Parse(T("Settings.AuthenticationMode"), "Manual");
+        foreach (object value in new object[] { null, "LoginFlow", "Manual", " loginflow ", " MANUAL ", "", "invalid", "0", 0, 1, false, new byte[] { 1 } })
+        foreach (object raw in new[] { loginFlow, manual })
+        {
+            string text = value as string;
+            bool valid = value == null || string.Equals(text == null ? null : text.Trim(), "LoginFlow", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text == null ? null : text.Trim(), "Manual", StringComparison.OrdinalIgnoreCase);
+            bool present = value != null;
+            object expected = present ? (valid && string.Equals(text.Trim(), "Manual", StringComparison.OrdinalIgnoreCase) ? manual : loginFlow) : raw;
+            object policy = ManagedAuthMode(value);
+            Check((bool)Get(policy, "HasAuthModePolicy") == present && (bool)Get(policy, "IsAuthModePolicyValid") == valid,
+                "Auth mode preserves value presence separately from validity");
+            object local = New("Settings.AddinSettings");
+            Set(local, "AuthMode", raw);
+            Call(local, "ApplyManagedSetupPolicy", policy);
+            Check(object.Equals(Get(local, "AuthMode"), expected) && object.Equals(Get(local, "LocalAuthMode"), raw), "Auth mode overlay does not replace the local choice");
+            Check((bool)Get(local, "HasManagedAuthMode") == present && (bool)Get(local, "IsManagedAuthModeValid") == valid
+                && (bool)Get(local, "IsEnterpriseRollout") == present, "Auth mode presence alone activates managed rollout");
+            Check((bool)Get(local, "ShowMainRibbonTab") && !(bool)Get(local, "HasManagedTransportTls") && (bool)Get(local, "IsManagedTransportTlsValid"),
+                "Invalid authentication mode does not hide the ribbon or invalidate TLS");
+            var xml = new XmlDocument(); xml.LoadXml(Serialize(local));
+            Check(xml.DocumentElement["AuthMode"].InnerText == raw.ToString(), "XML persists raw authentication mode");
+            object restored = RoundTrip(local, root);
+            Check(object.Equals(Get(restored, "AuthMode"), raw) && !(bool)Get(restored, "HasManagedAuthMode"), "XML reload does not preserve a policy as local choice");
+            object clone = Call(local, "Clone");
+            Check(object.Equals(Get(clone, "AuthMode"), expected) && object.Equals(Get(clone, "LocalAuthMode"), raw)
+                && (bool)Get(clone, "HasManagedAuthMode") == present && (bool)Get(clone, "IsManagedAuthModeValid") == valid, "Clone preserves auth mode overlay, raw choice and validity");
+            Call(clone, "ApplyManagedSetupPolicy", (object)null);
+            Check(object.Equals(Get(clone, "AuthMode"), raw) && !(bool)Get(clone, "HasManagedAuthMode"), "Policy removal restores the local authentication mode");
+            Check((bool)Get(local, "HasManagedAuthMode") == present, "Removing cloned auth policy does not alter the original");
+        }
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (object value in new object[] { null, "LoginFlow", "Manual", "invalid" })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "AuthMode", manual);
+            Call(local, "ApplyManagedSetupPolicy", ManagedAuthMode(value));
+            object status = Status(D(), D(), true, mode, seat);
+            using (Form form = Settings(local, status))
+            {
+                var manualRadio = (RadioButton)Field(form, "_manualRadio");
+                var flowRadio = (RadioButton)Field(form, "_loginFlowRadio");
+                bool effectiveManual = value == null || object.Equals(value, "Manual");
+                Check(manualRadio.Checked == effectiveManual && flowRadio.Checked == !effectiveManual, "Auth controls display effective managed mode");
+                foreach (bool busy in new[] { false, true, false })
+                {
+                    Call(form, "SetBusy", busy); Call(form, "UpdateControlState");
+                    Check(manualRadio.Enabled == (value == null && !busy) && flowRadio.Enabled == (value == null && !busy), "Both auth mode radios retain policy locks across busy changes");
+                    Check(((Button)Field(form, "_loginFlowButton")).Enabled == (!effectiveManual && !busy), "Managed LoginFlow retains the explicit login button");
+                    Check(((Button)Field(form, "_testButton")).Enabled == !busy, "Authentication mode alone does not block connection tests");
+                }
+                string hint = ((ToolTip)Field(form, "_toolTip")).GetToolTip(manualRadio);
+                Check(string.IsNullOrEmpty(hint) == (value == null), "Managed authentication radios have a reachable hint");
+                if (object.Equals(value, "invalid")) Check(hint == (string)T("Utilities.Strings").GetProperty("ManagedAuthModeInvalid", Flags).GetValue(null, null), "Invalid auth mode has a configuration hint");
+                object previousTls = Call(form, "ApplySelectedTransportSecurity", "auth_mode_test");
+                Call(T("UI.SettingsForm"), "RestoreTemporaryTls", previousTls, "auth_mode_test");
+                if (value == null) flowRadio.Checked = true;
+                Task save = (Task)Call(form, "SaveSettingsAsync");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+                while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(save.IsCompleted, "Auth mode settings save finishes without configured credentials"); save.GetAwaiter().GetResult();
+                Check(object.Equals(Get(Get(form, "Result"), "LocalAuthMode"), value == null ? loginFlow : manual), "Actual save preserves managed raw mode and accepts unmanaged edits");
+            }
+            if (value != null) Check(RolloutNotice(local, status) == RolloutNotice(ManagedSettings(null, true), status), "Auth-mode-only rollout retains existing Community/Pro and personal seat rules");
+        }
+        Console.WriteLine("[OK] Managed authentication mode presence, validity, XML, clone/removal, live radios, save and seat parity");
+    }
+    private static void TestManagedLoginEligibility()
+    {
+        const string cloud = "https://cloud.example.test/nextcloud";
+        object[][] cases = {
+            new object[] { "LoginFlow", cloud, null, "", "", "", true },
+            new object[] { " loginflow ", cloud, true, "", "", "", true },
+            new object[] { "LoginFlow", cloud, false, cloud + "/", "", "", true },
+            new object[] { "LoginFlow", cloud, false, "https://other.example.test", "", "", false },
+            new object[] { "LoginFlow", cloud, true, "https://other.example.test", "", "", true },
+            new object[] { "LoginFlow", cloud, null, "", "existing-user", "", true },
+            new object[] { "LoginFlow", cloud, null, "", "", "existing-test-password", true },
+            new object[] { "LoginFlow", cloud, null, "", "existing-user", "existing-test-password", false },
+            new object[] { "Manual", cloud, true, "", "", "", false },
+            new object[] { "invalid", cloud, true, "", "", "", false },
+            new object[] { "", cloud, true, "", "", "", false },
+            new object[] { 1, cloud, true, "", "", "", false },
+            new object[] { null, cloud, true, "", "", "", false },
+            new object[] { "LoginFlow", null, true, "", "", "", false },
+            new object[] { "LoginFlow", null, true, cloud, "", "", false },
+            new object[] { "LoginFlow", "", true, "", "", "", false },
+            new object[] { "LoginFlow", "http://cloud.example.test", true, cloud, "", "", false },
+            new object[] { "LoginFlow", "https://user:password@cloud.example.test", true, "", "", "", false },
+            new object[] { null, null, true, cloud, "", "", false }
+        };
+        foreach (object[] values in cases)
+        foreach (bool ribbon in new[] { false, true })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "ServerUrl", values[3]); Set(local, "Username", values[4]); Set(local, "AppPassword", values[5]);
+            Call(local, "ApplyManagedSetupPolicy", ManagedAuthMode(values[0], values[1], values[2], ribbon));
+            using (Form form = Settings(local, null))
+            {
+                Check(!(bool)Field(form, "_automaticLoginFlowPending"), "Opening normal settings never requests automatic login");
+                Check((bool)Call(form, "ShouldStartManagedLoginFlow") == (bool)values[6], "Managed login eligibility matches mode, actual URL and credential presence");
+                foreach (bool rejected in new[] { false, true })
+                {
+                    Call(form, "BeginAuthentication", rejected);
+                    Check((bool)Field(form, "_automaticLoginFlowPending") == (bool)values[6], "Authentication-only entry schedules only an eligible managed LoginFlow");
+                    Check(((TabControl)Field(form, "_tabControl")).TabPages.Count == (ribbon ? 8 : 1), "Auth policy retains ribbon-based dialog scope");
+                }
+                object result = Get(form, "Result");
+                string[] names = { "LocalAuthMode", "ServerUrl", "Username", "AppPassword" };
+                object[] before = names.Select(name => Get(result, name)).ToArray();
+                form.Close(); form.Dispose();
+                Check(names.Select(name => Get(result, name)).SequenceEqual(before), "Cancelling authentication does not change raw mode, URL or credentials");
+                var xml = new XmlDocument(); xml.LoadXml(Serialize(result));
+                Check(xml.DocumentElement["AuthMode"].InnerText == before[0].ToString(), "Cancelled authentication still serializes only the raw mode");
+            }
+        }
+        Console.WriteLine("[OK] Automatic login eligibility: normal settings, URL-only/lock-only, invalid modes, mismatched URLs and existing credentials");
+    }
+    private static void CaptureManagedAuthPreview(string path)
+    {
+        object local = New("Settings.AddinSettings");
+        Call(local, "ApplyManagedSetupPolicy", ManagedAuthMode("Manual", "https://cloud.example.test/nextcloud", true));
+        using (Form form = Settings(local, null))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            form.Show(); Application.DoEvents();
+            using (var bitmap = new System.Drawing.Bitmap(form.Width, form.Height))
+            {
+                form.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height));
+                bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            }
+        }
     }
     private static readonly string[] IfbProperties = { "IfbEnabled", "IfbDays", "IfbCacheHours", "IfbPort" };
     private static void CheckIfb(object target, object[] values, string message, bool raw = false)
@@ -2197,6 +2338,8 @@ internal static class OutlookPolicyUiTests
             TestDefaultsSourceMetadata();
             TestDefaultsSourcePrecedence(root);
             TestDefaultsSourceValues();
+            TestManagedAuthMode(root);
+            TestManagedLoginEligibility();
             TestLocalChoices(root);
             TestWizards();
             TestSettingsEdits(root);
@@ -2209,6 +2352,7 @@ internal static class OutlookPolicyUiTests
             TestManagedUpdateNotify(root);
             TestManagedIfb(root);
             TestDefaultsSourceUi(root, args[2]);
+            CaptureManagedAuthPreview(Path.Combine(Path.GetDirectoryName(args[2]), "auth-mode-settings.png"));
             Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
@@ -2380,6 +2524,38 @@ internal static class ManagedIfbRuntimeTests {
         Check(!ManagedSetupPolicy.Load().HasDefaultsSourcePolicy && !ManagedSetupPolicy.Load().IsEnterpriseRollout,
             "Removing the last source trigger removes its managed state and rollout");
     }
+    private static void TestAuthModeRegistry() {
+        RegistryKey.Fixtures.Clear();
+        Check(!ManagedSetupPolicy.Load().HasAuthModePolicy && !ManagedSetupPolicy.Load().IsEnterpriseRollout,
+            "Absent authentication mode leaves managed rollout inactive");
+        foreach (RegistryValueKind kind in new[] { RegistryValueKind.String, RegistryValueKind.ExpandString, RegistryValueKind.MultiString,
+            RegistryValueKind.DWord, RegistryValueKind.QWord, RegistryValueKind.Binary, RegistryValueKind.None, RegistryValueKind.Unknown })
+        foreach (object value in new object[] { "LoginFlow", "Manual", " loginflow ", " MANUAL ", "invalid", "", "0", null, 0, false, new[] { "LoginFlow" } })
+        for (int location = 0; location < Locations().Length; location++) {
+            RegistryKey.Fixtures.Clear();
+            Put(location, "authmode", value, kind);
+            for (int lower = location + 1; lower < Locations().Length; lower++) Put(lower, "AuthMode", "Manual", RegistryValueKind.String);
+            ManagedSetupPolicy policy = ManagedSetupPolicy.Load();
+            string mode = value as string;
+            bool valid = kind == RegistryValueKind.String && (string.Equals(mode == null ? null : mode.Trim(), "LoginFlow", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mode == null ? null : mode.Trim(), "Manual", StringComparison.OrdinalIgnoreCase));
+            Check(policy.HasAuthModePolicy && policy.IsEnterpriseRollout && policy.IsAuthModePolicyValid == valid,
+                "AuthMode accepts only REG_SZ names and retains first-present priority: " + kind + "/" + location);
+            Check(policy.AuthMode == (valid && string.Equals(mode.Trim(), "Manual", StringComparison.OrdinalIgnoreCase) ? AuthenticationMode.Manual : AuthenticationMode.LoginFlow),
+                "Invalid selected auth mode masks lower entries and uses LoginFlow without claiming validity");
+        }
+        RegistryKey.Fixtures.Clear();
+        Put(0, "AuthMode", "Manual", RegistryValueKind.String);
+        Put(Locations().Length - 1, "AuthMode", "invalid", RegistryValueKind.String);
+        Put(Locations().Length - 1, "NextcloudUrl", "https://cloud.example.test", RegistryValueKind.String);
+        Put(Locations().Length - 1, "DefaultsSource", "backend", RegistryValueKind.String);
+        ManagedSetupPolicy mixed = ManagedSetupPolicy.Load();
+        Check(mixed.AuthMode == AuthenticationMode.Manual && mixed.IsAuthModePolicyValid && mixed.HasNextcloudUrl && mixed.DefaultsSource == "backend",
+            "Auth mode priority is independent of URL and defaults source; unused invalid auth entries do not invalidate it");
+        RegistryKey.Fixtures.Clear();
+        Check(!ManagedSetupPolicy.Load().HasAuthModePolicy && !ManagedSetupPolicy.Load().IsEnterpriseRollout,
+            "Removing the final auth policy trigger removes managed rollout");
+    }
     private static void TestManager() {
         RegistryKey.Fixtures.Clear(); Put(0, "IfbEnabled", 1, RegistryValueKind.DWord);
         Put(0, "IfbDays", 60, RegistryValueKind.DWord); Put(0, "IfbCacheHours", 6, RegistryValueKind.DWord); Put(0, "IfbPort", 8888, RegistryValueKind.DWord);
@@ -2414,13 +2590,13 @@ internal static class ManagedIfbRuntimeTests {
         Check(FreeBusyServer.Stops > 0 && IfbRegistryOwnershipManager.Restores > 0, "Manager disposal stops and restores without rewriting managed enabled");
     }
     public static int Main() {
-        try { TestRegistryKindsAndPrecedence(); TestDefaultsSourceRegistry(); TestManager(); Console.WriteLine("[OK] " + checks + " in-memory production IFB/defaults-source registry/manager assertions passed"); return 0; }
+        try { TestRegistryKindsAndPrecedence(); TestDefaultsSourceRegistry(); TestAuthModeRegistry(); TestManager(); Console.WriteLine("[OK] " + checks + " in-memory production IFB/defaults-source/auth-mode registry/manager assertions passed"); return 0; }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
 }
 '@ | Set-Content -LiteralPath $ifbSource -Encoding UTF8
     $ifbExe = Join-Path $TempRoot 'ManagedIfbRuntimeTests.exe'
-    & $csc /noconfig /nologo /nowarn:0436 /target:exe "/out:$ifbExe" /reference:System.dll /reference:System.Core.dll $ifbSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Settings/ManagedSetupPolicy.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Models/BackendPolicyStatus.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Services/FreeBusyManager.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Utilities/NextcloudUriValidator.cs')
+    & $csc /noconfig /nologo /nowarn:0436 /target:exe "/out:$ifbExe" /reference:System.dll /reference:System.Core.dll $ifbSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Settings/ManagedSetupPolicy.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Settings/AuthenticationMode.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Models/BackendPolicyStatus.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Services/FreeBusyManager.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Utilities/NextcloudUriValidator.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Managed IFB runtime test harness compilation failed.' }
     & $ifbExe
     if ($LASTEXITCODE -ne 0) { throw 'Production managed IFB registry/runtime tests failed.' }
@@ -2538,6 +2714,292 @@ internal static class SettingsWorkflowTests {
     if ($LASTEXITCODE -ne 0) { throw 'Settings workflow test harness compilation failed.' }
     & $workflowExe
     if ($LASTEXITCODE -ne 0) { throw 'Production settings workflow tests failed.' }
+
+    # Run the production authentication entry and login flow against controlled services.
+    $authFormSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/UI/SettingsForm.cs') -Raw
+    $authGeneralSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/UI/SettingsForm.General.cs') -Raw
+    $authMethods = foreach ($entry in @(
+        @($authFormSource, 'internal void BeginAuthentication('),
+        @($authFormSource, 'protected override async void OnShown('),
+        @($authFormSource, 'private async Task SaveSettingsWithErrorHandlingAsync('),
+        @($authFormSource, 'private async Task SaveSettingsAsync('),
+        @($authGeneralSource, 'private bool ShouldStartManagedLoginFlow('),
+        @($authGeneralSource, 'private async void OnLoginFlowButtonClick('),
+        @($authGeneralSource, 'private async Task StartLoginFlowAsync(')
+    )) {
+        $methodText = $entry[0]
+        $methodStart = $methodText.IndexOf($entry[1], [StringComparison]::Ordinal)
+        if ($methodStart -lt 0) { throw "Authentication method not found: $($entry[1])" }
+        $methodLine = $methodText.LastIndexOf([char]10, $methodStart) + 1
+        $methodIndent = $methodText.Substring($methodLine, $methodStart - $methodLine)
+        $methodClosing = [string][char]10 + $methodIndent + '}'
+        $methodEnd = $methodText.IndexOf($methodClosing, $methodStart, [StringComparison]::Ordinal)
+        if ($methodEnd -lt 0) { throw "Authentication method end not found: $($entry[1])" }
+        $methodText.Substring($methodStart, $methodEnd + $methodClosing.Length - $methodStart)
+    }
+    $authSource = Join-Path $TempRoot 'ManagedAuthenticationTests.cs'
+    $authHarness = @'
+using System;
+using System.Globalization;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using NcTalkOutlookAddIn.Settings;
+using NcTalkOutlookAddIn.Utilities;
+
+internal sealed class AuthSettings {
+    internal bool HasManagedAuthMode = true, IsManagedAuthModeValid = true, HasManagedNextcloudUrl = true;
+    internal AuthenticationMode AuthMode = AuthenticationMode.LoginFlow;
+    internal string ManagedNextcloudUrl = "https://cloud.example.test/nextcloud";
+    internal bool IsManagedTransportTlsValid = true, ShowMainRibbonTab = true;
+    internal bool HasManagedIfb = true, HasManagedLogging = true, HasManagedTransportTls = true, HasManagedUpdateNotify = true;
+    internal bool ManagedNextcloudUrlLocked, IfbEnabled, IfbUserDecisionRecorded, DebugLoggingEnabled, LogAnonymizationEnabled;
+    internal bool TransportTlsUseSystemDefault, TransportTlsEnable12, TransportTlsEnable13, UpdateNotifyEnabled;
+    internal int IfbDays, IfbPort, IfbCacheHours;
+    internal string ServerUrl, Username, AppPassword;
+}
+internal static class AddinSettings { internal static int NormalizeIfbPort(int port) { return port; } }
+internal sealed class TalkServiceConfiguration {
+    private readonly string url, user, password;
+    internal TalkServiceConfiguration(string url, string user, string password) { this.url = url; this.user = user; this.password = password; }
+    internal bool IsComplete() { return GetNormalizedBaseUrl().Length > 0 && !string.IsNullOrWhiteSpace(user) && !string.IsNullOrEmpty(password); }
+    internal string GetNormalizedBaseUrl() { string normalized; return NextcloudUriValidator.TryNormalizeBaseUrl(url, out normalized) ? normalized : ""; }
+}
+internal sealed class TalkServiceException : Exception { internal TalkServiceException(string message) : base(message) {} }
+internal sealed class LoginFlowStart { internal string LoginUrl = "https://cloud.example.test/nextcloud/login/isolated-test"; }
+internal sealed class LoginFlowCredentials { internal string LoginName = "test-login", AppPassword = "test-only-password"; }
+internal sealed class TalkLoginFlowService {
+    internal static readonly ManualResetEventSlim StartRelease = new ManualResetEventSlim(true);
+    internal static readonly ManualResetEventSlim PollRelease = new ManualResetEventSlim(true);
+    internal static int Starts, Polls, StartThread, PollThread;
+    internal static bool FailStart, FailPoll;
+    internal TalkLoginFlowService(string url) {}
+    internal LoginFlowStart StartLoginFlow() {
+        StartThread = Thread.CurrentThread.ManagedThreadId; Interlocked.Increment(ref Starts);
+        if (!StartRelease.Wait(TimeSpan.FromSeconds(10))) throw new Exception("Test start wait expired");
+        if (FailStart) throw new TalkServiceException("Test start failure");
+        return new LoginFlowStart();
+    }
+    internal LoginFlowCredentials CompleteLoginFlow(LoginFlowStart start, TimeSpan timeout, TimeSpan interval) {
+        PollThread = Thread.CurrentThread.ManagedThreadId; Interlocked.Increment(ref Polls);
+        if (!PollRelease.Wait(TimeSpan.FromSeconds(10))) throw new Exception("Test poll wait expired");
+        if (FailPoll) throw new TalkServiceException("Test poll failure");
+        return new LoginFlowCredentials();
+    }
+}
+internal sealed class TalkService {
+    internal static int Verifications;
+    internal static bool VerifyResult = true;
+    internal TalkService(TalkServiceConfiguration configuration) {}
+    internal bool VerifyConnection(out string response) { Interlocked.Increment(ref Verifications); response = ""; return VerifyResult; }
+}
+internal static class BrowserLauncher {
+    internal static int Calls, ThreadId;
+    internal static void OpenUrl(string url, string category, string error) { Calls++; ThreadId = Thread.CurrentThread.ManagedThreadId; }
+}
+internal static class LogCategories { internal const string Core = "core"; }
+internal static class DiagnosticsLogger {
+    internal static void Log(string category, string message) {}
+    internal static void LogException(string category, string message, Exception ex) {}
+}
+internal static class Strings {
+    internal const string StatusServerUrlRequired = "url required", StatusInvalidServerUrl = "invalid url", StatusLoginFlowStarting = "starting";
+    internal const string StatusLoginFlowBrowser = "browser", ErrorCredentialsNotVerified = "not verified", StatusLoginFlowFailure = "failure: {0}", StatusLoginFlowSuccess = "success";
+    internal const string SettingsSaveFailed = "save failed", ManagedTlsPolicyInvalid = "invalid TLS", TransportTlsSelectionRequired = "TLS required", DialogTitle = "Test";
+}
+internal sealed class AuthForm : Form {
+    internal AuthSettings Result = new AuthSettings();
+    internal readonly TextBox _serverUrlTextBox = new TextBox(), _usernameTextBox = new TextBox(), _appPasswordTextBox = new TextBox();
+    internal readonly RadioButton _manualRadio = new RadioButton(), _loginFlowRadio = new RadioButton();
+    internal readonly TabControl _tabControl = new TabControl();
+    internal readonly TabPage _generalTab = new TabPage();
+    internal readonly CheckBox _tlsUseSystemDefaultCheckBox = new CheckBox(), _tlsEnable12CheckBox = new CheckBox(), _tlsEnable13CheckBox = new CheckBox();
+    internal readonly CheckBox _ifbEnabledCheckBox = new CheckBox(), _debugLogCheckBox = new CheckBox(), _debugAnonymizeCheckBox = new CheckBox(), _updateNotifyCheckBox = new CheckBox();
+    internal readonly ComboBox _ifbDaysCombo = new ComboBox(), _ifbCacheHoursCombo = new ComboBox();
+    internal readonly NumericUpDown _ifbPortUpDown = new NumericUpDown();
+    internal bool _isBusy, _authenticationRequired, _authenticationRejected, _connectionSetupPending, _automaticLoginFlowPending;
+    internal bool TlsValid = true, SaveRefreshResult = true, SaveRefreshThrows, _ifbDefaultApplied;
+    internal int TlsApplies, TlsRestores, VerifiedTransitions, SaveRefreshes, CloseCalls, RepeatedVerification;
+    internal string StatusText;
+    internal AuthForm() {
+        _serverUrlTextBox.Text = Result.ManagedNextcloudUrl;
+        _loginFlowRadio.Checked = true;
+        _tlsEnable12CheckBox.Checked = true;
+        _tabControl.TabPages.Add(_generalTab);
+    }
+    internal void ShowEvent() { OnShown(EventArgs.Empty); }
+    internal void LoginButton() { OnLoginFlowButtonClick(null, EventArgs.Empty); }
+    internal Task LoginTask() { return StartLoginFlowAsync(); }
+    internal new void Close() { CloseCalls++; base.Close(); }
+    private Task<bool> TestConnectionAsync() { RepeatedVerification++; return Task.FromResult(true); }
+    private Task<bool> RefreshSettingsServerStateAsync(TalkServiceConfiguration configuration, bool save, string source) {
+        SaveRefreshes++;
+        if (_isBusy || TlsApplies != TlsRestores) throw new Exception("Save started before login cleanup");
+        if (SaveRefreshThrows) throw new InvalidOperationException("Controlled save failure");
+        return Task.FromResult(SaveRefreshResult);
+    }
+    private int ParseComboValue(ComboBox combo, int fallback) { return fallback; }
+    private void ApplyResponsiveLayout(bool width) {}
+    private void ApplyBackendPolicyStatus(string source) { if (source == "login_verified") VerifiedTransitions++; }
+    private void SetBusy(bool value) { _isBusy = value; }
+    private void SetStatus(string message, bool error) { StatusText = message; }
+    private SecurityProtocolType ApplySelectedTransportSecurity(string source) {
+        TlsApplies++; if (!TlsValid) throw new InvalidOperationException("Invalid managed TLS"); return ServicePointManager.SecurityProtocol;
+    }
+    private void RestoreTemporaryTls(SecurityProtocolType previous, string source) { TlsRestores++; }
+    private void HandleServiceFailure(string format, TalkServiceException ex) { SetStatus(string.Format(format, ex.Message), true); }
+    __AUTH_METHODS__
+}
+internal static class ManagedAuthenticationTests {
+    private static int checks;
+    private static void Check(bool value, string message) { checks++; if (!value) throw new Exception(message); }
+    private static void PumpUntil(Func<bool> condition, string message) {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline) { Application.DoEvents(); Thread.Sleep(1); }
+        Check(condition(), message);
+    }
+    private static void Reset() {
+        TalkLoginFlowService.StartRelease.Set(); TalkLoginFlowService.PollRelease.Set();
+        TalkLoginFlowService.Starts = TalkLoginFlowService.Polls = BrowserLauncher.Calls = TalkService.Verifications = 0;
+        TalkLoginFlowService.FailStart = TalkLoginFlowService.FailPoll = false; TalkService.VerifyResult = true;
+    }
+    private static void Complete(AuthForm form) { PumpUntil(() => !form._isBusy, "Login operation completes"); }
+    [STAThread]
+    public static int Main() {
+        try {
+            Reset();
+            using (var form = new AuthForm()) {
+                form.ShowEvent(); form.ShowEvent();
+                Check(TalkLoginFlowService.Starts == 0, "Normal settings never start browser authentication automatically");
+                form.LoginButton(); Complete(form);
+                Check(TalkLoginFlowService.Starts == 1 && BrowserLauncher.Calls == 1 && form.VerifiedTransitions == 1, "Explicit login button retains the original verified flow");
+                Check(form.CloseCalls == 0 && form.SaveRefreshes == 0, "Normal Settings never save or close automatically");
+            }
+            Reset();
+            using (var form = new AuthForm()) {
+                int uiThread = Thread.CurrentThread.ManagedThreadId;
+                TalkLoginFlowService.StartRelease.Reset(); TalkLoginFlowService.PollRelease.Reset();
+                form.BeginAuthentication(false); Check(form._automaticLoginFlowPending, "Eligible authentication entry schedules login");
+                form.ShowEvent();
+                PumpUntil(() => TalkLoginFlowService.Starts == 1, "Automatic entry reaches the controlled service");
+                Check(!form._automaticLoginFlowPending && form._isBusy, "Pending automatic start is consumed before awaiting service work");
+                form.ShowEvent(); form.LoginButton();
+                Check(TalkLoginFlowService.Starts == 1, "Repeated show and login clicks do not duplicate an active operation");
+                TalkLoginFlowService.StartRelease.Set();
+                PumpUntil(() => TalkLoginFlowService.Polls == 1, "Login start hands off to browser and poll");
+                Check(BrowserLauncher.Calls == 1 && BrowserLauncher.ThreadId == uiThread && TalkLoginFlowService.StartThread != uiThread
+                    && TalkLoginFlowService.PollThread != uiThread, "Network work leaves the UI thread while browser launch returns to it");
+                TalkLoginFlowService.PollRelease.Set(); Complete(form);
+                Check(!form._connectionSetupPending && !form._authenticationRejected && form.VerifiedTransitions == 1
+                    && form.TlsApplies == 1 && form.TlsRestores == 1, "Verified automatic login finishes setup and restores temporary TLS");
+                Check(form.CloseCalls == 1 && form.DialogResult == DialogResult.OK && form.SaveRefreshes == 1
+                    && form.Result.Username == "test-login" && form.Result.AppPassword == "test-only-password"
+                    && form.RepeatedVerification == 0, "Managed login uses the real save path and closes once without duplicate verification");
+                form.ShowEvent(); form.BeginAuthentication(true); form.ShowEvent();
+                Check(TalkLoginFlowService.Starts == 1 && !form._automaticLoginFlowPending, "Complete existing credentials suppress automatic login even on rejected-credential entry");
+            }
+            foreach (string failure in new[] { "start", "poll", "verification" }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    TalkLoginFlowService.FailStart = failure == "start"; TalkLoginFlowService.FailPoll = failure == "poll";
+                    TalkService.VerifyResult = failure != "verification";
+                    form.BeginAuthentication(false); form.ShowEvent(); Complete(form);
+                    Check(TalkLoginFlowService.Starts == 1 && form._connectionSetupPending && form.VerifiedTransitions == 0, "Failed automatic login cannot complete setup: " + failure);
+                    Check(form.CloseCalls == 0 && form.SaveRefreshes == 0, "Failed login never saves or closes: " + failure);
+                    form.ShowEvent(); Check(TalkLoginFlowService.Starts == 1, "A failed attempt never starts an automatic retry: " + failure);
+                    TalkLoginFlowService.FailStart = TalkLoginFlowService.FailPoll = false; TalkService.VerifyResult = true;
+                    form.LoginButton(); Complete(form);
+                    Check(TalkLoginFlowService.Starts == 2 && form.VerifiedTransitions == 1, "Explicit button retries failed automatic authentication: " + failure);
+                    Check(form.CloseCalls == 1 && form.DialogResult == DialogResult.OK, "Successful managed retry saves and closes: " + failure);
+                }
+            }
+            Reset();
+            using (var form = new AuthForm()) {
+                TalkLoginFlowService.FailStart = true;
+                form.BeginAuthentication(false); form.ShowEvent(); Complete(form);
+                form.BeginAuthentication(false); form.ShowEvent(); Complete(form);
+                Check(TalkLoginFlowService.Starts == 2, "A new authentication invocation may make one new automatic attempt");
+            }
+            foreach (string cancellation in new[] { "before-show", "during-start", "during-poll" }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.BeginAuthentication(false);
+                    if (cancellation == "before-show") { form.Dispose(); form.ShowEvent(); }
+                    else {
+                        if (cancellation == "during-start") TalkLoginFlowService.StartRelease.Reset();
+                        else TalkLoginFlowService.PollRelease.Reset();
+                        form.ShowEvent();
+                        PumpUntil(() => cancellation == "during-start" ? TalkLoginFlowService.Starts == 1 : TalkLoginFlowService.Polls == 1, "Cancellation fixture reaches pending stage");
+                        form.Dispose(); TalkLoginFlowService.StartRelease.Set(); TalkLoginFlowService.PollRelease.Set(); Complete(form);
+                    }
+                    Check(!form._automaticLoginFlowPending && TalkService.Verifications == 0 && form.VerifiedTransitions == 0, "Cancellation cannot verify or finish setup: " + cancellation);
+                    Check(BrowserLauncher.Calls == (cancellation == "during-poll" ? 1 : 0), "Closed forms cannot open a later login browser: " + cancellation);
+                    Check(form._usernameTextBox.Text == "" && form._appPasswordTextBox.Text == "", "Cancelled login cannot overwrite credentials: " + cancellation);
+                    Check(form.SaveRefreshes == 0 && form.CloseCalls == 0, "Cancelled login cannot save or accept the form: " + cancellation);
+                }
+            }
+            foreach (string reason in new[] { "manual", "invalid-policy", "url-missing", "url-changed", "busy", "tls-invalid" }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    if (reason == "manual") { form.Result.AuthMode = AuthenticationMode.Manual; form._manualRadio.Checked = true; }
+                    if (reason == "invalid-policy") form.Result.IsManagedAuthModeValid = false;
+                    if (reason == "url-missing") { form.Result.HasManagedNextcloudUrl = false; form._serverUrlTextBox.Text = ""; }
+                    if (reason == "tls-invalid") form.TlsValid = false;
+                    form.BeginAuthentication(false);
+                    if (reason == "url-changed") form._serverUrlTextBox.Text = "https://other.example.test";
+                    if (reason == "busy") form._isBusy = true;
+                    form.ShowEvent();
+                    if (reason != "busy") Complete(form);
+                    Check(!form._automaticLoginFlowPending && TalkLoginFlowService.Starts == 0 && BrowserLauncher.Calls == 0, "Ineligible automatic entry cannot contact the service: " + reason);
+                    form._isBusy = false; form.ShowEvent();
+                    Check(TalkLoginFlowService.Starts == 0, "State changes after first show do not replay automatic entry: " + reason);
+                    if (reason == "invalid-policy" || reason == "busy" || reason == "url-changed") {
+                        form.LoginButton(); Complete(form);
+                        Check(TalkLoginFlowService.Starts == 1, "Explicit login remains available without an automatic attempt: " + reason);
+                        Check(form.CloseCalls == (reason == "invalid-policy" ? 0 : 1), "Only valid managed onboarding closes after explicit login: " + reason);
+                    } else {
+                        form.LoginButton(); Complete(form);
+                        Check(TalkLoginFlowService.Starts == 0, "Manual/URL/TLS guard remains in the shared explicit login flow: " + reason);
+                    }
+                }
+            }
+            foreach (bool ribbon in new[] { false, true }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.Result.ShowMainRibbonTab = ribbon;
+                    form.Result.HasManagedNextcloudUrl = false;
+                    form.BeginAuthentication(false); form.ShowEvent(); form.LoginButton(); Complete(form);
+                    Check(form.CloseCalls == 1 && form.SaveRefreshes == 1 && form.DialogResult == DialogResult.OK,
+                        "Managed action login saves in full and authentication-only dialogs even without URL autostart");
+                }
+            }
+            foreach (string outcome in new[] { "refused", "exception", "unmanaged" }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.SaveRefreshResult = outcome != "refused";
+                    form.SaveRefreshThrows = outcome == "exception";
+                    if (outcome == "unmanaged") form.Result.HasManagedAuthMode = false;
+                    form.BeginAuthentication(false); form.LoginButton(); Complete(form);
+                    Check(form.VerifiedTransitions == 1 && form.CloseCalls == 0 && form.DialogResult != DialogResult.OK,
+                        "Unsuccessful save and unmanaged login never close automatically: " + outcome);
+                    Check(form.SaveRefreshes == (outcome == "unmanaged" ? 0 : 1), "Save uses existing refresh only for managed action login: " + outcome);
+                    if (outcome == "exception") Check(form.StatusText == Strings.SettingsSaveFailed, "Automatic save shares the save-button error handler");
+                }
+            }
+            Console.WriteLine("[OK] " + checks + " production authentication entry/login-flow assertions passed with isolated services");
+            return 0;
+        } catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+        finally { TalkLoginFlowService.StartRelease.Set(); TalkLoginFlowService.PollRelease.Set(); }
+    }
+}
+'@
+    $authHarness.Replace('__AUTH_METHODS__', ($authMethods -join "`r`n")) | Set-Content -LiteralPath $authSource -Encoding UTF8
+    $authExe = Join-Path $TempRoot 'ManagedAuthenticationTests.exe'
+    & $csc /noconfig /nologo /target:exe "/out:$authExe" /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll $authSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Settings/AuthenticationMode.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Utilities/NextcloudUriValidator.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Managed authentication test harness compilation failed.' }
+    & $authExe
+    if ($LASTEXITCODE -ne 0) { throw 'Production managed authentication tests failed.' }
 }
 finally {
     if (Test-Path $TempRoot) {

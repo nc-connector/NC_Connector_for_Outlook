@@ -25,6 +25,7 @@ namespace NcTalkOutlookAddIn.Settings
         private Dictionary<string, object> _localPolicyValues = new Dictionary<string, object>(StringComparer.Ordinal);
         private ManagedSetupPolicy _managedSetupPolicy;
         private string _defaultsSource;
+        private AuthenticationMode _localAuthMode;
         private bool _localDebugLoggingEnabled;
         private bool _localLogAnonymizationEnabled;
         private bool _localUpdateNotifyEnabled;
@@ -81,7 +82,15 @@ namespace NcTalkOutlookAddIn.Settings
 
         public string AppPassword { get; set; }
 
-        public AuthenticationMode AuthMode { get; set; }
+        public AuthenticationMode AuthMode
+        {
+            get { return HasManagedAuthMode ? _managedSetupPolicy.AuthMode : _localAuthMode; }
+            set { _localAuthMode = value; }
+        }
+
+        internal AuthenticationMode LocalAuthMode { get { return _localAuthMode; } }
+        internal bool HasManagedAuthMode { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasAuthModePolicy; } }
+        internal bool IsManagedAuthModeValid { get { return !HasManagedAuthMode || _managedSetupPolicy.IsAuthModePolicyValid; } }
 
         public string DefaultsSource
         {

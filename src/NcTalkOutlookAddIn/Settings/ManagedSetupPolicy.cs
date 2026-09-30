@@ -27,6 +27,7 @@ namespace NcTalkOutlookAddIn.Settings
         private const string IfbCacheHoursValueName = "IfbCacheHours";
         private const string IfbPortValueName = "IfbPort";
         private const string DefaultsSourceValueName = "DefaultsSource";
+        private const string AuthModeValueName = "AuthMode";
         private static readonly object InvalidRegistryValue = new object();
         private bool _tlsSystemValueValid;
         private bool _tls12ValueValid;
@@ -39,6 +40,7 @@ namespace NcTalkOutlookAddIn.Settings
         private bool _ifbCacheHoursValueValid;
         private bool _ifbPortValueValid;
         private bool _defaultsSourceValueValid;
+        private bool _authModeValueValid;
 
         private ManagedSetupPolicy(
             object nextcloudUrlValue,
@@ -55,6 +57,7 @@ namespace NcTalkOutlookAddIn.Settings
             object ifbCacheHoursValue,
             object ifbPortValue,
             object defaultsSourceValue,
+            object authModeValue,
             string source)
         {
             HasNextcloudUrlValue = nextcloudUrlValue != null;
@@ -74,6 +77,8 @@ namespace NcTalkOutlookAddIn.Settings
             string defaultsSource = BackendPolicyStatus.NormalizeDefaultsSource(defaultsSourceValue as string);
             _defaultsSourceValueValid = defaultsSourceValue == null || defaultsSource != null;
             DefaultsSource = defaultsSource ?? "local";
+            HasAuthModePolicy = authModeValue != null;
+            AuthMode = ReadAuthMode(authModeValue, out _authModeValueValid);
             IfbEnabled = ReadPolicyBoolean(ifbEnabledValue, false, out _ifbEnabledValueValid);
             IfbDays = ReadPolicyDword(ifbDaysValue, AddinSettings.DefaultIfbDays,
                 value => value == 10 || value == 30 || value == 60 || value == 90, out _ifbDaysValueValid);
@@ -96,7 +101,7 @@ namespace NcTalkOutlookAddIn.Settings
             bool showMainRibbonTab;
             ShowMainRibbonTab = !TryReadBoolean(showMainRibbonTabValue, out showMainRibbonTab)
                 || showMainRibbonTab;
-            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy || HasLoggingPolicy || HasUpdateNotifyPolicy || HasIfbPolicy || HasDefaultsSourcePolicy;
+            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy || HasLoggingPolicy || HasUpdateNotifyPolicy || HasIfbPolicy || HasDefaultsSourcePolicy || HasAuthModePolicy;
             Source = source ?? string.Empty;
         }
 
@@ -137,6 +142,10 @@ namespace NcTalkOutlookAddIn.Settings
         internal string DefaultsSource { get; private set; }
         internal bool HasDefaultsSourcePolicy { get; private set; }
         internal bool IsDefaultsSourcePolicyValid { get { return _defaultsSourceValueValid; } }
+
+        internal AuthenticationMode AuthMode { get; private set; }
+        internal bool HasAuthModePolicy { get; private set; }
+        internal bool IsAuthModePolicyValid { get { return _authModeValueValid; } }
 
         internal bool IfbEnabled { get; private set; }
         internal int IfbDays { get; private set; }
@@ -189,7 +198,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal static ManagedSetupPolicy Resolve(IEnumerable<ManagedSetupPolicy> policies)
         {
-            var result = new ManagedSetupPolicy(null, null, null, null, null, null, null, null, null, null, null, null, null, null, string.Empty);
+            var result = new ManagedSetupPolicy(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, string.Empty);
             if (policies == null)
             {
                 return result;
@@ -281,6 +290,12 @@ namespace NcTalkOutlookAddIn.Settings
                     result.DefaultsSource = policy.DefaultsSource;
                     result._defaultsSourceValueValid = policy._defaultsSourceValueValid;
                 }
+                if (!result.HasAuthModePolicy && policy.HasAuthModePolicy)
+                {
+                    result.HasAuthModePolicy = true;
+                    result.AuthMode = policy.AuthMode;
+                    result._authModeValueValid = policy._authModeValueValid;
+                }
             }
             return result;
         }
@@ -321,7 +336,8 @@ namespace NcTalkOutlookAddIn.Settings
                         ReadIfbPolicyValue(policyKey, IfbDaysValueName, true),
                         ReadIfbPolicyValue(policyKey, IfbCacheHoursValueName, true),
                         ReadIfbPolicyValue(policyKey, IfbPortValueName, true),
-                        ReadDefaultsSourcePolicyValue(policyKey),
+                        ReadStringPolicyValue(policyKey, DefaultsSourceValueName),
+                        ReadStringPolicyValue(policyKey, AuthModeValueName),
                         source);
 
                     if (!policy.IsEnterpriseRollout)
@@ -347,7 +363,9 @@ namespace NcTalkOutlookAddIn.Settings
                         + ", ifbPolicyPresent=" + policy.HasIfbPolicy
                         + ", ifbPolicyValid=" + policy.IsIfbPolicyValid
                         + ", defaultsSourcePolicyPresent=" + policy.HasDefaultsSourcePolicy
-                        + ", defaultsSourcePolicyValid=" + policy.IsDefaultsSourcePolicyValid + ").");
+                        + ", defaultsSourcePolicyValid=" + policy.IsDefaultsSourcePolicyValid
+                        + ", authModePolicyPresent=" + policy.HasAuthModePolicy
+                        + ", authModePolicyValid=" + policy.IsAuthModePolicyValid + ").");
                     return policy;
                 }
             }
@@ -388,18 +406,27 @@ namespace NcTalkOutlookAddIn.Settings
                 ?? InvalidRegistryValue;
         }
 
-        private static object ReadDefaultsSourcePolicyValue(RegistryKey policyKey)
+        private static object ReadStringPolicyValue(RegistryKey policyKey, string valueName)
         {
-            if (!Array.Exists(policyKey.GetValueNames(), name => string.Equals(name, DefaultsSourceValueName, StringComparison.OrdinalIgnoreCase)))
+            if (!Array.Exists(policyKey.GetValueNames(), name => string.Equals(name, valueName, StringComparison.OrdinalIgnoreCase)))
             {
                 return null;
             }
-            if (policyKey.GetValueKind(DefaultsSourceValueName) != RegistryValueKind.String)
+            if (policyKey.GetValueKind(valueName) != RegistryValueKind.String)
             {
                 return InvalidRegistryValue;
             }
-            return policyKey.GetValue(DefaultsSourceValueName, InvalidRegistryValue, RegistryValueOptions.DoNotExpandEnvironmentNames)
+            return policyKey.GetValue(valueName, InvalidRegistryValue, RegistryValueOptions.DoNotExpandEnvironmentNames)
                 ?? InvalidRegistryValue;
+        }
+
+        private static AuthenticationMode ReadAuthMode(object rawValue, out bool valid)
+        {
+            string text = rawValue as string;
+            text = text == null ? null : text.Trim();
+            bool isManual = string.Equals(text, "Manual", StringComparison.OrdinalIgnoreCase);
+            valid = rawValue == null || isManual || string.Equals(text, "LoginFlow", StringComparison.OrdinalIgnoreCase);
+            return isManual ? AuthenticationMode.Manual : AuthenticationMode.LoginFlow;
         }
 
         private static int ReadPolicyDword(object rawValue, int defaultValue, Predicate<int> allowedValue, out bool valid)

@@ -122,7 +122,25 @@ namespace NcTalkOutlookAddIn.UI
 
         private async void OnLoginFlowButtonClick(object sender, EventArgs e)
         {
-            if (_isBusy)
+            await StartLoginFlowAsync();
+        }
+
+        private bool ShouldStartManagedLoginFlow()
+        {
+            if (Result == null || !Result.HasManagedAuthMode || !Result.IsManagedAuthModeValid
+                || Result.AuthMode != AuthenticationMode.LoginFlow || !Result.HasManagedNextcloudUrl)
+            {
+                return false;
+            }
+            string normalizedUrl;
+            return NextcloudUriValidator.TryNormalizeBaseUrl(_serverUrlTextBox.Text, out normalizedUrl)
+                && string.Equals(normalizedUrl, Result.ManagedNextcloudUrl, StringComparison.Ordinal)
+                && !new TalkServiceConfiguration(normalizedUrl, _usernameTextBox.Text, _appPasswordTextBox.Text).IsComplete();
+        }
+
+        private async Task StartLoginFlowAsync()
+        {
+            if (_isBusy || IsDisposed || Disposing || _manualRadio.Checked)
             {
                 return;
             }
@@ -145,6 +163,7 @@ namespace NcTalkOutlookAddIn.UI
             SetStatus(Strings.StatusLoginFlowStarting, false);
             SecurityProtocolType previousSecurityProtocol = ServicePointManager.SecurityProtocol;
             bool temporaryTlsApplied = false;
+            bool loginVerified = false;
 
             try
             {
@@ -152,7 +171,11 @@ namespace NcTalkOutlookAddIn.UI
                 temporaryTlsApplied = true;
 
                 var flowService = new TalkLoginFlowService(normalizedUrl);
-                var startInfo = flowService.StartLoginFlow();
+                var startInfo = await Task.Run(() => flowService.StartLoginFlow());
+                if (IsDisposed || Disposing)
+                {
+                    return;
+                }
 
                 BrowserLauncher.OpenUrl(
                     startInfo.LoginUrl,
@@ -200,6 +223,7 @@ namespace NcTalkOutlookAddIn.UI
                 _authenticationRejected = false;
                 ApplyBackendPolicyStatus("login_verified");
                 SetStatus(Strings.StatusLoginFlowSuccess, false);
+                loginVerified = true;
             }
             catch (TalkServiceException ex)
             {
@@ -218,6 +242,14 @@ namespace NcTalkOutlookAddIn.UI
                     RestoreTemporaryTls(previousSecurityProtocol, "settings_login_flow");
                 }
                 SetBusy(false);
+            }
+
+            if (loginVerified && !IsDisposed && !Disposing && _authenticationRequired
+                && Result != null && Result.HasManagedAuthMode && Result.IsManagedAuthModeValid
+                && Result.AuthMode == AuthenticationMode.LoginFlow)
+            {
+                DiagnosticsLogger.Log(LogCategories.Core, "Saving verified managed login credentials for the pending action.");
+                await SaveSettingsWithErrorHandlingAsync();
             }
         }
 

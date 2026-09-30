@@ -179,6 +179,10 @@ if ($storage -notmatch 'if\s*\(settings\.DefaultsSource\s*!=\s*null\)\s*\{\s*App
 if ($settingsForm -notmatch 'TrackLocalPolicyChoices\(\)' -or $settingsForm -notmatch '!_applyingPolicyDefaults') {
     $failures.Add('Settings must track user choices without persisting programmatic backend overlays.')
 }
+if ($storage -notmatch 'AppendElement\(document, root, "AuthMode", settings\.LocalAuthMode\.ToString\(\)\)' -or
+    $settingsForm -notmatch 'if\s*\(!Result\.HasManagedAuthMode\)\s*\{\s*Result\.AuthMode\s*=') {
+    $failures.Add('Managed authentication mode must retain its raw local XML value during settings saves.')
+}
 
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Error $_ }

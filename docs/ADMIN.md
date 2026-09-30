@@ -10,6 +10,7 @@ Source layout, internal processing, protocol implementation, builds, and develop
 - [Requirements and rollout planning](#requirements-and-rollout-planning)
 - [Deployment and application lifecycle](#deployment-and-application-lifecycle)
 - [Managed configuration and user data](#managed-configuration-and-user-data)
+  - [Registry reference](#registry-reference)
 - [Nextcloud server preparation](#nextcloud-server-preparation)
 - [Optional NC Connector Backend](#optional-nc-connector-backend)
 - [Feature operation](#feature-operation)
@@ -79,9 +80,9 @@ Before a broad rollout:
 3. Verify the public certificate chain, DNS, proxy path, and TLS inspection policy from a representative workstation.
 4. Complete the [Pretty URL test](#nextcloud-pretty-urls).
 5. Enable Talk, Secrets, the system address book, and NC Connector Backend only where the corresponding functions are planned.
-6. Assign a backend seat to a pilot user before testing centrally managed functions.
+6. Assign an active backend Seat to the intended users before enabling Enterprise Rollout.
 7. Keep the current and previous MSI available for rollout and recovery.
-8. Define a pilot acceptance test covering installation, connection, one share, one Talk meeting, and every optional function in use.
+8. Plan initial setup with a representative user account and the functions the organization will use.
 
 ## Deployment and application lifecycle
 
@@ -112,18 +113,11 @@ Expected result:
 
 If any check fails, use [Add-in does not load](#add-in-does-not-load).
 
-### Pilot acceptance test
+### Initial setup
 
-Run this test with a normal user account:
-
-1. In **Settings**, test and save the Nextcloud connection.
-2. Create a new mail and insert a small Nextcloud share.
-3. Create a new appointment and insert a Talk link when Talk is in scope.
-4. Test a reply or forward when sharing or managed signatures are in scope.
-5. Test IFB from [the local endpoint](#internet-freebusy-gateway-ifb) when enabled.
-6. Close and reopen Outlook, then repeat the connection test.
-
-Record the add-in version, Outlook bitness, Nextcloud version, and result of each step.
+1. Sign in to Nextcloud under the intended user account, run the connection test in **Settings**, and save.
+2. Check the functions that account will use, such as inserting a share or Talk link. For centrally managed functions, assign an active Seat first.
+3. If a function is unavailable or fails, follow the matching [troubleshooting runbook](#troubleshooting-runbooks).
 
 ### Upgrade or return to an older version
 
@@ -138,7 +132,7 @@ The add-in reports release metadata but does not install updates. **Settings -> 
 1. Close Outlook.
 2. Back up `%LOCALAPPDATA%\NC4OL\settings_*.xml`.
 3. Install the target MSI over the existing installation.
-4. Start Outlook and repeat the pilot acceptance test for the functions in use.
+4. Start Outlook, check the connection, and verify the functions affected by the update.
 
 To return to the previous add-in release, repeat the same procedure with the previous MSI. If settings must also be restored, close Outlook first and restore only the files belonging to the same Windows user. A protected app password copied to another Windows account or computer may not be readable; authenticate again in that case.
 
@@ -197,7 +191,7 @@ If Outlook does not expose a profile name, the add-in uses:
 
 The app password is stored as `AppPasswordProtected` with Windows Data Protection for the current user. It is not a portable credential.
 
-Every successful settings save is written to a validated temporary file in the same directory and then replaces the primary file. The previous valid file remains as `settings_<OutlookProfile>.xml.bak`. If only the protected password is unreadable, NC Connector keeps the other settings, clears the password, and blocks automatic settings writes until the user explicitly saves a corrected configuration.
+The previous valid settings file remains as `settings_<OutlookProfile>.xml.bak` and can be used for recovery. If only the protected password is unreadable, NC Connector keeps the other settings. Authenticate again and save the corrected configuration to resume normal operation.
 
 Pending Talk room deletions and IFB registry ownership are stored separately per Outlook profile below `%LOCALAPPDATA%\NC4OL\`. These state files use Windows Data Protection and keep a backup next to the primary file. Do not copy protected state to another Windows account.
 
@@ -237,196 +231,120 @@ If a profile XML must be pre-seeded:
 - include only stable defaults needed by the organization
 - remove `AppPasswordProtected` before distribution
 - let each user authenticate through the Nextcloud login flow
-- validate the result against every Outlook profile naming pattern in the rollout
+- deploy the file under the name of the intended Outlook profile
 
 Do not copy a protected app password between users or computers.
 
+### Registry reference
+
+All values below belong under `HKLM\Software\Policies\NC Connector` or `HKCU\Software\Policies\NC Connector`.
+
+- **Precedence:** HKLM 64-bit → HKLM 32-bit → HKCU 64-bit → HKCU 32-bit. For each value, the first present entry wins, even if invalid. Exception: `NextcloudUrlLocked` belongs to the URL in the same path and registry view.
+- **Managed mode:** Any of these 15 values enables [Enterprise Rollout](#enterprise-rollout), including `0`, empty, or invalid values. Prepare the backend and assign active Seats before deployment. Community and Pro Seats provide the same access.
+- **Local values:** “Local; new: …” means the saved user preference applies; the stated factory default applies only without a saved preference.
+- **Group rule:** Any TLS, logging, or IFB value configures and locks its **whole group**. Missing values within that group use the listed factory defaults, **not** local preferences. Other groups are unaffected.
+- **Changes:** Restart Outlook to apply registry changes. Only `ShowMainRibbonTab=0` hides the main tab and Settings button.
+
+Use `REG_DWORD` with `0` / `1` for on/off values. Boolean strings such as `false` / `true` are also accepted. Numeric IFB settings require actual `REG_DWORD` values; `AuthMode` and `DefaultsSource` require `REG_SZ`.
+
+| Key | Type / values | Effect and dependencies | When absent |
+| --- | --- | --- | --- |
+| `NextcloudUrl` | `REG_SZ`: public HTTPS Nextcloud base URL, including any installation subpath | Sets the server; replaces an existing local URL only when the URL is locked | Local URL; new profile: empty |
+| `NextcloudUrlLocked` | On/off | `1`: locks the URL field; requires a valid `NextcloudUrl` in the same path and registry view | `0`: URL editable |
+| `ShowMainRibbonTab` | On/off | `0`: hides the main tab and Settings; Share/Talk action buttons remain accessible | `1`: visible |
+| `AuthMode` | `REG_SZ`: `LoginFlow` / `Manual` | Selects and locks the sign-in method; automatic start requires a matching registry URL, see [sign-in](#managed-sign-in-method) | Local; new: `LoginFlow`; no managed automatic start |
+| `DefaultsSource` | `REG_SZ`: `local` / `backend` | Sets the source of editable defaults; an explicit backend setting wins, see [source selection](#default-values-source) | Backend setting, otherwise user choice, otherwise `local` |
+| `TransportTlsUseSystemDefault` | On/off; TLS group | `1`: Windows selects TLS; both version switches have no effect | Local; new: `0` |
+| `TransportTlsEnable12` | On/off; TLS group | Allows TLS 1.2 when system-default mode is off | Local; new: `1` |
+| `TransportTlsEnable13` | On/off; TLS group | Allows TLS 1.3 when system-default mode is off; requires runtime/Windows support | Local; new: `0` |
+| `DebugLoggingEnabled` | On/off; logging group | Enables detailed debug logging; errors are also logged without debug enabled | Local; new: `0` |
+| `LogAnonymizationEnabled` | On/off; logging group | Anonymizes personal log values; password/token masking always remains active | Local; new: `1` |
+| `UpdateNotifyEnabled` | On/off | Controls update notifications and locks the switch; does not disable daily retrieval or **Check now** | Local; new: `0` |
+| `IfbEnabled` | On/off; IFB group | Enables IFB; requires sign-in, a valid active Seat, and a matching URL reservation | Local; new: `0` |
+| `IfbDays` | `REG_DWORD`: `10`, `30`, `60`, `90`; IFB group | Free/busy time horizon in days | Local; new: `30` |
+| `IfbCacheHours` | `REG_DWORD`: `1`–`24`; IFB group | Cache lifetime in hours; also applies to the shared Talk address-book cache | Local; new: `24` |
+| `IfbPort` | `REG_DWORD`: `1024`–`49151`; IFB group | Local IFB port; another port needs its own [URL reservation](#custom-ifb-port) | Local; new: `7777` |
+
+For example, setting only `TransportTlsEnable12=0` produces the invalid TLS combination `0 / 0 / 0`. Setting only `IfbPort` does **not** enable IFB: `IfbEnabled` remains `0`.
+
 ### Managed Nextcloud URL
 
-Supported policy locations:
+Without a URL lock, the policy fills only an empty URL field. With the lock, it replaces each profile's URL. Credentials remain user-specific. `NextcloudUrlLocked` alone enables Enterprise Rollout but neither supplies a URL nor locks the field.
 
-```text
-HKLM\Software\Policies\NC Connector
-HKCU\Software\Policies\NC Connector
-```
+An invalid selected URL is not used; an invalid URL lock is treated as off. An invalid ribbon value leaves the main tab and Settings visible. Lower-priority registry entries do not replace an invalid higher-priority value.
 
-Values:
+### Managed sign-in method
 
-- `NextcloudUrl` (`REG_SZ`): full public Nextcloud URL
-- `NextcloudUrlLocked` (`REG_DWORD` or string, optional): `1` or `true` locks the field
-- `ShowMainRibbonTab` (`REG_DWORD`, optional): `0` hides the main NC Connector tab, `1` allows it. The default when absent is `1`; string values `true` and `false` are also accepted.
+With incomplete credentials, **Insert Nextcloud share** or **Insert Talk link** starts browser sign-in directly when `AuthMode=LoginFlow` and a valid registry `NextcloudUrl` are set. The actual URL must match that registry URL. A local URL alone, a standalone URL-lock value, or `Manual` does not trigger automatic login.
 
-Example for a machine policy:
+Opening ordinary Settings and having complete credentials do not trigger automatic login. Each sign-in dialog makes at most one automatic attempt; after failure or cancellation, the login button remains available for an explicit retry.
 
-```powershell
-$policyPath = "HKLM:\Software\Policies\NC Connector"
-New-Item -Path $policyPath -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name NextcloudUrl -PropertyType String -Value "https://cloud.example.com" -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name NextcloudUrlLocked -PropertyType DWord -Value 1 -Force | Out-Null
-```
+With a valid managed `AuthMode=LoginFlow`, initial Share or Talk sign-in saves automatically and closes the dialog after successful login and connection verification. This also applies after an explicit login retry. Only successful saving resumes the original action while its message or appointment is still open. Normally opened Settings never close automatically; `Manual` still requires **Save**.
 
-Priority and result:
-
-- `HKLM` takes priority over `HKCU`.
-- Both 64-bit and 32-bit registry views are read.
-- An unlocked value fills only an empty profile.
-- A locked value is used for every profile and disables the URL field.
-- Credentials remain user-specific.
-
-URL and ribbon values resolve independently, in order: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. The URL lock belongs to the selected URL entry. An invalid ribbon value keeps the visibility default of `true`; an invalid URL is not used as a server address.
+Invalid `AuthMode` locks the selection to `LoginFlow` with a configuration hint but no automatic start. Explicitly clicking the login button remains possible.
 
 ### Default values source
 
-Under **Settings -> Advanced -> Default values source**, users with confirmed valid access and an active assigned Community or Pro Seat can choose **Local settings** or **NC Connector Backend**, unless the source is locked by an administrator. Without a source setting, **Local settings** applies. Without usable Seat access, backend defaults are unavailable and the selector is disabled; Enterprise Rollout access requirements still apply.
+`DefaultsSource` covers sharing, Talk, attachment automation, generated text languages, and signature switches. **local** prefers saved local choices, then editable backend defaults. **backend** prefers available backend values, then local choices. Individually enforced policies always win; editable values remain adjustable in the wizard for the current action. The signature template still comes from the backend.
 
-The source controls editable defaults for sharing, Talk, attachment automation, generated text languages, and signature insertion switches. A locked individual backend policy always wins with either source. **Local settings** prefers saved local choices, then editable backend defaults for options without a saved choice. **NC Connector Backend** prefers available backend defaults, falling back to local choices for missing values. It does not turn editable defaults into mandatory rules: users can still adjust editable values for an individual action in the Sharing and Talk wizards. The signature template itself always comes from the backend.
+Precedence with a valid active Seat:
 
-To manage the source centrally:
+1. An explicit backend source under **Group settings → Default settings → General**; full Nextcloud administrators only, not delegable. With **Editable in add-on**, a saved user source choice wins over this suggestion.
+2. With **No preset**, or an older backend without this field: registry `DefaultsSource`, locking the source selector.
+3. Without a registry value: user choice under **Settings → Advanced → Default values source**, otherwise `local`.
 
-1. Prepare backend access and assign active Seats before deploying a registry value.
-2. Set `DefaultsSource` (`REG_SZ`) to `local` or `backend` at the [managed policy locations](#managed-nextcloud-url). The first present value wins: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. Its presence, including an empty or invalid value, enables Enterprise Rollout. Registry configuration locks the source selector unless an explicit backend source setting supersedes it.
-3. Alternatively, a full Nextcloud administrator can configure the installation-wide source under **Group settings -> Default settings -> General** in the NC Connector Backend. Delegated administrators cannot change this setting. An explicit backend source takes precedence over the registry, including its lock. If the backend permits user changes, a saved user selection takes precedence over the backend's proposed source; otherwise the backend source is fixed. **No preset** leaves the registry or, without a registry value, the user's choice in control.
-4. Restart Outlook after registry changes. Refresh the backend connection or reopen Settings after backend changes. With **NC Connector Backend** effective, the **Sharing**, **Talk Link**, and **Signature** settings tabs are greyed out and cannot be selected. The source selector's tooltip identifies an administrative lock; with an editable source, switching to **Local settings** restores the tabs.
+Without a valid active Seat, the selector is disabled and the source is local; Enterprise Rollout still requires valid access. With effective source `backend`, the **Sharing**, **Talk Link**, and **Signature** settings tabs are greyed out. An invalid registry source uses locked `local` with a configuration hint unless an explicit backend setting wins.
 
-Example: deploy backend defaults from an elevated 64-bit PowerShell:
-
-```powershell
-$policyPath = "HKLM:\Software\Policies\NC Connector"
-New-Item -Path $policyPath -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name DefaultsSource -PropertyType String -Value "backend" -Force | Out-Null
-```
-
-An invalid effective registry value falls back to `local`, retains the lock, and shows an administrator configuration hint; correct that entry and restart Outlook. It does not fall through to a lower-priority registry value. An explicit backend source still takes precedence.
-
-To return control to users, set the backend source to **No preset**, remove `DefaultsSource` from every applicable registry location and view, and restart Outlook. Saved source choices and individual local settings are retained while an override is active; removing it restores them. Other registry policies continue to enable Enterprise Rollout. Older backends without source settings behave like **No preset**; older clients ignore the new backend setting and need an update to use it.
+After backend changes, refresh the connection or reopen Settings. To return source selection to users, set the backend source to **No preset** and remove the registry override. Older clients ignore the new backend source setting.
 
 ### Managed transport security (TLS)
 
-The same policy locations also accept these TLS values. Use `REG_DWORD` with `0` for disabled and `1` for enabled:
+All three fields under **Settings → Advanced → Transport security (TLS)** are locked together. Without the TLS registry group, local preferences apply; a new profile uses system default off / TLS 1.2 on / TLS 1.3 off.
 
-| Value | Meaning | Default when absent from an active TLS policy |
-| --- | --- | --- |
-| `TransportTlsUseSystemDefault` | Let Windows select the TLS protocols | `0` |
-| `TransportTlsEnable12` | Allow TLS 1.2 in custom mode | `1` |
-| `TransportTlsEnable13` | Allow TLS 1.3 in custom mode | `0` |
-
-Each TLS value resolves independently in this order: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. The first present entry wins, even if invalid; an invalid higher-priority entry does not fall through to a lower-priority entry.
-
-The presence of any one TLS value activates Enterprise Rollout and locks the entire TLS group in **Settings -> Advanced -> Transport security (TLS)**, including when the value is `0`, empty, or invalid. Missing TLS values use the product defaults in the table, not the user's saved choices. With `TransportTlsUseSystemDefault=1`, Windows selects the protocols and the two explicit version selections have no effect, as in the local settings dialog. The TLS policy does not hide Settings; only `ShowMainRibbonTab=false` does that.
-
-Example: require TLS 1.2 using a computer policy. Run from an elevated 64-bit PowerShell on 64-bit Windows, then restart Outlook:
-
-```powershell
-$policyPath = "HKLM:\Software\Policies\NC Connector"
-New-Item -Path $policyPath -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name TransportTlsUseSystemDefault -PropertyType DWord -Value 0 -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name TransportTlsEnable12 -PropertyType DWord -Value 1 -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name TransportTlsEnable13 -PropertyType DWord -Value 0 -Force | Out-Null
-```
-
-Deploy the backend and assign active Seats before applying even a TLS-only policy. A valid active Community Seat provides the same access as a Pro Seat.
-
-TLS policy is enforced at startup and before login, authentication tests, and backend/Seat checks. An invalid effective TLS value or the combination `0 / 0 / 0` shows a configuration error and blocks NC Connector's server HTTP requests, including update checks. It does not silently enable TLS 1.2. In particular, setting only `TransportTlsEnable12=0` produces that invalid combination because the two missing values default to `0`. Select system-default mode or explicitly enable at least one TLS version. A TLS 1.3 selection rejected by the runtime also fails without automatic fallback. Correct the policy and restart Outlook; changing credentials or Seats does not repair a TLS configuration error.
-
-Acceptance checks on a pilot workstation:
-
-1. Restart Outlook after every registry change. With the example above, confirm that all three TLS controls are locked and show system default off, TLS 1.2 on, and TLS 1.3 off; the remaining settings stay accessible unless the ribbon policy hides them.
-2. Run the connection test and complete login with an active Seat. Check Community and Pro Seats separately; neither requires different TLS values.
-3. In a test deployment, use an invalid TLS value or `0 / 0 / 0`. Confirm the visible configuration error and that a connection test sends no NC Connector server request; this must not appear as an incorrect-password or missing-Seat diagnosis. Restore a valid policy and restart Outlook before continuing.
-4. For rollback, remove all three TLS value names from every applicable hive and registry view, then restart Outlook. Removing only one higher-priority entry can expose a lower-priority value. The user's previous local TLS choices return, including after settings were saved while the policy was active; policy values do not replace those saved choices. If no local choice existed, the local product defaults apply. Other configured rollout values still keep Enterprise Rollout active.
+Invalid values or `0 / 0 / 0` block server HTTP requests, including sign-in and update checks, with a configuration hint. There is no silent TLS 1.2 activation or fallback when the runtime rejects a selected TLS version. Correct the policy and restart Outlook; changing credentials or Seats does not fix this error.
 
 ### Managed logging
 
-Use `DebugLoggingEnabled` and `LogAnonymizationEnabled` at the same policy locations, preferably as `REG_DWORD` (`0` off, `1` on). Each value resolves independently: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit; the first present entry wins.
-
-Either value activates Enterprise Rollout and locks both controls in **Settings -> Debug**, even when false or malformed. Deploy the backend and assign an active Seat first; Community and Pro Seats have identical access. Missing values within an active logging policy use the product defaults: debug logging off, anonymization on. With neither value configured, saved local choices apply, or those same defaults on a new installation.
-
-Example: centrally enable anonymized support logs, then restart Outlook:
-
-```powershell
-$policyPath = "HKLM:\Software\Policies\NC Connector"
-New-Item -Path $policyPath -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name DebugLoggingEnabled -PropertyType DWord -Value 1 -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name LogAnonymizationEnabled -PropertyType DWord -Value 1 -Force | Out-Null
-```
-
-An unreadable value uses that field's default and shows a configuration hint in the Debug tab; a diagnostic entry is written even when debug logging is off. Valid values in the other field remain effective. Invalid higher-priority entries do not expose lower-priority values. Both values set to `0` is valid. A logging configuration error does not block network requests. Password/token masking remains mandatory even with anonymization off; runtime errors are still logged when debug logging is off.
-
-On a pilot workstation, restart Outlook and check the effective values, both locks, and a support log. Saving other settings must not replace the user's local logging choices. To roll back, remove both values from every applicable hive/view and restart Outlook; previous local values return. Other rollout policies still apply. Logging policy alone does not hide the ribbon.
+Both fields under **Settings → Debug** are locked together. An invalid value uses the table's default for that field only and shows a configuration hint; valid values in the other field remain effective. The hint is logged even without debug enabled. Logging errors do not block connections; see [Logs](#logs).
 
 ### Managed update notifications
 
-Set `UpdateNotifyEnabled` as `REG_DWORD` at the same policy locations: `0` suppresses update notifications, `1` enables them. The first present value wins in the order HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. Its presence activates Enterprise Rollout even when false or malformed; prepare the backend and an active Community or Pro Seat before deployment.
-
-After restarting Outlook, the notification checkbox under **Settings -> Advanced** shows the effective value and is locked with an administrator tooltip. Daily update retrieval and **Check now** remain unchanged: this policy controls notifications, not network requests or automatic installation. An invalid selected value defaults to `0` and its tooltip asks the administrator to correct it; it does not fall through to a lower-priority entry or block connections.
-
-For example, from an elevated 64-bit PowerShell:
-
-```powershell
-$policyPath = "HKLM:\Software\Policies\NC Connector"
-New-Item -Path $policyPath -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name UpdateNotifyEnabled -PropertyType DWord -Value 0 -Force | Out-Null
-```
-
-On a pilot workstation, restart Outlook, verify the locked unchecked control, and run **Check now**. To roll back, remove this value from all applicable policy locations and restart Outlook. The user's saved preference returns, including after saving other settings with the policy active. With no saved preference, notifications default to off. Other rollout values remain effective; only `ShowMainRibbonTab=false` hides Settings.
+The switch under **Settings → Advanced** is locked. An invalid value uses `0` with a configuration hint. Update retrieval is unchanged; the add-in never installs updates automatically.
 
 ### Managed Internet Free/Busy (IFB)
 
-Use these values at the [managed policy locations](#managed-nextcloud-url). Each value resolves independently in this order: HKLM 64-bit, HKLM 32-bit, HKCU 64-bit, HKCU 32-bit. The first present entry wins, including an invalid entry; lower-priority values do not repair it.
+Activation, days, and port under **Settings → IFB**, plus the cache lifetime under **Advanced**, are locked together. Sign-in and port preparation are described under [IFB](#internet-freebusy-gateway-ifb). Without a managed IFB group, initial setup can preselect IFB once when credentials become available and no user decision has been saved; the factory default is off.
 
-| Value | Type and accepted values | Default when absent from an active IFB policy |
-| --- | --- | --- |
-| `IfbEnabled` | Prefer `REG_DWORD`: `0` off, `1` on; boolean strings such as `true` and `false` are also accepted | `0` |
-| `IfbDays` | `REG_DWORD`: `10`, `30`, `60`, or `90` days | `30` |
-| `IfbCacheHours` | `REG_DWORD`: `1` through `24` hours | `24` |
-| `IfbPort` | `REG_DWORD`: `1024` through `49151` | `7777` |
+An invalid value disables IFB with a configuration hint, not Share or Talk. Invalid cache hours make the shared address-book cache use 24 hours; a valid cache lifetime remains effective even when another IFB value is invalid.
 
-Any one present IFB value activates Enterprise Rollout and locks all four controls: enablement, days, and port under **Settings -> IFB**, and cache duration under **Settings -> Advanced**. This also applies when `IfbEnabled=0` or a value is invalid. Missing values use the table's product defaults, not saved local choices. Thus a port-only policy leaves IFB disabled. Deploy the backend and assign each user a valid active Seat before applying even an IFB-only policy; Community and Pro Seats have identical requirements. IFB policy does not hide the ribbon or Settings; only `ShowMainRibbonTab=false` does that.
+### Removing registry overrides
 
-Example: enable IFB with the default period, cache duration, and port. Run in an elevated 64-bit PowerShell:
+Remove the relevant value from every applicable path and registry view; for TLS, logging, and IFB, remove the **whole group**. Restart Outlook. Removing only a higher-priority entry can expose a lower-priority setting. Saved local sign-in, source, TLS, logging, notification, and IFB choices remain intact during overrides. URL prefill, however, is not a backup of an earlier server address.
 
-```powershell
-$policyPath = "HKLM:\Software\Policies\NC Connector"
-New-Item -Path $policyPath -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name IfbEnabled -PropertyType DWord -Value 1 -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name IfbDays -PropertyType DWord -Value 30 -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name IfbCacheHours -PropertyType DWord -Value 24 -Force | Out-Null
-New-ItemProperty -Path $policyPath -Name IfbPort -PropertyType DWord -Value 7777 -Force | Out-Null
-```
-
-For a custom port, an administrator must first create the matching [URL reservation](#custom-ifb-port). The add-in does not request elevation or create a custom reservation automatically.
-
-After distribution:
-
-1. Restart Outlook; registry changes are not applied live.
-2. Open **Settings -> IFB** and **Settings -> Advanced** where the ribbon policy permits it. The three IFB controls and the cache duration show the effective values and remain locked with an administrator tooltip, including when IFB is off.
-3. With IFB enabled, complete the user's authentication and confirm backend access and the active Seat. Check the matching URL reservation, TCP listener, and Outlook Scheduling Assistant as described under [IFB](#internet-freebusy-gateway-ifb).
-
-If any selected value has an invalid type or value, the whole IFB group stays locked and IFB remains disabled. The IFB warning and tooltip identify an invalid centrally managed IFB setting; correct the selected registry entry and restart Outlook. There is no fallback to a lower-priority policy or local IFB setting. This error disables only IFB; connection tests, login, Share, Talk, and update checks retain their existing requirements. If `IfbCacheHours` is invalid, the shared Talk address-book cache uses `24` hours. A valid cache duration remains effective even if another IFB value is invalid.
-
-To remove the IFB policy, delete all four value names from every applicable hive and registry view, then restart Outlook. Removing only one entry may expose a lower-priority value. The user's saved local IFB choices return; without saved choices, IFB is off with 30 days, 24 cache hours, and port `7777`. Saving unrelated settings while the policy is active does not overwrite those local choices. Other rollout values remain effective.
+Other remaining keys keep Enterprise Rollout active. To leave it completely, remove all values listed in the table.
 
 ### Enterprise Rollout
 
-The presence of any of `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `DefaultsSource`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled`, `UpdateNotifyEnabled`, `IfbEnabled`, `IfbDays`, `IfbCacheHours`, or `IfbPort` enables Enterprise Rollout, including a value of `false`. An empty or invalid configured value still counts as present. With none of these fourteen values present, existing local behavior remains unchanged. `NextcloudUrlLocked` alone does not supply or lock a server address; the user can enter the URL during authentication.
+Enterprise Rollout applies as soon as any value in the [registry reference](#registry-reference) is present. With all fifteen values absent, existing local behavior remains unchanged.
 
 **Upgrade impact:** An existing registry-based URL deployment also enables this mode after upgrading. Assign Seats and prepare the backend before rollout; an XML-preseeded URL alone does not enable it.
 
 - Only `ShowMainRibbonTab=false` hides the main Explorer tab together with its Settings button. With the value absent or `true`, both remain visible and the full settings dialog is available, including with a managed URL or URL lock.
-- The Share and Talk buttons remain in their existing mail and appointment tabs, including inline replies. Their visibility does not depend on `ShowMainRibbonTab`; there is no replacement or status button.
+- The Share and Talk buttons remain in their existing mail and appointment tabs, including inline replies. Their visibility does not depend on `ShowMainRibbonTab`.
 - A confirmed, valid, personally active Seat enables NC Connector. A Community Seat is fully equivalent to a Pro Seat. Global overcapacity alone does not block an active Seat.
 - A confirmed missing backend shows an installation/configuration message. A missing, paused or invalid Seat shows the managed-installation Seat message. An unconfirmed connection or response error shows a verification message, not a false missing-backend or missing-Seat message.
 - Share, Talk, attachment automation, managed signatures and IFB require rollout access. Ordinary Outlook mail remains usable; this mode is not an Outlook send restriction or a data-loss prevention system.
-- An accepted last-success status can survive a temporary refresh failure under the existing cache rules. A newly confirmed refusal replaces it. An already-open wizard retains its opening snapshot.
-- Existing cleanup of newly created, abandoned artifacts and already accepted password follow-ups are not discarded. No existing files, shares or appointments are deleted because a Seat becomes unavailable.
+- Previously confirmed access can remain available during a temporary connection failure. A newly confirmed refusal takes effect; an already-open wizard continues with the status available when it was opened.
+- Losing a Seat does not delete existing files, shares or appointments. Cleanup of newly created, abandoned shares or rooms and already accepted password follow-ups continues.
 
 First sign-in and verification:
 
 1. Restart Outlook after deploying the registry values.
 2. Without credentials, click **Insert Nextcloud share** in a message or **Insert Talk link** in an appointment. The existing settings dialog opens directly with a blue **Connect to Nextcloud** invitation, without a preliminary error. This also applies to unmanaged installations. Only with `ShowMainRibbonTab=false` are the other settings tabs unavailable; otherwise the full dialog is also accessible through **NC Connector -> Settings**.
-3. Complete the Nextcloud login flow or enter the user's app password, then save. Authentication must succeed before this setup can be saved. The managed URL and its lock remain effective; existing preferences are preserved. After saving successfully, the original action continues if its message or appointment is still open (an inline reply must still be active). Cancelling ends the action quietly. Signing in alone does not upload files or create a Talk room.
-4. Verify access with an active Seat, then separately verify the missing-Seat and missing-backend messages in a test environment. Rejected credentials reopen sign-in with a friendly reminder; connection failures remain distinct. If the main tab is hidden, normal settings remain hidden too. The backend and Seat checks still apply after authentication.
-5. To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all fourteen trigger values from all applicable policy locations and registry views, then restart Outlook. Saved credentials and preferences remain.
+3. Complete sign-in. With a valid managed `AuthMode=LoginFlow`, verified credentials are saved automatically and the dialog closes; otherwise click **Save**. The [managed sign-in method](#managed-sign-in-method) section explains automatic browser login. The managed URL and its lock remain effective; existing preferences are preserved. After saving successfully, the original action continues if its message or appointment is still open (an inline reply must still be active). Cancelling ends the action quietly. Signing in alone does not upload files or create a Talk room.
+4. If access is unavailable after signing in, check the backend and the user's active Seat assignment. Rejected credentials reopen sign-in with a reminder; connection failures have a separate message. If the main tab is hidden, normal settings remain hidden too.
+
+To show the tab and Settings again, remove the effective `ShowMainRibbonTab=false` policy or set it to `true`, then restart Outlook. This does not bypass managed access checks. To leave Enterprise Rollout, remove all fifteen trigger values from all applicable policy locations and registry views, then restart Outlook. Saved credentials and preferences remain.
 
 Registry policy is an administrator deployment control, not protection against a user who can change that policy or replace the add-in. Protect the policy keys and deployment permissions accordingly.
 
@@ -651,7 +569,7 @@ The backend can manage:
 - separate password delivery and optional Secret links
 - central signature assignment and separate switches for new mail, reply, and forward
 
-Keep values editable when users may adjust them for an individual action. Use the [default values source](#default-values-source) to choose between local and backend defaults; lock individual settings only when users must not change them. Test both a user with an active seat and a user without one before broad rollout.
+Keep values editable when users may adjust them for an individual action. Use the [default values source](#default-values-source) to choose between local and backend defaults; lock individual settings only when users must not change them. Assign active Seats to the users who should receive central policies.
 
 Settings, the Sharing and Talk wizards, attachment automation, and signature switches use the selected source without changing individual policy locks. An explicit local `false` or a saved product-default value remains a user choice. Saving credentials alone does not select untouched options. Administrative overrides never overwrite the saved local choice; it returns when local defaults apply again and the field is unlocked. Without usable Seat access, local settings remain available in unmanaged installations; Seat-only functions remain restricted.
 
@@ -675,31 +593,17 @@ For Talk appointment HTML:
 - avoid `flex`, `grid`, `border-radius`, `overflow`, `object-fit`, and `user-select`
 - use explicit full `https://` links
 
-Unsupported or unsafe HTML can be removed or the template can be rejected. Test templates in HTML/RTF Outlook appointments and in every supported Office theme.
+Unsupported or unsafe HTML can be removed or the template can be rejected. Preview custom templates in the message formats and Office themes used by your organization before deploying them.
 
-### Managed signature acceptance test
+### Configure managed signatures
 
-A central signature is applied only when the effective Outlook **From** address matches the email address assigned by the backend. A shared mailbox or delegated **From** address must resolve to the same SMTP address.
+1. Assign an active Seat and a signature to the user in the backend.
+2. Match the assigned email address to the effective Outlook **From** address. For shared mailboxes or delegated senders, the actual sender SMTP address must also match; the signed-in Nextcloud account alone is not sufficient.
+3. Enable the signature for new messages, replies, and forwards as required. Lock the corresponding backend settings only when users must not change them.
 
-Test this matrix before rollout:
+In new messages, the signature appears after the user's text. In replies and forwards, it appears above the quoted message. Changing to a non-matching sender removes the managed signature; other senders and their own signatures remain unchanged. A separate password mail receives the managed signature only when its sender also matches.
 
-1. New HTML mail with the matching identity.
-2. New plain-text mail with the matching identity.
-3. Reply and forward with the matching identity selected from the start.
-4. Reply and forward after changing from a non-matching identity to the matching identity.
-5. A non-matching identity.
-6. A shared or delegated mailbox, if used.
-7. A separate password follow-up mail.
-
-Expected result:
-
-- new mail places the signature after user-written text
-- replies and forwards place it above the quoted message
-- switching away from the matching identity removes only the managed signature
-- a non-matching identity and its own signature remain unchanged
-- separate new-mail, reply, and forward policy switches are followed
-- a locked backend value cannot be changed in Outlook
-- the follow-up password mail receives the signature only when its effective sender also matches
+Before rollout, open a message with the intended sender and check that the assigned signature appears in the expected position.
 
 If a required final signature check cannot complete, Outlook keeps the message open instead of sending it with an unverified signature state.
 
@@ -711,9 +615,9 @@ The message distinguishes an unavailable signature policy from a signature that 
 
 Select the language of the sharing HTML block under **Settings -> Sharing**, below the sharing defaults. Existing choices remain unchanged; a locked backend language remains read-only.
 
-The sharing wizard accepts local files and folders as well as existing content from the configured user's own Nextcloud. The queue shows the complete destination path, groups both sources, and reports entries, source count, total size, and the user's Nextcloud storage state. The **My Nextcloud** picker includes Explorer-style back, forward, up and refresh controls, clickable path segments, filtering, familiar file icons, file details, multi-selection feedback, storage information, and on-demand previews for images and documents supported by the Nextcloud server. Document previews such as PDF or Office files depend on the preview providers enabled on that server. This source works without NC Connector Backend.
+The sharing wizard accepts local files and folders as well as existing content from the configured user's own Nextcloud. **My Nextcloud** shows files, folders, storage information, and previews. Document previews such as PDF or Office files depend on the preview providers enabled on that server. This source works without NC Connector Backend unless Enterprise Rollout is enabled.
 
-Selected Nextcloud content is copied within the same account into the new share folder. The original remains unchanged and is not downloaded to Outlook for the transfer. For a preview, Outlook first requests a size-limited image generated by Nextcloud. If the server has no generated preview for a supported image file, Outlook can temporarily load that original image up to 5 MiB. Other original files are not downloaded for previews. Local content still uses the upload method supported by the server and selected files. Implementation details are in [DEVELOPMENT.md](DEVELOPMENT.md#sharing-flow-mail-compose).
+Selected Nextcloud content is copied within the same account into the new share folder. The original remains unchanged and is not downloaded to Outlook for the transfer. For a preview, Outlook first requests a size-limited image generated by Nextcloud. If the server has no generated preview for a supported image file, Outlook can temporarily load that original image up to 5 MiB. Other original files are not downloaded for previews.
 
 Operating limits and error behavior:
 
@@ -740,16 +644,16 @@ Attachment rules older than five minutes continue to apply while they are refres
 
 Both attachment targets remain read-only shares. If a valid ZIP-download URL cannot be derived from the public share, insertion stops with an error. NC Connector does not label a normal share-page URL as a ZIP download.
 
-Outlook or Exchange can reject a large attachment before an add-in event runs. In that case, users must select **Insert Nextcloud share** and add the file directly in the sharing wizard.
+Outlook or Exchange can reject a large attachment before NC Connector can process it. In that case, users must select **Insert Nextcloud share** and add the file directly in the sharing wizard.
 
 ### Unsent mail and share cleanup
 
-After a share block is inserted, NC Connector tracks the newly created server share until Outlook successfully saves the message after that insertion. If the compose window is discarded before a successful save, NC Connector removes the exact server folder with the account context captured when the share was created.
+If a message is discarded before Outlook saves it after inserting a share, NC Connector removes the newly created share folder from the Nextcloud account used to create it.
 
 - Saving or automatically saving a draft keeps the share. Sending the message, delayed delivery, and offline Outbox delivery also keep it.
 - Cancelling the close action or moving an inline reply into its own window does not remove the share.
 - Deleting a draft that Outlook has already saved is not tracked. Remove its unused share manually in Nextcloud.
-- If the share block cannot be inserted, the wizard reports failure and immediately attempts to remove the newly created server folder with the captured account context.
+- If the share block cannot be inserted, the wizard reports failure and attempts to remove the newly created share folder.
 - An enforcing attachment policy blocks sending while a normal attachment that should have been routed through NC Connector remains in the message.
 - Separate password delivery is submitted directly when the user clicks **Send**, as described below.
 
@@ -760,8 +664,8 @@ Separate password delivery requires NC Connector Backend and an active seat.
 - The primary mail contains no plain password.
 - Separate password delivery is tied to the open compose session in which the share was created. The user must click **Send** from that same, still-open message. Saving or AutoSave does not interrupt the flow while the compose window remains open.
 - Saving the primary mail as a draft or `.oft` template and then closing it is not supported. Reopening that draft, restarting Outlook before the first send attempt, or creating a message from that template restores the visible share block, but not the password follow-up state. No password follow-up is created; create a new share in the final message before sending it.
-- Clicking **Send** finalizes and immediately submits the password follow-up with the primary mail's effective Outlook account. NC Connector does not save an intermediate password draft or inspect Drafts, Outbox, or Sent folders.
-- This direct boundary does not wait for delayed or offline primary delivery. The password follow-up can therefore be submitted while the primary mail is still in the Outbox or if Outlook rejects it after NC Connector's send callback.
+- Clicking **Send** immediately submits the password mail using the primary mail's Outlook account.
+- The password mail does not wait for delayed or offline delivery of the primary mail. It may therefore be sent before the primary mail leaves the Outbox, or even if Outlook subsequently rejects the primary mail.
 - If sender verification or automatic submission definitely fails, Outlook opens a fully prepared message for manual sending. An ambiguous Outlook submission is not repeated automatically.
 - With the Secrets mode, one one-time Secret link is created per final recipient.
 - Equal SMTP addresses across To, Cc, and Bcc receive only one Secret follow-up.
@@ -774,20 +678,13 @@ Select the language of the Talk description under **Settings -> Talk link**, bel
 
 Deleting a saved Outlook appointment removes its remote Talk room only when the setting is explicitly enabled and the appointment contains NC Connector room metadata. The setting is disabled by default. A Talk URL copied into a location or body is not sufficient for remote deletion.
 
-Deleting one occurrence or an exception from a recurring appointment does not remove the shared room. Only a non-recurring appointment or the series master can queue room deletion.
+Deleting one occurrence or an exception from a recurring appointment does not remove the shared room. Room deletion applies only to a non-recurring appointment or the entire series, whether deleted from the calendar view or an open appointment.
 
-NC Connector reacts only to Outlook events for the individual Talk appointment. Opening or selecting a Talk appointment binds that appointment to the deletion event, including the current calendar selection restored after an Outlook restart. Deletion from an open appointment and from the calendar view therefore uses the same checks and queue. Outlook startup does not enumerate stores or calendar folders and does not scan calendar items.
+Pending room deletions are retained per Outlook profile and retried after temporary Nextcloud failures or an Outlook restart. A newly created room from an unsaved, discarded appointment is still cleaned up even when deletion of saved appointments is disabled.
 
-Queued room deletions are stored per Outlook profile and retried in the background after temporary Nextcloud failures or an Outlook restart. The cleanup of a newly created room from an unsaved, discarded appointment remains active.
+Moderator delegation requires another Nextcloud user. After a successful handoff, the original moderator leaves the room.
 
-Moderator delegation rejects the current Nextcloud user when the wizard input matches the canonical user ID, the configured login, or the known primary email address. A successful handoff to another user still causes the original moderator to leave the room.
-
-Before enabling saved-appointment room deletion across an organization:
-
-1. Create and save a Talk appointment with a pilot account.
-2. Restart Outlook, then delete the still-unopened appointment directly from the calendar view.
-3. Verify that the remote room is removed.
-4. Repeat with deletion from the open appointment, then document room recovery or recreation procedures for users.
+Before enabling deletion of saved appointments, inform users that deleting the appointment also deletes its Talk room, and document how to create a replacement room when needed.
 
 ## Internet Free/Busy Gateway (IFB)
 
@@ -808,7 +705,7 @@ http://127.0.0.1:7777/nc-ifb/
 
 The MSI reserves the default URL namespace for authenticated Windows users. NC Connector adds a random path segment to Outlook's Free/Busy URL; requests without that segment return `404`. The secret path is managed internally and is intentionally not shown in this guide.
 
-Enabling IFB updates only Outlook's per-user Free/Busy values. Existing values and their types are recorded separately. Disabling IFB restores a value only while it still contains the value written by NC Connector; later administrator or application changes are left untouched. Values below `Software\Policies` are read for conflicts but are never written. The address-book cache is separated by Outlook profile, full Nextcloud base URL including any subpath, and configured login. The address-book request itself uses the canonical Nextcloud user ID.
+Enabling IFB updates only Outlook's per-user Free/Busy values. Disabling IFB restores the previous configuration unless another application or administrator has since changed it. Group-policy values below `Software\Policies` are not overwritten. The address-book cache is separate for each Outlook profile and Nextcloud account.
 
 The listener runs only while Outlook is running, IFB is effectively enabled, and the stored Nextcloud credentials are complete. Invalid managed IFB settings prevent listener startup; Enterprise Rollout also requires confirmed backend access and an active assigned Seat for requests.
 
@@ -860,16 +757,7 @@ The daily update request sends product, installed version, channel, and a rotati
 
 ### Routine operating checks
 
-After an add-in, Outlook, proxy, certificate, or Nextcloud update:
-
-1. Run the Settings connection test.
-2. Create and open a small share.
-3. Create and open a Talk link when Talk is enabled.
-4. Test user search when the system address book is used.
-5. Test every locked backend setting with a seat-assigned user.
-6. Run the signature acceptance cases in use.
-7. Test the local IFB endpoint when enabled.
-8. Open **Settings -> Advanced -> Check now** and review the displayed release metadata.
+After a change to the add-in, Outlook, proxy, certificates, or Nextcloud, run the Settings connection test and check the functions affected by that change under a representative user account. For example, check a share after changing upload limits, or the assigned signature after changing its template. Use the relevant section of this guide for configuration and troubleshooting.
 
 ### Logs
 
@@ -954,17 +842,17 @@ Run the [`/login` comparison](#quick-test). If only the `/index.php/login` URL w
 3. Check client access to `/apps/ncc_backend_4mc/api/v1/status`.
 4. Open Settings and review the displayed backend or seat state. If `ShowMainRibbonTab=false` hides Settings, use the Share or Talk action to check the access message.
 5. Confirm whether the setting is a default or a locked value.
-6. Compare with another seat-assigned pilot user.
+6. For user-specific problems, compare with a working account that has an assigned Seat.
 
-In unmanaged installations, Share and Talk can use local settings during a backend outage. Managed signatures and separate password delivery require a valid backend state. Enterprise Rollout requires confirmed access or a matching last-success snapshot as described above.
+In unmanaged installations, Share and Talk can use local settings during a backend outage. Managed signatures and separate password delivery require a valid backend state. Enterprise Rollout requires confirmed access; previously confirmed access may remain available during a temporary connection failure as described above.
 
 ### Managed signature is missing or misplaced
 
 1. Confirm the backend seat and signature assignment.
 2. Compare the effective Outlook **From** SMTP address with the assigned backend email address.
 3. Check the separate switches for new mail, reply, and forward.
-4. Repeat the matching cases in the [signature acceptance test](#managed-signature-acceptance-test).
-5. Test once with Outlook's own signature enabled and once without it.
+4. Check the sender and message type described under [Configure managed signatures](#configure-managed-signatures).
+5. If signatures are duplicated or overlap, check whether Outlook also inserts its own signature for that sender.
 6. Collect `CORE` and relevant compose log entries without sharing the signature HTML.
 
 Do not work around a blocked final signature check by copying unknown HTML into the message. Restore backend access or correct the sender/policy assignment.

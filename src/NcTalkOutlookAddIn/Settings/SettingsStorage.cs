@@ -613,7 +613,7 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "ServerUrl", Safe(settings.ServerUrl));
             AppendElement(document, root, "Username", Safe(settings.Username));
             AppendElement(document, root, "AppPasswordProtected", ProtectPassword(settings.AppPassword));
-            AppendElement(document, root, "AuthMode", settings.AuthMode.ToString());
+            AppendElement(document, root, "AuthMode", settings.LocalAuthMode.ToString());
             if (settings.DefaultsSource != null)
             {
                 AppendElement(document, root, "DefaultsSource", settings.DefaultsSource);

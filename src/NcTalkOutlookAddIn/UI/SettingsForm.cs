@@ -141,6 +141,7 @@ namespace NcTalkOutlookAddIn.UI
         private bool _authenticationRequired;
         private bool _authenticationRejected;
         private bool _connectionSetupPending;
+        private bool _automaticLoginFlowPending;
         private AddinSettings _result;
         private bool _applyingPolicyDefaults;
         private bool _initialIfbEnabled;
@@ -171,6 +172,7 @@ namespace NcTalkOutlookAddIn.UI
             _authenticationRejected = authenticationRejected;
             _connectionSetupPending = true;
             ApplyBackendPolicyStatus("authentication_open");
+            _automaticLoginFlowPending = ShouldStartManagedLoginFlow();
         }
 
         internal SettingsForm(
@@ -310,10 +312,19 @@ namespace NcTalkOutlookAddIn.UI
                 PolicyUiHelper.OpenLicenseAdministration(_policyWarningLinkLabel, LogCategories.Core);
         }
 
-        protected override void OnShown(EventArgs e)
+        protected override async void OnShown(EventArgs e)
         {
             base.OnShown(e);
             ApplyResponsiveLayout(true);
+            if (_automaticLoginFlowPending)
+            {
+                _automaticLoginFlowPending = false;
+                if (!IsDisposed && !Disposing && !_isBusy && ShouldStartManagedLoginFlow())
+                {
+                    DiagnosticsLogger.Log(LogCategories.Core, "Managed login flow requested for initial connection setup.");
+                    await StartLoginFlowAsync();
+                }
+            }
         }
 
         private void ApplyResponsiveLayout(bool ensureClientWidth)
@@ -508,6 +519,11 @@ namespace NcTalkOutlookAddIn.UI
 
         private async void OnSaveButtonClick(object sender, EventArgs e)
         {
+            await SaveSettingsWithErrorHandlingAsync();
+        }
+
+        private async Task SaveSettingsWithErrorHandlingAsync()
+        {
             try
             {
                 await SaveSettingsAsync();
@@ -590,7 +606,10 @@ namespace NcTalkOutlookAddIn.UI
             Result.ServerUrl = normalizedServerUrl;
             Result.Username = _usernameTextBox.Text.Trim();
             Result.AppPassword = _appPasswordTextBox.Text;
-            Result.AuthMode = _loginFlowRadio.Checked ? AuthenticationMode.LoginFlow : AuthenticationMode.Manual;
+            if (!Result.HasManagedAuthMode)
+            {
+                Result.AuthMode = _loginFlowRadio.Checked ? AuthenticationMode.LoginFlow : AuthenticationMode.Manual;
+            }
             if (!Result.ShowMainRibbonTab)
             {
                 DialogResult = DialogResult.OK;
@@ -932,8 +951,11 @@ namespace NcTalkOutlookAddIn.UI
         {
             bool manual = _manualRadio.Checked;
             bool managedUrlLocked = Result != null && Result.ManagedNextcloudUrlLocked;
+            bool managedAuthMode = Result != null && Result.HasManagedAuthMode;
 
             _serverUrlTextBox.Enabled = !managedUrlLocked && !_isBusy;
+            _manualRadio.Enabled = !managedAuthMode && !_isBusy;
+            _loginFlowRadio.Enabled = !managedAuthMode && !_isBusy;
             _usernameTextBox.Enabled = manual && !_isBusy;
             _appPasswordTextBox.Enabled = manual && !_isBusy;
             _loginFlowButton.Enabled = !manual && !_isBusy;
@@ -942,6 +964,11 @@ namespace NcTalkOutlookAddIn.UI
                 _serverUrlTextBox,
                 managedUrlLocked ? Strings.TooltipManagedNextcloudUrl : string.Empty,
                 managedUrlLocked);
+            string authModeHint = managedAuthMode
+                ? (Result.IsManagedAuthModeValid ? Strings.PolicyAdminControlledTooltip : Strings.ManagedAuthModeInvalid)
+                : string.Empty;
+            _disabledTooltipHints.Apply(_manualRadio, authModeHint, managedAuthMode);
+            _disabledTooltipHints.Apply(_loginFlowRadio, authModeHint, managedAuthMode);
 
             bool credentialsAvailable =
                 !string.IsNullOrWhiteSpace(_serverUrlTextBox.Text) &&

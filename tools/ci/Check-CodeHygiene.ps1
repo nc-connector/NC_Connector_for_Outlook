@@ -62,6 +62,7 @@ $asyncVoidAllowList = @(
     'OnSelectedTabChanged',
     'OnUpdateCheckButtonClick',
     'OnLoginFlowButtonClick',
+    'OnShown',
     'OnTestButtonClick',
     'HandleFileListViewDragDrop'
 )
