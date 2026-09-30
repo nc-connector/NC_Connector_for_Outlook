@@ -17,6 +17,9 @@ function Assert-Contains {
 
 Assert-Contains 'UpgradeCode="\{8C9D7AA6-EBB2-4F7D-9B5F-A34C59F314B3\}"' "MSI UpgradeCode changed or is missing."
 Assert-Contains '<MajorUpgrade\s+AllowDowngrades="yes"\s*/>' "MajorUpgrade rule is missing."
+Assert-Contains '<Property\s+Id="MSIRMSHUTDOWN"\s+Value="0"\s*/>' "Restart Manager must request orderly shutdown, not force termination."
+Assert-Contains '<util:RestartResource\s+Id="OutlookAddinResource"\s+Path="\[INSTALLFOLDER\]NcTalkOutlookAddIn\.dll"\s*/>' "Restart Manager must also detect the loaded add-in during same-version maintenance."
+Assert-Contains '<Custom\s+Action="CheckOutlookClosed"\s+Before="RemoveExistingProducts"' "The Outlook guard must run after native files-in-use handling and before removal of the old product."
 Assert-Contains '<Component\s+Id="cmpOutlookAddinReg"\s+Guid="\{8ED9BE3B-8138-4F3D-92FD-A5DA0CECA9F6\}"' "64-bit Outlook add-in registry component GUID changed or is missing."
 Assert-Contains '<Component\s+Id="cmpOutlookAddinReg32"\s+Guid="\{BC89C35C-3ACF-4F5B-B851-AFE8576EE014\}"\s+Bitness="always32"' "32-bit Outlook add-in registry component is missing or not always32."
 Assert-Contains 'Key="Software\\Microsoft\\Office\\Outlook\\Addins\\NcTalkOutlook\.AddIn"\s+Name="LoadBehavior"\s+Type="integer"\s+Value="3"' "Outlook LoadBehavior=3 registration is missing."

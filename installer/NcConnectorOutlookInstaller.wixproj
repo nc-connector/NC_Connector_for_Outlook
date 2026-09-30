@@ -5,8 +5,8 @@
     <InstallerPlatform>x64</InstallerPlatform>
 
     <BuildOutputDir Condition=" '$(BuildOutputDir)' == '' ">$(MSBuildProjectDirectory)\..\src\NcTalkOutlookAddIn\bin\Release\</BuildOutputDir>
-    <ProductVersion Condition=" '$(ProductVersion)' == '' ">3.4.1</ProductVersion>
-    <AssemblyVersion Condition=" '$(AssemblyVersion)' == '' ">3.4.1.0</AssemblyVersion>
+    <ProductVersion Condition=" '$(ProductVersion)' == '' ">3.4.3</ProductVersion>
+    <AssemblyVersion Condition=" '$(AssemblyVersion)' == '' ">3.4.3.0</AssemblyVersion>
 
     <IfbCleanupExe>$(MSBuildProjectDirectory)\IfbCleanup\bin\$(Configuration)\NcConnectorIfbCleanup.exe</IfbCleanupExe>
     <DefineConstants>BuildOutputDir=$(BuildOutputDir);ProductVersion=$(ProductVersion);AssemblyVersion=$(AssemblyVersion);IfbCleanupExe=$(IfbCleanupExe)</DefineConstants>
@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <PackageReference Include="WixToolset.Http.wixext" Version="6.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
   </ItemGroup>
 </Project>
 

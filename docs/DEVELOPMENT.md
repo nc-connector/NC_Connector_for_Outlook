@@ -426,6 +426,8 @@ The rollback action precedes deferred cleanup; removed raw values and registry t
 
 `Invoke-OutlookIfbInstallerTests.ps1` exercises cleanup and rollback against isolated HKCU fixtures, never real user hives. `Check-MsiPackage.ps1` checks the compiled action types/order and evaluates install, upgrade, repair and uninstall conditions without running them. `Invoke-OutlookTalkIfbLifecycleTests.ps1` covers the retained-journal restart and predecessor restoration. Real MSI installation and offline-hive mounting still require an installation test machine.
 
+Before cleanup, `util:RestartResource` registers the installed add-in DLL with Windows Installer's Restart Manager, including maintenance where the DLL version is unchanged. `MSIRMSHUTDOWN=0` requests orderly shutdown, not forced termination. `InstallValidate` handles applications in use first; `CheckOutlookClosed` then runs before `RemoveExistingProducts` and `InstallInitialize`. A remaining Outlook process in any session blocks maintenance before the old package is removed or IFB values are changed. Deferred cleanup retains its repeated process checks. Verify interactive and silent upgrades, same-version maintenance, declined shutdown and another Windows session on the installation test machine.
+
 ## Network endpoints
 
 The add-in uses Nextcloud **OCS** and **WebDAV** endpoints.

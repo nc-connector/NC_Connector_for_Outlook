@@ -65,6 +65,12 @@ $binaries = Invoke-MsiQuery "SELECT ``Name`` FROM ``Binary``" | ForEach-Object {
 Assert-Check ($binaries -contains "IfbCleanupExe") "MSI must embed its IFB cleanup executable."
 $actions = Invoke-MsiQuery "SELECT ``Action``, ``Type``, ``Source``, ``Target`` FROM ``CustomAction``"
 $sequences = Invoke-MsiQuery "SELECT ``Action``, ``Condition``, ``Sequence`` FROM ``InstallExecuteSequence``"
+$shutdown = @(Invoke-MsiQuery "SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = 'MSIRMSHUTDOWN'")
+Assert-Check ($shutdown.Count -eq 1 -and $shutdown[0][0] -eq "0") "MSI must request orderly application shutdown."
+$resources = @(Invoke-MsiQuery "SELECT ``RestartResource``, ``Component_``, ``Resource``, ``Attributes`` FROM ``Wix4RestartResource``")
+Assert-Check ($resources.Count -eq 1 -and $resources[0][0] -eq "OutlookAddinResource" -and
+    [string]::IsNullOrEmpty($resources[0][1]) -and $resources[0][2] -eq "[INSTALLFOLDER]NcTalkOutlookAddIn.dll" -and
+    $resources[0][3] -eq "1") "The installed add-in DLL must be registered independently of component replacement."
 $expectedTypes = @{ CheckOutlookClosed = 2; RollbackIfbRegistry = 3330; CleanupIfbRegistry = 3074; CommitIfbRegistry = 3586 }
 $condition = 'NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~="ALL")'
 foreach ($name in $expectedTypes.Keys) {
@@ -74,7 +80,7 @@ foreach ($name in $expectedTypes.Keys) {
     Assert-Check ($sequence.Count -eq 1 -and $sequence[0][1] -eq $condition) "IFB action must cover install, upgrade, repair and uninstall: $name"
 }
 $previous = -1
-foreach ($name in @("CheckOutlookClosed", "InstallValidate", "InstallInitialize", "RollbackIfbRegistry", "CleanupIfbRegistry", "CommitIfbRegistry", "InstallFinalize")) {
+foreach ($name in @("CostFinalize", "Wix4RegisterRestartResources_X64", "InstallValidate", "CheckOutlookClosed", "RemoveExistingProducts", "InstallInitialize", "RollbackIfbRegistry", "CleanupIfbRegistry", "CommitIfbRegistry", "InstallFinalize")) {
     $sequence = @($sequences | Where-Object { $_[0] -eq $name })
     Assert-Check ($sequence.Count -eq 1 -and [int]$sequence[0][2] -gt $previous) "Incorrect IFB scheduling at $name"
     $previous = [int]$sequence[0][2]
@@ -97,4 +103,4 @@ foreach ($scenario in @(
 }
 [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($session)
 
-Write-Host "MSI package check OK: files, registration, IFB actions and maintenance conditions: $MsiPath"
+Write-Host "MSI package check OK: files, registration, orderly shutdown, IFB actions and maintenance conditions: $MsiPath"

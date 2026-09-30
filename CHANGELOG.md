@@ -4,6 +4,30 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.4.3] - 2026-10-01
+
+### Added
+
+- Add registry-based Enterprise Rollout for a low-touch, user-friendly deployment with centrally configured settings and guided first sign-in. See the [Enterprise Rollout guide](docs/ADMIN.md#enterprise-rollout).
+- Add a choice of local or backend defaults for Sharing, Talk, attachment automation and signature switches, configurable through the backend, registry or add-in settings according to administrator permissions.
+
+### Changed
+
+- Setting any supported managed registry value now requires the NC Connector Backend and a valid assigned NC Connector Seat. This also applies to existing registry deployments, regardless of the configured value.
+- Move sharing-block and Talk-description language settings from Advanced to the Sharing and Talk tabs.
+
+### Fixed
+
+- Prevent saving settings from overwriting local preferences with enforced backend values or turning untouched defaults into explicit local choices.
+- Apply a one-day lifetime consistently when older backends return zero-day share expiry.
+- Accept valid, non-empty system address-book exports with HTTP 404. Reject malformed exports without overwriting cached contacts, and include users without an email address in user and moderator searches.
+- Keep missing-Seat notices visible alongside grace-period and synchronization warnings, and explain that Sharing and Talk remain available with local settings outside Enterprise Rollout.
+- Accept valid backend status responses with HTTP 404 and treat incomplete status data as a failed check instead of a confirmed Seat refusal.
+- Make newly confirmed backend status available across Outlook actions so a received Seat refusal is not overridden by an older cached permission.
+- Show an actionable error instead of a generic heading when a signature-policy check or signature update prevents sending.
+- Preserve Talk room descriptions and pending appointment changes when rescheduling a meeting with an enabled lobby.
+- Restore Free/Busy operation after a profile reset or reinstall by removing obsolete NC Connector registry entries during installation, upgrade, repair and uninstall.
+
 ## [3.4.1] - 2026-09-18
 
 ### Changed

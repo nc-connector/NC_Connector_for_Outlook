@@ -417,6 +417,8 @@ Die Rollback-Aktion steht vor der verzögerten Bereinigung; entfernte Rohwerte u
 
 `Invoke-OutlookIfbInstallerTests.ps1` prüft Bereinigung und Rollback mit isolierten HKCU-Testschlüsseln, nie mit echten Benutzer-Hives. `Check-MsiPackage.ps1` prüft Aktionstypen und Reihenfolge im gebauten Paket und wertet Bedingungen für Installation, Upgrade, Reparatur und Deinstallation aus, ohne diese auszuführen. `Invoke-OutlookTalkIfbLifecycleTests.ps1` deckt Wiederanlauf mit erhaltenem Journal und Vorgängerwiederherstellung ab. Echte MSI-Installation und Offline-Hive-Einbindung benötigen weiterhin einen Installationstest-Rechner.
 
+Vor der Bereinigung registriert `util:RestartResource` die installierte Add-in-DLL beim Restart Manager von Windows Installer, auch bei Wartung mit unveränderter DLL-Version. `MSIRMSHUTDOWN=0` fordert reguläres Schließen an, kein erzwungenes Prozessende. `InstallValidate` behandelt zunächst laufende Anwendungen; danach prüft `CheckOutlookClosed` vor `RemoveExistingProducts` und `InstallInitialize`. Ein verbleibender Outlook-Prozess in einer beliebigen Sitzung blockiert die Wartung, bevor das alte Paket entfernt oder IFB-Werte geändert werden. Die verzögerte Bereinigung behält ihre wiederholten Prozessprüfungen. Interaktives und stilles Upgrade, Wartung derselben Version, abgelehntes Schließen und eine weitere Windows-Sitzung auf dem Installationstest-Rechner prüfen.
+
 ## Netzwerk-Endpunkte
 
 Das Add-in verwendet Nextcloud-**OCS**- und **WebDAV**-Endpunkte.

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:http="http://wixtoolset.org/schemas/v4/wxs/http">
+     xmlns:http="http://wixtoolset.org/schemas/v4/wxs/http"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="NC Connector for Outlook"
     Manufacturer="Bastian Kleinschmidt"
@@ -19,6 +20,9 @@
     <Icon Id="ProductIcon" SourceFile="assets\nc-connector.ico" />
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
     <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
+    <Property Id="MSIRMSHUTDOWN" Value="0" />
+    <!-- Register unchanged binaries too when reinstalling the same release. -->
+    <util:RestartResource Id="OutlookAddinResource" Path="[INSTALLFOLDER]NcTalkOutlookAddIn.dll" />
 
     <Binary Id="IfbCleanupExe" SourceFile="$(var.IfbCleanupExe)" />
     <CustomAction Id="CheckOutlookClosed" BinaryRef="IfbCleanupExe"
@@ -33,7 +37,7 @@
                   ExeCommand="commit &quot;[ProductCode]&quot;"
                   Execute="commit" Impersonate="no" Return="check" />
     <InstallExecuteSequence>
-      <Custom Action="CheckOutlookClosed" Before="InstallValidate"
+      <Custom Action="CheckOutlookClosed" Before="RemoveExistingProducts"
               Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
       <Custom Action="RollbackIfbRegistry" Before="CleanupIfbRegistry"
               Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
