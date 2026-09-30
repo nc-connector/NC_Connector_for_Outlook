@@ -109,6 +109,11 @@ $protectedStateStore = Join-Path $SourceRoot "Services\ProtectedJsonStateStore.c
 $talkStore = Join-Path $SourceRoot "Services\TalkRoomLifecycleStore.cs"
 $ifbStore = Join-Path $SourceRoot "Services\IfbRegistryStateStore.cs"
 
+Assert-SourceContract `
+    "Appointment capture retains the deferred lobby-only scope" `
+    $appointmentSyncController `
+    'LobbyOnly\s*=\s*lobbyOnly'
+
 Assert-PathAbsent `
     "Global Talk calendar lifecycle partial is removed" `
     $calendarLifecycle
@@ -426,6 +431,7 @@ using System.Web.Script.Serialization;
 using Microsoft.Win32;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
+using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.Utilities;
 
 namespace NcTalkOutlookAddIn.Utilities
@@ -454,6 +460,18 @@ namespace NcTalkOutlookAddIn.Utilities
         internal const string TalkSystemAddressbookInvalidResponse = "Invalid address book";
         internal const string TalkSystemAddressbookFetchFailed = "Address book fetch failed";
     }
+
+    internal static class PolicyUiHelper
+    {
+        internal static string GetEnterpriseRolloutNotice(
+            AddinSettings settings,
+            BackendPolicyStatus status) { return null; }
+    }
+}
+
+namespace NcTalkOutlookAddIn.Models
+{
+    internal sealed class BackendPolicyStatus { }
 }
 
 namespace NcTalkOutlookAddIn.Settings
@@ -464,6 +482,7 @@ namespace NcTalkOutlookAddIn.Settings
         public string Username { get; set; }
         public string AppPassword { get; set; }
         public string IfbPreviousFreeBusyPath { get; set; }
+        public bool IsEnterpriseRollout { get; set; }
     }
 }
 
@@ -516,6 +535,7 @@ namespace NcTalkOutlookAddIn.Services
 
     internal sealed class TalkService
     {
+        internal static readonly List<string> Operations = new List<string>();
         internal readonly List<string> Users = new List<string>();
         internal readonly List<string> Guests = new List<string>();
         internal TalkService(
@@ -526,19 +546,32 @@ namespace NcTalkOutlookAddIn.Services
             bool isEventConversation) { }
         internal void AddUserParticipant(string roomToken, string uid) { Users.Add(uid); }
         internal void AddGuestParticipant(string roomToken, string email) { Guests.Add(email); }
+        internal void UpdateRoomName(string roomToken, string name) { Operations.Add("name:" + name); }
+        internal void UpdateDescription(string roomToken, string description) { Operations.Add("description:" + description); }
+        internal void UpdateLobby(string roomToken, DateTime start, DateTime end, bool isEvent)
+        {
+            Operations.Add("lobby:" + new DateTimeOffset(start).ToUnixTimeSeconds());
+        }
     }
+
+    internal sealed class TalkServiceException : Exception { }
 }
 
-internal static class NextcloudTalkAddIn
+internal sealed class NextcloudTalkAddIn
 {
+    internal AddinSettings CurrentSettings = new AddinSettings();
+    internal BackendPolicyStatus FetchEnterpriseRolloutPolicyStatus(
+        TalkServiceConfiguration configuration, string reason) { return null; }
+
     internal static void LogTalkMessage(string message)
     {
         DiagnosticsLogger.Log("TALK", message);
     }
 }
 
-internal static class TalkIfbLifecycleTests
+internal sealed class TalkIfbLifecycleTests
 {
+    private readonly NextcloudTalkAddIn _owner = new NextcloudTalkAddIn();
     private static int failures;
 
     private static void Check(
@@ -566,6 +599,8 @@ internal static class TalkIfbLifecycleTests
         TestDeletionRetryAcrossRestart();
         TestPendingStoreMigration();
         TestSyncCoalescing();
+        TestLobbyOnlySync();
+        TestLobbySyncCoalescing();
         TestProtectedStateStoreCompatibility();
         TestLegacyIfbRegistryMigration();
         TestDurableReplacement();
@@ -846,6 +881,71 @@ internal static class TalkIfbLifecycleTests
     }
 
     // EXECUTE_PARTICIPANT_SYNC_SOURCE
+
+    // EXECUTE_REMOTE_SYNC_SOURCE
+
+    // EXECUTE_ROOM_SYNC_SOURCE
+
+    private static bool IsEventConversationDescriptionError(TalkServiceException ex) { return false; }
+    private static bool IsMissingOrForbiddenRoomMutationError(TalkServiceException ex) { return false; }
+    private static void ExecuteDelegationSync(
+        TalkService service, TalkAppointmentSyncSnapshot snapshot, TalkAppointmentSyncResult result)
+    {
+        TalkService.Operations.Add("delegation");
+        result.DelegationApplied = snapshot.DelegationPending;
+    }
+
+    private static void TestLobbyOnlySync()
+    {
+        var controller = new TalkIfbLifecycleTests();
+        var snapshot = new TalkAppointmentSyncSnapshot
+        {
+            RoomToken = "lobby-room", Configuration = NewConfiguration(),
+            LobbyOnly = true, UpdateLobby = true, StartEpoch = 1800000000,
+            RoomName = "Do not rename", Description = "Do not replace",
+            AddUsers = true, AddGuests = true, DelegationPending = true,
+            DelegateUserId = "other-moderator",
+            AttendeeEmails = new List<string> { "bob@example.test" }
+        };
+        foreach (bool isEvent in new[] { false, true })
+        {
+            snapshot.IsEventConversation = isEvent;
+            TalkService.Operations.Clear();
+            int sends = NcHttpClient.SendCount;
+            var result = controller.ExecuteRemoteSync(snapshot);
+            Check("Lobby-only sync changes only lobby for event=" + isEvent,
+                string.Join(",", TalkService.Operations.ToArray()) == "lobby:1800000000"
+                && result.AppliedLobbyEpoch == snapshot.StartEpoch
+                && !result.DelegationApplied && result.Warnings.Count == 0
+                && NcHttpClient.SendCount == sends);
+        }
+        snapshot.UpdateLobby = false;
+        TalkService.Operations.Clear();
+        Check("Lobby-only snapshot without a required lobby change makes no requests",
+            !controller.ExecuteRemoteSync(snapshot).AppliedLobbyEpoch.HasValue
+            && TalkService.Operations.Count == 0);
+
+        snapshot.LobbyOnly = false;
+        snapshot.IsEventConversation = false;
+        snapshot.AddUsers = false;
+        snapshot.AddGuests = false;
+        snapshot.DelegationPending = false;
+        foreach (string description in new[] { "Existing description", "", null })
+        {
+            snapshot.Description = description;
+            TalkService.Operations.Clear();
+            controller.ExecuteRemoteSync(snapshot);
+            Check("Full sync retains explicit description update including empty or null",
+                TalkService.Operations.Contains("name:Do not rename")
+                && TalkService.Operations.Contains("description:" + description)
+                && TalkService.Operations.Contains("delegation"));
+        }
+        snapshot.IsEventConversation = true;
+        TalkService.Operations.Clear();
+        controller.ExecuteRemoteSync(snapshot);
+        Check("Full event-conversation sync still omits name and description",
+            string.Join(",", TalkService.Operations.ToArray()) == "delegation");
+    }
 
     private static void TestLifecycleAccountMatching()
     {
@@ -1400,6 +1500,134 @@ internal static class TalkIfbLifecycleTests
         };
     }
 
+    private static void TestLobbySyncCoalescing()
+    {
+        foreach (string scenario in new[] { "full-lobby", "full-lobby-lobby", "lobby-full", "lobby-lobby" })
+        {
+            using (var firstStarted = new ManualResetEventSlim(false))
+            using (var releaseFirst = new ManualResetEventSlim(false))
+            using (var completed = new ManualResetEventSlim(false))
+            {
+                var executed = new List<TalkAppointmentSyncSnapshot>();
+                int completionCount = 0;
+                using (var coordinator = new TalkAppointmentSyncCoordinator(
+                    snapshot =>
+                    {
+                        int count;
+                        lock (executed)
+                        {
+                            executed.Add(snapshot);
+                            count = executed.Count;
+                        }
+                        if (count == 1)
+                        {
+                            firstStarted.Set();
+                            releaseFirst.Wait(TimeSpan.FromSeconds(5));
+                        }
+                        return new TalkAppointmentSyncResult(snapshot.RoomToken);
+                    },
+                    result =>
+                    {
+                        if (Interlocked.Increment(ref completionCount) == 2)
+                        {
+                            completed.Set();
+                        }
+                        return Task.FromResult(0);
+                    }))
+                {
+                    coordinator.Queue(NewSnapshot("running"));
+                    Check("Lobby merge worker starts for " + scenario,
+                        firstStarted.Wait(TimeSpan.FromSeconds(5)));
+                    var full = NewSnapshot("New room name");
+                    full.Description = "New room description";
+                    full.RoomUrl = "https://cloud.example.test/call/same-room";
+                    full.Configuration = NewConfiguration();
+                    full.AddUsers = true;
+                    full.AddGuests = true;
+                    full.AttendeeEmails.Add("new-person@example.test");
+                    full.DelegationPending = true;
+                    full.DelegateUserId = "new-moderator";
+                    full.DataDirectory = "original-directory";
+                    full.ProfileScope = "original-profile";
+                    full.CacheHours = 24;
+                    full.StartEpoch = 1800000000;
+                    var lobby = NewSnapshot("unused-lobby-name");
+                    lobby.LobbyOnly = true;
+                    lobby.UpdateLobby = true;
+                    lobby.LobbyKnown = true;
+                    lobby.LobbyEnabled = true;
+                    lobby.StartEpoch = 1800000600;
+                    lobby.End = DateTime.UtcNow;
+
+                    if (scenario.StartsWith("full", StringComparison.Ordinal))
+                    {
+                        coordinator.Queue(full);
+                        coordinator.Queue(lobby);
+                        if (scenario == "full-lobby-lobby")
+                        {
+                            lobby = new TalkAppointmentSyncSnapshot
+                            {
+                                RoomToken = "same-room", LobbyOnly = true,
+                                UpdateLobby = true, LobbyKnown = true, LobbyEnabled = true,
+                                StartEpoch = 1799990000, End = lobby.End.AddHours(-3)
+                            };
+                            coordinator.Queue(lobby);
+                        }
+                    }
+                    else
+                    {
+                        coordinator.Queue(lobby);
+                        coordinator.Queue(scenario == "lobby-full" ? full : new TalkAppointmentSyncSnapshot
+                        {
+                            RoomToken = "same-room", LobbyOnly = true, UpdateLobby = true,
+                            StartEpoch = 1799990000, End = lobby.End.AddHours(-3)
+                        });
+                    }
+                    releaseFirst.Set();
+                    Check("Lobby merge worker completes for " + scenario,
+                        completed.Wait(TimeSpan.FromSeconds(5)));
+                    lock (executed)
+                    {
+                        Check("Lobby merge keeps exactly one pending update for " + scenario,
+                            executed.Count == 2);
+                        if (executed.Count != 2) { continue; }
+                        var merged = executed[1];
+                        if (scenario.StartsWith("full", StringComparison.Ordinal))
+                        {
+                            Check("Deferred lobby preserves every full field for " + scenario,
+                                !merged.LobbyOnly && merged.RoomName == full.RoomName
+                                && merged.Description == full.Description && merged.RoomUrl == full.RoomUrl
+                                && merged.AddUsers && merged.AddGuests
+                                && merged.AttendeeEmails.Count == 1 && merged.AttendeeEmails[0] == full.AttendeeEmails[0]
+                                && merged.DelegationPending && merged.DelegateUserId == full.DelegateUserId
+                                && object.ReferenceEquals(merged.Configuration, full.Configuration)
+                                && merged.DataDirectory == full.DataDirectory && merged.ProfileScope == full.ProfileScope
+                                && merged.CacheHours == full.CacheHours);
+                            Check("Newest lobby capture wins even when moved earlier for " + scenario,
+                                merged.UpdateLobby == lobby.UpdateLobby && merged.LobbyKnown == lobby.LobbyKnown
+                                && merged.LobbyEnabled == lobby.LobbyEnabled && merged.StartEpoch == lobby.StartEpoch
+                                && merged.End == lobby.End && merged.IsEventConversation == lobby.IsEventConversation);
+                            Check("Merging does not mutate the original full snapshot for " + scenario,
+                                !object.ReferenceEquals(merged, full) && full.StartEpoch == 1800000000
+                                && !full.UpdateLobby);
+                        }
+                        else if (scenario == "lobby-full")
+                        {
+                            Check("Newer full snapshot replaces pending lobby completely",
+                                object.ReferenceEquals(merged, full) && !merged.UpdateLobby && !merged.LobbyOnly);
+                        }
+                        else
+                        {
+                            Check("Newer lobby snapshot replaces pending lobby without widening scope",
+                                merged.LobbyOnly && merged.StartEpoch == 1799990000
+                                && merged.Description == string.Empty && !merged.DelegationPending);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private static void TestProtectedStateStoreCompatibility()
     {
         string root = NewTestRoot("protected-state");
@@ -1822,7 +2050,17 @@ internal static class TalkIfbLifecycleTests
         $appointmentSyncController `
         '        private static void ExecuteParticipantSync(' `
         '        private static void ExecuteDelegationSync('
-    $testCode.Replace('// EXECUTE_PARTICIPANT_SYNC_SOURCE', $participantSyncSource) |
+    $executeRemoteSyncSource = Get-SourceSlice `
+        $appointmentSyncController `
+        '        internal TalkAppointmentSyncResult ExecuteRemoteSync(' `
+        '        internal bool ApplyRemoteSyncResult('
+    $executeRoomSyncSource = Get-SourceSlice `
+        $appointmentSyncController `
+        '        private static void ExecuteRoomNameSync(' `
+        '        private static void ExecuteParticipantSync('
+    $testCode.Replace('// EXECUTE_PARTICIPANT_SYNC_SOURCE', $participantSyncSource).
+        Replace('// EXECUTE_REMOTE_SYNC_SOURCE', $executeRemoteSyncSource).
+        Replace('// EXECUTE_ROOM_SYNC_SOURCE', $executeRoomSyncSource) |
         Set-Content -LiteralPath $testSource -Encoding UTF8
 
     $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"

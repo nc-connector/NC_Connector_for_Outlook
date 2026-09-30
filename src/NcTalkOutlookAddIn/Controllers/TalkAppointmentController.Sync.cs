@@ -79,6 +79,7 @@ namespace NcTalkOutlookAddIn.Controllers
             {
                 RoomToken = roomToken.Trim(),
                 RoomUrl = roomUrl ?? string.Empty,
+                LobbyOnly = lobbyOnly,
                 IsEventConversation = isEventConversation,
                 LobbyKnown = lobbyKnown,
                 LobbyEnabled = lobbyEnabled,
@@ -155,6 +156,12 @@ namespace NcTalkOutlookAddIn.Controllers
             }
 
             var service = new TalkService(snapshot.Configuration);
+            if (snapshot.LobbyOnly)
+            {
+                ExecuteLobbySync(service, snapshot, result);
+                return result;
+            }
+
             ExecuteRoomNameSync(service, snapshot, result);
             ExecuteLobbySync(service, snapshot, result);
             ExecuteDescriptionSync(service, snapshot, result);

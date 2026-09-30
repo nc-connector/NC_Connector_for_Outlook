@@ -26,6 +26,8 @@ namespace NcTalkOutlookAddIn.Models
 
         internal string RoomUrl { get; set; }
 
+        internal bool LobbyOnly { get; set; }
+
         internal bool IsEventConversation { get; set; }
 
         internal bool LobbyKnown { get; set; }
@@ -59,6 +61,19 @@ namespace NcTalkOutlookAddIn.Models
         internal string DataDirectory { get; set; }
 
         internal TalkServiceConfiguration Configuration { get; set; }
+
+        internal TalkAppointmentSyncSnapshot WithLobbyUpdate(
+            TalkAppointmentSyncSnapshot lobby)
+        {
+            var updated = (TalkAppointmentSyncSnapshot)MemberwiseClone();
+            updated.IsEventConversation = lobby.IsEventConversation;
+            updated.LobbyKnown = lobby.LobbyKnown;
+            updated.LobbyEnabled = lobby.LobbyEnabled;
+            updated.UpdateLobby = lobby.UpdateLobby;
+            updated.StartEpoch = lobby.StartEpoch;
+            updated.End = lobby.End;
+            return updated;
+        }
     }
 
     internal sealed class TalkAppointmentSyncResult

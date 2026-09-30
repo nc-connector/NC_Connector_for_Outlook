@@ -59,7 +59,12 @@ namespace NcTalkOutlookAddIn.Services
                     slot = new SyncSlot();
                     _slots[key] = slot;
                 }
-                slot.Pending = snapshot;
+                // A deferred lobby check must not discard a pending full edit.
+                slot.Pending = snapshot.LobbyOnly
+                               && slot.Pending != null
+                               && !slot.Pending.LobbyOnly
+                    ? slot.Pending.WithLobbyUpdate(snapshot)
+                    : snapshot;
                 if (!slot.Running)
                 {
                     slot.Running = true;
