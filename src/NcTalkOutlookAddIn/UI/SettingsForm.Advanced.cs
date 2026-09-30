@@ -24,7 +24,7 @@ namespace NcTalkOutlookAddIn.UI
         private void ApplyAdvancedTabLayout()
         {
             int left = ScaleLogical(24);
-            int labelToComboGap = ScaleLogical(16);
+            int labelToComboGap = ScaleLogical(Result != null && Result.HasManagedIfb ? 28 : 16);
             int comboLeft = left + _ifbCacheHoursLabel.PreferredSize.Width + labelToComboGap;
             int rightMargin = ScaleLogical(24);
             int rowTop = ScaleLogical(24);

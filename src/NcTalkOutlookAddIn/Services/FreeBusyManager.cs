@@ -56,6 +56,12 @@ namespace NcTalkOutlookAddIn.Services
                 return;
             }
 
+            if (!settings.IsManagedIfbValid)
+            {
+                StopAndRestoreOwnedSettings();
+                throw new InvalidOperationException(Strings.ManagedIfbPolicyInvalid);
+            }
+
             bool credentialsComplete =
                 !string.IsNullOrWhiteSpace(settings.ServerUrl)
                 && !string.IsNullOrWhiteSpace(settings.Username)

@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "Egy központilag kezelt IFB-beállítás érvénytelen. Az IFB letiltva marad. Forduljon a rendszergazdához."
+  },
   "managed_update_notify_policy_invalid": {
     "message": "A frissítési értesítések központi beállítása érvénytelen. Az értesítések kikapcsolva maradnak. Forduljon a rendszergazdához."
   },

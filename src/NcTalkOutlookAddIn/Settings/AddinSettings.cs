@@ -14,6 +14,8 @@ namespace NcTalkOutlookAddIn.Settings
     // Persistent add-in settings (credentials, sharing/IFB options, etc.).
     internal class AddinSettings
     {
+        internal const int DefaultIfbDays = 30;
+        internal const int DefaultIfbCacheHours = 24;
         internal const int DefaultIfbPort = 7777;
         internal const int MinIfbPort = 1024;
         internal const int MaxIfbPort = 49151;
@@ -28,6 +30,10 @@ namespace NcTalkOutlookAddIn.Settings
         private bool _localTransportTlsUseSystemDefault;
         private bool _localTransportTlsEnable12;
         private bool _localTransportTlsEnable13;
+        private bool _localIfbEnabled;
+        private int _localIfbDays;
+        private int _localIfbCacheHours;
+        private int _localIfbPort;
 
         public AddinSettings()
         {
@@ -36,8 +42,8 @@ namespace NcTalkOutlookAddIn.Settings
             AppPassword = string.Empty;
             AuthMode = AuthenticationMode.LoginFlow;
             IfbEnabled = false;
-            IfbDays = 30;
-            IfbCacheHours = 24;
+            IfbDays = DefaultIfbDays;
+            IfbCacheHours = DefaultIfbCacheHours;
             IfbPort = DefaultIfbPort;
             IfbPreviousFreeBusyPath = string.Empty;
             IfbUserDecisionRecorded = false;
@@ -76,13 +82,36 @@ namespace NcTalkOutlookAddIn.Settings
 
         public AuthenticationMode AuthMode { get; set; }
 
-        public bool IfbEnabled { get; set; }
+        public bool IfbEnabled
+        {
+            get { return HasManagedIfb ? _managedSetupPolicy.IfbEnabled : _localIfbEnabled; }
+            set { _localIfbEnabled = value; }
+        }
 
-        public int IfbDays { get; set; }
+        public int IfbDays
+        {
+            get { return HasManagedIfb ? _managedSetupPolicy.IfbDays : _localIfbDays; }
+            set { _localIfbDays = value; }
+        }
 
-        public int IfbCacheHours { get; set; }
+        public int IfbCacheHours
+        {
+            get { return HasManagedIfb ? _managedSetupPolicy.IfbCacheHours : _localIfbCacheHours; }
+            set { _localIfbCacheHours = value; }
+        }
 
-        public int IfbPort { get; set; }
+        public int IfbPort
+        {
+            get { return HasManagedIfb ? _managedSetupPolicy.IfbPort : _localIfbPort; }
+            set { _localIfbPort = value; }
+        }
+
+        internal bool LocalIfbEnabled { get { return _localIfbEnabled; } }
+        internal int LocalIfbDays { get { return _localIfbDays; } }
+        internal int LocalIfbCacheHours { get { return _localIfbCacheHours; } }
+        internal int LocalIfbPort { get { return _localIfbPort; } }
+        internal bool HasManagedIfb { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasIfbPolicy; } }
+        internal bool IsManagedIfbValid { get { return !HasManagedIfb || _managedSetupPolicy.IsIfbPolicyValid; } }
 
         public string IfbPreviousFreeBusyPath { get; set; }
 

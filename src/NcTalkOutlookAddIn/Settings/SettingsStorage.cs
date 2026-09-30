@@ -614,10 +614,10 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "Username", Safe(settings.Username));
             AppendElement(document, root, "AppPasswordProtected", ProtectPassword(settings.AppPassword));
             AppendElement(document, root, "AuthMode", settings.AuthMode.ToString());
-            AppendElement(document, root, "IfbEnabled", settings.IfbEnabled.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "IfbDays", settings.IfbDays.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "IfbCacheHours", settings.IfbCacheHours.ToString(CultureInfo.InvariantCulture));
-            AppendElement(document, root, "IfbPort", AddinSettings.NormalizeIfbPort(settings.IfbPort).ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "IfbEnabled", settings.LocalIfbEnabled.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "IfbDays", settings.LocalIfbDays.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "IfbCacheHours", settings.LocalIfbCacheHours.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "IfbPort", AddinSettings.NormalizeIfbPort(settings.LocalIfbPort).ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbPreviousFreeBusyPath", Safe(settings.IfbPreviousFreeBusyPath));
             AppendElement(document, root, "IfbUserDecisionRecorded", settings.IfbUserDecisionRecorded.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "DebugLoggingEnabled", settings.LocalDebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));

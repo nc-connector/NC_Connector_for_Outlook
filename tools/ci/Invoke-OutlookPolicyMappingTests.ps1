@@ -1190,19 +1190,199 @@ internal static class OutlookPolicyUiTests
     }
     private static object Managed(object url, object locked, object ribbon, string source)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedTls(object system, object tls12, object tls13, string source = "TLS test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, null, null, null, null, source);
     }
     private static object ManagedLogging(object debug, object anonymize, string source = "Logging test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, null, null, null, null, source);
     }
     private static object ManagedUpdateNotify(object value)
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, "Update notification test");
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, null, null, null, null, "Update notification test");
+    }
+    private static object ManagedIfb(object enabled, object days, object cacheHours, object port, string source = "IFB test")
+    {
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, enabled, days, cacheHours, port, source);
+    }
+    private static readonly string[] IfbProperties = { "IfbEnabled", "IfbDays", "IfbCacheHours", "IfbPort" };
+    private static void CheckIfb(object target, object[] values, string message, bool raw = false)
+    {
+        for (int i = 0; i < IfbProperties.Length; i++)
+            Check(object.Equals(Get(target, (raw ? "Local" : "") + IfbProperties[i]), values[i]), message + ": " + IfbProperties[i]);
+    }
+    private static void TestManagedIfb(string root)
+    {
+        object[] defaults = { false, 30, 24, 7777 };
+        object[][] validInputs = {
+            new object[] { null, 0, 1, false, true, "false", "true" },
+            new object[] { null, 10, 30, 60, 90 },
+            new object[] { null, 1, 12, 24 },
+            new object[] { null, 1024, 7777, 49151 }
+        };
+        object[][] invalidInputs = {
+            new object[] { "", "bad", new byte[] { 1 } },
+            new object[] { 0, 9, 11, 29, 31, 59, 61, 89, 91, -1, int.MaxValue, "30", 30L, 30U, 30.0, true, "", new byte[] { 30 } },
+            new object[] { 0, 25, -1, int.MaxValue, "24", 24L, 24U, 24.0, true, "", new byte[] { 24 } },
+            new object[] { 0, 1023, 49152, -1, int.MaxValue, "7777", 7777L, 7777U, 7777.0, true, "", new byte[] { 1 } }
+        };
+        for (int field = 0; field < IfbProperties.Length; field++)
+        foreach (bool valid in new[] { true, false })
+        foreach (object selected in valid ? validInputs[field] : invalidInputs[field])
+        foreach (bool rawEnabled in new[] { false, true })
+        foreach (bool decision in new[] { false, true })
+        {
+            object[] values = { null, null, null, null };
+            values[field] = selected;
+            object policy = ManagedIfb(values[0], values[1], values[2], values[3]);
+            bool present = selected != null;
+            Check((bool)Get(policy, "HasIfbPolicy") == present && (bool)Get(policy, "IsEnterpriseRollout") == present,
+                "Any present IFB field activates rollout, including false, empty and invalid values");
+            Check((bool)Get(policy, "IsIfbPolicyValid") == valid, "IFB validity rejects unsupported values without losing presence");
+            object[] raw = { rawEnabled, 90, 3, 8888 };
+            object[] effective = (object[])(present ? defaults : raw).Clone();
+            if (present && valid) effective[field] = field == 0
+                ? (object)(object.Equals(selected, 1) || object.Equals(selected, true) || object.Equals(selected, "true"))
+                : selected;
+            object local = New("Settings.AddinSettings");
+            for (int i = 0; i < IfbProperties.Length; i++) Set(local, IfbProperties[i], raw[i]);
+            Set(local, "IfbUserDecisionRecorded", decision);
+            Call(local, "ApplyManagedSetupPolicy", policy);
+            Check((bool)Get(local, "HasManagedIfb") == present && (bool)Get(local, "IsManagedIfbValid") == valid,
+                "Settings retains IFB presence and validation separately");
+            CheckIfb(local, effective, "Effective IFB uses selected fields and missing-sibling defaults");
+            CheckIfb(local, raw, "Managed IFB preserves raw local values", true);
+            Check((bool)Get(local, "IfbUserDecisionRecorded") == decision, "Applying IFB policy is not a user decision");
+            Check((bool)Get(local, "ShowMainRibbonTab") && !(bool)Get(local, "HasManagedLogging")
+                && !(bool)Get(local, "HasManagedTransportTls") && !(bool)Get(local, "HasManagedUpdateNotify"),
+                "IFB-only policy neither hides Settings nor manages other groups");
+            object clone = Call(local, "Clone");
+            Check((bool)Get(clone, "HasManagedIfb") == present && (bool)Get(clone, "IsManagedIfbValid") == valid,
+                "Clone retains IFB presence and validity");
+            CheckIfb(clone, effective, "Clone retains effective IFB");
+            CheckIfb(clone, raw, "Clone retains local IFB", true);
+            string serialized = Serialize(local);
+            var xml = new XmlDocument(); xml.LoadXml(serialized);
+            for (int i = 0; i < IfbProperties.Length; i++)
+                Check(xml.DocumentElement[IfbProperties[i]].InnerText == Convert.ToString(raw[i], System.Globalization.CultureInfo.InvariantCulture),
+                    "Existing IFB XML elements write local choices only: " + IfbProperties[i]);
+            Check(!serialized.Contains("HasManagedIfb") && !serialized.Contains("IsManagedIfbValid") && !serialized.Contains("LocalIfb"),
+                "IFB policy metadata never enters profile XML");
+            object restored = RoundTrip(local, root);
+            CheckIfb(restored, raw, "XML alone restores saved IFB choices");
+            Check(!(bool)Get(restored, "HasManagedIfb") && (bool)Get(restored, "IfbUserDecisionRecorded") == decision,
+                "XML preserves the user decision without manufacturing a policy");
+            Call(clone, "ApplyManagedSetupPolicy", (object)null);
+            CheckIfb(clone, raw, "Removing IFB policy restores raw choices");
+            Check(!(bool)Get(clone, "HasManagedIfb") && (bool)Get(clone, "IsManagedIfbValid")
+                && (bool)Get(clone, "IfbUserDecisionRecorded") == decision, "Removal clears invalid IFB state without recording a decision");
+            Check((bool)Get(local, "HasManagedIfb") == present, "Removing a clone overlay does not mutate its source");
+        }
+        for (int field = 0; field < IfbProperties.Length; field++)
+        for (int location = 0; location < 4; location++)
+        foreach (bool valid in new[] { true, false })
+        {
+            object[] values = { null, null, null, null };
+            values[field] = valid ? new object[] { 0, 10, 1, 1024 }[field] : invalidInputs[field][0];
+            Array policies = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 4);
+            policies.SetValue(ManagedIfb(values[0], values[1], values[2], values[3]), location);
+            for (int lower = location + 1; lower < 4; lower++) policies.SetValue(ManagedIfb(1, 90, 24, 49151), lower);
+            object resolved = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+            object expected = valid ? (field == 0 ? (object)false : values[field]) : defaults[field];
+            Check(object.Equals(Get(resolved, IfbProperties[field]), expected) && (bool)Get(resolved, "IsIfbPolicyValid") == valid,
+                "First present IFB field wins in every hive/view, even when false or invalid");
+        }
+        Array mixed = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 4);
+        mixed.SetValue(ManagedIfb(1, null, null, null, "HKLM64"), 0);
+        mixed.SetValue(ManagedIfb("bad", 60, null, null, "HKLM32"), 1);
+        mixed.SetValue(ManagedIfb(null, "bad", 6, null, "HKCU64"), 2);
+        mixed.SetValue(ManagedIfb(null, null, "bad", 49151, "HKCU32"), 3);
+        object merged = Call(T("Settings.ManagedSetupPolicy"), "Resolve", mixed);
+        CheckIfb(merged, new object[] { true, 60, 6, 49151 }, "IFB fields independently merge across policy locations");
+        Check((bool)Get(merged, "IsIfbPolicyValid"), "Ignored malformed lower-priority IFB values cannot invalidate the selected group");
+        mixed.SetValue(ManagedTls(1, null, null), 0);
+        mixed.SetValue(ManagedLogging(1, null), 1);
+        mixed.SetValue(ManagedUpdateNotify(1), 2);
+        mixed.SetValue(ManagedIfb(0, null, null, null), 3);
+        merged = Call(T("Settings.ManagedSetupPolicy"), "Resolve", mixed);
+        Check((bool)Get(merged, "HasIfbPolicy") && (bool)Get(merged, "HasTransportTlsPolicy")
+            && (bool)Get(merged, "HasLoggingPolicy") && (bool)Get(merged, "HasUpdateNotifyPolicy"),
+            "IFB, TLS, logging and update policy groups resolve independently");
+        object invalidCache = New("Settings.AddinSettings");
+        Call(invalidCache, "ApplyManagedSetupPolicy", ManagedIfb(1, 60, 0, 8888));
+        Check(!(bool)Get(invalidCache, "IsManagedIfbValid") && (int)Get(invalidCache, "IfbCacheHours") == 24
+            && (bool)Get(invalidCache, "IsManagedTransportTlsValid"), "Malformed IFB cache uses 24 hours without blocking unrelated transport");
+        TestManagedIfbUi(root);
+        Console.WriteLine("[OK] Managed IFB presence, DWORD validation, precedence, defaults, raw XML, clone/removal, UI and seat parity");
+    }
+    private static void TestManagedIfbUi(string root)
+    {
+        string[] fields = { "_ifbEnabledCheckBox", "_ifbDaysCombo", "_ifbCacheHoursCombo", "_ifbPortUpDown" };
+        object[][] policies = {
+            new object[] { 0, null, null, null }, new object[] { 1, 60, 6, 8888 },
+            new object[] { null, 90, null, null }, new object[] { null, null, 1, null },
+            new object[] { null, null, null, 1024 }, new object[] { 1, "bad", 25, 49152 }
+        };
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string seat in new[] { "active", "none", "paused", "invalid" })
+        foreach (object[] values in policies)
+        foreach (bool decision in new[] { false, true })
+        {
+            object local = New("Settings.AddinSettings");
+            object[] raw = { false, 10, 2, 9999 };
+            for (int i = 0; i < IfbProperties.Length; i++) Set(local, IfbProperties[i], raw[i]);
+            Set(local, "IfbUserDecisionRecorded", decision);
+            Call(local, "ApplyManagedSetupPolicy", ManagedIfb(values[0], values[1], values[2], values[3]));
+            object status = Status(D(), D(), true, mode, seat);
+            using (Form form = Settings(local, status))
+            {
+                var enabled = (CheckBox)Field(form, fields[0]);
+                Check(((TabControl)Field(form, "_tabControl")).TabPages.Count == 8, "IFB-only rollout retains every settings tab");
+                foreach (bool busy in new[] { false, true, false })
+                {
+                    Call(form, "SetBusy", busy); Call(form, "UpdateControlState");
+                    foreach (string field in fields) Check(!((Control)Field(form, field)).Enabled,
+                        "IFB group remains locked through busy and state refresh: " + field);
+                    Check(enabled.Checked == (bool)Get(local, "IfbEnabled"), "Managed enabled value remains visible without credentials");
+                    Check((int)Call(T("UI.SettingsForm"), "ParseComboValue", Field(form, fields[1]), 30) == (int)Get(local, "IfbDays")
+                        && (int)Call(T("UI.SettingsForm"), "ParseComboValue", Field(form, fields[2]), 24) == (int)Get(local, "IfbCacheHours")
+                        && ((NumericUpDown)Field(form, fields[3])).Value == (int)Get(local, "IfbPort"), "IFB controls display effective values");
+                    Check(((CheckBox)Field(form, "_debugLogCheckBox")).Enabled == !busy
+                        && ((Button)Field(form, "_updateCheckButton")).Enabled == !busy, "IFB policy leaves unrelated controls available");
+                }
+                string expectedHint = (string)T("Utilities.Strings").GetProperty(
+                    (bool)Get(local, "IsManagedIfbValid") ? "PolicyAdminControlledTooltip" : "ManagedIfbPolicyInvalid", Flags).GetValue(null, null);
+                foreach (string field in fields)
+                    Check(((ToolTip)Field(form, "_toolTip")).GetToolTip((Control)Field(form, field)) == expectedHint,
+                        "Every managed IFB control explains its lock or invalid policy: " + field);
+                Call(form, "ApplyBackendPolicyStatus", "managed_ifb_test");
+                foreach (string field in fields) Check(!((Control)Field(form, field)).Enabled, "Backend refresh cannot unlock IFB policy");
+                Task save = (Task)Call(form, "SaveSettingsAsync");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+                while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(save.IsCompleted, "Managed IFB settings save completes without network credentials"); save.GetAwaiter().GetResult();
+                Check(form.DialogResult == DialogResult.OK, "IFB policy errors do not block unrelated settings saves");
+                object result = Get(form, "Result");
+                CheckIfb(result, raw, "Saving managed controls never bakes IFB into local preferences", true);
+                Check((bool)Get(result, "IfbUserDecisionRecorded") == decision, "Managed settings save does not record an IFB user decision");
+                CheckIfb(RoundTrip(result, root), raw, "Actual managed settings save retains raw IFB XML");
+            }
+            Check(RolloutNotice(local, status) == RolloutNotice(ManagedSettings(null, true), status),
+                "IFB-only rollout retains shared Community/Pro access and personal-seat rules");
+            using (Form form = Settings(local, status))
+            {
+                ((TextBox)Field(form, "_serverUrlTextBox")).Text = "https://cloud.example.test";
+                ((TextBox)Field(form, "_usernameTextBox")).Text = "ifb-test";
+                ((TextBox)Field(form, "_appPasswordTextBox")).Text = "test-only";
+                Call(form, "UpdateControlState");
+                Check(((CheckBox)Field(form, fields[0])).Checked == (bool)Get(local, "IfbEnabled"),
+                    "Completing credentials cannot auto-enable a managed false IFB value");
+                foreach (string field in fields) Check(!((Control)Field(form, field)).Enabled, "Completing credentials cannot unlock managed IFB");
+            }
+        }
     }
     private static void TestManagedUpdateNotify(string root)
     {
@@ -1790,6 +1970,7 @@ internal static class OutlookPolicyUiTests
             TestManagedTls(root);
             TestManagedLogging(root);
             TestManagedUpdateNotify(root);
+            TestManagedIfb(root);
             Console.WriteLine("[OK] " + Checks + " production policy/persistence/UI assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
@@ -1801,6 +1982,182 @@ internal static class OutlookPolicyUiTests
     if ($LASTEXITCODE -ne 0) { throw 'Policy UI test harness compilation failed.' }
     & $uiExe (Join-Path $uiOutput 'NcTalkOutlookAddIn.dll') $TempRoot
     if ($LASTEXITCODE -ne 0) { throw 'Production policy/persistence/UI tests failed.' }
+
+    # Compile the production registry reader and IFB manager against in-memory platform doubles.
+    $ifbSource = Join-Path $TempRoot 'ManagedIfbRuntimeTests.cs'
+    @'
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Win32;
+using NcTalkOutlookAddIn.Settings;
+using NcTalkOutlookAddIn.Services;
+namespace Microsoft.Win32 {
+    public sealed class RegistryKey : IDisposable {
+        public static readonly Dictionary<string, Dictionary<string, object[]>> Fixtures = new Dictionary<string, Dictionary<string, object[]>>();
+        private readonly string location;
+        private RegistryKey(string value) { location = value; }
+        public static RegistryKey OpenBaseKey(RegistryHive hive, RegistryView view) { return new RegistryKey(hive + "/" + view); }
+        public RegistryKey OpenSubKey(string path, bool writable) {
+            if (path != @"Software\Policies\NC Connector" || writable) throw new Exception("Unexpected registry access");
+            return Fixtures.ContainsKey(location) ? this : null;
+        }
+        public string[] GetValueNames() { return Fixtures[location].Keys.ToArray(); }
+        public RegistryValueKind GetValueKind(string name) { return (RegistryValueKind)Fixtures[location][name][1]; }
+        public object GetValue(string name, object missing, RegistryValueOptions options) {
+            if (options != RegistryValueOptions.DoNotExpandEnvironmentNames) throw new Exception("Unexpected registry expansion");
+            object[] value; return Fixtures[location].TryGetValue(name, out value) ? value[0] : missing;
+        }
+        public void Dispose() {}
+    }
+}
+namespace Microsoft.Office.Interop.Outlook { public sealed class Application { public string Version { get { return "16.0"; } } } }
+namespace NcTalkOutlookAddIn.Models { internal sealed class BackendPolicyStatus {} }
+namespace NcTalkOutlookAddIn.Settings {
+    internal sealed class AddinSettings {
+        internal const int DefaultIfbDays = 30, DefaultIfbCacheHours = 24, DefaultIfbPort = 7777, MinIfbPort = 1024, MaxIfbPort = 49151;
+        internal string ServerUrl = "https://cloud.example.test", Username = "test", AppPassword = "test-only";
+        internal bool IfbEnabled, IsEnterpriseRollout, IsManagedIfbValid = true;
+        internal int IfbDays = DefaultIfbDays, IfbCacheHours = DefaultIfbCacheHours, IfbPort = DefaultIfbPort;
+        internal static int NormalizeIfbPort(int port) { return port >= MinIfbPort && port <= MaxIfbPort ? port : DefaultIfbPort; }
+    }
+}
+namespace NcTalkOutlookAddIn.Utilities {
+    internal static class LogCategories { internal const string Core = "core", Ifb = "ifb"; }
+    internal static class DiagnosticsLogger {
+        internal static void Log(string category, string message) {}
+        internal static void LogException(string category, string message, Exception ex) {}
+    }
+    internal static class Strings { internal const string ManagedIfbPolicyInvalid = "Invalid managed IFB policy"; }
+}
+namespace NcTalkOutlookAddIn.Services {
+    internal sealed class TalkServiceConfiguration {
+        private readonly bool complete;
+        internal TalkServiceConfiguration(string url, string username, string password) { complete = url.StartsWith("https://") && username.Length > 0 && password.Length > 0; }
+        internal bool IsComplete() { return complete; }
+    }
+    internal sealed class IfbAddressBookCache { internal IfbAddressBookCache(string root, string profile) {} }
+    internal sealed class FreeBusyServer {
+        internal static int Starts, Stops, Updates, Port, Days, CacheHours;
+        internal static bool Rollout;
+        internal static string Secret;
+        internal FreeBusyServer(IfbAddressBookCache cache, Func<TalkServiceConfiguration, NcTalkOutlookAddIn.Models.BackendPolicyStatus> policy) {}
+        internal void UpdateSettings(TalkServiceConfiguration config, int days, int cacheHours, string secret, bool rollout) {
+            Updates++; Days = days; CacheHours = cacheHours; Secret = secret; Rollout = rollout;
+        }
+        internal void Start(int port) { Starts++; Port = port; }
+        internal void Stop() { Stops++; }
+    }
+    internal sealed class IfbRegistryOwnershipManager {
+        internal static int Applies, Restores;
+        internal static string Url;
+        internal IfbRegistryOwnershipManager(string root, string profile) {}
+        internal void Apply(string version, string url, AddinSettings settings) { Applies++; Url = url; }
+        internal void Restore() { Restores++; }
+    }
+}
+internal static class ManagedIfbRuntimeTests {
+    private static int checks;
+    private static void Check(bool value, string message) { checks++; if (!value) throw new Exception(message); }
+    private static string[] Locations() {
+        return Environment.Is64BitOperatingSystem
+            ? new[] { "LocalMachine/Registry64", "LocalMachine/Registry32", "CurrentUser/Registry64", "CurrentUser/Registry32" }
+            : new[] { "LocalMachine/Registry32", "CurrentUser/Registry32" };
+    }
+    private static void Put(int location, string name, object value, RegistryValueKind kind) {
+        string key = Locations()[location];
+        Dictionary<string, object[]> values;
+        if (!RegistryKey.Fixtures.TryGetValue(key, out values)) {
+            values = new Dictionary<string, object[]>(StringComparer.OrdinalIgnoreCase); RegistryKey.Fixtures[key] = values;
+        }
+        values[name] = new object[] { value, kind };
+    }
+    private static AddinSettings Settings(ManagedSetupPolicy policy) {
+        return new AddinSettings { IfbEnabled = policy.IfbEnabled, IfbDays = policy.IfbDays, IfbCacheHours = policy.IfbCacheHours,
+            IfbPort = policy.IfbPort, IsManagedIfbValid = policy.IsIfbPolicyValid, IsEnterpriseRollout = policy.IsEnterpriseRollout };
+    }
+    private static void TestRegistryKindsAndPrecedence() {
+        RegistryKey.Fixtures.Clear();
+        Check(!ManagedSetupPolicy.Load().HasIfbPolicy, "Absent IFB registry group remains unmanaged");
+        string[] fields = { "IfbEnabled", "IfbDays", "IfbCacheHours", "IfbPort" };
+        object[] validValues = { 1, 60, 6, 8888 };
+        foreach (string field in fields)
+        foreach (RegistryValueKind kind in new[] { RegistryValueKind.DWord, RegistryValueKind.QWord, RegistryValueKind.String,
+            RegistryValueKind.ExpandString, RegistryValueKind.MultiString, RegistryValueKind.Binary, RegistryValueKind.None, RegistryValueKind.Unknown })
+        for (int location = 0; location < Locations().Length; location++) {
+            RegistryKey.Fixtures.Clear();
+            int index = Array.IndexOf(fields, field);
+            object value = kind == RegistryValueKind.QWord ? (object)Convert.ToInt64(validValues[index])
+                : kind == RegistryValueKind.String || kind == RegistryValueKind.ExpandString ? (object)validValues[index].ToString()
+                : kind == RegistryValueKind.MultiString ? (object)new[] { validValues[index].ToString() }
+                : kind == RegistryValueKind.Binary ? (object)new byte[] { 1 } : validValues[index];
+            Put(location, field, value, kind);
+            for (int lower = location + 1; lower < Locations().Length; lower++) Put(lower, field, validValues[index], RegistryValueKind.DWord);
+            ManagedSetupPolicy policy = ManagedSetupPolicy.Load();
+            bool valid = kind == RegistryValueKind.DWord || index == 0 && (kind == RegistryValueKind.QWord
+                || kind == RegistryValueKind.String || kind == RegistryValueKind.ExpandString);
+            Check(policy.HasIfbPolicy && policy.IsEnterpriseRollout && policy.IsIfbPolicyValid == valid,
+                "Production reader honors IFB kind and first-present priority: " + field + "/" + kind + "/" + location);
+            if (valid) Check(index == 0 ? policy.IfbEnabled : index == 1 ? policy.IfbDays == 60 : index == 2 ? policy.IfbCacheHours == 6 : policy.IfbPort == 8888,
+                "Production registry reader retains selected valid value");
+        }
+        foreach (string field in fields) {
+            RegistryKey.Fixtures.Clear(); Put(0, field.ToLowerInvariant(), null, RegistryValueKind.DWord);
+            ManagedSetupPolicy policy = ManagedSetupPolicy.Load();
+            Check(policy.HasIfbPolicy && !policy.IsIfbPolicyValid, "Present null IFB value cannot disappear or fall back");
+        }
+        RegistryKey.Fixtures.Clear();
+        Put(0, "IfbEnabled", 0, RegistryValueKind.DWord);
+        Put(Locations().Length - 1, "IfbEnabled", 1, RegistryValueKind.DWord);
+        Put(Locations().Length - 1, "IfbCacheHours", 3, RegistryValueKind.DWord);
+        ManagedSetupPolicy mixed = ManagedSetupPolicy.Load();
+        Check(!mixed.IfbEnabled && mixed.IfbCacheHours == 3 && mixed.IfbDays == 30 && mixed.IfbPort == 7777 && mixed.IsIfbPolicyValid,
+            "Managed false masks lower enabled while siblings resolve independently");
+    }
+    private static void TestManager() {
+        RegistryKey.Fixtures.Clear(); Put(0, "IfbEnabled", 1, RegistryValueKind.DWord);
+        Put(0, "IfbDays", 60, RegistryValueKind.DWord); Put(0, "IfbCacheHours", 6, RegistryValueKind.DWord); Put(0, "IfbPort", 8888, RegistryValueKind.DWord);
+        AddinSettings settings = Settings(ManagedSetupPolicy.Load());
+        using (var manager = new FreeBusyManager("in-memory", "managed-ifb-test")) {
+            manager.Initialize(new Microsoft.Office.Interop.Outlook.Application()); manager.ApplySettings(settings);
+            Check(FreeBusyServer.Starts == 1 && FreeBusyServer.Updates == 1 && IfbRegistryOwnershipManager.Applies == 1,
+                "Valid managed IFB starts and owns the endpoint through the production manager");
+            Check(FreeBusyServer.Port == 8888 && FreeBusyServer.Days == 60 && FreeBusyServer.CacheHours == 6 && FreeBusyServer.Rollout,
+                "Production manager forwards managed port, days, shared cache hours and rollout gate");
+            Check(FreeBusyServer.Secret.Length == 64 && IfbRegistryOwnershipManager.Url == "http://127.0.0.1:8888/nc-ifb/" + FreeBusyServer.Secret + "/freebusy/%NAME%@%SERVER%.vfb",
+                "Managed IFB retains the process secret and Outlook attendee placeholders");
+            foreach (bool enabled in new[] { false, true })
+            foreach (bool credentials in new[] { false, true }) {
+                settings.IfbEnabled = enabled; settings.Username = credentials ? "test" : ""; settings.IsManagedIfbValid = false;
+                int restores = IfbRegistryOwnershipManager.Restores, stops = FreeBusyServer.Stops;
+                bool rejected = false;
+                try { manager.ApplySettings(settings); }
+                catch (InvalidOperationException ex) { rejected = ex.Message == NcTalkOutlookAddIn.Utilities.Strings.ManagedIfbPolicyInvalid; }
+                Check(rejected && FreeBusyServer.Starts == 1 && FreeBusyServer.Updates == 1 && IfbRegistryOwnershipManager.Applies == 1,
+                    "Invalid managed IFB rejects before credentials, listener updates or registry writes");
+                Check(IfbRegistryOwnershipManager.Restores == restores + 1 && FreeBusyServer.Stops == stops + 1,
+                    "Invalid policy stops the running listener and restores owned state");
+            }
+            settings.IsManagedIfbValid = true; settings.IfbEnabled = true; settings.Username = ""; manager.ApplySettings(settings);
+            Check(FreeBusyServer.Starts == 1, "Managed enabled without credentials cannot start a listener");
+            settings.Username = "test"; settings.IfbEnabled = false; manager.ApplySettings(settings);
+            Check(FreeBusyServer.Starts == 1, "Managed disabled with complete credentials cannot start a listener");
+            settings.IfbEnabled = true; manager.ApplySettings(settings);
+            Check(FreeBusyServer.Starts == 2, "Corrected managed settings can start again");
+        }
+        Check(FreeBusyServer.Stops > 0 && IfbRegistryOwnershipManager.Restores > 0, "Manager disposal stops and restores without rewriting managed enabled");
+    }
+    public static int Main() {
+        try { TestRegistryKindsAndPrecedence(); TestManager(); Console.WriteLine("[OK] " + checks + " in-memory production IFB registry/manager assertions passed"); return 0; }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+}
+'@ | Set-Content -LiteralPath $ifbSource -Encoding UTF8
+    $ifbExe = Join-Path $TempRoot 'ManagedIfbRuntimeTests.exe'
+    & $csc /noconfig /nologo /nowarn:0436 /target:exe "/out:$ifbExe" /reference:System.dll /reference:System.Core.dll $ifbSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Settings/ManagedSetupPolicy.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Services/FreeBusyManager.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Utilities/NextcloudUriValidator.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Managed IFB runtime test harness compilation failed.' }
+    & $ifbExe
+    if ($LASTEXITCODE -ne 0) { throw 'Production managed IFB registry/runtime tests failed.' }
 
     # Exercise the production workflow with dialog/network doubles; never touch a user's profile.
     $workflowSource = Join-Path $TempRoot 'SettingsWorkflowTests.cs'

@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "Uma configuração de IFB gerenciada centralmente é inválida. O IFB permanece desativado. Entre em contato com o administrador."
+  },
   "managed_update_notify_policy_invalid": {
     "message": "A configuração centralizada das notificações de atualização é inválida. As notificações permanecem desativadas. Entre em contato com o administrador."
   },

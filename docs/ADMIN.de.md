@@ -345,9 +345,45 @@ New-ItemProperty -Path $policyPath -Name UpdateNotifyEnabled -PropertyType DWord
 
 Auf einem Pilotarbeitsplatz Outlook neu starten, den gesperrten ausgeschalteten Schalter prüfen und **Jetzt prüfen** ausführen. Zum Zurücknehmen den Wert aus allen zutreffenden Policy-Pfaden entfernen und Outlook neu starten. Die gespeicherte Benutzerauswahl gilt wieder, auch nach dem Speichern anderer Einstellungen während aktiver Policy. Ohne gespeicherte Auswahl sind Benachrichtigungen standardmäßig aus. Andere Rollout-Werte bleiben wirksam; nur `ShowMainRibbonTab=false` blendet die Einstellungen aus.
 
+### Verwaltetes Internet Free/Busy (IFB)
+
+Diese Werte an den [verwalteten Policy-Pfaden](#verwaltete-nextcloud-url) setzen. Jeder Wert wird unabhängig aufgelöst: HKLM 64-Bit, HKLM 32-Bit, HKCU 64-Bit, HKCU 32-Bit. Der erste vorhandene Eintrag gewinnt, auch wenn er ungültig ist; nachrangige Werte beheben ihn nicht.
+
+| Wert | Typ und zulässige Werte | Standard bei fehlendem Wert in einer aktiven IFB-Policy |
+| --- | --- | --- |
+| `IfbEnabled` | Vorzugsweise `REG_DWORD`: `0` aus, `1` an; Boolean-Strings wie `true` und `false` werden ebenfalls akzeptiert | `0` |
+| `IfbDays` | `REG_DWORD`: `10`, `30`, `60` oder `90` Tage | `30` |
+| `IfbCacheHours` | `REG_DWORD`: `1` bis `24` Stunden | `24` |
+| `IfbPort` | `REG_DWORD`: `1024` bis `49151` | `7777` |
+
+Bereits ein vorhandener IFB-Wert aktiviert Enterprise Rollout und sperrt alle vier Felder: Aktivierung, Tage und Port unter **Einstellungen -> IFB** sowie die Cache-Dauer unter **Einstellungen -> Erweitert**. Das gilt auch bei `IfbEnabled=0` oder einem ungültigen Wert. Fehlende Werte verwenden die Produktstandards der Tabelle, nicht gespeicherte lokale Einstellungen. Eine reine Port-Vorgabe lässt IFB daher deaktiviert. Vor jeder IFB-Policy das Backend bereitstellen und jedem Benutzer einen gültigen aktiven Seat zuweisen; für Community- und Pro-Seats gelten dieselben Voraussetzungen. Die IFB-Policy blendet weder Ribbon noch Einstellungen aus; das bewirkt ausschließlich `ShowMainRibbonTab=false`.
+
+Beispiel: IFB mit Standardzeitraum, Cache-Dauer und Port aktivieren. In einer erhöhten 64-Bit-PowerShell ausführen:
+
+```powershell
+$policyPath = "HKLM:\Software\Policies\NC Connector"
+New-Item -Path $policyPath -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name IfbEnabled -PropertyType DWord -Value 1 -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name IfbDays -PropertyType DWord -Value 30 -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name IfbCacheHours -PropertyType DWord -Value 24 -Force | Out-Null
+New-ItemProperty -Path $policyPath -Name IfbPort -PropertyType DWord -Value 7777 -Force | Out-Null
+```
+
+Für einen eigenen Port muss ein Administrator zuerst die passende [URL-Reservierung](#eigener-ifb-port) anlegen. Das Add-in fordert keine erhöhten Rechte an und erstellt eine eigene Reservierung nicht automatisch.
+
+Nach der Verteilung:
+
+1. Outlook neu starten; Registry-Änderungen werden nicht im laufenden Betrieb übernommen.
+2. **Einstellungen -> IFB** und **Einstellungen -> Erweitert** öffnen, sofern die Ribbon-Policy dies zulässt. Die drei IFB-Felder und die Cache-Dauer zeigen die effektiven Werte und bleiben mit Administrator-Tooltip gesperrt, auch bei deaktiviertem IFB.
+3. Bei aktiviertem IFB den Benutzer anmelden sowie Backend-Zugriff und aktiven Seat bestätigen. Passende URL-Reservierung, TCP-Listener und Outlook-Terminplanungs-Assistent wie unter [IFB](#internet-freebusy-gateway-ifb) beschrieben prüfen.
+
+Hat ein ausgewählter Wert einen ungültigen Typ oder Inhalt, bleibt die gesamte IFB-Gruppe gesperrt und IFB deaktiviert. IFB-Warnung und Tooltip nennen eine ungültige zentral verwaltete IFB-Einstellung; den ausgewählten Registry-Eintrag korrigieren und Outlook neu starten. Es gibt keinen Rückgriff auf nachrangige Policies oder lokale IFB-Werte. Der Fehler deaktiviert nur IFB; Verbindungstest, Anmeldung, Freigaben, Talk und Update-Prüfungen behalten ihre bisherigen Voraussetzungen. Bei ungültigem `IfbCacheHours` verwendet der gemeinsame Talk-Adressbuch-Cache `24` Stunden. Eine gültige Cache-Dauer bleibt wirksam, wenn ein anderer IFB-Wert ungültig ist.
+
+**Vorgabe zurücknehmen:** Alle vier Wertnamen aus sämtlichen zutreffenden Hives und Registry-Ansichten entfernen und Outlook neu starten. Das Entfernen nur eines Eintrags kann einen nachrangigen Wert freigeben. Danach gelten wieder die gespeicherten lokalen IFB-Einstellungen; ohne gespeicherte Auswahl ist IFB aus, mit 30 Tagen, 24 Cache-Stunden und Port `7777`. Das Speichern anderer Einstellungen während aktiver Policy überschreibt die lokale Auswahl nicht. Andere Rollout-Werte bleiben wirksam.
+
 ### Enterprise Rollout
 
-Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled` oder `UpdateNotifyEnabled` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle neun Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
+Sobald `NextcloudUrl`, `NextcloudUrlLocked`, `ShowMainRibbonTab`, `TransportTlsUseSystemDefault`, `TransportTlsEnable12`, `TransportTlsEnable13`, `DebugLoggingEnabled`, `LogAnonymizationEnabled`, `UpdateNotifyEnabled`, `IfbEnabled`, `IfbDays`, `IfbCacheHours` oder `IfbPort` vorhanden ist, gilt Enterprise Rollout, auch beim Wert `false`. Ein leerer oder ungültiger gesetzter Wert zählt weiterhin als vorhanden. Fehlen alle dreizehn Werte, bleibt das bisherige lokale Verhalten unverändert. `NextcloudUrlLocked` allein gibt keine Serveradresse vor und sperrt das URL-Feld nicht; die URL kann bei der Anmeldung eingegeben werden.
 
 **Auswirkung beim Upgrade:** Auch eine bereits bestehende Registry-URL-Vorgabe aktiviert diesen Modus nach dem Update. Seats und Backend deshalb vor dem Rollout vorbereiten; eine ausschließlich per XML vorbelegte URL aktiviert ihn nicht.
 
@@ -365,7 +401,7 @@ Erstanmeldung und Prüfung:
 2. Ohne Zugangsdaten in einer Mail **Nextcloud-Freigabe einfügen** oder in einem Termin **Talk-Link einfügen** anklicken. Der vorhandene Einstellungsdialog öffnet sich direkt mit dem blauen Hinweis **Mit Nextcloud verbinden**, ohne vorgeschaltete Fehlermeldung. Das gilt auch für nicht verwaltete Installationen. Nur bei `ShowMainRibbonTab=false` sind die anderen Einstellungstabs nicht verfügbar; andernfalls ist der vollständige Dialog auch über **NC Connector -> Einstellungen** erreichbar.
 3. Den Nextcloud-Login-Flow abschließen oder das App-Passwort des Benutzers eingeben und speichern. Die Anmeldung muss erfolgreich geprüft sein, bevor diese Einrichtung gespeichert werden kann. Verwaltete URL und Sperre bleiben wirksam; vorhandene Einstellungen bleiben erhalten. Nach erfolgreichem Speichern wird die ursprüngliche Aktion fortgesetzt, sofern Mail oder Termin noch geöffnet sind (eine Inline-Antwort muss weiterhin aktiv sein). Abbrechen beendet die Aktion ohne weitere Meldung. Die Anmeldung allein lädt keine Dateien hoch und erstellt keinen Talk-Raum.
 4. Den Zugriff mit aktivem Seat prüfen; anschließend in einer Testumgebung die Meldungen für fehlenden Seat und fehlendes Backend getrennt prüfen. Abgelehnte Zugangsdaten öffnen die Anmeldung mit einem freundlichen Hinweis erneut; Verbindungsfehler bleiben davon unterscheidbar. Bei ausgeblendetem Haupttab bleiben die normalen Einstellungen dabei ausgeblendet. Backend- und Seat-Prüfung gelten auch nach der Anmeldung unverändert.
-5. Zum Einblenden von Tab und Einstellungen die wirksame Policy `ShowMainRibbonTab=false` entfernen oder auf `true` setzen und Outlook neu starten. Die verwaltete Zugriffsprüfung bleibt bestehen. Zum Verlassen des Modus alle neun Auslöser an allen zutreffenden Policy-Pfaden und Registry-Ansichten entfernen und Outlook neu starten. Gespeicherte Zugangsdaten und Einstellungen bleiben erhalten.
+5. Zum Einblenden von Tab und Einstellungen die wirksame Policy `ShowMainRibbonTab=false` entfernen oder auf `true` setzen und Outlook neu starten. Die verwaltete Zugriffsprüfung bleibt bestehen. Zum Verlassen des Modus alle dreizehn Auslöser an allen zutreffenden Policy-Pfaden und Registry-Ansichten entfernen und Outlook neu starten. Gespeicherte Zugangsdaten und Einstellungen bleiben erhalten.
 
 Registry-Policies steuern den administrativen Rollout. Sie schützen nicht vor Benutzern, die diese Policy verändern oder das Add-in ersetzen können. Policy-Pfade und Berechtigungen zur Softwareverteilung entsprechend schützen.
 
@@ -732,11 +768,11 @@ Vor der organisationsweiten Aktivierung der Raumlöschung für gespeicherte Term
 
 ### Zweck und Aktivierung
 
-IFB lässt Outlook Nextcloud-Free/Busy-Daten über einen lokalen HTTP-Endpunkt abfragen.
+IFB lässt Outlook Nextcloud-Free/Busy-Daten über einen lokalen HTTP-Endpunkt abfragen. Es ist standardmäßig ausgeschaltet. Bei gesperrten Einstellungen die [verwaltete IFB-Policy](#verwaltetes-internet-freebusy-ifb) verwenden; andernfalls lokal konfigurieren:
 
 1. Das Nextcloud-Systemadressbuch prüfen.
 2. **NC Connector -> Einstellungen -> IFB** öffnen.
-3. IFB aktivieren und Anzahl der Tage, Cache-Dauer und lokalen Port wählen. Vorgaben sind 30 Tage, 24 Cache-Stunden und Port `7777`.
+3. IFB aktivieren und Anzahl der Tage sowie lokalen Port wählen. Die gemeinsame Adressbuch-Cache-Dauer unter **Einstellungen -> Erweitert** setzen. Vorgaben sind 30 Tage, 24 Cache-Stunden und Port `7777`.
 4. Speichern und Outlook neu starten.
 
 Reservierter Listener-Namespace:
@@ -749,7 +785,7 @@ Die MSI reserviert den Standard-URL-Namespace für authentifizierte Windows-Benu
 
 Beim Aktivieren von IFB werden nur benutzerspezifische Outlook-Free/Busy-Werte aktualisiert. Vorhandene Werte und Typen werden getrennt erfasst. Beim Deaktivieren stellt NC Connector einen Wert nur wieder her, solange er noch den von NC Connector geschriebenen Inhalt hat; spätere Änderungen durch Administratoren oder andere Anwendungen bleiben unangetastet. Werte unter `Software\Policies` werden nur auf Konflikte geprüft und nie geschrieben. Der Adressbuch-Cache ist nach Outlook-Profil, vollständiger Nextcloud-Basis-URL einschließlich Unterpfad und konfiguriertem Login getrennt. Der Adressbuchabruf selbst verwendet die kanonische Nextcloud-Benutzer-ID.
 
-Der Listener läuft nur, solange Outlook läuft, IFB aktiviert ist und die gespeicherten Nextcloud-Zugangsdaten vollständig sind.
+Der Listener läuft nur, solange Outlook läuft, IFB effektiv aktiviert ist und die gespeicherten Nextcloud-Zugangsdaten vollständig sind. Ungültige verwaltete IFB-Einstellungen verhindern den Listener-Start; Enterprise Rollout benötigt für Anfragen außerdem bestätigten Backend-Zugriff und einen aktiv zugewiesenen Seat.
 
 ### Standard-Reservierung prüfen
 
@@ -762,7 +798,7 @@ Danach in Outlook einen Testtermin erstellen, eine Adresse aus dem Nextcloud-Sys
 
 ### Eigener IFB-Port
 
-Gültige konfigurierte Ports reichen von `1024` bis `49151`. Die MSI erstellt nur für Port `7777` eine Reservierung. Für einen anderen Port eine PowerShell mit erhöhten Rechten öffnen und eine Reservierung für authentifizierte Benutzer hinzufügen:
+Gültige konfigurierte Ports reichen von `1024` bis `49151`. Die MSI erstellt nur für Port `7777` eine Reservierung. Das gilt gleichermaßen für lokale Einstellungen und verwaltete IFB-Policies; das Add-in erhöht seine Rechte nicht und erstellt keine eigene Reservierung. Für einen anderen Port muss ein Administrator eine PowerShell mit erhöhten Rechten öffnen und eine Reservierung für authentifizierte Benutzer hinzufügen:
 
 ```powershell
 netsh http add urlacl url=http://127.0.0.1:<ifb-port>/nc-ifb/ sddl="D:(A;;GX;;;AU)"
@@ -927,7 +963,7 @@ Erwartetes Ergebnis: Ein erfolgreiches ausdrückliches Speichern erzeugt eine g�
 
 ### IFB antwortet nicht
 
-1. Prüfen, ob IFB aktiviert ist und die Zugangsdaten vollständig sind.
+1. Prüfen, ob IFB aktiviert ist und die Zugangsdaten vollständig sind. Bei gesperrten Einstellungen die [verwaltete IFB-Policy](#verwaltetes-internet-freebusy-ifb) prüfen, Konfigurationsfehler korrigieren und Outlook neu starten. Enterprise Rollout benötigt außerdem bestätigten Backend-Zugriff und einen aktiv zugewiesenen Seat.
 2. Den konfigurierten Port prüfen.
 3. Die passende URL-Reservierung prüfen.
 4. Prüfen, ob ein anderer Prozess den Port belegt:

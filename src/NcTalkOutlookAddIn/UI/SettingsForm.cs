@@ -417,7 +417,7 @@ namespace NcTalkOutlookAddIn.UI
             try
             {
                 _initialIfbEnabled = Result.IfbEnabled;
-                _ifbDefaultApplied = _initialIfbEnabled || Result.IfbUserDecisionRecorded;
+                _ifbDefaultApplied = Result.HasManagedIfb || _initialIfbEnabled || Result.IfbUserDecisionRecorded;
                 _serverUrlTextBox.Text = Result.ManagedNextcloudUrlLocked ? Result.ManagedNextcloudUrl : Result.ServerUrl;
                 _usernameTextBox.Text = Result.Username;
                 _appPasswordTextBox.Text = Result.AppPassword;
@@ -597,11 +597,14 @@ namespace NcTalkOutlookAddIn.UI
                 Close();
                 return;
             }
-            Result.IfbEnabled = _ifbEnabledCheckBox.Checked;
-            Result.IfbUserDecisionRecorded = _ifbDefaultApplied;
-            Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
-            Result.IfbPort = AddinSettings.NormalizeIfbPort((int)_ifbPortUpDown.Value);
-            Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
+            if (!Result.HasManagedIfb)
+            {
+                Result.IfbEnabled = _ifbEnabledCheckBox.Checked;
+                Result.IfbUserDecisionRecorded = _ifbDefaultApplied;
+                Result.IfbDays = ParseComboValue(_ifbDaysCombo, 30);
+                Result.IfbPort = AddinSettings.NormalizeIfbPort((int)_ifbPortUpDown.Value);
+                Result.IfbCacheHours = ParseComboValue(_ifbCacheHoursCombo, 24);
+            }
             if (!Result.HasManagedLogging)
             {
                 Result.DebugLoggingEnabled = _debugLogCheckBox.Checked;
@@ -956,30 +959,7 @@ namespace NcTalkOutlookAddIn.UI
                 !string.IsNullOrWhiteSpace(_usernameTextBox.Text) &&
                 !string.IsNullOrEmpty(_appPasswordTextBox.Text);
 
-            if (credentialsAvailable && !_ifbDefaultApplied && !_initialIfbEnabled && !_ifbEnabledCheckBox.Checked)
-            {
-                _ifbEnabledCheckBox.Checked = true;
-                _ifbDefaultApplied = true;
-            }
-            if (!credentialsAvailable && _ifbEnabledCheckBox.Checked)
-            {
-                _ifbEnabledCheckBox.Checked = false;
-            }
-
-            _ifbEnabledCheckBox.Enabled = credentialsAvailable && !_isBusy;
-
-            bool showDays = _ifbEnabledCheckBox.Checked;
-            _ifbDaysCombo.Visible = showDays;
-            _ifbDaysLabel.Visible = showDays;
-            _ifbDaysCombo.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-            _ifbDaysLabel.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-            _ifbPortUpDown.Visible = showDays;
-            _ifbPortLabel.Visible = showDays;
-            _ifbPortUpDown.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-            _ifbPortLabel.Enabled = showDays && !_isBusy && _ifbEnabledCheckBox.Enabled;
-
-            _ifbCacheHoursCombo.Enabled = !_isBusy;
-            _ifbCacheHoursLabel.Enabled = !_isBusy;
+            UpdateIfbOptionsState(credentialsAvailable);
             UpdateLoggingOptionsState();
             _debugOpenLink.Enabled = !_isBusy;
             bool managedUpdateNotify = Result != null && Result.HasManagedUpdateNotify;

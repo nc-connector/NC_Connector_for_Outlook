@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "Centralnie zarządzane ustawienie IFB jest nieprawidłowe. IFB pozostaje wyłączone. Skontaktuj się z administratorem."
+  },
   "managed_update_notify_policy_invalid": {
     "message": "Centralne ustawienie powiadomień o aktualizacjach jest nieprawidłowe. Powiadomienia pozostają wyłączone. Skontaktuj się z administratorem."
   },

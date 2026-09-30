@@ -21,12 +21,21 @@ namespace NcTalkOutlookAddIn.Settings
         private const string DebugLoggingEnabledValueName = "DebugLoggingEnabled";
         private const string LogAnonymizationEnabledValueName = "LogAnonymizationEnabled";
         private const string UpdateNotifyEnabledValueName = "UpdateNotifyEnabled";
+        private const string IfbEnabledValueName = "IfbEnabled";
+        private const string IfbDaysValueName = "IfbDays";
+        private const string IfbCacheHoursValueName = "IfbCacheHours";
+        private const string IfbPortValueName = "IfbPort";
+        private static readonly object InvalidRegistryValue = new object();
         private bool _tlsSystemValueValid;
         private bool _tls12ValueValid;
         private bool _tls13ValueValid;
         private bool _debugLoggingValueValid;
         private bool _logAnonymizationValueValid;
         private bool _updateNotifyValueValid;
+        private bool _ifbEnabledValueValid;
+        private bool _ifbDaysValueValid;
+        private bool _ifbCacheHoursValueValid;
+        private bool _ifbPortValueValid;
 
         private ManagedSetupPolicy(
             object nextcloudUrlValue,
@@ -38,6 +47,10 @@ namespace NcTalkOutlookAddIn.Settings
             object debugLoggingEnabledValue,
             object logAnonymizationEnabledValue,
             object updateNotifyEnabledValue,
+            object ifbEnabledValue,
+            object ifbDaysValue,
+            object ifbCacheHoursValue,
+            object ifbPortValue,
             string source)
         {
             HasNextcloudUrlValue = nextcloudUrlValue != null;
@@ -49,6 +62,17 @@ namespace NcTalkOutlookAddIn.Settings
             HasDebugLoggingEnabledValue = debugLoggingEnabledValue != null;
             HasLogAnonymizationEnabledValue = logAnonymizationEnabledValue != null;
             HasUpdateNotifyPolicy = updateNotifyEnabledValue != null;
+            HasIfbEnabledValue = ifbEnabledValue != null;
+            HasIfbDaysValue = ifbDaysValue != null;
+            HasIfbCacheHoursValue = ifbCacheHoursValue != null;
+            HasIfbPortValue = ifbPortValue != null;
+            IfbEnabled = ReadPolicyBoolean(ifbEnabledValue, false, out _ifbEnabledValueValid);
+            IfbDays = ReadPolicyDword(ifbDaysValue, AddinSettings.DefaultIfbDays,
+                value => value == 10 || value == 30 || value == 60 || value == 90, out _ifbDaysValueValid);
+            IfbCacheHours = ReadPolicyDword(ifbCacheHoursValue, AddinSettings.DefaultIfbCacheHours,
+                value => value >= 1 && value <= 24, out _ifbCacheHoursValueValid);
+            IfbPort = ReadPolicyDword(ifbPortValue, AddinSettings.DefaultIfbPort,
+                value => value >= AddinSettings.MinIfbPort && value <= AddinSettings.MaxIfbPort, out _ifbPortValueValid);
             UpdateNotifyEnabled = ReadPolicyBoolean(updateNotifyEnabledValue, false, out _updateNotifyValueValid);
             TransportTlsUseSystemDefault = ReadPolicyBoolean(transportTlsUseSystemDefaultValue, false, out _tlsSystemValueValid);
             TransportTlsEnable12 = ReadPolicyBoolean(transportTlsEnable12Value, true, out _tls12ValueValid);
@@ -64,7 +88,7 @@ namespace NcTalkOutlookAddIn.Settings
             bool showMainRibbonTab;
             ShowMainRibbonTab = !TryReadBoolean(showMainRibbonTabValue, out showMainRibbonTab)
                 || showMainRibbonTab;
-            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy || HasLoggingPolicy || HasUpdateNotifyPolicy;
+            IsEnterpriseRollout = HasNextcloudUrlValue || HasNextcloudUrlLockedValue || HasShowMainRibbonTabValue || HasTransportTlsPolicy || HasLoggingPolicy || HasUpdateNotifyPolicy || HasIfbPolicy;
             Source = source ?? string.Empty;
         }
 
@@ -89,6 +113,10 @@ namespace NcTalkOutlookAddIn.Settings
         private bool HasTransportTlsEnable13Value { get; set; }
         private bool HasDebugLoggingEnabledValue { get; set; }
         private bool HasLogAnonymizationEnabledValue { get; set; }
+        private bool HasIfbEnabledValue { get; set; }
+        private bool HasIfbDaysValue { get; set; }
+        private bool HasIfbCacheHoursValue { get; set; }
+        private bool HasIfbPortValue { get; set; }
 
         internal bool DebugLoggingEnabled { get; private set; }
         internal bool LogAnonymizationEnabled { get; private set; }
@@ -97,6 +125,19 @@ namespace NcTalkOutlookAddIn.Settings
         internal bool UpdateNotifyEnabled { get; private set; }
         internal bool HasUpdateNotifyPolicy { get; private set; }
         internal bool IsUpdateNotifyPolicyValid { get { return _updateNotifyValueValid; } }
+
+        internal bool IfbEnabled { get; private set; }
+        internal int IfbDays { get; private set; }
+        internal int IfbCacheHours { get; private set; }
+        internal int IfbPort { get; private set; }
+        internal bool HasIfbPolicy
+        {
+            get { return HasIfbEnabledValue || HasIfbDaysValue || HasIfbCacheHoursValue || HasIfbPortValue; }
+        }
+        internal bool IsIfbPolicyValid
+        {
+            get { return _ifbEnabledValueValid && _ifbDaysValueValid && _ifbCacheHoursValueValid && _ifbPortValueValid; }
+        }
 
         internal bool TransportTlsUseSystemDefault { get; private set; }
         internal bool TransportTlsEnable12 { get; private set; }
@@ -136,7 +177,7 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal static ManagedSetupPolicy Resolve(IEnumerable<ManagedSetupPolicy> policies)
         {
-            var result = new ManagedSetupPolicy(null, null, null, null, null, null, null, null, null, string.Empty);
+            var result = new ManagedSetupPolicy(null, null, null, null, null, null, null, null, null, null, null, null, null, string.Empty);
             if (policies == null)
             {
                 return result;
@@ -198,6 +239,30 @@ namespace NcTalkOutlookAddIn.Settings
                     result.UpdateNotifyEnabled = policy.UpdateNotifyEnabled;
                     result._updateNotifyValueValid = policy._updateNotifyValueValid;
                 }
+                if (!result.HasIfbEnabledValue && policy.HasIfbEnabledValue)
+                {
+                    result.HasIfbEnabledValue = true;
+                    result.IfbEnabled = policy.IfbEnabled;
+                    result._ifbEnabledValueValid = policy._ifbEnabledValueValid;
+                }
+                if (!result.HasIfbDaysValue && policy.HasIfbDaysValue)
+                {
+                    result.HasIfbDaysValue = true;
+                    result.IfbDays = policy.IfbDays;
+                    result._ifbDaysValueValid = policy._ifbDaysValueValid;
+                }
+                if (!result.HasIfbCacheHoursValue && policy.HasIfbCacheHoursValue)
+                {
+                    result.HasIfbCacheHoursValue = true;
+                    result.IfbCacheHours = policy.IfbCacheHours;
+                    result._ifbCacheHoursValueValid = policy._ifbCacheHoursValueValid;
+                }
+                if (!result.HasIfbPortValue && policy.HasIfbPortValue)
+                {
+                    result.HasIfbPortValue = true;
+                    result.IfbPort = policy.IfbPort;
+                    result._ifbPortValueValid = policy._ifbPortValueValid;
+                }
             }
             return result;
         }
@@ -234,6 +299,10 @@ namespace NcTalkOutlookAddIn.Settings
                         policyKey.GetValue(DebugLoggingEnabledValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         policyKey.GetValue(LogAnonymizationEnabledValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
                         policyKey.GetValue(UpdateNotifyEnabledValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                        ReadIfbPolicyValue(policyKey, IfbEnabledValueName, false),
+                        ReadIfbPolicyValue(policyKey, IfbDaysValueName, true),
+                        ReadIfbPolicyValue(policyKey, IfbCacheHoursValueName, true),
+                        ReadIfbPolicyValue(policyKey, IfbPortValueName, true),
                         source);
 
                     if (!policy.IsEnterpriseRollout)
@@ -255,7 +324,9 @@ namespace NcTalkOutlookAddIn.Settings
                         + ", loggingPolicyPresent=" + policy.HasLoggingPolicy
                         + ", loggingPolicyValid=" + policy.IsLoggingPolicyValid
                         + ", updateNotifyPolicyPresent=" + policy.HasUpdateNotifyPolicy
-                        + ", updateNotifyPolicyValid=" + policy.IsUpdateNotifyPolicyValid + ").");
+                        + ", updateNotifyPolicyValid=" + policy.IsUpdateNotifyPolicyValid
+                        + ", ifbPolicyPresent=" + policy.HasIfbPolicy
+                        + ", ifbPolicyValid=" + policy.IsIfbPolicyValid + ").");
                     return policy;
                 }
             }
@@ -276,6 +347,30 @@ namespace NcTalkOutlookAddIn.Settings
             return NextcloudUriValidator.TryNormalizeBaseUrl(raw, out normalized)
                 ? normalized
                 : string.Empty;
+        }
+
+        private static object ReadIfbPolicyValue(RegistryKey policyKey, string valueName, bool requireDword)
+        {
+            if (!Array.Exists(policyKey.GetValueNames(), name => string.Equals(name, valueName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return null;
+            }
+
+            RegistryValueKind kind = policyKey.GetValueKind(valueName);
+            if (requireDword ? kind != RegistryValueKind.DWord
+                : kind != RegistryValueKind.DWord && kind != RegistryValueKind.QWord
+                    && kind != RegistryValueKind.String && kind != RegistryValueKind.ExpandString)
+            {
+                return InvalidRegistryValue;
+            }
+            return policyKey.GetValue(valueName, InvalidRegistryValue, RegistryValueOptions.DoNotExpandEnvironmentNames)
+                ?? InvalidRegistryValue;
+        }
+
+        private static int ReadPolicyDword(object rawValue, int defaultValue, Predicate<int> allowedValue, out bool valid)
+        {
+            valid = rawValue == null || (rawValue is int && allowedValue((int)rawValue));
+            return rawValue != null && valid ? (int)rawValue : defaultValue;
         }
 
         private static bool ReadBoolean(object rawValue)

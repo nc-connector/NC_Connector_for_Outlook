@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "Un paramètre IFB géré de manière centralisée est invalide. IFB reste désactivé. Veuillez contacter votre administrateur."
+  },
   "managed_update_notify_policy_invalid": {
     "message": "Le paramètre central des notifications de mise à jour est invalide. Les notifications restent désactivées. Contactez votre administrateur."
   },

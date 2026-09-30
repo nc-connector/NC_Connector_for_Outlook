@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "一元管理されている IFB 設定が無効です。IFB は無効のままになります。管理者にお問い合わせください。"
+  },
   "managed_update_notify_policy_invalid": {
     "message": "組織が指定した更新通知の設定が無効です。通知は無効のままになります。管理者にお問い合わせください。"
   },

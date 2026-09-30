@@ -276,13 +276,11 @@ namespace NcTalkOutlookAddIn
             DisposeTalkAppointmentSync();
             DisposeTalkAppointmentSubscriptions();
             DisposeTalkRoomLifecycle();
-            if (_freeBusyManager != null && _currentSettings != null && _currentSettings.IfbEnabled)
+            if (_freeBusyManager != null)
             {
                 try
                 {
-                    var clone = _currentSettings.Clone();
-                    clone.IfbEnabled = false;
-                    _freeBusyManager.ApplySettings(clone);
+                    _freeBusyManager.Dispose();
                 }
                 catch (Exception ex)
                 {
@@ -291,10 +289,6 @@ namespace NcTalkOutlookAddIn
                         "Failed to disable IFB during add-in " + (origin ?? "teardown") + ".",
                         ex);
                 }
-            }
-            if (_freeBusyManager != null)
-            {
-                _freeBusyManager.Dispose();
             }
             _freeBusyManager = null;
 

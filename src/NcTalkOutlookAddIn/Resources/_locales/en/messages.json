@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "A centrally managed IFB setting is invalid. IFB remains disabled. Please contact your administrator."
+  },
   "managed_update_notify_policy_invalid": {
     "message": "The centrally configured update notification setting is invalid. Notifications remain off. Please contact your administrator."
   },

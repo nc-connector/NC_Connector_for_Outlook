@@ -21,12 +21,14 @@ namespace NcTalkOutlookAddIn.UI
 {
     internal sealed partial class SettingsForm
     {
+        private readonly Label _ifbPolicyHintLabel = new Label();
+
         private void ApplyIfbTabLayout()
         {
             int left = ScaleLogical(24);
             int top = ScaleLogical(20);
             int rowGap = ScaleLogical(18);
-            int labelToComboGap = ScaleLogical(14);
+            int labelToComboGap = ScaleLogical(Result != null && Result.HasManagedIfb ? 28 : 14);
 
             _ifbEnabledCheckBox.Location = new Point(left, top);
 
@@ -42,6 +44,8 @@ namespace NcTalkOutlookAddIn.UI
 
             int portHeight = Math.Max(_ifbPortUpDown.Height, _ifbPortUpDown.PreferredHeight + ScaleLogical(2));
             _ifbPortUpDown.SetBounds(comboLeft, portLabelTop - ScaleLogical(2), Math.Max(ScaleLogical(110), _ifbPortUpDown.Width), portHeight);
+            _ifbPolicyHintLabel.MaximumSize = new Size(Math.Max(ScaleLogical(220), _ifbTab.ClientSize.Width - 2 * left), 0);
+            _ifbPolicyHintLabel.Location = new Point(left, Math.Max(_ifbPortLabel.Bottom, _ifbPortUpDown.Bottom) + rowGap);
         }
 
         private void InitializeIfbTab()
@@ -78,6 +82,53 @@ namespace NcTalkOutlookAddIn.UI
             _ifbPortUpDown.Maximum = AddinSettings.MaxIfbPort;
             _ifbPortUpDown.Value = AddinSettings.DefaultIfbPort;
             _ifbTab.Controls.Add(_ifbPortUpDown);
+
+            _ifbPolicyHintLabel.AutoSize = true;
+            _ifbTab.Controls.Add(_ifbPolicyHintLabel);
+        }
+
+        private void UpdateIfbOptionsState(bool credentialsAvailable)
+        {
+            bool managed = Result != null && Result.HasManagedIfb;
+            if (!managed)
+            {
+                if (credentialsAvailable && !_ifbDefaultApplied && !_initialIfbEnabled && !_ifbEnabledCheckBox.Checked)
+                {
+                    _ifbEnabledCheckBox.Checked = true;
+                    _ifbDefaultApplied = true;
+                }
+                if (!credentialsAvailable && _ifbEnabledCheckBox.Checked)
+                {
+                    _ifbEnabledCheckBox.Checked = false;
+                }
+            }
+
+            _ifbEnabledCheckBox.Enabled = !managed && credentialsAvailable && !_isBusy;
+            bool showOptions = managed || _ifbEnabledCheckBox.Checked;
+            bool editOptions = showOptions && _ifbEnabledCheckBox.Enabled;
+            _ifbDaysCombo.Visible = showOptions;
+            _ifbDaysLabel.Visible = showOptions;
+            _ifbDaysCombo.Enabled = editOptions;
+            _ifbDaysLabel.Enabled = editOptions;
+            _ifbPortUpDown.Visible = showOptions;
+            _ifbPortLabel.Visible = showOptions;
+            _ifbPortUpDown.Enabled = editOptions;
+            _ifbPortLabel.Enabled = editOptions;
+            _ifbCacheHoursCombo.Enabled = !managed && !_isBusy;
+            _ifbCacheHoursLabel.Enabled = !managed && !_isBusy;
+
+            bool invalid = managed && !Result.IsManagedIfbValid;
+            string hint = managed
+                ? (invalid ? Strings.ManagedIfbPolicyInvalid : Strings.PolicyAdminControlledTooltip)
+                : string.Empty;
+            _ifbPolicyHintLabel.Text = invalid ? hint : string.Empty;
+            _ifbPolicyHintLabel.Visible = invalid;
+            _ifbPolicyHintLabel.ForeColor = _themePalette.ErrorText;
+            _disabledTooltipHints.Apply(_ifbEnabledCheckBox, hint, managed);
+            _disabledTooltipHints.Apply(_ifbDaysCombo, hint, managed, _ifbDaysLabel);
+            _disabledTooltipHints.Apply(_ifbPortUpDown, hint, managed, _ifbPortLabel);
+            _disabledTooltipHints.Apply(_ifbCacheHoursCombo, hint, managed, _ifbCacheHoursLabel);
+            ApplyIfbTabLayout();
         }
 
         private void OnIfbEnabledChanged(object sender, EventArgs e)

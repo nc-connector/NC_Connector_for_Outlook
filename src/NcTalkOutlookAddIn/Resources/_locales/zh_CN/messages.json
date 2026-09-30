@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "由组织统一管理的某项 IFB 设置无效。IFB 将保持禁用。请联系您的管理员。"
+  },
   "managed_update_notify_policy_invalid": {
     "message": "集中配置的更新通知设置无效。通知将保持关闭。请联系管理员。"
   },

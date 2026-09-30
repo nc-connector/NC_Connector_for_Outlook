@@ -1,4 +1,7 @@
 {
+  "managed_ifb_policy_invalid": {
+    "message": "Centrálně spravované nastavení IFB je neplatné. IFB zůstává vypnuté. Obraťte se na správce."
+  },
   "managed_update_notify_policy_invalid": {
     "message": "Centrální nastavení oznámení o aktualizacích je neplatné. Oznámení zůstávají vypnutá. Obraťte se na správce."
   },
