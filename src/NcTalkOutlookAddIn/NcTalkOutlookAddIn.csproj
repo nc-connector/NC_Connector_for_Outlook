@@ -164,6 +164,7 @@
     <Compile Include="Services\FreeBusyServer.cs" />
     <Compile Include="Services\IfbAddressBookCache.cs" />
     <Compile Include="Services\IfbRegistryOwnershipManager.cs" />
+    <Compile Include="Services\IfbRegistryEndpoint.cs" />
     <Compile Include="Services\ProtectedJsonStateStore.cs" />
     <Compile Include="Services\IfbRegistryStateStore.cs" />
     <Compile Include="Services\DurableFileReplace.cs" />

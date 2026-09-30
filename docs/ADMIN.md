@@ -129,7 +129,9 @@ Record the add-in version, Outlook bitness, Nextcloud version, and result of eac
 
 The MSI replaces an installed newer, equal, or older release. Per-user settings remain in the user profile.
 
-At the first enabled IFB start after an upgrade, NC Connector migrates only its legacy `/nc-ifb/freebusy/...` Outlook values to the protected current path. Existing external Outlook Free/Busy values remain unchanged. This migration concerns per-user Outlook values; it does not require deleting the HTTP URL reservation with `netsh`.
+Installation, direct upgrade and MSI repair remove obsolete NC Connector Free/Busy paths from local Windows user profiles. This also works if `%LOCALAPPDATA%\NC4OL\` was deleted or renamed. On the next start with IFB enabled, NC Connector registers the current path again. Other Free/Busy providers and administrative policies remain unchanged; no manual registry cleanup or `netsh` command is required.
+
+Close Outlook in **all Windows sessions** before running setup. Setup stops if Outlook is still running; it does not terminate Outlook. Windows Installer rollback must be enabled.
 
 The add-in reports release metadata but does not install updates. **Settings -> Advanced -> Inform me about new versions** controls the popup; the daily metadata check still runs when the popup is disabled. MSI approval and deployment remain administrator tasks.
 
@@ -142,16 +144,16 @@ To return to the previous add-in release, repeat the same procedure with the pre
 
 ### Uninstall
 
-1. While Outlook is still installed, open **NC Connector -> Settings -> IFB**.
-2. Disable IFB and save. This restores the previously recorded Outlook Free/Busy path.
-3. Close Outlook and wait until no `OUTLOOK.EXE` process remains.
-4. Use **Windows Settings -> Apps -> Installed apps** or:
+1. Close Outlook in all Windows sessions and wait until no `OUTLOOK.EXE` process remains.
+2. Use **Windows Settings -> Apps -> Installed apps** or:
 
 ```powershell
 msiexec.exe /x "NCConnectorForOutlook-<version>.msi" /qn /norestart
 ```
 
-The MSI removes installed files, add-in registration, and the default IFB URL reservation. Per-user settings, caches, and logs under `%LOCALAPPDATA%\NC4OL\` remain so that reinstalling does not erase user configuration.
+The MSI removes installed files, add-in registration, the default IFB URL reservation, and any remaining own Outlook Free/Busy paths. This cleanup does not require disabling IFB beforehand or retaining its data directory. Other providers' current values and administrative policies remain unchanged. Per-user settings, caches, and logs under `%LOCALAPPDATA%\NC4OL\` remain so that reinstalling does not erase user configuration.
+
+If you want to restore a previously used external Free/Busy provider before uninstalling, disable IFB in Settings while its saved configuration still exists. The installer removes own leftovers; it cannot reconstruct an external provider's address from a deleted data directory.
 
 Delete that profile directory only when its settings and logs are no longer needed. A URL reservation created manually for a custom IFB port is not owned by the MSI; remove it separately as described under [Custom IFB port](#custom-ifb-port).
 

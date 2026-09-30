@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<messages>
+  <language id="en"><outlook>Please close Outlook in all Windows sessions, then run setup again.</outlook><rollback>Windows Installer rollback must be enabled. Please contact your administrator.</rollback></language>
+  <language id="de"><outlook>Bitte schließen Sie Outlook in allen Windows-Sitzungen und starten Sie das Setup erneut.</outlook><rollback>Die Rücknahme von Änderungen durch Windows Installer muss aktiviert sein. Bitte wenden Sie sich an Ihren Administrator.</rollback></language>
+  <language id="fr"><outlook>Veuillez fermer Outlook dans toutes les sessions Windows, puis relancer le programme d’installation.</outlook><rollback>La restauration des modifications de Windows Installer doit être activée. Veuillez contacter votre administrateur.</rollback></language>
+  <language id="cs"><outlook>Zavřete prosím Outlook ve všech relacích Windows a spusťte instalaci znovu.</outlook><rollback>Vrácení změn služby Windows Installer musí být povoleno. Obraťte se na správce.</rollback></language>
+  <language id="es"><outlook>Cierre Outlook en todas las sesiones de Windows y vuelva a ejecutar el instalador.</outlook><rollback>Debe habilitarse la reversión de cambios de Windows Installer. Póngase en contacto con su administrador.</rollback></language>
+  <language id="hu"><outlook>Zárja be az Outlookot minden Windows-munkamenetben, majd indítsa újra a telepítőt.</outlook><rollback>A Windows Installer módosításainak visszaállítását engedélyezni kell. Forduljon a rendszergazdához.</rollback></language>
+  <language id="it"><outlook>Chiudi Outlook in tutte le sessioni di Windows, quindi avvia nuovamente il programma di installazione.</outlook><rollback>Il ripristino delle modifiche di Windows Installer deve essere abilitato. Contatta l’amministratore.</rollback></language>
+  <language id="ja"><outlook>すべての Windows セッションで Outlook を終了してから、セットアップを再実行してください。</outlook><rollback>Windows Installer のロールバックを有効にする必要があります。管理者にお問い合わせください。</rollback></language>
+  <language id="nl"><outlook>Sluit Outlook in alle Windows-sessies en voer de installatie opnieuw uit.</outlook><rollback>Het terugdraaien van wijzigingen door Windows Installer moet zijn ingeschakeld. Neem contact op met uw beheerder.</rollback></language>
+  <language id="pl"><outlook>Zamknij program Outlook we wszystkich sesjach systemu Windows, a następnie ponownie uruchom instalator.</outlook><rollback>Cofanie zmian przez usługę Windows Installer musi być włączone. Skontaktuj się z administratorem.</rollback></language>
+  <language id="pt_BR"><outlook>Feche o Outlook em todas as sessões do Windows e execute a instalação novamente.</outlook><rollback>A reversão de alterações do Windows Installer deve estar habilitada. Entre em contato com o administrador.</rollback></language>
+  <language id="pt_PT"><outlook>Feche o Outlook em todas as sessões do Windows e execute novamente a instalação.</outlook><rollback>A reversão de alterações do Windows Installer tem de estar ativada. Contacte o administrador.</rollback></language>
+  <language id="ru"><outlook>Закройте Outlook во всех сеансах Windows, затем снова запустите установку.</outlook><rollback>Откат изменений установщика Windows должен быть включён. Обратитесь к администратору.</rollback></language>
+  <language id="zh_CN"><outlook>请关闭所有 Windows 会话中的 Outlook，然后重新运行安装程序。</outlook><rollback>必须启用 Windows Installer 回滚功能。请联系管理员。</rollback></language>
+  <language id="zh_TW"><outlook>請關閉所有 Windows 工作階段中的 Outlook，然後重新執行安裝程式。</outlook><rollback>必須啟用 Windows Installer 復原功能。請聯絡管理員。</rollback></language>
+</messages>

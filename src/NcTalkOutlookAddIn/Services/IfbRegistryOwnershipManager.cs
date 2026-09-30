@@ -60,7 +60,7 @@ namespace NcTalkOutlookAddIn.Services
                     RegistryValueSnapshot current = ReadValue(
                         ownership.RegistryPath,
                         ownership.ValueName);
-                    if (!MatchesWritten(current, ownership))
+                    if (current.Exists && !MatchesWritten(current, ownership))
                     {
                         DiagnosticsLogger.Log(
                             LogCategories.Ifb,
@@ -161,7 +161,8 @@ namespace NcTalkOutlookAddIn.Services
             IfbRegistryOwnership ownership = FindOwnership(target);
             if (ownership != null)
             {
-                if (!MatchesWritten(current, ownership))
+                // MSI maintenance removes our endpoint but retains its saved predecessor.
+                if (current.Exists && !MatchesWritten(current, ownership))
                 {
                     _state.Ownership.Remove(ownership);
                     _stateStore.Save(_state);
@@ -353,28 +354,15 @@ namespace NcTalkOutlookAddIn.Services
         internal static bool IsNcConnectorIfbUrl(string value)
         {
             Uri uri;
-            return TryGetNcConnectorIfbUri(value, out uri);
+            return IfbRegistryEndpoint.TryGetConnectorUri(value, out uri);
         }
 
         internal static bool IsLegacyNcConnectorIfbUrl(string value)
         {
             Uri uri;
-            return TryGetNcConnectorIfbUri(value, out uri)
+            return IfbRegistryEndpoint.TryGetConnectorUri(value, out uri)
                    && uri.AbsolutePath.StartsWith(
                        "/nc-ifb/freebusy/",
-                       StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool TryGetNcConnectorIfbUri(
-            string value,
-            out Uri uri)
-        {
-            uri = null;
-            return !string.IsNullOrWhiteSpace(value)
-                   && Uri.TryCreate(value.Trim(), UriKind.Absolute, out uri)
-                   && uri.IsLoopback
-                   && uri.AbsolutePath.StartsWith(
-                       "/nc-ifb/",
                        StringComparison.OrdinalIgnoreCase);
         }
 

@@ -351,3 +351,7 @@ jobs:
       - name: Check MSI upgrade and registration contract
         shell: pwsh
         run: .\tools\ci\Check-MsiUpgradeContract.ps1
+
+      - name: Test IFB cleanup and rollback in isolated registry keys
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookIfbInstallerTests.ps1

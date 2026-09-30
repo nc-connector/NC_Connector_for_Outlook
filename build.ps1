@@ -51,6 +51,13 @@ $assemblyVersionFull = $assemblyInfo.ToString()
 $assemblyVersionShort = "{0}.{1}.{2}" -f $assemblyInfo.Major, $assemblyInfo.Minor, $assemblyInfo.Build
 Write-Host "Assembly version detected: $assemblyVersionFull"
 
+$ifbCleanupProject = Join-Path $ProjectFolder "installer\IfbCleanup\IfbCleanup.csproj"
+Write-Host "Building the embedded IFB installer cleanup helper..."
+& $MsbuildPath $ifbCleanupProject /t:Rebuild "/p:Configuration=$Configuration" | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "IFB cleanup helper build exited with code $LASTEXITCODE."
+}
+
 $wixProject = Join-Path $ProjectFolder "installer\\NcConnectorOutlookInstaller.wixproj"
 if (-not (Test-Path $wixProject)) {
     throw "WiX project not found at $wixProject."

@@ -61,4 +61,40 @@ $loadBehaviorRows = @($registryRows | Where-Object { $_[0] -eq "Software\Microso
 Assert-Check ($loadBehaviorRows.Count -ge 2) "MSI must register Outlook add-in LoadBehavior in both registry views."
 Assert-Check (@($registryRows | Where-Object { $_[0] -like "Software\Classes\CLSID\{A8CC9257-A153-4A01-AB35-D66CB3D44AAA}*" -and $_[1] -eq "Assembly" }).Count -ge 2) "MSI must register COM assembly entries."
 
-Write-Host "MSI package check OK: $MsiPath"
+$binaries = Invoke-MsiQuery "SELECT ``Name`` FROM ``Binary``" | ForEach-Object { $_[0] }
+Assert-Check ($binaries -contains "IfbCleanupExe") "MSI must embed its IFB cleanup executable."
+$actions = Invoke-MsiQuery "SELECT ``Action``, ``Type``, ``Source``, ``Target`` FROM ``CustomAction``"
+$sequences = Invoke-MsiQuery "SELECT ``Action``, ``Condition``, ``Sequence`` FROM ``InstallExecuteSequence``"
+$expectedTypes = @{ CheckOutlookClosed = 2; RollbackIfbRegistry = 3330; CleanupIfbRegistry = 3074; CommitIfbRegistry = 3586 }
+$condition = 'NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~="ALL")'
+foreach ($name in $expectedTypes.Keys) {
+    $action = @($actions | Where-Object { $_[0] -eq $name })
+    Assert-Check ($action.Count -eq 1 -and [int]$action[0][1] -eq $expectedTypes[$name] -and $action[0][2] -eq "IfbCleanupExe") "Incorrect IFB action type or binary: $name"
+    $sequence = @($sequences | Where-Object { $_[0] -eq $name })
+    Assert-Check ($sequence.Count -eq 1 -and $sequence[0][1] -eq $condition) "IFB action must cover install, upgrade, repair and uninstall: $name"
+}
+$previous = -1
+foreach ($name in @("CheckOutlookClosed", "InstallValidate", "InstallInitialize", "RollbackIfbRegistry", "CleanupIfbRegistry", "CommitIfbRegistry", "InstallFinalize")) {
+    $sequence = @($sequences | Where-Object { $_[0] -eq $name })
+    Assert-Check ($sequence.Count -eq 1 -and [int]$sequence[0][2] -gt $previous) "Incorrect IFB scheduling at $name"
+    $previous = [int]$sequence[0][2]
+}
+
+# Evaluate the compiled condition without executing any installation action.
+$session = $installer.GetType().InvokeMember("OpenPackage", "InvokeMethod", $null, $installer, @($MsiPath, 1))
+foreach ($scenario in @(
+    @{ Name = "fresh install"; Installed = ""; REINSTALL = ""; REMOVE = ""; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
+    @{ Name = "new side of upgrade"; Installed = ""; REINSTALL = ""; REMOVE = ""; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
+    @{ Name = "repair"; Installed = "1"; REINSTALL = "ALL"; REMOVE = ""; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
+    @{ Name = "full uninstall"; Installed = "1"; REINSTALL = ""; REMOVE = "ALL"; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
+    @{ Name = "retiring upgrade package"; Installed = "1"; REINSTALL = ""; REMOVE = "ALL"; UPGRADINGPRODUCTCODE = "1"; Expected = 0 }
+)) {
+    foreach ($property in @("Installed", "REINSTALL", "REMOVE", "UPGRADINGPRODUCTCODE")) {
+        $session.GetType().InvokeMember("Property", "SetProperty", $null, $session, @($property, $scenario[$property])) | Out-Null
+    }
+    $result = $session.GetType().InvokeMember("EvaluateCondition", "InvokeMethod", $null, $session, @($condition))
+    Assert-Check ($result -eq $scenario.Expected) "Unexpected cleanup condition for $($scenario.Name)."
+}
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($session)
+
+Write-Host "MSI package check OK: files, registration, IFB actions and maintenance conditions: $MsiPath"

@@ -397,9 +397,15 @@ Compose runtime in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) delegates
 2. `Services/FreeBusyManager.cs` creates a random request secret for each Outlook process. `Services/IfbRegistryStateStore.cs` keeps the DPAPI-protected ownership state with primary/backup recovery.
 3. `Services/FreeBusyServer.cs` starts a local HTTP listener on the configured IFB port (`Settings -> IFB -> Local IFB port`, default: `7777`), accepts only `/nc-ifb/<request-secret>/freebusy/<address>.vfb`, and caps concurrent proxy requests at four.
 4. `Services/IfbRegistryOwnershipManager.cs` records each original user value and registers `%NAME%@%SERVER%.vfb` below the secret endpoint. Outlook replaces both placeholders with the attendee's full SMTP address. Policy values are read for conflicts but are not written.
-5. During upgrade, an unowned legacy `/nc-ifb/freebusy/...` value is adopted only in its pre-token form. An unowned tokenized path remains blocked. Without a saved external predecessor, disabling IFB removes the stale legacy value rather than restoring it.
-6. On disable, an original value is restored only if the current value still equals the value written by NC Connector.
+5. The MSI removes own stale paths during install, direct upgrade, repair and full uninstall. At runtime, legacy pre-token paths can still be adopted; unowned tokenized paths remain blocked to avoid taking over another running profile.
+6. With a retained ownership journal, a missing registry value after MSI maintenance can be registered again immediately. On disable, the original value is restored if the current value is absent or still equals the value written by NC Connector. A different existing value is never overwritten.
 7. `IfbAddressBookCache` scopes cached identities by Outlook profile, normalized Nextcloud base URL including subpath, and canonical Nextcloud UID.
+
+`installer/IfbCleanup` is a standalone .NET Framework executable embedded in the MSI Binary table. `build.ps1` builds it before WiX. It shares `IfbRegistryEndpoint` with the add-in and only removes the two known Outlook search values when they match the complete own loopback URL format. Policies and foreign values are excluded. The helper enumerates local user profiles, uses loaded HKU hives or temporarily mounts existing NTUSER.DAT files, and runs elevated without impersonation. Outlook must be closed across sessions. It does not read, delete or decrypt the user's settings or DPAPI ownership files.
+
+The rollback action precedes deferred cleanup; removed raw values and registry types are saved first in an administrator/SYSTEM-only HKLM transaction journal. Rollback restores only missing values in existing keys; commit removes the journal. A subsequent maintenance run recovers a retained journal before cleanup. The retiring package's `UPGRADINGPRODUCTCODE` skips cleanup; the incoming package performs it. Windows Installer rollback must remain enabled. Setup messages are embedded from `installer/IfbCleanup/SetupMessages.xml` in all supported languages.
+
+`Invoke-OutlookIfbInstallerTests.ps1` exercises cleanup and rollback against isolated HKCU fixtures, never real user hives. `Check-MsiPackage.ps1` checks the compiled action types/order and evaluates install, upgrade, repair and uninstall conditions without running them. `Invoke-OutlookTalkIfbLifecycleTests.ps1` covers the retained-journal restart and predecessor restoration. Real MSI installation and offline-hive mounting still require an installation test machine.
 
 ## Network endpoints
 

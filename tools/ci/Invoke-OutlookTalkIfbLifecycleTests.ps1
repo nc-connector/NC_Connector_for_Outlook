@@ -1686,6 +1686,52 @@ internal static class TalkIfbLifecycleTests
                 "Legacy IFB migration restores its saved external predecessor",
                 ReadRegistryValue(calendarPath, calendarValue) == externalUrl
                 && ReadRegistryValue(internetPath, internetValue) == externalUrl);
+
+            var reinstallManager = new IfbRegistryOwnershipManager(
+                root,
+                "retained-install-state");
+            reinstallManager.Apply(outlookVersion, desiredUrl, externalSettings);
+            using (RegistryKey calendar = Registry.CurrentUser.OpenSubKey(calendarPath, true))
+            using (RegistryKey internet = Registry.CurrentUser.OpenSubKey(internetPath, true))
+            {
+                calendar.DeleteValue(calendarValue);
+                internet.DeleteValue(internetValue);
+            }
+            // Installer cleanup leaves the profile journal available for a subsequent start.
+            reinstallManager = new IfbRegistryOwnershipManager(root, "retained-install-state");
+            reinstallManager.Apply(outlookVersion, desiredUrl, externalSettings);
+            Check(
+                "IFB starts immediately after installer cleanup with a retained journal",
+                ReadRegistryValue(calendarPath, calendarValue) == desiredUrl
+                && ReadRegistryValue(internetPath, internetValue) == desiredUrl);
+            reinstallManager.Restore();
+            Check(
+                "IFB retains the external predecessor across installer cleanup",
+                ReadRegistryValue(calendarPath, calendarValue) == externalUrl
+                && ReadRegistryValue(internetPath, internetValue) == externalUrl);
+
+            reinstallManager.Apply(outlookVersion, desiredUrl, externalSettings);
+            using (RegistryKey calendar = Registry.CurrentUser.OpenSubKey(calendarPath, true))
+            using (RegistryKey internet = Registry.CurrentUser.OpenSubKey(internetPath, true))
+            {
+                calendar.DeleteValue(calendarValue);
+                internet.DeleteValue(internetValue);
+            }
+            reinstallManager.Restore();
+            Check(
+                "Disabled IFB restores its retained predecessor after installer cleanup",
+                ReadRegistryValue(calendarPath, calendarValue) == externalUrl
+                && ReadRegistryValue(internetPath, internetValue) == externalUrl);
+
+            reinstallManager.Apply(outlookVersion, desiredUrl, externalSettings);
+            const string replacementUrl = "https://other.example.org/freebusy.vfb";
+            WriteRegistryValue(calendarPath, calendarValue, replacementUrl);
+            WriteRegistryValue(internetPath, internetValue, replacementUrl);
+            reinstallManager.Restore();
+            Check(
+                "Registry recovery preserves values changed by another application",
+                ReadRegistryValue(calendarPath, calendarValue) == replacementUrl
+                && ReadRegistryValue(internetPath, internetValue) == replacementUrl);
         }
         finally
         {
@@ -1795,6 +1841,7 @@ internal static class TalkIfbLifecycleTests
         (Join-Path $SourceRoot "Services\TalkRoomLifecycleStore.cs"),
         (Join-Path $SourceRoot "Services\IfbRegistryStateStore.cs"),
         (Join-Path $SourceRoot "Services\IfbRegistryOwnershipManager.cs"),
+        (Join-Path $SourceRoot "Services\IfbRegistryEndpoint.cs"),
         (Join-Path $SourceRoot "Models\TalkAppointmentSyncSnapshot.cs"),
         (Join-Path $SourceRoot "Models\NextcloudUser.cs"),
         (Join-Path $SourceRoot "Models\TalkRoomLifecycleRecord.cs"),

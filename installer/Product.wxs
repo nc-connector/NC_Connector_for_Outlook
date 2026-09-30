@@ -20,6 +20,29 @@
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
     <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
 
+    <Binary Id="IfbCleanupExe" SourceFile="$(var.IfbCleanupExe)" />
+    <CustomAction Id="CheckOutlookClosed" BinaryRef="IfbCleanupExe"
+                  ExeCommand="check-outlook [UILevel] &quot;[RollbackDisabled]&quot;" Execute="immediate" Return="check" />
+    <CustomAction Id="RollbackIfbRegistry" BinaryRef="IfbCleanupExe"
+                  ExeCommand="rollback &quot;[ProductCode]&quot;"
+                  Execute="rollback" Impersonate="no" Return="check" />
+    <CustomAction Id="CleanupIfbRegistry" BinaryRef="IfbCleanupExe"
+                  ExeCommand="clean &quot;[ProductCode]&quot; &quot;[RollbackDisabled]&quot;"
+                  Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="CommitIfbRegistry" BinaryRef="IfbCleanupExe"
+                  ExeCommand="commit &quot;[ProductCode]&quot;"
+                  Execute="commit" Impersonate="no" Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="CheckOutlookClosed" Before="InstallValidate"
+              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+      <Custom Action="RollbackIfbRegistry" Before="CleanupIfbRegistry"
+              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+      <Custom Action="CleanupIfbRegistry" After="InstallInitialize"
+              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+      <Custom Action="CommitIfbRegistry" After="CleanupIfbRegistry"
+              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+    </InstallExecuteSequence>
+
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="NC4OL">
 

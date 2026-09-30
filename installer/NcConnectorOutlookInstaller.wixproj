@@ -8,7 +8,8 @@
     <ProductVersion Condition=" '$(ProductVersion)' == '' ">3.4.1</ProductVersion>
     <AssemblyVersion Condition=" '$(AssemblyVersion)' == '' ">3.4.1.0</AssemblyVersion>
 
-    <DefineConstants>BuildOutputDir=$(BuildOutputDir);ProductVersion=$(ProductVersion);AssemblyVersion=$(AssemblyVersion)</DefineConstants>
+    <IfbCleanupExe>$(MSBuildProjectDirectory)\IfbCleanup\bin\$(Configuration)\NcConnectorIfbCleanup.exe</IfbCleanupExe>
+    <DefineConstants>BuildOutputDir=$(BuildOutputDir);ProductVersion=$(ProductVersion);AssemblyVersion=$(AssemblyVersion);IfbCleanupExe=$(IfbCleanupExe)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

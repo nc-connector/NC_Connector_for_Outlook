@@ -129,7 +129,9 @@ Add-in-Version, Outlook-Bitness, Nextcloud-Version und das Ergebnis jedes Schrit
 
 Die MSI ersetzt eine installierte neuere, gleiche oder ältere Version. Benutzerspezifische Einstellungen bleiben im Benutzerprofil erhalten.
 
-Beim ersten Start mit aktiviertem IFB nach einem Upgrade migriert NC Connector nur seine alten Outlook-Werte im Format `/nc-ifb/freebusy/...` auf den aktuellen geschützten Pfad. Vorhandene externe Outlook-Free/Busy-Werte bleiben unverändert. Diese Migration betrifft benutzerspezifische Outlook-Werte; ein Löschen der HTTP-URL-Reservierung mit `netsh` ist dafür nicht erforderlich.
+Installation, direktes Upgrade und MSI-Reparatur entfernen alte NC-Connector-Free/Busy-Pfade aus den lokalen Windows-Benutzerprofilen. Das funktioniert auch, wenn `%LOCALAPPDATA%\NC4OL\` gelöscht oder umbenannt wurde. Beim nächsten Start mit aktiviertem IFB trägt NC Connector den aktuellen Pfad wieder ein. Andere Free/Busy-Anbieter und administrative Policies bleiben unverändert; manuelle Registry-Bereinigung oder `netsh`-Befehle sind nicht erforderlich.
+
+Vor dem Setup Outlook in **allen Windows-Sitzungen** schließen. Läuft Outlook noch, bricht das Setup ab; Outlook wird nicht zwangsweise beendet. Die Rücknahme von Änderungen durch Windows Installer muss aktiviert sein.
 
 Das Add-in meldet Release-Metadaten, installiert aber keine Updates. **Einstellungen -> Erweitert -> Über neue Versionen informieren** steuert das Popup; die tägliche Metadatenabfrage läuft auch bei deaktiviertem Popup. Freigabe und Verteilung der MSI bleiben Aufgaben der Administration.
 
@@ -142,16 +144,16 @@ Für die Rückkehr zur vorherigen Add-in-Version denselben Ablauf mit der vorher
 
 ### Deinstallation
 
-1. Solange Outlook noch installiert ist, **NC Connector -> Einstellungen -> IFB** öffnen.
-2. IFB deaktivieren und speichern. Dadurch wird der zuvor gespeicherte Outlook-Free/Busy-Pfad wiederhergestellt.
-3. Outlook schließen und warten, bis kein `OUTLOOK.EXE`-Prozess mehr läuft.
-4. **Windows-Einstellungen -> Apps -> Installierte Apps** verwenden oder:
+1. Outlook in allen Windows-Sitzungen schließen und warten, bis kein `OUTLOOK.EXE`-Prozess mehr läuft.
+2. **Windows-Einstellungen -> Apps -> Installierte Apps** verwenden oder:
 
 ```powershell
 msiexec.exe /x "NCConnectorForOutlook-<version>.msi" /qn /norestart
 ```
 
-Die MSI entfernt installierte Dateien, die Add-in-Registrierung und die Standard-IFB-URL-Reservierung. Benutzerspezifische Einstellungen, Caches und Logs unter `%LOCALAPPDATA%\NC4OL\` bleiben erhalten, damit eine Neuinstallation die Benutzerkonfiguration nicht löscht.
+Die MSI entfernt installierte Dateien, die Add-in-Registrierung, die Standard-IFB-URL-Reservierung und verbliebene eigene Outlook-Free/Busy-Pfade. Dafür muss IFB nicht vorher deaktiviert werden; auch der Datenordner wird für die Bereinigung nicht benötigt. Aktuelle Werte anderer Anbieter und administrative Policies bleiben unverändert. Benutzerspezifische Einstellungen, Caches und Logs unter `%LOCALAPPDATA%\NC4OL\` bleiben erhalten, damit eine Neuinstallation die Benutzerkonfiguration nicht löscht.
+
+Soll vor der Deinstallation ein zuvor verwendeter externer Free/Busy-Anbieter wiederhergestellt werden, IFB in den Einstellungen deaktivieren, solange dessen gespeicherte Konfiguration noch vorhanden ist. Der Installer entfernt eigene Restwerte; die Adresse eines externen Anbieters kann er aus einem gelöschten Datenordner nicht rekonstruieren.
 
 Dieses Profilverzeichnis erst löschen, wenn Einstellungen und Logs nicht mehr benötigt werden. Eine manuell für einen eigenen IFB-Port erstellte URL-Reservierung gehört nicht zur MSI; sie muss wie unter [Eigener IFB-Port](#eigener-ifb-port) beschrieben separat entfernt werden.
 
