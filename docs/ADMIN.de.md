@@ -69,6 +69,8 @@ Für Update-Hinweise fragt das Add-in `https://nc-connector.de/wp-json/ncc/v1/up
 4. Nextcloud-URL eintragen und anmelden. Beim Login Flow erfolgt die Anmeldung im Browser; bei manueller Anmeldung Benutzername und App-Passwort eintragen.
 5. Verbindung testen und Einstellungen speichern.
 
+Geänderte Serveradressen oder Zugangsdaten müssen vor dem Speichern die Nextcloud-Verbindungsprüfung bestehen. Bei abgelehnter Anmeldung bleiben die gespeicherte Verbindung unverändert und der Dialog geöffnet. Lokale Einstellungen mit unveränderten Zugangsdaten lassen sich ohne erneute Anmeldung speichern.
+
 Ist Outlook noch geöffnet, kann Windows Installer anbieten, es geordnet zu schließen. Eine unbeaufsichtigte Installation versucht dies automatisch. Läuft Outlook danach weiter, etwa in einer anderen Windows-Sitzung, stoppt das Setup vor dem Austausch der installierten Version. Outlook dann manuell schließen und die Installation wiederholen. Das Setup erzwingt kein Beenden und garantiert keinen automatischen Neustart von Outlook.
 
 Für die unbeaufsichtigte Installation mit Protokoll:
@@ -312,9 +314,11 @@ Bei Freigabevorlagen passen sich `{LINK_INTRO}` und `{LINK_LABEL}` an das gewäh
 
 Die Anhangsautomatisierung wird unter **Freigabe → Anhänge** eingerichtet. Sie kann Anhänge immer über NC Connector senden oder die Nutzung ab einem Schwellwert anbieten. Das Linkziel ist wahlweise ZIP-Download oder Freigabeseite; ohne Vorgabe gilt ZIP-Download. Manuelle Freigaben verlinken auf die Freigabeseite.
 
+Die lokale Anhangsautomatisierung funktioniert bei erreichbarer Nextcloud auch ohne installiertes Backend. Ein fehlender Backend-Endpunkt pausiert lokale Freigaben nicht. Enterprise Rollout und bereits bestätigte zentrale Freigabevorgaben benötigen weiterhin das Backend und berücksichtigen das konfigurierte Ausfallverhalten.
+
 Outlook oder Exchange kann einen Anhang abweisen, bevor NC Connector ihn erhält. In diesem Fall die Datei direkt über **Nextcloud-Freigabe einfügen** auswählen. Ein zentral gesperrter Größen-Schwellwert macht das Teilen bei Überschreitung verbindlich; ein lokales Uploadangebot nicht. Bei verfügbaren Diensten verhindert eine verbindliche Anhangsregel den Versand, solange eine betroffene Datei noch normal an der Mail hängt. Bei Dienstausfällen gilt [SendPolicyFailureMode](#versand-bei-dienstausfällen).
 
-Originalanhänge bleiben erhalten, bis ihre Dateien erfolgreich geteilt wurden und der Freigabelink in die Mail eingefügt wurde. Abbruch des Assistenten sowie fehlgeschlagener Upload oder Einfügung erhalten die Anhänge. Werden Dateien aus der Assistentenauswahl entfernt, werden nur die tatsächlich geteilten Originale gelöscht; spätere Ergänzungen und andere gleichnamige Dateien bleiben erhalten.
+Beim Abbrechen des automatischen Anhangsassistenten werden auch die von ihm übernommenen Anhänge aus der Mail entfernt. Ein Upload- oder Einfügefehler allein erhält die Anhänge. Nach erfolgreichem Teilen werden nur Originale entfernt, deren Dateien geteilt und in der Mail verlinkt wurden. Aus der Assistentenauswahl entfernte Dateien bleiben angehängt, sofern nicht der gesamte Assistent abgebrochen wird; spätere Ergänzungen und andere gleichnamige Dateien bleiben unverändert. Der Abbruch einer manuell gestarteten Freigabe entfernt keine vorhandenen Mailanhänge.
 
 <a id="ungesendete-mail-und-freigabebereinigung"></a>
 <a id="unsent-mail-and-share-cleanup"></a>
@@ -484,6 +488,8 @@ Fehlen Dateien oder Registrierung, Outlook schließen und die MSI reparieren. Be
 3. Bei HTTP `401` erneut anmelden; bei `403` die Berechtigungen und vorgeschaltete Zugriffssperren prüfen.
 4. Den Verbindungstest erneut ausführen. Falls nur ein Arbeitsplatz betroffen ist, dessen Proxy-, Zertifikats- und Endpoint-Security-Konfiguration mit einem funktionierenden Arbeitsplatz vergleichen.
 
+Nach HTTP `401` pausiert NC Connector Anfragen mit diesen Zugangsdaten für die laufende Outlook-Sitzung. Korrigierte Zugangsdaten in den Einstellungen prüfen, um die Anfragen fortzusetzen. HTTP `429` pausiert authentifizierte Anfragen an diesen Nextcloud-Server bis zum Ablauf der serverseitigen Wartezeit; ein Wechsel der Zugangsdaten umgeht diese Pause nicht. Ohne verwertbare Wartezeit beträgt die Pause eine Minute. Meldet Enterprise Rollout, dass das Backend erforderlich ist, muss der Administrator es installieren oder aktivieren; ein erneuter Verbindungstest allein hilft dabei nicht.
+
 Beim Klick auf Freigabe oder Talk wird die Nextcloud-Verbindung vor dem Assistenten erneut geprüft. Ein nicht erreichbarer Server zeigt in beiden Aktionen denselben Hinweis mit dem Angebot, die Einstellungen zu öffnen; eine frühere erfolgreiche Verbindung überspringt diese Prüfung nicht. Nach dem Speichern geprüfter Zugangsdaten wird vor der Fortsetzung nochmals geprüft. Einrichtungsabbruch oder Schließen der ursprünglichen Mail/des Termins beendet die Aktion. Die Anhangsautomatisierung öffnet keine Anmeldung automatisch; fehlgeschlagenes Teilen erhält die Originalanhänge. Für den normalen Versand gilt weiterhin der konfigurierte `SendPolicyFailureMode`.
 
 Keine Zertifikatsprüfung abschalten und nicht versuchsweise computerweite TLS-Einstellungen ändern.
@@ -598,7 +604,7 @@ Bei **Apache** Rewrite-Module, `AllowOverride` und Rewrite Base prüfen; nach Ä
 4. Bei ausbleibender Automatisierung die Einstellungen unter **Freigabe → Anhänge** kontrollieren. Hat Outlook den Anhang bereits abgelehnt, die Datei direkt im Freigabe-Assistenten auswählen.
 5. Mit einer kleinen Datei eingrenzen und das zugehörige Zeitfenster im `FILELINK`-Log auswerten.
 
-Wird der Versand wegen ungeprüfter zentraler Vorgaben blockiert, `SendPolicyFailureMode` prüfen, die Dienste wieder verfügbar machen, die Mail geöffnet lassen und nach erfolgreicher Prüfung erneut senden. Der Hinweis bedeutet nicht, dass ein Upload fehlgeschlagen ist. Originalanhänge bleiben nach abgebrochenem oder fehlgeschlagenem Teilen erhalten; vor einem neuen Versuch kontrollieren.
+Wird der Versand wegen ungeprüfter zentraler Vorgaben blockiert, `SendPolicyFailureMode` prüfen, die Dienste wieder verfügbar machen, die Mail geöffnet lassen und nach erfolgreicher Prüfung erneut senden. Der Hinweis bedeutet nicht, dass ein Upload fehlgeschlagen ist. Fehlgeschlagenes Teilen erhält die Originalanhänge; beim Abbrechen des automatischen Anhangsassistenten werden die von ihm übernommenen Anhänge aus der Mail entfernt.
 
 <a id="verwaltete-signatur-fehlt-oder-steht-falsch"></a>
 <a id="managed-signature-is-missing-or-misplaced"></a>

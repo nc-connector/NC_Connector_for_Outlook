@@ -222,6 +222,10 @@ Runtime rules:
 
 ### Runtime configuration and policy processing
 
+`SettingsForm` verifies changed connection fields through the existing fresh `TalkService.VerifyConnection` path before accepting Save. Only a successful connection test or verified Login Flow clears pending verification; backend/address-book refresh does not. Later credential or TLS edits invalidate that verification. Unchanged credentials permit local preference saves without a new authentication check. The controller still persists before applying runtime changes.
+
+`NcHttpClient` shares request pauses across authenticated service instances for the current Outlook process. HTTP 401 pauses the normalized server/login/password context; Settings alone may explicitly retry verification. A successful capabilities and canonical UID check releases only that verified context, without overriding a later rejection. HTTP 429 pauses the server across credential changes and explicit tests until `Retry-After` expires, defaulting to one minute when absent or invalid. Backend enterprise workers also honor the existing failed-check cooldown. Pauses suppress HTTP, not confirmed policy knowledge; they do not create or revoke Seat entitlements.
+
 `SendPolicyFailureMode` is an optional `REG_SZ` policy accepting `failopen` and `failclosed`. It uses the existing independent hive/view precedence; the first present entry wins even if malformed. Missing or invalid input resolves to `failopen`; invalid selected input retains the presence flag and exposes `Strings.SendPolicyFailureModeInvalid` in Settings and diagnostics. Presence activates Enterprise Rollout. The mode is runtime-only, cloned with other managed state, never serialized as a user preference, and has no user override. Registry changes require an Outlook restart.
 
 Sending decisions separate three facts: matching confirmed policy knowledge, current service availability, and actual applicability to this message. Successful policy snapshots remain scoped to the normalized Nextcloud URL, account, and authentication context. Refresh is asynchronous after the five-minute freshness boundary; failures retain the last successful policy without advancing its timestamp. Failed checks have a fifteen-second retry cooldown, extended by a server-provided `Retry-After`. A fresh confirmed refusal replaces older permission; request ordering prevents an older in-flight result from replacing a more recent confirmed state. A malformed response is a failed check, not proof of a missing policy or Seat.
@@ -367,13 +371,14 @@ Compose runtime in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) delegates
 - Attachment partials share one compose subscription and its existing event registrations and lifetime. Policy, materialization, and queue work do not introduce independent event handlers or task dispatch paths.
 - Open compose windows invalidate their attachment-rule snapshot immediately after local settings are saved. After five minutes, attachment events refresh backend policy in the background while continuing with matching last-success rules. An unsuccessful refresh retains those rules and does not mark them fresh; the latest check outcome is evaluated separately. Share and Talk wizards retain the policy loaded when they opened for their entire operation.
 - A missing initial snapshot does not cancel ordinary Send in `failopen` or produce an invented upload warning. Explicit `failclosed` requires initial policy clarification. An effective `AlwaysConnector` rule or exceeded locked central `attachments_min_size_mb` threshold requires sharing when services are available. A local optional threshold does not become mandatory. Known applicable requirements during service outages follow `SendPolicyFailureMode`; authentication, permission, quota, and local processing failures do not grant the outage bypass.
+- A plain HTTP 404 from the backend status endpoint is `backend_missing`, distinct from transport and server failures. `BackendRequired` is set for Enterprise Rollout or a confirmed active sharing policy. A missing optional backend neither pauses local automation nor bypasses local `AlwaysConnector` at Send. The live Nextcloud check still runs before the wizard. A missing required backend follows the outage mode without discarding the last confirmed policy.
 - Attachment automation modes:
   - always route attachments into NC sharing flow, or
   - threshold mode with a two-action prompt (`Share with NC Connector` / `Remove last selected attachments`).
 - For a multi-file addition, the prompt pairs the last file's name with that file's size while the remove action still covers the complete added batch.
 - Pre-add attachment interception:
   - `BeforeAttachmentAdd` path resolves candidate file metadata early
-  - captures candidates without discarding the original host attachment before a successful share and body insertion.
+  - captures candidates without discarding the original host attachment during queue admission.
   - unavailable candidate metadata does not erase the user's file; final mandatory-rule validation remains in the Send gate.
   - hard Outlook/Exchange size blocks can still happen before add-in callbacks and are not interceptable via official Outlook OOM events.
 - Runtime host guard checks (live large-attachment setting) at:
@@ -383,8 +388,9 @@ Compose runtime in `NextcloudTalkAddIn.cs` (`MailComposeSubscription`) delegates
 - Attachment-mode wizard launch:
   - preserves the actual trigger for queued pre-add batches. Always mode takes precedence in mixed batches; a size comparison is shown only for threshold mode with an exceeded effective limit.
   - after server prefetch, materializes the current compose attachments on the Outlook STA and queues them as initial wizard selections while retaining the original attachment identities.
-  - removes only originals whose materialized source paths actually completed sharing and whose links were successfully inserted into the message; queue acceptance alone never deletes originals.
-  - cancellation, failed transfer, failed body insertion, or a file removed from the wizard selection preserves the corresponding original. Later additions and unrelated same-name files remain untouched; stale attachment indexes and filenames are not deletion identities.
+  - after successful sharing, removes only originals whose materialized source paths actually completed sharing and whose links were inserted into the message; queue acceptance alone never deletes originals.
+  - explicit user cancellation removes all adopted originals on the Outlook STA through their captured identities. `CancelledByUser` is carried separately from technical failure; preflight failure, rejected queue handoff, host shutdown, or failed transfer/insertion alone does not discard originals. A subsequent user cancellation still discards them.
+  - a file removed from the wizard selection retains its original after successful subset sharing. Later additions and unrelated same-name files remain untouched; stale attachment indexes and filenames are not deletion identities. Manual sharing never adopts existing mail attachments.
   - opens directly in file-step-equivalent mode.
   - copies the effective attachment link target into `FileLinkRequest`; no per-share target switch is exposed.
 - Outlook body resources with `PR_ATTACHMENT_HIDDEN=true`, such as signature images, are excluded from attachment batching, threshold totals, FileLink selection, host removal, and the required-routing send gate.

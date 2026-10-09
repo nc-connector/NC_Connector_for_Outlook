@@ -67,6 +67,8 @@ For update notices, the add-in queries `https://nc-connector.de/wp-json/ncc/v1/u
 4. Enter the Nextcloud URL and sign in. Login Flow opens a browser; manual sign-in requires a username and app password.
 5. Test the connection and save the settings.
 
+Changed server addresses or credentials must pass a Nextcloud connection test before they are saved. A rejected sign-in leaves the saved connection unchanged and the dialog open. Saving local preferences with unchanged credentials does not require a new sign-in.
+
 If Outlook is still open, Windows Installer can offer to close it cleanly. An unattended installation attempts this automatically. If Outlook remains active, for example in another Windows session, setup stops before replacing the installed version. Close Outlook manually and run the installation again. Setup does not force termination or promise to restart Outlook automatically.
 
 For an unattended installation with a log:
@@ -306,9 +308,11 @@ In share templates, `{LINK_INTRO}` and `{LINK_LABEL}` adapt to the selected link
 
 Configure attachment automation under **Share → Attachments**. It can always route attachments through NC Connector or offer NC Connector above a size threshold. The link target can be ZIP download or share page; ZIP download is the default when no value is set. Manual shares always link to the share page.
 
+Local attachment automation works without an installed backend when Nextcloud is reachable. A missing backend endpoint does not pause local sharing. Enterprise Rollout and previously confirmed central sharing rules still require the backend and follow the configured outage behavior.
+
 Outlook or Exchange can reject an attachment before NC Connector receives it. In that case, select the file directly through **Insert Nextcloud share**. A locked central size threshold makes sharing mandatory when exceeded; a locally configured upload offer does not. While services are available, a mandatory attachment rule blocks sending while an affected file remains attached normally. During service outages, [SendPolicyFailureMode](#sending-during-service-outages) applies.
 
-Original attachments remain until their files have been shared successfully and the share link has been inserted into the message. Cancelling the wizard or a failed upload or insertion preserves them. If files are removed from the wizard selection, only the originals actually shared are removed; later additions and unrelated same-name files remain.
+Cancelling the automatic attachment-sharing wizard also removes the attachments adopted by that wizard from the message. An upload or insertion failure alone preserves them. After successful sharing, only originals whose files were shared and linked in the message are removed. Files removed from the wizard selection remain attached unless the whole wizard is cancelled; later additions and unrelated same-name files remain untouched. Cancelling a manually started share does not remove existing mail attachments.
 
 <a id="ungesendete-mail-und-freigabebereinigung"></a>
 <a id="unsent-mail-and-share-cleanup"></a>
@@ -476,6 +480,8 @@ If files or registration are missing, close Outlook and repair the MSI. If the p
 3. For HTTP `401`, sign in again; for `403`, check permissions and upstream access controls.
 4. Run the connection test again. If only one workstation is affected, compare its proxy, certificate, and endpoint-security configuration with a working workstation.
 
+After HTTP `401`, NC Connector pauses requests with those credentials for the current Outlook session. Verify the corrected credentials in Settings to resume. HTTP `429` pauses authenticated requests to that Nextcloud server until the server's waiting time has elapsed; changing credentials does not bypass that wait. Without a usable waiting time, the pause is one minute. An Enterprise Rollout notice that the backend is required means the administrator must install or enable it, not merely repeat the connection test.
+
 Clicking Share or Talk checks the Nextcloud connection again before opening the wizard. An unavailable server produces the same notice and offer to open Settings in both actions; a previous successful connection does not skip this check. After saving verified credentials, the action checks again before continuing. Cancelling setup or closing the original message/appointment ends the action. Attachment automation does not open sign-in Settings automatically; failed sharing preserves the original attachments. Ordinary sending continues to follow the configured `SendPolicyFailureMode`.
 
 Do not disable certificate validation or change computer-wide TLS settings as an experiment.
@@ -589,7 +595,7 @@ For **Apache**, check the rewrite modules, `AllowOverride`, and the rewrite base
 4. If automation does not start, check **Share → Attachments**. If Outlook has already rejected the attachment, select the file directly in the sharing wizard.
 5. Narrow down the problem with a small file and review the matching time range in the `FILELINK` log.
 
-If sending is blocked because central requirements could not be checked, verify `SendPolicyFailureMode`, restore service availability, keep the message open, and send it again after the check succeeds. This notice does not mean that an upload failed. Original attachments remain after a cancelled or failed sharing attempt; review them before retrying.
+If sending is blocked because central requirements could not be checked, verify `SendPolicyFailureMode`, restore service availability, keep the message open, and send it again after the check succeeds. This notice does not mean that an upload failed. Failed sharing preserves original attachments; cancelling the automatic sharing wizard removes its adopted attachments from the message.
 
 <a id="verwaltete-signatur-fehlt-oder-steht-falsch"></a>
 <a id="managed-signature-is-missing-or-misplaced"></a>
