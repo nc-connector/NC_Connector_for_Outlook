@@ -476,6 +476,8 @@ If files or registration are missing, close Outlook and repair the MSI. If the p
 3. For HTTP `401`, sign in again; for `403`, check permissions and upstream access controls.
 4. Run the connection test again. If only one workstation is affected, compare its proxy, certificate, and endpoint-security configuration with a working workstation.
 
+Clicking Share or Talk checks the Nextcloud connection again before opening the wizard. An unavailable server produces the same notice and offer to open Settings in both actions; a previous successful connection does not skip this check. After saving verified credentials, the action checks again before continuing. Cancelling setup or closing the original message/appointment ends the action. Attachment automation does not open sign-in Settings automatically; failed sharing preserves the original attachments. Ordinary sending continues to follow the configured `SendPolicyFailureMode`.
+
 Do not disable certificate validation or change computer-wide TLS settings as an experiment.
 
 ### A registry setting is not applied as expected

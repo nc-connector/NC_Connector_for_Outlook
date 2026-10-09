@@ -674,9 +674,6 @@
   "outlook_error_connection_failed_format": {
     "message": "Verbinding met de Nextcloud-server mislukt: $1"
   },
-  "outlook_error_unknown_authentication_format": {
-    "message": "Onbekende fout tijdens authenticatie: $1"
-  },
   "outlook_error_credentials_not_verified": {
     "message": "Inloggegevens konden niet worden geverifieerd."
   },

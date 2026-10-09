@@ -51,7 +51,8 @@ namespace NcTalkOutlookAddIn.Services
                 TimeoutMs = 60000,
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
-                ParseJson = true
+                ParseJson = true,
+                ForceFreshConnection = forceRefresh
             });
 
             if (!response.HasHttpResponse)

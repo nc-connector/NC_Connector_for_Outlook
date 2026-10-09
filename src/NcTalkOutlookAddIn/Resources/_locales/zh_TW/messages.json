@@ -674,9 +674,6 @@
   "outlook_error_connection_failed_format": {
     "message": "連線到 Nextcloud 伺服器失敗：$1"
   },
-  "outlook_error_unknown_authentication_format": {
-    "message": "驗證期間發生未知錯誤：$1"
-  },
   "outlook_error_credentials_not_verified": {
     "message": "無法驗證憑證。"
   },

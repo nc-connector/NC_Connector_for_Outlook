@@ -674,9 +674,6 @@
   "outlook_error_connection_failed_format": {
     "message": "连接 Nextcloud 服务器失败：$1"
   },
-  "outlook_error_unknown_authentication_format": {
-    "message": "身份验证期间发生未知错误：$1"
-  },
   "outlook_error_credentials_not_verified": {
     "message": "无法验证凭据。"
   },

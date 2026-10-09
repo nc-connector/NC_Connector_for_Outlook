@@ -3,6 +3,7 @@
 // See LICENSE.txt for details.
 
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
@@ -59,9 +60,25 @@ namespace NcTalkOutlookAddIn.Controllers
             _outlookProfileScope = outlookProfileScope ?? string.Empty;
         }
 
-        internal async Task<bool> RunAsync(bool requireAuthentication = false, bool authenticationRejected = false)
+        internal async Task<bool> RunAsync(
+            bool requireAuthentication = false,
+            bool authenticationRejected = false,
+            Func<bool> canOpenDialog = null)
         {
-            AddinSettings currentSettings = ((_getCurrentSettings != null ? _getCurrentSettings() : null) ?? new AddinSettings()).Clone();
+            if (_runOnOutlookUiThreadAsync == null)
+            {
+                throw new InvalidOperationException("The Outlook UI-thread dispatcher is unavailable.");
+            }
+            AddinSettings currentSettings = null;
+            await _runOnOutlookUiThreadAsync(() =>
+            {
+                if (canOpenDialog == null || canOpenDialog())
+                {
+                    currentSettings = ((_getCurrentSettings != null ? _getCurrentSettings() : null)
+                        ?? new AddinSettings()).Clone();
+                }
+            }).ConfigureAwait(false);
+            if (currentSettings == null) { return false; }
             currentSettings.ApplyManagedSetupPolicy(ManagedSetupPolicy.Load());
             _logSettings("Settings dialog opened.");
             if (currentSettings.HasManagedNextcloudUrl)
@@ -101,14 +118,9 @@ namespace NcTalkOutlookAddIn.Controllers
             IfbAddressBookCache.SystemAddressbookStatus initialAddressbookStatus =
                 await addressbookStatusTask.ConfigureAwait(false);
 
-            if (_runOnOutlookUiThreadAsync == null)
-            {
-                throw new InvalidOperationException("The Outlook UI-thread dispatcher is unavailable.");
-            }
-
             bool saved = false;
             await _runOnOutlookUiThreadAsync(
-                () => saved = RunSettingsDialogOnUiThread(
+                () => saved = (canOpenDialog == null || canOpenDialog()) && RunSettingsDialogOnUiThread(
                     currentSettings,
                     initialPolicyStatus,
                     addressBookCache,
@@ -116,6 +128,140 @@ namespace NcTalkOutlookAddIn.Controllers
                     requireAuthentication,
                     authenticationRejected)).ConfigureAwait(false);
             return saved;
+        }
+
+        internal async Task<AddinSettings> EnsureConnectionForActionAsync(
+            Func<bool> isOriginalItemOpen,
+            bool allowInteractiveRecovery,
+            string context,
+            Action<Exception> onFailureObserved = null)
+        {
+            if (_runOnOutlookUiThreadAsync == null)
+            {
+                throw new InvalidOperationException("The Outlook UI-thread dispatcher is unavailable.");
+            }
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                AddinSettings settings = null;
+                await _runOnOutlookUiThreadAsync(() =>
+                {
+                    if (isOriginalItemOpen != null && isOriginalItemOpen())
+                    {
+                        AddinSettings current = _getCurrentSettings != null ? _getCurrentSettings() : null;
+                        settings = current != null ? current.Clone() : null;
+                    }
+                }).ConfigureAwait(false);
+                if (settings == null)
+                {
+                    _logSettings(context + " connection check ended: original item unavailable.");
+                    return null;
+                }
+
+                var configuration = new TalkServiceConfiguration(
+                    settings.ServerUrl, settings.Username, settings.AppPassword);
+                Func<bool> canOpenSettings = () => isOriginalItemOpen != null
+                    && isOriginalItemOpen() && ConnectionSettingsMatch(settings);
+                if (!configuration.IsComplete() && allowInteractiveRecovery && attempt == 0)
+                {
+                    if (!await RunAsync(true, false, canOpenSettings).ConfigureAwait(false)) { return null; }
+                    continue;
+                }
+
+                Exception failure = null;
+                try
+                {
+                    string response = string.Empty;
+                    _logSettings(context + " fresh connection check started.");
+                    bool verified = await Task.Run(() =>
+                        new TalkService(configuration).VerifyConnection(out response)).ConfigureAwait(false);
+                    if (!verified)
+                    {
+                        failure = new TalkServiceException(
+                            string.IsNullOrWhiteSpace(response) ? Strings.ErrorCredentialsNotVerified : response,
+                            false, 0, null);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+
+                bool canContinue = false;
+                await _runOnOutlookUiThreadAsync(() =>
+                    canContinue = isOriginalItemOpen != null && isOriginalItemOpen()
+                        && ConnectionSettingsMatch(settings)).ConfigureAwait(false);
+                if (!canContinue)
+                {
+                    _logSettings(context + " connection check discarded: original item or credentials changed.");
+                    return null;
+                }
+                if (failure == null)
+                {
+                    _logSettings(context + " fresh connection check succeeded.");
+                    return settings;
+                }
+                if (onFailureObserved != null) { onFailureObserved(failure); }
+                _logSettings(context + " fresh connection check failed: " + failure.Message);
+
+                var serviceFailure = failure as TalkServiceException;
+                bool authenticationRejected = serviceFailure != null && serviceFailure.IsAuthenticationError;
+                bool canRecover = allowInteractiveRecovery && attempt == 0;
+                if (authenticationRejected && canRecover)
+                {
+                    if (!await RunAsync(true, true, canOpenSettings).ConfigureAwait(false)) { return null; }
+                    continue;
+                }
+
+                string message = GetActionConnectionFailureMessage(failure);
+                DialogResult result = DialogResult.Cancel;
+                await _runOnOutlookUiThreadAsync(() =>
+                {
+                    if (isOriginalItemOpen == null || !isOriginalItemOpen() || !ConnectionSettingsMatch(settings))
+                    {
+                        return;
+                    }
+                    result = MessageBox.Show(
+                        canRecover ? string.Format(CultureInfo.CurrentCulture, Strings.PromptOpenSettings, message) : message,
+                        Strings.DialogTitle,
+                        canRecover ? MessageBoxButtons.YesNo : MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                }).ConfigureAwait(false);
+                if (result != DialogResult.Yes
+                    || !await RunAsync(true, false, canOpenSettings).ConfigureAwait(false)) { return null; }
+            }
+            return null;
+        }
+
+        internal static string GetActionConnectionFailureMessage(Exception failure)
+        {
+            var serviceFailure = failure as TalkServiceException;
+            if (serviceFailure != null && serviceFailure.IsAuthenticationError)
+            {
+                return Strings.ConnectionSignInRequired;
+            }
+            if (serviceFailure != null && serviceFailure.IsTransportError)
+            {
+                return Strings.ErrorServerUnavailable;
+            }
+            return string.Format(CultureInfo.CurrentCulture, Strings.ErrorConnectionFailed, failure.Message);
+        }
+
+        private bool ConnectionSettingsMatch(AddinSettings verifiedSettings)
+        {
+            AddinSettings current = _getCurrentSettings != null ? _getCurrentSettings() : null;
+            return ConnectionSettingsMatch(current, verifiedSettings);
+        }
+
+        internal static bool ConnectionSettingsMatch(AddinSettings current, AddinSettings verifiedSettings)
+        {
+            return current != null && verifiedSettings != null
+                && string.Equals(current.ServerUrl, verifiedSettings.ServerUrl, StringComparison.Ordinal)
+                && string.Equals(current.Username, verifiedSettings.Username, StringComparison.Ordinal)
+                && string.Equals(current.AppPassword, verifiedSettings.AppPassword, StringComparison.Ordinal);
         }
 
         private bool RunSettingsDialogOnUiThread(

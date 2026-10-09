@@ -674,9 +674,6 @@
   "outlook_error_connection_failed_format": {
     "message": "Не удалось подключиться к серверу Nextcloud: $1"
   },
-  "outlook_error_unknown_authentication_format": {
-    "message": "Неизвестная ошибка при аутентификации: $1"
-  },
   "outlook_error_credentials_not_verified": {
     "message": "Не удалось проверить учётные данные."
   },

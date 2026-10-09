@@ -285,10 +285,18 @@ namespace NcTalkOutlookAddIn
             return _currentSettings.ShowMainRibbonTab;
         }
 
-        internal Task<bool> OpenAuthenticationSettingsAsync(bool authenticationRejected = false)
+        internal Task<AddinSettings> EnsureConnectionForActionAsync(
+            object originalItem,
+            bool allowInteractiveRecovery,
+            string context,
+            Action<Exception> onFailureObserved = null)
         {
             EnsureSettingsLoaded();
-            return CreateSettingsWorkflowController().RunAsync(true, authenticationRejected);
+            return CreateSettingsWorkflowController().EnsureConnectionForActionAsync(
+                () => IsItemOpenForRibbonAction(originalItem),
+                allowInteractiveRecovery,
+                context,
+                onFailureObserved);
         }
 
         public stdole.IPictureDisp OnGetButtonImage(IRibbonControl control)

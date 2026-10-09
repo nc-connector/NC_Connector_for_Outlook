@@ -131,7 +131,8 @@ namespace NcTalkOutlookAddIn.Services
                     transport != null ? transport.Message : Strings.ErrorServerUnavailable,
                     false,
                     0,
-                    null);
+                    null,
+                    true);
             }
             if (response.StatusCode == HttpStatusCode.Unauthorized
                 || response.StatusCode == HttpStatusCode.Forbidden)

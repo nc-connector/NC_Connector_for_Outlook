@@ -43,26 +43,11 @@ namespace NcTalkOutlookAddIn.Controllers
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            if (!_owner.SettingsAreComplete())
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Talk connection setup requested.");
-                if (!await _owner.OpenAuthenticationSettingsAsync().ConfigureAwait(false))
-                {
-                    NextcloudTalkAddIn.LogTalkMessage("Talk launch ended without saved authentication.");
-                    return;
-                }
-            }
-            else if (!await EnsureAuthenticationValidAsync(appointment).ConfigureAwait(false))
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Talk link cancelled: authentication failed.");
-                return;
-            }
-
-            AddinSettings settings = await _owner.RunOnOutlookUiThreadAsync(
-                () => _owner.IsItemOpenForRibbonAction(appointment) ? _owner.CurrentSettings : null).ConfigureAwait(false);
+            AddinSettings settings = await _owner.EnsureConnectionForActionAsync(
+                appointment, true, "talk_wizard_open").ConfigureAwait(false);
             if (settings == null)
             {
-                NextcloudTalkAddIn.LogTalkMessage("Talk launch ended because the original appointment is unavailable.");
+                NextcloudTalkAddIn.LogTalkMessage("Talk launch ended without a verified connection for the original appointment.");
                 return;
             }
             var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
@@ -140,9 +125,10 @@ namespace NcTalkOutlookAddIn.Controllers
             List<NextcloudUser> userDirectory,
             IfbAddressBookCache.SystemAddressbookStatus talkClickAddressbookStatus)
         {
-            if (!_owner.IsItemOpenForRibbonAction(appointment))
+            if (!_owner.IsItemOpenForRibbonAction(appointment)
+                || !SettingsWorkflowController.ConnectionSettingsMatch(_owner.CurrentSettings, settings))
             {
-                NextcloudTalkAddIn.LogTalkMessage("Talk wizard ended because the original appointment is unavailable.");
+                NextcloudTalkAddIn.LogTalkMessage("Talk wizard ended because the original appointment or credentials changed during prefetch.");
                 return false;
             }
             string subject = appointment.Subject ?? string.Empty;
@@ -344,76 +330,6 @@ namespace NcTalkOutlookAddIn.Controllers
                 MessageBoxIcon.Error);
         }
 
-        private async Task<bool> EnsureAuthenticationValidAsync(Outlook.AppointmentItem appointment)
-        {
-            string message;
-            bool authenticationRejected = false;
-            try
-            {
-                var service = _owner.CreateTalkService();
-                string response = string.Empty;
-                NextcloudTalkAddIn.LogTalkMessage("Starting credential verification request.");
-                if (await Task.Run(() => service.VerifyConnection(out response)).ConfigureAwait(false))
-                {
-                    NextcloudTalkAddIn.LogTalkMessage("Credentials verified.");
-                    return true;
-                }
-                message = string.IsNullOrEmpty(response)
-                    ? Strings.ErrorCredentialsNotVerified
-                    : string.Format(CultureInfo.CurrentCulture, Strings.ErrorConnectionFailed, response);
-            }
-            catch (TalkServiceException ex)
-            {
-                if (ex.IsAuthenticationError)
-                {
-                    authenticationRejected = true;
-                    message = Strings.ConnectionSignInRequired;
-                }
-                else if ((int)ex.StatusCode == 0)
-                {
-                    message = Strings.ErrorServerUnavailable;
-                }
-                else
-                {
-                    message = string.Format(Strings.ErrorConnectionFailed, ex.Message);
-                }
-
-                NextcloudTalkAddIn.LogTalkMessage("Connection check failed: " + message);
-            }
-            catch (Exception ex)
-            {
-                NextcloudTalkAddIn.LogTalkMessage("Unexpected error during connection check: " + ex.Message);
-                message = string.Format(Strings.ErrorUnknownAuthentication, ex.Message);
-            }
-            if (authenticationRejected)
-            {
-                bool itemOpen = await _owner.RunOnOutlookUiThreadAsync(
-                    () => _owner.IsItemOpenForRibbonAction(appointment)).ConfigureAwait(false);
-                if (!itemOpen)
-                {
-                    return false;
-                }
-                NextcloudTalkAddIn.LogTalkMessage("Talk credentials were rejected; connection setup requested.");
-                return await _owner.OpenAuthenticationSettingsAsync(true).ConfigureAwait(false);
-            }
-            return await PromptOpenSettingsAsync(appointment, message).ConfigureAwait(false);
-        }
-
-        private async Task<bool> PromptOpenSettingsAsync(Outlook.AppointmentItem appointment, string message)
-        {
-            var result = await _owner.RunOnOutlookUiThreadAsync(
-                () => _owner.IsItemOpenForRibbonAction(appointment)
-                    ? MessageBox.Show(
-                        string.Format(Strings.PromptOpenSettings, message),
-                        Strings.DialogTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
-                    : DialogResult.Cancel).ConfigureAwait(false);
-
-            if (result == DialogResult.Yes)
-            {
-                return await _owner.OpenAuthenticationSettingsAsync().ConfigureAwait(false);
-            }
-            return false;
-        }
     }
 }
 

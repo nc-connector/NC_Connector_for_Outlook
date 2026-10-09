@@ -89,6 +89,7 @@ namespace NcTalkOutlookAddIn.Services
         internal bool IncludeAuthHeader { get; set; }
         internal bool IncludeOcsApiHeader { get; set; }
         internal bool ParseJson { get; set; }
+        internal bool ForceFreshConnection { get; set; }
     }
 
     internal sealed class NcHttpResponse
@@ -149,6 +150,7 @@ internal static class NextcloudUserIdContractTests
         Check("Resolver preserves the Nextcloud subfolder", NcHttpClient.LastOptions.Url == "https://cloud.example.test/nextcloud/ocs/v2.php/cloud/user?format=json", NcHttpClient.LastOptions.Url);
         Check("Current-user request includes Basic Auth", NcHttpClient.LastOptions.IncludeAuthHeader);
         Check("Current-user request includes the OCS header", NcHttpClient.LastOptions.IncludeOcsApiHeader);
+        Check("Forced current-user verification uses a fresh connection", NcHttpClient.LastOptions.ForceFreshConnection);
         Check("Authentication keeps the configured email login", NcHttpClient.LastAuthenticationLogin == "login@example.test", NcHttpClient.LastAuthenticationLogin);
 
         int sendsAfterResolution = NcHttpClient.SendCount;

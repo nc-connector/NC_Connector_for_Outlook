@@ -50,6 +50,55 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string FileLinkWizardUploadCancelledMessage { get { return "upload cancelled"; } }
         internal static string FileLinkWizardUploadFailed { get { return "upload failed"; } }
         internal static string ErrorCredentialsNotVerified { get { return "credentials not verified"; } }
+        internal static string ErrorMissingCredentials { get { return "missing credentials"; } }
+        internal static string ErrorServerUnavailable { get { return "server unreachable"; } }
+        internal static string ErrorConnectionFailed { get { return "connection failed: {0}"; } }
+        internal static string TalkVersionUnknown { get { return "unknown"; } }
+        internal static string NextcloudMinimumVersionRequiredFormat { get { return "Nextcloud 32 required: {0}"; } }
+    }
+}
+
+namespace NcTalkOutlookAddIn.Services
+{
+    internal sealed class NcHttpRequestOptions
+    {
+        internal string Method, Url, Accept;
+        internal int TimeoutMs;
+        internal bool IncludeAuthHeader, IncludeOcsApiHeader, ParseJson, ForceFreshConnection;
+    }
+
+    internal sealed class NcHttpResponse
+    {
+        internal bool HasHttpResponse;
+        internal HttpStatusCode StatusCode;
+        internal string ResponseText;
+        internal IDictionary<string, object> ParsedJson;
+        internal WebException TransportException;
+    }
+
+    internal sealed class NcHttpClient
+    {
+        internal static readonly Queue<NcHttpResponse> Responses = new Queue<NcHttpResponse>();
+        internal static readonly List<NcHttpRequestOptions> Requests = new List<NcHttpRequestOptions>();
+
+        internal NcHttpClient(TalkServiceConfiguration configuration) { }
+
+        internal NcHttpResponse Send(NcHttpRequestOptions options)
+        {
+            Requests.Add(options);
+            if (Responses.Count == 0)
+            {
+                throw new InvalidOperationException("Unexpected connection-verification request.");
+            }
+            return Responses.Dequeue();
+        }
+
+        internal static void Reset(params NcHttpResponse[] responses)
+        {
+            Responses.Clear();
+            Requests.Clear();
+            foreach (NcHttpResponse response in responses) { Responses.Enqueue(response); }
+        }
     }
 }
 
@@ -79,6 +128,7 @@ internal static class OutlookUtilityTests
         TestSizeFormatting();
         TestVersionParsing();
         TestCapabilitiesOcsStatus();
+        TestConnectionVerification();
         TestComposeLifecycleOriginCompatibility();
         TestComposeShareCleanupTracker();
         TestFileLinkUploadPolicy();
@@ -216,6 +266,175 @@ internal static class OutlookUtilityTests
         Check(
             "Nextcloud capabilities rejects empty OCS metadata",
             !NcJson.IsOcsSuccess(incomplete, out detail));
+    }
+
+    private static void TestConnectionVerification()
+    {
+        var configuration = ConnectionTestConfiguration();
+        NcHttpClient.Reset(new NcHttpResponse
+        {
+            TransportException = new WebException("controlled transport failure")
+        });
+        TalkServiceException failure = CaptureConnectionFailure(() =>
+            new NextcloudCapabilitiesService(configuration).GetRequiredSnapshot(true, true));
+        Check("Capabilities without HTTP preserve a typed transport failure",
+            failure != null && failure.IsTransportError && !failure.IsAuthenticationError
+            && (int)failure.StatusCode == 0);
+        Equal("Capabilities preserve transport diagnostic text", "controlled transport failure",
+            failure != null ? failure.Message : null);
+
+        NcHttpClient.Reset(new NcHttpResponse());
+        failure = CaptureConnectionFailure(() =>
+            new NextcloudCapabilitiesService(configuration).GetRequiredSnapshot(true, true));
+        Check("Capabilities without HTTP or an exception remain a transport failure",
+            failure != null && failure.IsTransportError);
+        Equal("Missing transport detail uses the server-unavailable message", Strings.ErrorServerUnavailable,
+            failure != null ? failure.Message : null);
+
+        NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), UserTestResponse("initial-user"));
+        var verifier = new ConnectionVerificationHarness(configuration);
+        string message = string.Empty;
+        Check("Connection verification accepts supported capabilities and a canonical UID",
+            verifier.VerifyConnection(out message));
+        Equal("Successful connection verification reports the version", "32.0.0", message);
+        Equal("Connection verification checks capabilities and the current UID", 2, NcHttpClient.Requests.Count);
+        Check("Both connection-verification requests use fresh connections",
+            NcHttpClient.Requests.Count == 2 && NcHttpClient.Requests.All(request => request.ForceFreshConnection));
+        Check("Verification uses the authenticated capabilities and user endpoints",
+            NcHttpClient.Requests.Count == 2
+            && NcHttpClient.Requests[0].Url.EndsWith("/cloud/capabilities?format=json", StringComparison.Ordinal)
+            && NcHttpClient.Requests[1].Url.EndsWith("/cloud/user?format=json", StringComparison.Ordinal)
+            && NcHttpClient.Requests.All(request => request.IncludeAuthHeader && request.IncludeOcsApiHeader));
+
+        NcHttpClient.Reset(new NcHttpResponse());
+        failure = CaptureConnectionFailure(() => verifier.VerifyConnection(out message));
+        Check("A warm capability cache cannot hide an unavailable server at action verification",
+            failure != null && failure.IsTransportError && NcHttpClient.Requests.Count == 1);
+
+        NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), new NcHttpResponse
+        {
+            TransportException = new WebException("controlled UID transport failure")
+        });
+        failure = CaptureConnectionFailure(() => verifier.VerifyConnection(out message));
+        Check("VerifyConnection propagates UID transport failures despite a cached UID",
+            failure != null && failure.IsTransportError && !failure.IsAuthenticationError);
+        Check("UID transport failure retains its diagnostic text",
+            failure != null && failure.Message.Contains("controlled UID transport failure"));
+        Equal("The UID transport failure occurs after a fresh capability request", 2, NcHttpClient.Requests.Count);
+
+        foreach (HttpStatusCode statusCode in new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden })
+        {
+            NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), new NcHttpResponse
+            {
+                HasHttpResponse = true,
+                StatusCode = statusCode,
+                ResponseText = "controlled rejection"
+            });
+            failure = CaptureConnectionFailure(() => verifier.VerifyConnection(out message));
+            Check("VerifyConnection preserves typed UID authentication rejection " + (int)statusCode,
+                failure != null && failure.IsAuthenticationError && !failure.IsTransportError
+                && failure.StatusCode == statusCode && failure.ResponseBody == "controlled rejection");
+        }
+
+        NcHttpClient.Reset(new NcHttpResponse
+        {
+            HasHttpResponse = true,
+            StatusCode = HttpStatusCode.Unauthorized
+        });
+        failure = CaptureConnectionFailure(() => verifier.VerifyConnection(out message));
+        Check("Capability authentication rejection is not a transport outage",
+            failure != null && failure.IsAuthenticationError && !failure.IsTransportError);
+
+        foreach (string version in new[] { "31.0.9", "" })
+        {
+            NcHttpClient.Reset(CapabilitiesTestResponse(version));
+            Check("Unsupported or absent server version returns false without a transport exception: " + version,
+                !verifier.VerifyConnection(out message));
+            Check("Version refusal retains the minimum-version explanation",
+                message.StartsWith("Nextcloud 32 required:", StringComparison.Ordinal)
+                && message != Strings.ErrorServerUnavailable);
+            Equal("Version refusal never probes the UID", 1, NcHttpClient.Requests.Count);
+        }
+
+        NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), UserTestResponse(""));
+        Check("Missing canonical UID returns false instead of a transport exception",
+            !verifier.VerifyConnection(out message));
+        Check("Missing canonical UID retains the response-validation explanation",
+            message.Contains("canonical user ID") && message != Strings.ErrorServerUnavailable);
+
+        foreach (HttpStatusCode statusCode in new[] { (HttpStatusCode)429, HttpStatusCode.InternalServerError })
+        {
+            NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), new NcHttpResponse
+            {
+                HasHttpResponse = true,
+                StatusCode = statusCode
+            });
+            Check("Ordinary UID HTTP rejection returns false: " + (int)statusCode,
+                !verifier.VerifyConnection(out message));
+            Check("UID HTTP rejection retains status text rather than an invented transport message",
+                message.Contains("HTTP " + (int)statusCode) && message != Strings.ErrorServerUnavailable);
+        }
+
+        NcHttpClient.Reset(new NcHttpResponse
+        {
+            HasHttpResponse = true,
+            StatusCode = HttpStatusCode.OK
+        });
+        failure = CaptureConnectionFailure(() => verifier.VerifyConnection(out message));
+        Check("Malformed capabilities keep their non-transport validation failure",
+            failure != null && !failure.IsTransportError && !failure.IsAuthenticationError
+            && failure.Message == Strings.ErrorCredentialsNotVerified);
+
+        configuration = ConnectionTestConfiguration();
+        NcHttpClient.Reset(UserTestResponse("cached-user"));
+        Equal("Initial UID lookup caches the canonical identity", "cached-user",
+            NextcloudUserIdentityService.ResolveCurrentUserId(configuration));
+        Check("Ordinary UID lookup does not force a fresh connection",
+            NcHttpClient.Requests.Count == 1 && !NcHttpClient.Requests[0].ForceFreshConnection);
+        NcHttpClient.Reset(UserTestResponse("refreshed-user"));
+        Equal("Forced UID lookup replaces a cached identity", "refreshed-user",
+            NextcloudUserIdentityService.ResolveCurrentUserId(configuration, true));
+        Check("Forced UID lookup requests a fresh connection",
+            NcHttpClient.Requests.Count == 1 && NcHttpClient.Requests[0].ForceFreshConnection);
+        NcHttpClient.Reset();
+        Equal("Unforced UID lookup keeps the refreshed cache", "refreshed-user",
+            NextcloudUserIdentityService.ResolveCurrentUserId(configuration));
+        Equal("Unforced cached UID lookup performs no request", 0, NcHttpClient.Requests.Count);
+    }
+
+    private static TalkServiceConfiguration ConnectionTestConfiguration()
+    {
+        return new TalkServiceConfiguration(
+            "https://connection-" + Guid.NewGuid().ToString("N") + ".example.test", "test-user", "test-only");
+    }
+
+    private static NcHttpResponse CapabilitiesTestResponse(string version)
+    {
+        return new NcHttpResponse
+        {
+            HasHttpResponse = true,
+            StatusCode = HttpStatusCode.OK,
+            ParsedJson = NcJson.DeserializeObject(
+                "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":200},\"data\":{"
+                + "\"version\":{\"string\":\"" + version + "\"},\"capabilities\":{}}}}")
+        };
+    }
+
+    private static NcHttpResponse UserTestResponse(string userId)
+    {
+        return new NcHttpResponse
+        {
+            HasHttpResponse = true,
+            StatusCode = HttpStatusCode.OK,
+            ParsedJson = NcJson.DeserializeObject("{\"ocs\":{\"data\":{\"id\":\"" + userId + "\"}}}")
+        };
+    }
+
+    private static TalkServiceException CaptureConnectionFailure(Action action)
+    {
+        try { action(); }
+        catch (TalkServiceException ex) { return ex; }
+        return null;
     }
 
     private static void TestComposeShareCleanupTracker()
@@ -1617,6 +1836,30 @@ $($signatureQuoteParts -join "`r`n")
 }
 "@ | Set-Content -LiteralPath $signatureQuoteSource -Encoding UTF8
 
+    $talkServiceSource = Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkService.cs")
+    $verificationParts = @()
+    foreach ($signature in @('internal bool VerifyConnection', 'private void EnsureConfiguration')) {
+        $method = [regex]::Match($talkServiceSource, "(?ms)^        $signature\(.*?^        }")
+        if (-not $method.Success) {
+            throw "Could not isolate production connection-verification method '$signature'."
+        }
+        $verificationParts += $method.Value
+    }
+    $connectionVerificationSource = Join-Path $TempRoot "ConnectionVerificationHarness.cs"
+    @"
+using System;
+using System.Net;
+using NcTalkOutlookAddIn.Models;
+using NcTalkOutlookAddIn.Services;
+
+internal sealed class ConnectionVerificationHarness
+{
+    private readonly TalkServiceConfiguration _configuration;
+    internal ConnectionVerificationHarness(TalkServiceConfiguration configuration) { _configuration = configuration; }
+$($verificationParts -join "`r`n")
+}
+"@ | Set-Content -LiteralPath $connectionVerificationSource -Encoding UTF8
+
     $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
     if (-not (Test-Path $csc)) {
         throw "csc.exe not found at $csc"
@@ -1625,10 +1868,12 @@ $($signatureQuoteParts -join "`r`n")
     $sources = @(
         $testSource,
         $signatureQuoteSource,
+        $connectionVerificationSource,
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\ComInteropScope.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\FileLinkSelection.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\FileLinkQueueNode.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\NextcloudStorageEntry.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\NextcloudCapabilitiesSnapshot.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\ComposeLifecycleOrigin.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\ComposeShareCleanupRecord.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkDuplicateInfo.cs"),
@@ -1638,6 +1883,8 @@ $($signatureQuoteParts -join "`r`n")
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkUploadPlanner.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceConfiguration.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceException.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\NextcloudCapabilitiesService.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\NextcloudUserIdentityService.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Controllers\ComposeShareCleanupTracker.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\PasswordGenerator.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\SizeFormatting.cs"),

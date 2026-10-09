@@ -674,9 +674,6 @@
   "outlook_error_connection_failed_format": {
     "message": "Connessione al server Nextcloud non riuscita: $1"
   },
-  "outlook_error_unknown_authentication_format": {
-    "message": "Errore sconosciuto durante l'autenticazione: $1"
-  },
   "outlook_error_credentials_not_verified": {
     "message": "Impossibile verificare le credenziali."
   },

@@ -2836,7 +2836,10 @@ internal static class ManagedIfbRuntimeTests {
     $workflowSource = Join-Path $TempRoot 'SettingsWorkflowTests.cs'
     @'
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using NcTalkOutlookAddIn.Controllers;
 using NcTalkOutlookAddIn.Models;
@@ -2847,12 +2850,24 @@ using System.Windows.Forms;
 namespace Microsoft.Office.Interop.Outlook { public class Application {} }
 namespace NcTalkOutlookAddIn.Models { public class BackendPolicyStatus {} }
 namespace System.Windows.Forms {
-    public enum DialogResult { Cancel, OK }
-    public enum MessageBoxButtons { OK }
-    public enum MessageBoxIcon { Error }
+    public enum DialogResult { Cancel, OK, Yes, No }
+    public enum MessageBoxButtons { OK, YesNo }
+    public enum MessageBoxIcon { Error, Warning }
     public static class MessageBox {
         public static int Calls;
-        public static void Show(object owner, string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon) { Calls++; }
+        public static DialogResult NextResult = DialogResult.No;
+        public static Action OnShow;
+        public static readonly List<string> Texts = new List<string>();
+        public static readonly List<MessageBoxButtons> Buttons = new List<MessageBoxButtons>();
+        public static void Reset() { Calls = 0; NextResult = DialogResult.No; OnShow = null; Texts.Clear(); Buttons.Clear(); }
+        public static DialogResult Show(object owner, string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon) {
+            WorkflowUi.AssertUi("MessageBox"); Calls++; Texts.Add(text); Buttons.Add(buttons);
+            if (OnShow != null) OnShow();
+            return buttons == MessageBoxButtons.OK ? DialogResult.OK : NextResult;
+        }
+        public static DialogResult Show(string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon) {
+            return Show(null, text, title, buttons, icon);
+        }
     }
 }
 namespace NcTalkOutlookAddIn.Settings {
@@ -2861,16 +2876,34 @@ namespace NcTalkOutlookAddIn.Settings {
         public bool HasManagedNextcloudUrl, ManagedNextcloudUrlLocked, IfbEnabled, DebugLoggingEnabled, LogAnonymizationEnabled;
         public string ManagedNextcloudUrlSource = "test", AuthMode = "manual";
         public int IfbCacheHours = 24, IfbPort = 5000;
-        public AddinSettings Clone() { return (AddinSettings)MemberwiseClone(); }
+        public AddinSettings Clone() { WorkflowUi.AssertUi("Settings capture"); return (AddinSettings)MemberwiseClone(); }
         public void ApplyManagedSetupPolicy(object policy) {}
     }
     public static class ManagedSetupPolicy { public static object Load() { return null; } }
 }
 namespace NcTalkOutlookAddIn.Services {
     public class TalkServiceConfiguration {
-        private readonly bool complete;
-        public TalkServiceConfiguration(string url, string user, string password) { complete = url.Length > 0 && user.Length > 0 && password.Length > 0; }
-        public bool IsComplete() { return complete; }
+        public readonly string ServerUrl, Username, AppPassword;
+        public TalkServiceConfiguration(string url, string user, string password) { ServerUrl = url; Username = user; AppPassword = password; }
+        public bool IsComplete() { return !string.IsNullOrWhiteSpace(ServerUrl) && !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(AppPassword); }
+    }
+    public class TalkService {
+        public static int Calls;
+        public static readonly Queue<Func<TalkServiceConfiguration, ConnectionReply>> Steps = new Queue<Func<TalkServiceConfiguration, ConnectionReply>>();
+        public static readonly List<TalkServiceConfiguration> Configurations = new List<TalkServiceConfiguration>();
+        private readonly TalkServiceConfiguration configuration;
+        public TalkService(TalkServiceConfiguration value) { configuration = value; }
+        public static void Reset() { Calls = 0; Steps.Clear(); Configurations.Clear(); }
+        public bool VerifyConnection(out string response) {
+            if (WorkflowUi.Active != null && WorkflowUi.Active.IsUiThread) throw new Exception("Fresh connection request ran on the Outlook STA");
+            Calls++; Configurations.Add(configuration);
+            if (Steps.Count == 0) throw new Exception("Unexpected extra connection request");
+            ConnectionReply reply = Steps.Dequeue()(configuration); response = reply.Response; return reply.Verified;
+        }
+    }
+    public sealed class ConnectionReply {
+        public bool Verified = true;
+        public string Response = string.Empty;
     }
     public class IfbAddressBookCache {
         public class SystemAddressbookStatus {}
@@ -2881,26 +2914,293 @@ namespace NcTalkOutlookAddIn.Services {
 namespace NcTalkOutlookAddIn.Utilities {
     public static class LogCategories { public const string Core = "core"; }
     public static class DiagnosticsLogger { public static void LogException(string category, string message, Exception ex) {} }
-    public static class Strings { public const string SettingsSaveFailed = "save failed", SettingsFormTitle = "settings"; }
+    public static class Strings {
+        public const string SettingsSaveFailed = "save failed", SettingsFormTitle = "settings", DialogTitle = "connector";
+        public const string ConnectionSignInRequired = "sign in required", ErrorServerUnavailable = "server unavailable";
+        public const string ErrorCredentialsNotVerified = "credentials not verified", ErrorConnectionFailed = "connection failed: {0}";
+        public const string PromptOpenSettings = "{0}\n\nOpen settings now?";
+    }
 }
 namespace NcTalkOutlookAddIn.UI {
     public sealed class SettingsForm : IDisposable {
         public static DialogResult NextResult;
         public static bool AuthenticationStarted, Rejected, Disposed;
+        public static int ShowCalls, AuthenticationCalls;
+        public static Action OnShow;
+        public static Func<AddinSettings, AddinSettings> ResultFactory;
         public AddinSettings Result;
         public SettingsForm(AddinSettings current, object app, object policy, object cache, object book,
             Func<TalkServiceConfiguration, string, BackendPolicyStatus> fetch) {
             if (fetch == null) throw new Exception("Settings refresh callback missing");
+            WorkflowUi.AssertUi("SettingsForm creation");
             Result = current.Clone(); Result.Username = "new";
+            if (ResultFactory != null) Result = ResultFactory(current);
         }
-        public void BeginAuthentication(bool rejected) { AuthenticationStarted = true; Rejected = rejected; }
-        public DialogResult ShowDialog() { return NextResult; }
-        public void Dispose() { Disposed = true; }
+        public static void Reset() {
+            NextResult = DialogResult.OK; AuthenticationStarted = Rejected = Disposed = false;
+            ShowCalls = AuthenticationCalls = 0; OnShow = null; ResultFactory = null;
+        }
+        public void BeginAuthentication(bool rejected) { WorkflowUi.AssertUi("Authentication entry"); AuthenticationStarted = true; Rejected = rejected; AuthenticationCalls++; }
+        public DialogResult ShowDialog() { WorkflowUi.AssertUi("Settings dialog"); ShowCalls++; if (OnShow != null) OnShow(); return NextResult; }
+        public void Dispose() { WorkflowUi.AssertUi("SettingsForm disposal"); Disposed = true; }
     }
+}
+internal sealed class WorkflowUi : IDisposable {
+    private sealed class Work { internal Action Action; internal TaskCompletionSource<bool> Completion; }
+    private readonly BlockingCollection<Work> queue = new BlockingCollection<Work>();
+    private readonly Thread thread;
+    internal static WorkflowUi Active;
+    internal Action BeforeAction;
+    internal bool IsUiThread { get { return Thread.CurrentThread.ManagedThreadId == thread.ManagedThreadId; } }
+    internal WorkflowUi() {
+        thread = new Thread(() => {
+            foreach (Work work in queue.GetConsumingEnumerable()) {
+                try { if (BeforeAction != null) BeforeAction(); work.Action(); work.Completion.SetResult(true); }
+                catch (Exception ex) { work.Completion.SetException(ex); }
+            }
+        });
+        thread.IsBackground = true; thread.SetApartmentState(ApartmentState.STA); thread.Start(); Active = this;
+    }
+    internal Task Run(Action action) {
+        if (IsUiThread) { if (BeforeAction != null) BeforeAction(); action(); return Task.FromResult(true); }
+        var completion = new TaskCompletionSource<bool>();
+        queue.Add(new Work { Action = action, Completion = completion }); return completion.Task;
+    }
+    internal static void AssertUi(string operation) {
+        if (Active != null && (!Active.IsUiThread || Thread.CurrentThread.GetApartmentState() != ApartmentState.STA))
+            throw new Exception(operation + " ran outside the Outlook STA");
+    }
+    public void Dispose() { queue.CompleteAdding(); thread.Join(); Active = null; queue.Dispose(); }
+}
+internal sealed class EntryGateFixture : IDisposable {
+    internal readonly WorkflowUi Ui = new WorkflowUi();
+    internal AddinSettings Current = new AddinSettings();
+    internal readonly List<string> Events = new List<string>();
+    internal readonly List<string> Logs = new List<string>();
+    internal readonly List<Exception> Failures = new List<Exception>();
+    internal bool ItemOpen = true, PersistFails, ValidateFails, CommitFails;
+    internal readonly SettingsWorkflowController Controller;
+    internal EntryGateFixture() {
+        TalkService.Reset(); MessageBox.Reset(); SettingsForm.Reset();
+        Controller = new SettingsWorkflowController(null,
+            () => { WorkflowUi.AssertUi("Current settings read"); return Current; },
+            next => { WorkflowUi.AssertUi("Runtime settings apply"); Events.Add("runtime:" + next.Username); Current = next; },
+            (config, source) => { throw new Exception("Entry recovery prefetched backend policy"); },
+            next => { WorkflowUi.AssertUi("Diagnostics apply"); Events.Add("diagnostics"); },
+            (next, source, interactive) => {
+                WorkflowUi.AssertUi("TLS apply"); Events.Add(source);
+                return !(ValidateFails && source == "settings_save_validate") && !(CommitFails && source == "settings_save_commit");
+            },
+            () => { WorkflowUi.AssertUi("IFB apply"); Events.Add("ifb"); },
+            next => { WorkflowUi.AssertUi("Persistence"); Events.Add("persist:" + next.Username); if (PersistFails) throw new Exception("test write failure"); },
+            Ui.Run, message => Logs.Add(message), "test-directory", "test-profile");
+    }
+    internal AddinSettings Run(bool interactive) {
+        return Controller.EnsureConnectionForActionAsync(() => { WorkflowUi.AssertUi("Original-item check"); return ItemOpen; },
+            interactive, "entry test", failure => Failures.Add(failure)).GetAwaiter().GetResult();
+    }
+    internal void Succeed() { TalkService.Steps.Enqueue(config => new ConnectionReply()); }
+    internal void Fail(Exception failure) { TalkService.Steps.Enqueue(config => { throw failure; }); }
+    public void Dispose() { Ui.Dispose(); }
 }
 internal static class SettingsWorkflowTests {
     private static int checks;
     private static void Check(bool value, string name) { checks++; if (!value) throw new Exception(name); }
+    private static TalkServiceException TransportFailure() {
+        return new TalkServiceException("TLS handshake diagnostic", false, HttpStatusCode.BadGateway, null, true);
+    }
+    private static TalkServiceException AuthenticationFailure() {
+        return new TalkServiceException("authentication diagnostic", true, HttpStatusCode.Unauthorized, null);
+    }
+    private static void TestFailureMapping() {
+        Check(SettingsWorkflowController.GetActionConnectionFailureMessage(TransportFailure()) == NcTalkOutlookAddIn.Utilities.Strings.ErrorServerUnavailable,
+            "Typed transport failures map to server unavailable even with an HTTP status");
+        Check(SettingsWorkflowController.GetActionConnectionFailureMessage(AuthenticationFailure()) == NcTalkOutlookAddIn.Utilities.Strings.ConnectionSignInRequired,
+            "Authentication failures map to sign-in guidance");
+        foreach (HttpStatusCode status in new[] { (HttpStatusCode)0, HttpStatusCode.Forbidden, (HttpStatusCode)429, HttpStatusCode.InternalServerError }) {
+            string message = SettingsWorkflowController.GetActionConnectionFailureMessage(new TalkServiceException("specific failure", false, status, null));
+            Check(message.Contains("specific failure") && message != NcTalkOutlookAddIn.Utilities.Strings.ErrorServerUnavailable,
+                "Non-transport failure retains its cause for status " + (int)status);
+        }
+    }
+    private static void TestFreshSuccess() {
+        foreach (bool interactive in new[] { false, true }) using (var fixture = new EntryGateFixture()) {
+            fixture.Succeed(); fixture.Succeed();
+            AddinSettings first = fixture.Run(interactive), second = fixture.Run(interactive);
+            Check(first != null && second != null && first.Username == "old" && second.Username == "old", "Complete credentials pass after fresh verification");
+            Check(TalkService.Calls == 2 && TalkService.Steps.Count == 0, "Repeated entry with unchanged credentials never reuses a warm connection result");
+            Check(!object.ReferenceEquals(first, fixture.Current) && !object.ReferenceEquals(first, second), "Every successful entry returns its own captured settings clone");
+            Check(SettingsForm.ShowCalls == 0 && MessageBox.Calls == 0 && fixture.Events.Count == 0 && fixture.Failures.Count == 0,
+                "Successful fresh checks have no setup, persistence, failure callback or UI side effects");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.ItemOpen = false;
+            Check(fixture.Run(true) == null && TalkService.Calls == 0 && SettingsForm.ShowCalls == 0 && MessageBox.Calls == 0,
+                "Closed original item never starts connection verification or setup");
+        }
+    }
+    private static void TestTransportRecovery() {
+        using (var fixture = new EntryGateFixture()) {
+            Exception failure = TransportFailure(); fixture.Fail(failure);
+            Check(fixture.Run(true) == null && TalkService.Calls == 1 && SettingsForm.ShowCalls == 0, "No to transport recovery ends the original action");
+            Check(MessageBox.Calls == 1 && MessageBox.Buttons[0] == MessageBoxButtons.YesNo
+                && MessageBox.Texts[0] == string.Format(NcTalkOutlookAddIn.Utilities.Strings.PromptOpenSettings, NcTalkOutlookAddIn.Utilities.Strings.ErrorServerUnavailable),
+                "First transport failure offers localized settings recovery instead of TLS diagnostics");
+            Check(fixture.Failures.Count == 1 && object.ReferenceEquals(fixture.Failures[0], failure), "Transport failure callback retains the typed cause");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(TransportFailure()); fixture.Succeed(); MessageBox.NextResult = DialogResult.Yes;
+            AddinSettings result = fixture.Run(true);
+            Check(result != null && result.Username == "new" && TalkService.Calls == 2, "Verified settings save is followed by a new connection request");
+            Check(SettingsForm.ShowCalls == 1 && SettingsForm.AuthenticationCalls == 1 && !SettingsForm.Rejected,
+                "Transport recovery enters the existing authentication-required settings path once");
+            Check(TalkService.Configurations[0].Username == "old" && TalkService.Configurations[1].Username == "new",
+                "Retry captures saved credentials rather than the failed request snapshot");
+            Check(fixture.Events.IndexOf("persist:new") < fixture.Events.IndexOf("runtime:new") && fixture.Events.Contains("ifb"),
+                "Recovery resumes only after persistence and runtime application");
+            Check(MessageBox.Calls == 1 && fixture.Failures.Count == 1, "Successful retry adds no failure UI or extra recovery");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(TransportFailure()); MessageBox.NextResult = DialogResult.Yes; SettingsForm.NextResult = DialogResult.Cancel;
+            Check(fixture.Run(true) == null && TalkService.Calls == 1 && SettingsForm.ShowCalls == 1 && fixture.Events.Count == 0,
+                "Cancelled transport recovery performs no retry or settings commit");
+        }
+    }
+    private static void TestInitialSetup() {
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Current.AppPassword = "";
+            SettingsForm.ResultFactory = current => { var next = current.Clone(); next.Username = "setup"; next.AppPassword = "test-only-setup"; return next; };
+            fixture.Succeed();
+            AddinSettings result = fixture.Run(true);
+            Check(result != null && result.Username == "setup" && TalkService.Calls == 1, "Initial setup saves and verifies freshly before continuing");
+            Check(SettingsForm.ShowCalls == 1 && SettingsForm.AuthenticationCalls == 1 && !SettingsForm.Rejected && MessageBox.Calls == 0,
+                "Missing credentials use onboarding rather than reauthentication or an error prompt");
+        }
+        foreach (string outcome in new[] { "cancel", "persist", "validate", "commit" }) using (var fixture = new EntryGateFixture()) {
+            fixture.Current.Username = "";
+            SettingsForm.NextResult = outcome == "cancel" ? DialogResult.Cancel : DialogResult.OK;
+            fixture.PersistFails = outcome == "persist"; fixture.ValidateFails = outcome == "validate"; fixture.CommitFails = outcome == "commit";
+            Check(fixture.Run(true) == null && TalkService.Calls == 0 && SettingsForm.ShowCalls == 1,
+                "Initial setup " + outcome + " prevents any connection continuation");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Current.AppPassword = "";
+            SettingsForm.ResultFactory = current => { var next = current.Clone(); next.AppPassword = "test-only-setup"; return next; };
+            fixture.Fail(AuthenticationFailure());
+            Check(fixture.Run(true) == null && TalkService.Calls == 1 && SettingsForm.ShowCalls == 1,
+                "Initial setup consumes the single recovery allowance even when the post-save check rejects credentials");
+            Check(MessageBox.Calls == 1 && MessageBox.Buttons[0] == MessageBoxButtons.OK
+                && MessageBox.Texts[0] == NcTalkOutlookAddIn.Utilities.Strings.ConnectionSignInRequired,
+                "Failed post-setup verification reports once without another sign-in dialog");
+        }
+    }
+    private static void TestAuthenticationRecovery() {
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(AuthenticationFailure()); fixture.Succeed();
+            Check(fixture.Run(true) != null && TalkService.Calls == 2 && SettingsForm.ShowCalls == 1,
+                "Authentication rejection recovers once and checks the saved credentials again");
+            Check(SettingsForm.AuthenticationStarted && SettingsForm.Rejected && MessageBox.Calls == 0,
+                "Typed authentication rejection opens reauthentication directly");
+        }
+        foreach (bool secondTransport in new[] { false, true }) using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(AuthenticationFailure()); fixture.Fail(secondTransport ? TransportFailure() : AuthenticationFailure());
+            Check(fixture.Run(true) == null && TalkService.Calls == 2 && SettingsForm.ShowCalls == 1 && SettingsForm.AuthenticationCalls == 1,
+                "A second failure cannot start a third request or another sign-in dialog");
+            Check(MessageBox.Calls == 1 && MessageBox.Buttons[0] == MessageBoxButtons.OK
+                && MessageBox.Texts[0] == (secondTransport ? NcTalkOutlookAddIn.Utilities.Strings.ErrorServerUnavailable : NcTalkOutlookAddIn.Utilities.Strings.ConnectionSignInRequired),
+                "Retry failure shows the final mapped cause without a recovery loop");
+            Check(fixture.Failures.Count == 2, "Both observed request failures are reported once");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(AuthenticationFailure()); SettingsForm.NextResult = DialogResult.Cancel;
+            Check(fixture.Run(true) == null && TalkService.Calls == 1 && MessageBox.Calls == 0 && fixture.Events.Count == 0,
+                "Cancelled reauthentication ends without retry or follow-up error UI");
+        }
+    }
+    private static void TestOrdinaryFailures() {
+        foreach (string response in new[] { "", "server response detail" }) using (var fixture = new EntryGateFixture()) {
+            TalkService.Steps.Enqueue(config => new ConnectionReply { Verified = false, Response = response });
+            Check(fixture.Run(true) == null && TalkService.Calls == 1 && SettingsForm.ShowCalls == 0, "False verification cannot pass the entry gate");
+            Check(MessageBox.Calls == 1 && MessageBox.Buttons[0] == MessageBoxButtons.YesNo
+                && MessageBox.Texts[0].Contains(response.Length == 0 ? NcTalkOutlookAddIn.Utilities.Strings.ErrorCredentialsNotVerified : response),
+                "False verification preserves the empty-response fallback or server cause");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(new InvalidOperationException("specific unexpected cause"));
+            Check(fixture.Run(true) == null && MessageBox.Texts[0].Contains("specific unexpected cause")
+                && !MessageBox.Texts[0].Contains(NcTalkOutlookAddIn.Utilities.Strings.ErrorServerUnavailable),
+                "Unexpected processing errors retain a distinct diagnostic cause");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(new OperationCanceledException("cancelled request"));
+            Check(fixture.Run(true) == null && SettingsForm.ShowCalls == 0 && MessageBox.Calls == 0 && fixture.Failures.Count == 0,
+                "Cancelled request ends quietly without recovery or failure callback");
+        }
+    }
+    private static void TestClosedAndChangedItems() {
+        foreach (bool failed in new[] { false, true }) using (var fixture = new EntryGateFixture()) {
+            TalkService.Steps.Enqueue(config => {
+                fixture.Ui.Run(() => fixture.ItemOpen = false).GetAwaiter().GetResult();
+                if (failed) throw TransportFailure();
+                return new ConnectionReply();
+            });
+            Check(fixture.Run(true) == null && TalkService.Calls == 1 && SettingsForm.ShowCalls == 0 && MessageBox.Calls == 0 && fixture.Failures.Count == 0,
+                "Closing the original item during a request suppresses late results, recovery and failure UI");
+        }
+        foreach (bool initialSetup in new[] { false, true }) using (var fixture = new EntryGateFixture()) {
+            if (initialSetup) fixture.Current.AppPassword = ""; else fixture.Fail(AuthenticationFailure());
+            SettingsForm.ResultFactory = current => { var next = current.Clone(); next.Username = "saved"; next.AppPassword = "test-only-saved"; return next; };
+            SettingsForm.OnShow = () => fixture.ItemOpen = false;
+            Check(fixture.Run(true) == null && TalkService.Calls == (initialSetup ? 0 : 1) && MessageBox.Calls == 0,
+                "Closing the original item during settings recovery prevents a late request and continuation");
+            Check(fixture.Events.Contains("persist:saved") && fixture.Current.Username == "saved" && SettingsForm.Disposed,
+                "An explicit save in an already-open settings dialog remains valid after the original item closes");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(TransportFailure()); MessageBox.NextResult = DialogResult.Yes;
+            MessageBox.OnShow = () => fixture.ItemOpen = false;
+            Check(fixture.Run(true) == null && SettingsForm.ShowCalls == 0 && TalkService.Calls == 1 && MessageBox.Calls == 1,
+                "Closing the original item while answering recovery cannot open a late settings dialog");
+        }
+        foreach (bool initialSetup in new[] { false, true }) using (var fixture = new EntryGateFixture()) {
+            if (initialSetup) fixture.Current.AppPassword = ""; else fixture.Fail(AuthenticationFailure());
+            fixture.Ui.BeforeAction = () => { if (fixture.Logs.Contains("Settings dialog opened.")) fixture.ItemOpen = false; };
+            Check(fixture.Run(true) == null && SettingsForm.ShowCalls == 0 && TalkService.Calls == (initialSetup ? 0 : 1) && MessageBox.Calls == 0,
+                "A queued recovery dialog rechecks original-item lifetime immediately before display");
+            Check(fixture.Events.Count == 0, "Closing before recovery dialog display cannot persist or apply settings");
+        }
+        foreach (string field in new[] { "url", "username", "password" })
+        foreach (bool failed in new[] { false, true }) using (var fixture = new EntryGateFixture()) {
+            TalkService.Steps.Enqueue(config => {
+                fixture.Ui.Run(() => {
+                    if (field == "url") fixture.Current.ServerUrl = "https://changed.example.test";
+                    else if (field == "username") fixture.Current.Username = "changed";
+                    else fixture.Current.AppPassword = "test-only-changed";
+                }).GetAwaiter().GetResult();
+                if (failed) throw TransportFailure();
+                return new ConnectionReply();
+            });
+            Check(fixture.Run(true) == null && MessageBox.Calls == 0 && SettingsForm.ShowCalls == 0 && fixture.Failures.Count == 0,
+                "Changed " + field + " discards an in-flight result instead of returning stale settings or prompting recovery");
+            Check(TalkService.Configurations[0].ServerUrl == "https://example.test" && TalkService.Configurations[0].Username == "old"
+                && TalkService.Configurations[0].AppPassword == "test-only", "Connection configuration is detached from mutable runtime settings");
+        }
+    }
+    private static void TestAutomation() {
+        foreach (Exception failure in new Exception[] { AuthenticationFailure(), TransportFailure(), new InvalidOperationException("local failure") })
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Fail(failure); MessageBox.NextResult = DialogResult.Yes;
+            Check(fixture.Run(false) == null && TalkService.Calls == 1 && SettingsForm.ShowCalls == 0 && fixture.Events.Count == 0,
+                "Automatic entry never opens settings or persists credentials");
+            Check(fixture.Failures.Count == 1 && object.ReferenceEquals(fixture.Failures[0], failure), "Automatic entry exposes the actual failure to its caller");
+            Check(MessageBox.Calls == 1 && MessageBox.Buttons[0] == MessageBoxButtons.OK, "Automatic entry cannot offer interactive recovery");
+        }
+        using (var fixture = new EntryGateFixture()) {
+            fixture.Current.Username = ""; fixture.Fail(AuthenticationFailure());
+            Check(fixture.Run(false) == null && SettingsForm.ShowCalls == 0 && fixture.Failures.Count == 1,
+                "Automatic entry with missing credentials never starts onboarding");
+        }
+    }
     public static int Main() {
         try {
             foreach (string scenario in new[] { "cancel", "save", "persist-failure", "validate-failure", "commit-failure", "incomplete-cancel" })
@@ -2909,9 +3209,8 @@ internal static class SettingsWorkflowTests {
                 bool requireAuth = scenario != "incomplete-cancel";
                 if (!requireAuth) current.AppPassword = "";
                 var events = new List<string>();
-                SettingsForm.NextResult = scenario.EndsWith("cancel") ? DialogResult.Cancel : DialogResult.OK;
-                SettingsForm.AuthenticationStarted = SettingsForm.Rejected = SettingsForm.Disposed = false;
-                MessageBox.Calls = 0;
+                SettingsForm.Reset(); SettingsForm.NextResult = scenario.EndsWith("cancel") ? DialogResult.Cancel : DialogResult.OK;
+                MessageBox.Reset();
                 var workflow = new SettingsWorkflowController(null,
                     () => current,
                     next => { events.Add("runtime:" + next.Username); current = next; },
@@ -2933,19 +3232,21 @@ internal static class SettingsWorkflowTests {
                 Check(current.Username == (saved ? "new" : "old"), "Runtime state follows successful persistence only");
                 Check(events.Contains("ifb") == saved, "IFB applies only after successful commit");
                 Check(MessageBox.Calls == (scenario == "persist-failure" ? 1 : 0), "Only a write error displays the persistence error");
-                if (scenario.EndsWith("cancel")) Check(events.Count == 1, "Cancellation has no persistence or runtime side effects");
+                if (scenario.EndsWith("cancel")) Check(!events.Exists(value => value != "dispatch"), "Cancellation has no persistence or runtime side effects");
                 if (scenario == "save") Check(events.IndexOf("persist:new") < events.IndexOf("runtime:new") && events.IndexOf("settings_save_commit") < events.IndexOf("ifb"), "Persistence precedes runtime and IFB");
                 if (scenario == "validate-failure") Check(!events.Contains("persist:new"), "Validation failure does not save");
                 if (scenario == "commit-failure") Check(events.Contains("persist:old") && events.Contains("settings_save_commit_revert"), "Failed commit restores previous settings");
             }
-            Console.WriteLine("[OK] " + checks + " production settings-workflow save/cancel/failure assertions passed");
+            TestFailureMapping(); TestFreshSuccess(); TestTransportRecovery(); TestInitialSetup(); TestAuthenticationRecovery();
+            TestOrdinaryFailures(); TestClosedAndChangedItems(); TestAutomation();
+            Console.WriteLine("[OK] " + checks + " production settings-workflow save/cancel/failure and fresh action-entry assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
 }
 '@ | Set-Content -LiteralPath $workflowSource -Encoding UTF8
     $workflowExe = Join-Path $TempRoot 'SettingsWorkflowTests.exe'
-    & $csc /noconfig /nologo /target:exe "/out:$workflowExe" /reference:System.dll /reference:System.Core.dll $workflowSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Controllers/SettingsWorkflowController.cs')
+    & $csc /noconfig /nologo /target:exe "/out:$workflowExe" /reference:System.dll /reference:System.Core.dll $workflowSource (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Controllers/SettingsWorkflowController.cs') (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Services/TalkServiceException.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Settings workflow test harness compilation failed.' }
     & $workflowExe
     if ($LASTEXITCODE -ne 0) { throw 'Production settings workflow tests failed.' }

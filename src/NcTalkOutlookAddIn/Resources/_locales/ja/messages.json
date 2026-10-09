@@ -674,9 +674,6 @@
   "outlook_error_connection_failed_format": {
     "message": "Nextcloud サーバーへの接続に失敗しました: $1"
   },
-  "outlook_error_unknown_authentication_format": {
-    "message": "認証中に不明なエラーが発生しました: $1"
-  },
   "outlook_error_credentials_not_verified": {
     "message": "資格情報を検証できませんでした。"
   },

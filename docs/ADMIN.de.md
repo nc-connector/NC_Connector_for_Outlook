@@ -484,6 +484,8 @@ Fehlen Dateien oder Registrierung, Outlook schließen und die MSI reparieren. Be
 3. Bei HTTP `401` erneut anmelden; bei `403` die Berechtigungen und vorgeschaltete Zugriffssperren prüfen.
 4. Den Verbindungstest erneut ausführen. Falls nur ein Arbeitsplatz betroffen ist, dessen Proxy-, Zertifikats- und Endpoint-Security-Konfiguration mit einem funktionierenden Arbeitsplatz vergleichen.
 
+Beim Klick auf Freigabe oder Talk wird die Nextcloud-Verbindung vor dem Assistenten erneut geprüft. Ein nicht erreichbarer Server zeigt in beiden Aktionen denselben Hinweis mit dem Angebot, die Einstellungen zu öffnen; eine frühere erfolgreiche Verbindung überspringt diese Prüfung nicht. Nach dem Speichern geprüfter Zugangsdaten wird vor der Fortsetzung nochmals geprüft. Einrichtungsabbruch oder Schließen der ursprünglichen Mail/des Termins beendet die Aktion. Die Anhangsautomatisierung öffnet keine Anmeldung automatisch; fehlgeschlagenes Teilen erhält die Originalanhänge. Für den normalen Versand gilt weiterhin der konfigurierte `SendPolicyFailureMode`.
+
 Keine Zertifikatsprüfung abschalten und nicht versuchsweise computerweite TLS-Einstellungen ändern.
 
 ### Eine Registry-Vorgabe wird nicht wie erwartet angewendet

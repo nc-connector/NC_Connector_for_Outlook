@@ -793,7 +793,6 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string PromptOpenSettings { get { return Get("outlook_prompt_open_settings", "{0}\n\nOpen settings now?"); } }
         internal static string ErrorServerUnavailable { get { return Get("outlook_error_server_unavailable", "The Nextcloud server is currently unreachable. Please check your Internet connection."); } }
         internal static string ErrorConnectionFailed { get { return Get("outlook_error_connection_failed_format", "Connection to the Nextcloud server failed: {0}"); } }
-        internal static string ErrorUnknownAuthentication { get { return Get("outlook_error_unknown_authentication_format", "Unknown error during authentication: {0}"); } }
         internal static string ErrorCredentialsNotVerified { get { return Get("outlook_error_credentials_not_verified", "Credentials could not be verified."); } }
 
         internal static string WarningIfbStartFailed { get { return Get("outlook_warning_ifb_start_failed_format", "IFB could not be started: {0}"); } }
