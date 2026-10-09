@@ -31,6 +31,9 @@ namespace NcTalkOutlookAddIn
             InitializeOutlookUiSynchronizationContext();
             TryApplyTransportSecurityFromSettings("startup", false);
             TryApplyOfficeUiLanguage();
+            NextcloudConnectionState.Initialize(_settingsStorage.DataDirectory, outlookProfileName,
+                new TalkServiceConfiguration(_currentSettings.ServerUrl, _currentSettings.Username, _currentSettings.AppPassword));
+            InitializeComposeShareCleanup(_settingsStorage.DataDirectory, outlookProfileName);
             LogCore("Add-in connected (Outlook version=" + (_outlookApplication != null ? _outlookApplication.Version : "unknown") + ").");
             if (!string.IsNullOrWhiteSpace(outlookProfileName))
             {
@@ -276,6 +279,7 @@ namespace NcTalkOutlookAddIn
             DisposeTalkAppointmentSync();
             DisposeTalkAppointmentSubscriptions();
             DisposeTalkRoomLifecycle();
+            DisposeComposeShareCleanup();
             if (_freeBusyManager != null)
             {
                 try
@@ -291,6 +295,7 @@ namespace NcTalkOutlookAddIn
                 }
             }
             _freeBusyManager = null;
+            NextcloudConnectionState.Shutdown();
 
             if (clearOutlookApplication)
             {

@@ -35,7 +35,12 @@ namespace NcTalkOutlookAddIn.Services
                 profileScope,
                 getCurrentSettings,
                 isSavedEventDeletionEnabled,
-                configuration => NextcloudUserIdentityService.ResolveCurrentUserId(configuration),
+                configuration =>
+                {
+                    VerifiedNextcloudIdentity identity = NextcloudConnectionState.ResolveVerifiedIdentity();
+                    return identity != null && string.Equals(identity.BaseUrl, configuration.GetNormalizedBaseUrl(), StringComparison.Ordinal)
+                        ? identity.UserId : string.Empty;
+                },
                 (configuration, roomToken, isEventConversation) =>
                     new TalkService(configuration).DeleteRoom(roomToken, isEventConversation))
         {
@@ -78,10 +83,26 @@ namespace NcTalkOutlookAddIn.Services
             _resolveAccountId = resolveAccountId;
             _deleteRoom = deleteRoom;
             _timer = new Timer(OnTimer, null, Timeout.Infinite, Timeout.Infinite);
+            NextcloudConnectionState.ConnectionRestored += OnConnectionRestored;
         }
 
         internal void StartPendingProcessing()
         {
+            VerifiedNextcloudIdentity identity = NextcloudConnectionState.GetVerifiedIdentity();
+            if (identity != null) { OnConnectionRestored(identity); }
+            else if (_state.Records.Exists(record => record.ConnectionPaused && !string.IsNullOrWhiteSpace(record.AccountId))
+                && !NextcloudConnectionState.GetStatus().IsPaused)
+            {
+                ThreadPool.QueueUserWorkItem(ignored =>
+                {
+                    try
+                    {
+                        VerifiedNextcloudIdentity restored = NextcloudConnectionState.ResolveVerifiedIdentity();
+                        if (restored != null) { OnConnectionRestored(restored); }
+                    }
+                    catch (Exception ex) { DiagnosticsLogger.LogException(LogCategories.Talk, "Talk cleanup recovery awaits a verified connection.", ex); }
+                });
+            }
             ScheduleNext();
         }
 
@@ -103,6 +124,7 @@ namespace NcTalkOutlookAddIn.Services
                 string normalizedToken = roomToken.Trim();
                 string baseUrl = NormalizeBaseUrl(configuration);
                 string login = NormalizeLogin(configuration);
+                VerifiedNextcloudIdentity identity = NextcloudConnectionState.GetKnownIdentity(configuration);
                 lock (_syncRoot)
                 {
                     TalkRoomLifecycleRecord record =
@@ -115,6 +137,7 @@ namespace NcTalkOutlookAddIn.Services
                             IsEventConversation = isEventConversation,
                             ServerBaseUrl = baseUrl,
                             AccountLogin = login,
+                            AccountId = identity != null ? identity.UserId : string.Empty,
                             PendingDeletion = true,
                             PolicyRequired = policyRequired
                         };
@@ -244,9 +267,15 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             TalkServiceConfiguration configuration = BuildConfiguration(_getCurrentSettings());
+            ConnectionPauseStatus pause = NextcloudConnectionState.GetStatus(configuration);
+            if (pause.IsPaused)
+            {
+                PauseAll(due, pause);
+                return;
+            }
             if (configuration == null)
             {
-                RescheduleAll(due, TimeSpan.FromHours(1));
+                PauseAll(due, new ConnectionPauseStatus("auth_required", DateTime.MinValue));
                 return;
             }
 
@@ -261,12 +290,16 @@ namespace NcTalkOutlookAddIn.Services
                     LogCategories.Talk,
                     "Talk room deletions retained because the account could not be verified.",
                     ex);
-                RescheduleAll(due, TimeSpan.FromHours(1));
+                pause = NextcloudConnectionState.GetStatus(configuration);
+                if (pause.IsPaused) { PauseAll(due, pause); }
+                else { RescheduleAll(due, TimeSpan.FromHours(1)); }
                 return;
             }
             if (string.IsNullOrWhiteSpace(accountId))
             {
-                RescheduleAll(due, TimeSpan.FromHours(1));
+                pause = NextcloudConnectionState.GetStatus(configuration);
+                if (pause.IsPaused) { PauseAll(due, pause); }
+                else { RescheduleAll(due, TimeSpan.FromHours(1)); }
                 return;
             }
 
@@ -278,6 +311,12 @@ namespace NcTalkOutlookAddIn.Services
             for (int i = 0; i < due.Count; i++)
             {
                 TalkRoomLifecycleRecord record = due[i];
+                pause = NextcloudConnectionState.GetStatus(configuration);
+                if (pause.IsPaused)
+                {
+                    Pause(record.Id, pause);
+                    continue;
+                }
                 if (!MatchesAccount(record, baseUrl, login, accountId))
                 {
                     Reschedule(record.Id, TimeSpan.FromHours(1));
@@ -304,6 +343,14 @@ namespace NcTalkOutlookAddIn.Services
                                 "Saved-event room deletion policy could not be evaluated.",
                                 ex);
                         }
+                    }
+                    // An authentication rejection during the policy fetch must not look like
+                    // a disabled cleanup policy and discard an already accepted deletion.
+                    pause = NextcloudConnectionState.GetStatus(configuration);
+                    if (pause.IsPaused)
+                    {
+                        Pause(record.Id, pause);
+                        continue;
                     }
                     if (!policyAvailable)
                     {
@@ -337,7 +384,9 @@ namespace NcTalkOutlookAddIn.Services
                         LogCategories.Talk,
                         "Queued Talk room deletion failed.",
                         ex);
-                    Reschedule(record.Id, GetRetryDelay(record.AttemptCount + 1));
+                    pause = NextcloudConnectionState.GetStatus(configuration);
+                    if (pause.IsPaused) { Pause(record.Id, pause); }
+                    else { Reschedule(record.Id, GetRetryDelay(record.AttemptCount + 1)); }
                 }
             }
         }
@@ -352,6 +401,7 @@ namespace NcTalkOutlookAddIn.Services
                     TalkRoomLifecycleRecord record = _state.Records[i];
                     if (record != null
                         && record.PendingDeletion
+                        && !record.ConnectionPaused
                         && (record.NextAttemptUtc <= DateTime.MinValue
                             || record.NextAttemptUtc <= nowUtc))
                     {
@@ -369,6 +419,54 @@ namespace NcTalkOutlookAddIn.Services
             for (int i = 0; i < records.Count; i++)
             {
                 Reschedule(records[i].Id, delay);
+            }
+        }
+
+        private void PauseAll(IList<TalkRoomLifecycleRecord> records, ConnectionPauseStatus pause)
+        {
+            foreach (TalkRoomLifecycleRecord record in records) { Pause(record.Id, pause); }
+        }
+
+        private void Pause(string id, ConnectionPauseStatus pause)
+        {
+            lock (_syncRoot)
+            {
+                TalkRoomLifecycleRecord record = FindByIdLocked(id);
+                if (record == null) { return; }
+                record.ConnectionPaused = pause.Reason == "auth_required";
+                if (pause.Reason == "rate_limited") { record.NextAttemptUtc = pause.RetryAfterUtc; }
+                SaveLocked();
+            }
+            // A verified save may have completed concurrently with the failed request.
+            VerifiedNextcloudIdentity identity = NextcloudConnectionState.GetVerifiedIdentity();
+            if (identity != null) { OnConnectionRestored(identity); }
+        }
+
+        private void OnConnectionRestored(VerifiedNextcloudIdentity identity)
+        {
+            if (identity == null) { return; }
+            try
+            {
+                lock (_syncRoot)
+                {
+                    if (_disposed) { return; }
+                    bool changed = false;
+                    foreach (TalkRoomLifecycleRecord record in _state.Records)
+                    {
+                        if (!record.PendingDeletion || string.IsNullOrWhiteSpace(record.AccountId)
+                            || !string.Equals(record.ServerBaseUrl, identity.BaseUrl, StringComparison.Ordinal)
+                            || !string.Equals(record.AccountId, identity.UserId, StringComparison.Ordinal)) { continue; }
+                        record.ConnectionPaused = false;
+                        record.NextAttemptUtc = DateTime.UtcNow;
+                        changed = true;
+                    }
+                    if (changed) { SaveLocked(); }
+                }
+                ScheduleNext();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Pending Talk cleanup could not be resumed.", ex);
             }
         }
 
@@ -443,7 +541,7 @@ namespace NcTalkOutlookAddIn.Services
                 for (int i = 0; i < _state.Records.Count; i++)
                 {
                     TalkRoomLifecycleRecord record = _state.Records[i];
-                    if (record == null || !record.PendingDeletion)
+                    if (record == null || !record.PendingDeletion || record.ConnectionPaused)
                     {
                         continue;
                     }
@@ -535,6 +633,7 @@ namespace NcTalkOutlookAddIn.Services
                 AccountId = source.AccountId,
                 PendingDeletion = source.PendingDeletion,
                 PolicyRequired = source.PolicyRequired,
+                ConnectionPaused = source.ConnectionPaused,
                 AttemptCount = source.AttemptCount,
                 NextAttemptUtc = source.NextAttemptUtc
             };
@@ -550,6 +649,7 @@ namespace NcTalkOutlookAddIn.Services
             lock (_syncRoot)
             {
                 _disposed = true;
+                NextcloudConnectionState.ConnectionRestored -= OnConnectionRestored;
                 _timer.Change(Timeout.Infinite, Timeout.Infinite);
             }
             _timer.Dispose();

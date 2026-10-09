@@ -85,11 +85,6 @@ namespace NcTalkOutlookAddIn.Services
 
         internal NcHttpClient(TalkServiceConfiguration configuration) { }
 
-        internal static void ConfirmVerifiedAuthentication(TalkServiceConfiguration configuration, long requestSequence)
-        {
-            ConfirmedVerifications++;
-        }
-
         internal NcHttpResponse Send(NcHttpRequestOptions options)
         {
             Requests.Add(options);
@@ -107,6 +102,23 @@ namespace NcTalkOutlookAddIn.Services
             ConfirmedVerifications = 0;
             foreach (NcHttpResponse response in responses) { Responses.Enqueue(response); }
         }
+    }
+
+    internal static class NextcloudConnectionState
+    {
+        internal static VerifiedNextcloudIdentity GetKnownIdentity(TalkServiceConfiguration configuration) { return null; }
+        internal static void AssertRequestAllowed(TalkServiceConfiguration configuration, bool verification = false) { }
+        internal static void BeginVerification(TalkServiceConfiguration configuration) { }
+        internal static void RecordVerifiedIdentity(TalkServiceConfiguration configuration, string userId, long requestSequence, bool verification)
+        {
+            if (verification) NcHttpClient.ConfirmedVerifications++;
+        }
+    }
+
+    internal sealed class VerifiedNextcloudIdentity
+    {
+        internal string UserId { get; set; }
+        internal string BaseUrl { get; set; }
     }
 }
 
@@ -319,12 +331,12 @@ internal static class OutlookUtilityTests
 
         NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), UserTestResponse("initial-user"));
         Check("Explicit settings verification may retry rejected credentials", verifier.VerifyConnection(out message, true));
-        Check("Explicit verification marks both authenticated checks and confirms only the valid UID",
+        Check("Explicit verification marks both authenticated checks and records only the valid UID proof",
             NcHttpClient.Requests.Count == 2 && NcHttpClient.Requests.All(request => request.VerifyRejectedCredentials)
             && NcHttpClient.ConfirmedVerifications == 1);
 
         NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), UserTestResponse(string.Empty));
-        Check("An invalid UID cannot release an authentication pause", !verifier.VerifyConnection(out message, true)
+        Check("An invalid UID cannot produce a successful verification proof", !verifier.VerifyConnection(out message, true)
             && NcHttpClient.ConfirmedVerifications == 0);
 
         NcHttpClient.Reset(new NcHttpResponse());

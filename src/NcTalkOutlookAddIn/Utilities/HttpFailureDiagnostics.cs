@@ -61,7 +61,7 @@ namespace NcTalkOutlookAddIn.Utilities
                 }
                 DateTimeOffset retryAt;
                 if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal, out retryAt))
+                    DateTimeStyles.AssumeUniversal, out retryAt) && retryAt.UtcDateTime > DateTime.UtcNow)
                 {
                     return retryAt.UtcDateTime;
                 }

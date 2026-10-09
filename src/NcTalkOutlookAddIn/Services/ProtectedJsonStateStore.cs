@@ -91,6 +91,11 @@ namespace NcTalkOutlookAddIn.Services
             new JavaScriptSerializer();
         private bool _writeAllowed = true;
 
+        internal bool IsWriteAllowed
+        {
+            get { lock (_syncRoot) { return _writeAllowed; } }
+        }
+
         internal ProtectedJsonStateStore(
             string dataDirectory,
             string profileScope,

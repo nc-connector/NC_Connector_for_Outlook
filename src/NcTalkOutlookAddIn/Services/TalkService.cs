@@ -176,6 +176,7 @@ namespace NcTalkOutlookAddIn.Services
 
             // Force a fresh connection for connectivity diagnostics so TLS mode changes
             // are validated against a new handshake and not masked by pooled keep-alive sockets.
+            if (retryRejectedCredentials) { NextcloudConnectionState.BeginVerification(_configuration); }
             NextcloudCapabilitiesSnapshot snapshot =
                 new NextcloudCapabilitiesService(_configuration)
                     .GetSnapshot(true, true, retryRejectedCredentials);

@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "無法移除已儲存的登入憑證。請再試一次。"
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud 暫時限制了請求。請稍候再試。"
+  },
+  "connection_reauthenticate": {
+    "message": "重新登入"
+  },
+  "options_remove_credentials_button": {
+    "message": "移除已儲存的登入憑證"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "要從此 Outlook 設定檔中移除已儲存的登入憑證嗎？請先完成進行中的上傳及其他 NC Connector 操作。"
+  },
+  "options_remove_credentials_hint": {
+    "message": "移除此 Outlook 設定檔中儲存的使用者名稱和應用程式密碼。Nextcloud 網址及其他設定會保留。不會刪除 Nextcloud 中的應用程式密碼。"
+  },
+  "connection_auth_required": {
+    "message": "Nextcloud 登入已失效。請重新登入。"
+  },
+  "options_remove_credentials_success": {
+    "message": "已移除儲存的登入憑證。請在「一般」中重新登入。"
+  },
+  "options_remove_credentials_busy": {
+    "message": "請先完成進行中的上傳，然後再試一次。"
+  },
   "send_policy_check_failed": {
     "message": "無法滿足此郵件的中央傳送要求。郵件尚未傳送。請檢查連線或聯絡管理員。"
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "NC Connector Backend 目前無法使用。"
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud 拒絕了已儲存的認證資料。請在 NC Connector 設定中重新登入。"
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud 正在暫時限制請求。請遵守指定的等待時間。"
   },
   "send_policy_signature_warning": {
     "message": "無法載入此郵件應使用的中央簽章。郵件仍可傳送。"
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "請將 NC Connector 連線至您的 Nextcloud 帳號。請透過瀏覽器登入，或輸入您的使用者名稱和應用程式密碼。"
-  },
-  "connection_sign_in_required": {
-    "message": "未能成功登入 Nextcloud。請重新登入。"
   },
   "options_base_url_label": {
     "message": "Nextcloud 網址"

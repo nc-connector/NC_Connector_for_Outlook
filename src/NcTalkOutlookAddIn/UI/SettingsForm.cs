@@ -158,6 +158,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly IfbAddressBookCache _addressBookCache;
         private readonly IfbAddressBookCache.SystemAddressbookStatus _initialAddressbookStatus;
         private readonly Func<TalkServiceConfiguration, string, BackendPolicyStatus> _fetchBackendPolicyStatus;
+        private readonly Func<AddinSettings> _removeSavedCredentials;
         private BackendPolicyStatus _backendPolicyStatus;
         private string _updateOpenUrl = string.Empty;
 
@@ -182,7 +183,8 @@ namespace NcTalkOutlookAddIn.UI
             BackendPolicyStatus initialPolicyStatus,
             IfbAddressBookCache addressBookCache,
             IfbAddressBookCache.SystemAddressbookStatus initialAddressbookStatus,
-            Func<TalkServiceConfiguration, string, BackendPolicyStatus> fetchBackendPolicyStatus)
+            Func<TalkServiceConfiguration, string, BackendPolicyStatus> fetchBackendPolicyStatus,
+            Func<AddinSettings> removeSavedCredentials = null)
         {
             if (fetchBackendPolicyStatus == null)
             {
@@ -193,6 +195,7 @@ namespace NcTalkOutlookAddIn.UI
             _addressBookCache = addressBookCache;
             _initialAddressbookStatus = initialAddressbookStatus;
             _fetchBackendPolicyStatus = fetchBackendPolicyStatus;
+            _removeSavedCredentials = removeSavedCredentials;
             _runtimeSecurityProtocolAtOpen = ServicePointManager.SecurityProtocol;
             _disabledTooltipHints = new DisabledControlTooltipHintHelper(_toolTip);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -316,7 +319,16 @@ namespace NcTalkOutlookAddIn.UI
                 Strings.PolicyWarningAdminLinkLabel);
             Controls.Add(_policyWarningPanel);
             _policyWarningLinkLabel.LinkClicked += (s, e) =>
+            {
+                if (_policyWarningLinkLabel.Tag == null)
+                {
+                    _tabControl.SelectedTab = _generalTab;
+                    if (_manualRadio.Checked) { _usernameTextBox.Focus(); }
+                    else { _loginFlowButton.Focus(); }
+                    return;
+                }
                 PolicyUiHelper.OpenLicenseAdministration(_policyWarningLinkLabel, LogCategories.Core);
+            };
         }
 
         protected override async void OnShown(EventArgs e)
@@ -588,7 +600,11 @@ namespace NcTalkOutlookAddIn.UI
                     StringComparison.Ordinal)
                 || !string.Equals(configuration.Username, Result.Username, StringComparison.Ordinal)
                 || !string.Equals(configuration.AppPassword, Result.AppPassword, StringComparison.Ordinal);
-            if ((_authenticationRequired || credentialsChanged) && _connectionSetupPending
+            bool savedAuthenticationPaused = string.Equals(
+                NextcloudConnectionState.GetStatus(configuration).Reason, "auth_required", StringComparison.Ordinal);
+            bool verifiedConnectionPending = _authenticationRequired || credentialsChanged || savedAuthenticationPaused;
+            if (verifiedConnectionPending
+                && (_connectionSetupPending || !NextcloudConnectionState.HasFreshVerification(configuration))
                 && !await TestConnectionAsync())
             {
                 return;
@@ -597,7 +613,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return;
             }
-            if (!await RefreshSettingsServerStateAsync(
+            if (!verifiedConnectionPending && !await RefreshSettingsServerStateAsync(
                     configuration,
                     true,
                     "settings_save"))
@@ -783,6 +799,8 @@ namespace NcTalkOutlookAddIn.UI
                 _serverUrlTextBox.Text);
             bool credentialsMissing = !new TalkServiceConfiguration(
                 _serverUrlTextBox.Text, _usernameTextBox.Text, _appPasswordTextBox.Text).IsComplete();
+            string connectionNotice = PolicyUiHelper.GetConnectionNotice(_backendPolicyStatus);
+            _policyWarningLinkLabel.Text = Strings.PolicyWarningAdminLinkLabel;
             if (!Result.IsManagedTransportTlsValid)
             {
                 warningVisible = true;
@@ -791,6 +809,17 @@ namespace NcTalkOutlookAddIn.UI
                 _policyWarningPanel.BackColor = Color.FromArgb(20, _themePalette.ErrorText);
                 _policyWarningTextLabel.Text = Strings.ManagedTlsPolicyInvalid;
                 _policyWarningLinkLabel.Visible = false;
+                _policyWarningLinkLabel.Tag = null;
+            }
+            else if (_authenticationRejected || !string.IsNullOrEmpty(connectionNotice))
+            {
+                warningVisible = true;
+                _policyWarningPanel.Visible = true;
+                _policyWarningTextLabel.Text = _authenticationRejected
+                    ? Strings.ConnectionAuthRequired : connectionNotice;
+                _policyWarningLinkLabel.Text = Strings.ConnectionReauthenticate;
+                _policyWarningLinkLabel.Visible = _authenticationRejected
+                    || string.Equals(connectionNotice, Strings.ConnectionAuthRequired, StringComparison.Ordinal);
                 _policyWarningLinkLabel.Tag = null;
             }
             else if (_connectionSetupPending || credentialsMissing)
@@ -1151,6 +1180,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             Cursor.Current = busy ? Cursors.WaitCursor : Cursors.Default;
             _saveButton.Enabled = !busy;
+            _removeCredentialsButton.Enabled = !busy && _removeSavedCredentials != null;
             _cancelButton.Enabled = !busy;
             _debugOpenLink.Enabled = !busy;
             UpdateControlState();

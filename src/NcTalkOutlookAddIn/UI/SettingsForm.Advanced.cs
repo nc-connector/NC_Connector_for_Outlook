@@ -24,6 +24,8 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Label _defaultsSourceLabel = new Label();
         private readonly ComboBox _defaultsSourceCombo = new ComboBox();
         private readonly Label _defaultsSourceHintLabel = new Label();
+        private readonly Button _removeCredentialsButton = new Button();
+        private readonly Label _removeCredentialsHintLabel = new Label();
 
         private void OnDefaultsSourceChanged(object sender, EventArgs e)
         {
@@ -104,12 +106,25 @@ namespace NcTalkOutlookAddIn.UI
             _tlsHintLabel.MaximumSize = new Size(Math.Max(ScaleLogical(200), _tlsSettingsGroup.ClientSize.Width - ScaleLogical(20)), 0);
             _tlsHintLabel.AutoSize = true;
             _tlsSettingsGroup.Height = Math.Max(ScaleLogical(134), _tlsHintLabel.Bottom + ScaleLogical(12));
+            _removeCredentialsButton.SetBounds(left, _tlsSettingsGroup.Bottom + ScaleLogical(20),
+                Math.Min(width, Math.Max(ScaleLogical(260), _removeCredentialsButton.PreferredSize.Width)), ScaleLogical(30));
+            _removeCredentialsHintLabel.MaximumSize = new Size(width, 0);
+            _removeCredentialsHintLabel.Location = new Point(left, _removeCredentialsButton.Bottom + ScaleLogical(8));
         }
 
         private void InitializeAdvancedTab()
         {
             _advancedTab.AutoScroll = true;
             _advancedTab.Padding = new Padding(12);
+
+            _removeCredentialsButton.Text = Strings.OptionsRemoveCredentialsButton;
+            _removeCredentialsButton.AutoSize = true;
+            _removeCredentialsButton.Enabled = _removeSavedCredentials != null;
+            _removeCredentialsButton.Click += OnRemoveCredentialsClick;
+            _advancedTab.Controls.Add(_removeCredentialsButton);
+            _removeCredentialsHintLabel.Text = Strings.OptionsRemoveCredentialsHint;
+            _removeCredentialsHintLabel.AutoSize = true;
+            _advancedTab.Controls.Add(_removeCredentialsHintLabel);
 
             _defaultsSourceLabel.Text = Strings.DefaultsSourceLabel;
             _defaultsSourceLabel.AutoSize = true;
@@ -216,6 +231,40 @@ namespace NcTalkOutlookAddIn.UI
             _tlsHintLabel.Location = new Point(12, 94);
             _tlsHintLabel.ForeColor = Color.DimGray;
             _tlsSettingsGroup.Controls.Add(_tlsHintLabel);
+        }
+
+        private void OnRemoveCredentialsClick(object sender, EventArgs e)
+        {
+            if (_isBusy || _removeSavedCredentials == null) { return; }
+            foreach (Form openForm in Application.OpenForms)
+            {
+                if (openForm is FileLinkWizardForm)
+                {
+                    SetStatus(Strings.OptionsRemoveCredentialsBusy, true);
+                    return;
+                }
+            }
+            if (MessageBox.Show(this, Strings.OptionsRemoveCredentialsConfirm, Strings.DialogTitle,
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { return; }
+            try
+            {
+                AddinSettings saved = _removeSavedCredentials();
+                if (saved == null) { throw new InvalidOperationException("Credential removal did not return saved settings."); }
+                Result.Username = saved.Username;
+                Result.AppPassword = saved.AppPassword;
+                _usernameTextBox.Text = saved.Username ?? string.Empty;
+                _appPasswordTextBox.Text = saved.AppPassword ?? string.Empty;
+                _backendPolicyStatus = null;
+                _authenticationRejected = false;
+                _connectionSetupPending = true;
+                ApplyBackendPolicyStatus("credentials_removed");
+                SetStatus(Strings.OptionsRemoveCredentialsSuccess, false);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Saved credentials could not be removed.", ex);
+                SetStatus(Strings.OptionsRemoveCredentialsFailed, true);
+            }
         }
 
         private void UpdateUpdateCheckSection()

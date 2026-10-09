@@ -27,6 +27,7 @@ namespace NcTalkOutlookAddIn.Controllers
         private readonly Func<AddinSettings, string, bool, bool> _applyTransportSecurityFromSettings;
         private readonly Action _applyIfbSettings;
         private readonly Action<AddinSettings> _persistSettings;
+        private readonly Action<AddinSettings> _removeSavedCredentials;
         private readonly Func<Action, Task> _runOnOutlookUiThreadAsync;
         private readonly Action<string> _logSettings;
         private readonly string _dataDirectory;
@@ -44,7 +45,8 @@ namespace NcTalkOutlookAddIn.Controllers
             Func<Action, Task> runOnOutlookUiThreadAsync,
             Action<string> logSettings,
             string dataDirectory,
-            string outlookProfileScope)
+            string outlookProfileScope,
+            Action<AddinSettings> removeSavedCredentials = null)
         {
             _outlookApplication = outlookApplication;
             _getCurrentSettings = getCurrentSettings;
@@ -54,6 +56,7 @@ namespace NcTalkOutlookAddIn.Controllers
             _applyTransportSecurityFromSettings = applyTransportSecurityFromSettings;
             _applyIfbSettings = applyIfbSettings;
             _persistSettings = persistSettings;
+            _removeSavedCredentials = removeSavedCredentials;
             _runOnOutlookUiThreadAsync = runOnOutlookUiThreadAsync;
             _logSettings = logSettings;
             _dataDirectory = dataDirectory ?? string.Empty;
@@ -238,11 +241,9 @@ namespace NcTalkOutlookAddIn.Controllers
 
         internal static string GetActionConnectionFailureMessage(Exception failure)
         {
+            string connectionNotice = PolicyUiHelper.GetConnectionFailureMessage(failure);
+            if (!string.IsNullOrEmpty(connectionNotice)) { return connectionNotice; }
             var serviceFailure = failure as TalkServiceException;
-            if (serviceFailure != null && serviceFailure.IsAuthenticationError)
-            {
-                return Strings.ConnectionSignInRequired;
-            }
             if (serviceFailure != null && serviceFailure.IsTransportError)
             {
                 return Strings.ErrorServerUnavailable;
@@ -280,7 +281,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 initialPolicyStatus,
                 addressBookCache,
                 initialAddressbookStatus,
-                _fetchBackendPolicyStatus))
+                _fetchBackendPolicyStatus,
+                _removeSavedCredentials != null ? new Func<AddinSettings>(RemoveSavedCredentials) : null))
             {
                 if (requireAuthentication)
                 {
@@ -288,8 +290,22 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
                 if (form.ShowDialog() == DialogResult.OK)
                 {
-                    AddinSettings previousSettings = currentSettings.Clone();
+                    AddinSettings previousSettings = ((_getCurrentSettings != null ? _getCurrentSettings() : null)
+                        ?? currentSettings).Clone();
                     AddinSettings nextSettings = (form.Result ?? new AddinSettings()).Clone();
+                    var configuration = new TalkServiceConfiguration(
+                        nextSettings.ServerUrl, nextSettings.Username, nextSettings.AppPassword);
+                    bool verified = NextcloudConnectionState.HasFreshVerification(configuration);
+                    bool verificationRequired = requireAuthentication
+                        || !ConnectionSettingsMatch(previousSettings, nextSettings)
+                        || string.Equals(NextcloudConnectionState.GetStatus(configuration).Reason,
+                            "auth_required", StringComparison.Ordinal);
+                    if (verificationRequired && !verified)
+                    {
+                        MessageBox.Show(Strings.ErrorCredentialsNotVerified, Strings.SettingsFormTitle,
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
+                    }
 
                     if (!ValidateTransportSecurityBeforeSave(previousSettings, nextSettings))
                     {
@@ -324,8 +340,6 @@ namespace NcTalkOutlookAddIn.Controllers
                         return false;
                     }
 
-                    ApplyRuntimeSettings(nextSettings);
-
                     if (_applyTransportSecurityFromSettings != null
                         && !_applyTransportSecurityFromSettings(
                             nextSettings,
@@ -348,6 +362,27 @@ namespace NcTalkOutlookAddIn.Controllers
                         return false;
                     }
 
+                    try
+                    {
+                        ApplyRuntimeSettings(nextSettings);
+                        if (verified) { NextcloudConnectionState.CommitVerifiedSavedConnection(configuration); }
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Verified connection could not be committed.", ex);
+                        try { _persistSettings(previousSettings); }
+                        finally
+                        {
+                            ApplyRuntimeSettings(previousSettings);
+                            if (_applyTransportSecurityFromSettings != null)
+                            {
+                                _applyTransportSecurityFromSettings(previousSettings, "settings_connection_commit_revert", false);
+                            }
+                        }
+                        MessageBox.Show(Strings.SettingsSaveFailed, Strings.SettingsFormTitle,
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return false;
+                    }
                     if (_applyIfbSettings != null)
                     {
                         _applyIfbSettings();
@@ -368,6 +403,31 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
             }
             return false;
+        }
+
+        private AddinSettings RemoveSavedCredentials()
+        {
+            if (_removeSavedCredentials == null)
+            {
+                throw new InvalidOperationException("Credential removal is unavailable.");
+            }
+            AddinSettings nextSettings = ((_getCurrentSettings != null ? _getCurrentSettings() : null)
+                ?? new AddinSettings()).Clone();
+            nextSettings.Username = string.Empty;
+            nextSettings.AppPassword = string.Empty;
+            _removeSavedCredentials(nextSettings);
+            try
+            {
+                NextcloudConnectionState.RemoveSavedCredentials(new TalkServiceConfiguration(
+                    nextSettings.ServerUrl, string.Empty, string.Empty));
+            }
+            finally
+            {
+                ApplyRuntimeSettings(nextSettings);
+            }
+            if (_applyIfbSettings != null) { _applyIfbSettings(); }
+            _logSettings("Saved credentials removed; other settings and pending cleanup retained.");
+            return nextSettings;
         }
 
         private bool ValidateTransportSecurityBeforeSave(

@@ -318,7 +318,7 @@ namespace NcTalkOutlookAddIn.UI
                 UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed with service error.", ex);
                 FlushBufferedUploadProgress();
-                ShowUploadError(ex.Message);
+                ShowUploadError(PolicyUiHelper.GetConnectionFailureMessage(ex, ex.Message));
             }
             catch (Exception ex)
             {
@@ -415,7 +415,7 @@ namespace NcTalkOutlookAddIn.UI
                     LogCategories.FileLink,
                     "Empty upload preparation failed with service error.",
                     ex);
-                ShowUploadError(ex.Message);
+                ShowUploadError(PolicyUiHelper.GetConnectionFailureMessage(ex, ex.Message));
             }
             catch (Exception ex)
             {

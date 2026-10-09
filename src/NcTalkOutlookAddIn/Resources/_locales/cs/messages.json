@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "Uložené přihlašovací údaje se nepodařilo odstranit. Zkuste to znovu."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud nyní omezuje počet požadavků. Počkejte prosím a zkuste to později."
+  },
+  "connection_reauthenticate": {
+    "message": "Přihlásit se znovu"
+  },
+  "options_remove_credentials_button": {
+    "message": "Odstranit uložené přihlašovací údaje"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Odstranit uložené přihlašovací údaje z tohoto profilu Outlooku? Nejprve dokončete probíhající nahrávání a další akce NC Connectoru."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Odstraní uložené uživatelské jméno a heslo aplikace z tohoto profilu Outlooku. URL Nextcloudu a ostatní nastavení zůstanou zachována. Heslo aplikace v Nextcloudu se neodstraní."
+  },
+  "connection_auth_required": {
+    "message": "Přihlášení k Nextcloudu už není platné. Přihlaste se prosím znovu."
+  },
+  "options_remove_credentials_success": {
+    "message": "Uložené přihlašovací údaje byly odstraněny. Znovu se přihlaste v části Obecné."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Nejprve dokončete probíhající nahrávání a poté to zkuste znovu."
+  },
   "send_policy_check_failed": {
     "message": "Centrální požadavky na odeslání této zprávy se nepodařilo splnit. Zpráva nebyla odeslána. Zkontrolujte připojení nebo se obraťte na správce."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "NC Connector Backend je momentálně nedostupný."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud odmítl uložené přihlašovací údaje. Přihlaste se znovu v nastavení NC Connector."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud dočasně omezuje požadavky. Dodržte uvedenou čekací dobu."
   },
   "send_policy_signature_warning": {
     "message": "Centrální podpis určený pro tuto zprávu se nepodařilo načíst. Zprávu lze přesto odeslat."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Připojte NC Connector ke svému účtu Nextcloud. Přihlaste se přes prohlížeč nebo zadejte své uživatelské jméno a heslo aplikace."
-  },
-  "connection_sign_in_required": {
-    "message": "Přihlášení do Nextcloudu se nezdařilo. Přihlaste se prosím znovu."
   },
   "options_base_url_label": {
     "message": "URL Nextcloud"

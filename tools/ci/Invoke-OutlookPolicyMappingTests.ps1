@@ -156,6 +156,7 @@ internal static class OutlookPolicyMappingTests
         TestLicenseAdminLinks();
         TestLicenseWarningRendering();
         TestWarningPanelLayout();
+        TestConnectionNotices();
 
         if (failures > 0)
         {
@@ -344,6 +345,29 @@ internal static class OutlookPolicyMappingTests
             && oldBackend.LicenseActivationState == string.Empty && !oldBackend.LicenseConnectionError
             && oldBackend.LicenseLastSyncAtIso == string.Empty && oldBackend.LicenseOfflineUntilIso == string.Empty);
         Check("Missing status fails closed", !BackendPolicyService.ParseStatus(null).PolicyActive);
+    }
+
+    private static void TestConnectionNotices()
+    {
+        foreach (bool endpointAvailable in new[] { false, true })
+        foreach (string reason in new[] { "authentication_rejected", "auth_required", "rate_limited" })
+        {
+            var status = new BackendPolicyStatus(endpointAvailable, false, false, "local", reason,
+                false, false, "none", null, null, null, null, null, null);
+            string expected = reason == "rate_limited" ? Strings.ConnectionRateLimited : Strings.ConnectionAuthRequired;
+            Check("Connection cause precedes backend or seat notice: " + reason,
+                PolicyUiHelper.GetPolicyWarningMessage(status) == expected
+                && PolicyUiHelper.GetEnterpriseRolloutNotice(new AddinSettings { IsEnterpriseRollout = true }, status) == expected
+                && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(status) == expected);
+        }
+        foreach (HttpStatusCode status in new[] { HttpStatusCode.Unauthorized, (HttpStatusCode)429 })
+        {
+            var failure = new TalkServiceException("raw server diagnostic", status == HttpStatusCode.Unauthorized, status, null);
+            Check("Operation failure uses common notice: " + (int)status,
+                PolicyUiHelper.GetConnectionFailureMessage(failure, "fallback")
+                    == (status == HttpStatusCode.Unauthorized ? Strings.ConnectionAuthRequired : Strings.ConnectionRateLimited));
+        }
+        Check("Unrelated failure keeps its explicit fallback", PolicyUiHelper.GetConnectionFailureMessage(new Exception(), "fallback") == "fallback");
     }
 
     private static void TestLicenseNotices()
@@ -560,7 +584,9 @@ internal static class OutlookPolicyMappingTests
             BackendPolicyStatus failed = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
             Check("Other failures never become optional backend absence: " + code, !failed.FetchSucceeded && !failed.IsEndpointMissing);
             Check("Other HTTP errors do not claim Enterprise Rollout backend absence: " + code,
-                PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, failed) == Strings.EnterpriseRolloutStatusUnavailable);
+                PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, failed)
+                    == (code == HttpStatusCode.Unauthorized ? Strings.ConnectionAuthRequired
+                        : (int)code == 429 ? Strings.ConnectionRateLimited : Strings.EnterpriseRolloutStatusUnavailable));
         }
         NcHttpClient.NextResponse = new NcHttpResponse { TransportException = new InvalidOperationException("Offline test") };
         BackendPolicyStatus unavailableBackend = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
@@ -871,6 +897,7 @@ internal static class OutlookPolicyMappingTests
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\SharePasswordDeliveryPolicy.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\EmailSignaturePolicyService.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\BackendPolicyService.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceException.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NcJson.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpFailureDiagnostics.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NextcloudUriValidator.cs"),
@@ -989,7 +1016,7 @@ internal static class OutlookPolicyUiTests
             return (TStatus)status;
         });
     }
-    private static Form Settings(object local, object status) { return (Form)New("UI.SettingsForm", local, null, status, null, Addressbook(), PolicyFetcher(status)); }
+    private static Form Settings(object local, object status) { return (Form)New("UI.SettingsForm", local, null, status, null, Addressbook(), PolicyFetcher(status), null); }
     private static Form Share(object local, object status, bool attachment)
     {
         object launch = New("Models.FileLinkWizardLaunchOptions");
@@ -2569,6 +2596,95 @@ internal static class OutlookPolicyUiTests
         }
         Console.WriteLine("[OK] Friendly managed/local onboarding, incomplete saves, credential changes, seat parity and closed-form callbacks");
     }
+    private static void TestAutomaticSaveCredentialIdentity(string root)
+    {
+        string directory = Path.Combine(root, "automatic-save-credentials");
+        Directory.CreateDirectory(directory);
+        foreach (string outcome in new[] { "removed", "replaced", "same", "unreadable-password", "unreadable-xml", "missing-primary", "initial-empty", "initial-credentials" })
+        {
+            string path = Path.Combine(directory, outcome + ".xml");
+            object storage = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(T("Settings.SettingsStorage"));
+            T("Settings.SettingsStorage").GetField("_profileName", Flags).SetValue(storage, "isolated-policy-tests");
+            T("Settings.SettingsStorage").GetField("_dataDirectory", Flags).SetValue(storage, directory);
+            T("Settings.SettingsStorage").GetField("_filePath", Flags).SetValue(storage, path);
+            T("Settings.SettingsStorage").GetField("_settingsFileTransaction", Flags).SetValue(storage, New("Settings.SettingsFileTransaction", path));
+            object original = New("Settings.AddinSettings");
+            Set(original, "ServerUrl", "https://cloud.example.test/automatic-save");
+            Set(original, "Username", "saved-test-login"); Set(original, "AppPassword", "old-test-password");
+            if (outcome.StartsWith("initial-", StringComparison.Ordinal))
+            {
+                if (outcome == "initial-empty") { Set(original, "Username", ""); Set(original, "AppPassword", ""); }
+                Call(storage, "Save", original);
+                Check(File.Exists(path) == (outcome == "initial-empty"),
+                    "Only a new empty profile permits initial automatic settings creation: " + outcome);
+                if (outcome == "initial-empty")
+                {
+                    object first = Call(T("Settings.SettingsStorage"), "LoadFromXmlFile", path);
+                    Check(string.IsNullOrEmpty((string)Get(first, "Username")) && string.IsNullOrEmpty((string)Get(first, "AppPassword")),
+                        "Initial automatic creation persists preferences without inventing saved credentials");
+                }
+                continue;
+            }
+            Call(storage, "SaveUserInitiated", original);
+            Call(storage, "SaveUserInitiated", original);
+            object stale = Call(original, "Clone");
+            Set(stale, "UpdateLastCheckedAtUtc", "2026-10-09T10:00:00Z");
+            object next = Call(original, "Clone");
+            if (outcome == "removed")
+            {
+                Set(next, "Username", ""); Set(next, "AppPassword", "");
+                Call(storage, "RemoveSavedCredentials", next);
+            }
+            else if (outcome == "replaced")
+            {
+                Set(next, "Username", "new-test-login"); Set(next, "AppPassword", "new-test-password");
+                Call(storage, "SaveUserInitiated", next);
+            }
+            else if (outcome == "unreadable-password")
+            {
+                var document = new XmlDocument(); document.Load(path);
+                document.SelectSingleNode("//AppPasswordProtected").InnerText = "invalid-test-protected-value";
+                document.Save(path);
+            }
+            else if (outcome == "unreadable-xml") { File.WriteAllText(path, "<invalid-settings"); }
+            else if (outcome == "missing-primary") { File.Delete(path); }
+            byte[] beforePrimary = File.Exists(path) ? File.ReadAllBytes(path) : null, beforeBackup = File.ReadAllBytes(path + ".bak");
+            Call(storage, "Save", stale);
+            if (outcome == "same")
+            {
+                object saved = Call(T("Settings.SettingsStorage"), "LoadFromXmlFile", path);
+                Check((string)Get(saved, "UpdateLastCheckedAtUtc") == "2026-10-09T10:00:00Z"
+                    && (string)Get(saved, "Username") == "saved-test-login" && (string)Get(saved, "AppPassword") == "old-test-password",
+                    "Automatic saves retain their ordinary preference update when saved credentials match");
+            }
+            else
+            {
+                Check((beforePrimary == null ? !File.Exists(path) : beforePrimary.SequenceEqual(File.ReadAllBytes(path)))
+                    && beforeBackup.SequenceEqual(File.ReadAllBytes(path + ".bak")),
+                    "Automatic stale/unreadable connection snapshot leaves both primary and backup unchanged: " + outcome);
+            }
+            if (outcome == "removed")
+            {
+                foreach (string candidate in new[] { path, path + ".bak" })
+                {
+                    object saved = Call(T("Settings.SettingsStorage"), "LoadFromXmlFile", candidate);
+                    Check(string.IsNullOrEmpty((string)Get(saved, "Username")) && string.IsNullOrEmpty((string)Get(saved, "AppPassword")),
+                        "A late automatic save cannot restore credentials removed from primary or backup");
+                }
+            }
+            if (outcome == "replaced")
+            {
+                object saved = Call(T("Settings.SettingsStorage"), "LoadFromXmlFile", path);
+                Check((string)Get(saved, "Username") == "new-test-login" && (string)Get(saved, "AppPassword") == "new-test-password",
+                    "A late automatic save cannot overwrite newly saved verified credentials");
+                Set(next, "UpdateLastCheckedAtUtc", "2026-10-09T11:00:00Z"); Call(storage, "Save", next);
+                saved = Call(T("Settings.SettingsStorage"), "LoadFromXmlFile", path);
+                Check((string)Get(saved, "UpdateLastCheckedAtUtc") == "2026-10-09T11:00:00Z", "A fresh automatic snapshot can save after credential replacement");
+            }
+        }
+        Console.WriteLine("[OK] Automatic settings saves preserve removed/new credentials and reject unreadable saved authentication");
+    }
+
     private static void TestSettingsRefreshSnapshot()
     {
         foreach (string mode in new[] { "community", "pro" })
@@ -2582,7 +2698,7 @@ internal static class OutlookPolicyUiTests
             object good = Status(D(), D(), true, mode, "active");
             object denied = Status(D(), D(), true, mode, seat);
             Call(owner, "StoreBackendPolicySnapshotIfCurrent", config, good, "test_seed", 1L);
-            using (Form form = (Form)New("UI.SettingsForm", local, null, good, null, Addressbook(), PolicyFetcher(denied, owner)))
+            using (Form form = (Form)New("UI.SettingsForm", local, null, good, null, Addressbook(), PolicyFetcher(denied, owner), null))
             {
                 var refresh = (System.Threading.Tasks.Task<bool>)Call(form, "RefreshSettingsServerStateAsync", config, false, "test_refresh");
                 DateTime deadline = DateTime.UtcNow.AddSeconds(5);
@@ -2619,6 +2735,7 @@ internal static class OutlookPolicyUiTests
             TestBackendPolicyAvailabilitySnapshot();
             TestConnectionOnboarding();
             TestSettingsRefreshSnapshot();
+            TestAutomaticSaveCredentialIdentity(root);
             TestManagedTls(root);
             TestManagedLogging(root);
             TestManagedUpdateNotify(root);
@@ -2957,6 +3074,25 @@ namespace NcTalkOutlookAddIn.Settings {
     public static class ManagedSetupPolicy { public static object Load() { return null; } }
 }
 namespace NcTalkOutlookAddIn.Services {
+    public sealed class ConnectionPauseStatus { public string Reason = ""; }
+    public static class NextcloudConnectionState {
+        private static readonly HashSet<string> Proofs = new HashSet<string>();
+        public static int Commits, Removals;
+        public static bool CommitFails;
+        public static Action<TalkServiceConfiguration> ConnectionRestored;
+        public static string PauseReason = "";
+        private static string Key(TalkServiceConfiguration config) { return config.ServerUrl + "\n" + config.Username + "\n" + config.AppPassword; }
+        public static void Reset() { Proofs.Clear(); Commits = Removals = 0; CommitFails = false; PauseReason = ""; ConnectionRestored = null; }
+        public static void MarkVerified(TalkServiceConfiguration config) { Proofs.Add(Key(config)); }
+        public static bool HasFreshVerification(TalkServiceConfiguration config) { return Proofs.Contains(Key(config)); }
+        public static ConnectionPauseStatus GetStatus(TalkServiceConfiguration config) { return new ConnectionPauseStatus { Reason = PauseReason }; }
+        public static void CommitVerifiedSavedConnection(TalkServiceConfiguration config) {
+            if (!HasFreshVerification(config) || CommitFails) throw new InvalidOperationException("Verification commit rejected");
+            Commits++; PauseReason = "";
+            if (ConnectionRestored != null) ConnectionRestored(config);
+        }
+        public static void RemoveSavedCredentials(TalkServiceConfiguration config) { Removals++; Proofs.Clear(); }
+    }
     public class TalkServiceConfiguration {
         public readonly string ServerUrl, Username, AppPassword;
         public TalkServiceConfiguration(string url, string user, string password) { ServerUrl = url; Username = user; AppPassword = password; }
@@ -2987,11 +3123,20 @@ namespace NcTalkOutlookAddIn.Services {
     }
 }
 namespace NcTalkOutlookAddIn.Utilities {
+    public static class PolicyUiHelper {
+        public static string GetConnectionFailureMessage(Exception failure) {
+            var serviceFailure = failure as TalkServiceException;
+            if (serviceFailure == null) return "";
+            return serviceFailure.IsAuthenticationError ? Strings.ConnectionSignInRequired
+                : (int)serviceFailure.StatusCode == 429 ? Strings.ConnectionRateLimited : "";
+        }
+    }
     public static class LogCategories { public const string Core = "core"; }
     public static class DiagnosticsLogger { public static void LogException(string category, string message, Exception ex) {} }
     public static class Strings {
         public const string SettingsSaveFailed = "save failed", SettingsFormTitle = "settings", DialogTitle = "connector";
         public const string ConnectionSignInRequired = "sign in required", ErrorServerUnavailable = "server unavailable";
+        public const string ConnectionRateLimited = "rate limited";
         public const string ErrorCredentialsNotVerified = "credentials not verified", ErrorConnectionFailed = "connection failed: {0}";
         public const string PromptOpenSettings = "{0}\n\nOpen settings now?";
     }
@@ -3003,9 +3148,10 @@ namespace NcTalkOutlookAddIn.UI {
         public static int ShowCalls, AuthenticationCalls;
         public static Action OnShow;
         public static Func<AddinSettings, AddinSettings> ResultFactory;
+        public static bool VerifyResult = true;
         public AddinSettings Result;
         public SettingsForm(AddinSettings current, object app, object policy, object cache, object book,
-            Func<TalkServiceConfiguration, string, BackendPolicyStatus> fetch) {
+            Func<TalkServiceConfiguration, string, BackendPolicyStatus> fetch, Func<AddinSettings> remove = null) {
             if (fetch == null) throw new Exception("Settings refresh callback missing");
             WorkflowUi.AssertUi("SettingsForm creation");
             Result = current.Clone(); Result.Username = "new";
@@ -3014,9 +3160,16 @@ namespace NcTalkOutlookAddIn.UI {
         public static void Reset() {
             NextResult = DialogResult.OK; AuthenticationStarted = Rejected = Disposed = false;
             ShowCalls = AuthenticationCalls = 0; OnShow = null; ResultFactory = null;
+            VerifyResult = true; NextcloudConnectionState.Reset();
         }
         public void BeginAuthentication(bool rejected) { WorkflowUi.AssertUi("Authentication entry"); AuthenticationStarted = true; Rejected = rejected; AuthenticationCalls++; }
-        public DialogResult ShowDialog() { WorkflowUi.AssertUi("Settings dialog"); ShowCalls++; if (OnShow != null) OnShow(); return NextResult; }
+        public DialogResult ShowDialog() {
+            WorkflowUi.AssertUi("Settings dialog"); ShowCalls++;
+            if (VerifyResult && NextResult == DialogResult.OK)
+                NextcloudConnectionState.MarkVerified(new TalkServiceConfiguration(Result.ServerUrl, Result.Username, Result.AppPassword));
+            if (OnShow != null) OnShow();
+            return NextResult;
+        }
         public void Dispose() { WorkflowUi.AssertUi("SettingsForm disposal"); Disposed = true; }
     }
 }
@@ -3092,7 +3245,9 @@ internal static class SettingsWorkflowTests {
             "Typed transport failures map to server unavailable even with an HTTP status");
         Check(SettingsWorkflowController.GetActionConnectionFailureMessage(AuthenticationFailure()) == NcTalkOutlookAddIn.Utilities.Strings.ConnectionSignInRequired,
             "Authentication failures map to sign-in guidance");
-        foreach (HttpStatusCode status in new[] { (HttpStatusCode)0, HttpStatusCode.Forbidden, (HttpStatusCode)429, HttpStatusCode.InternalServerError }) {
+        Check(SettingsWorkflowController.GetActionConnectionFailureMessage(new TalkServiceException("retry later", false, (HttpStatusCode)429, null))
+            == NcTalkOutlookAddIn.Utilities.Strings.ConnectionRateLimited, "Rate-limit failure uses the shared connection notice");
+        foreach (HttpStatusCode status in new[] { (HttpStatusCode)0, HttpStatusCode.Forbidden, HttpStatusCode.InternalServerError }) {
             string message = SettingsWorkflowController.GetActionConnectionFailureMessage(new TalkServiceException("specific failure", false, status, null));
             Check(message.Contains("specific failure") && message != NcTalkOutlookAddIn.Utilities.Strings.ErrorServerUnavailable,
                 "Non-transport failure retains its cause for status " + (int)status);
@@ -3276,15 +3431,52 @@ internal static class SettingsWorkflowTests {
                 "Automatic entry with missing credentials never starts onboarding");
         }
     }
+    private static void TestCredentialRemoval() {
+        foreach (bool storageFails in new[] { false, true }) {
+            NextcloudConnectionState.Reset();
+            var original = new AddinSettings { IfbEnabled = true, DebugLoggingEnabled = true, IfbPort = 9876 };
+            var current = original;
+            AddinSettings persisted = null;
+            int runtimeApplies = 0, ifbApplies = 0;
+            var workflow = new SettingsWorkflowController(null, () => current,
+                next => { runtimeApplies++; current = next; }, (config, trigger) => null, next => {},
+                (next, trigger, warning) => true, () => ifbApplies++, next => {},
+                action => { action(); return Task.FromResult(0); }, message => {}, "test", "test",
+                next => {
+                    Check(next.Username == "" && next.AppPassword == "", "Credential removal persists empty credentials only");
+                    Check(next.ServerUrl == original.ServerUrl && next.IfbEnabled && next.DebugLoggingEnabled && next.IfbPort == 9876,
+                        "Removal preserves the currently saved URL and preferences independently of form drafts");
+                    if (storageFails) throw new InvalidOperationException("Controlled removal failure");
+                    persisted = next.Clone();
+                });
+            bool failed = false;
+            try { typeof(SettingsWorkflowController).GetMethod("RemoveSavedCredentials", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(workflow, null); }
+            catch (System.Reflection.TargetInvocationException ex) { failed = ex.InnerException is InvalidOperationException; }
+            Check(failed == storageFails, "Removal reports persistence failure without hiding it");
+            Check(runtimeApplies == (storageFails ? 0 : 1) && ifbApplies == (storageFails ? 0 : 1)
+                && NextcloudConnectionState.Removals == (storageFails ? 0 : 1), "Removal changes runtime and connection state only after storage succeeds");
+            Check(storageFails ? object.ReferenceEquals(current, original) && persisted == null
+                : current.Username == "" && current.AppPassword == "" && persisted != null,
+                "Failed removal retains the saved connection; successful removal remains immediate");
+        }
+    }
     public static int Main() {
         try {
-            foreach (string scenario in new[] { "cancel", "save", "persist-failure", "validate-failure", "commit-failure", "incomplete-cancel" })
+            foreach (string scenario in new[] { "cancel", "save", "persist-failure", "validate-failure", "commit-failure", "incomplete-cancel", "proof-expired", "state-commit-failure" })
             foreach (bool rejected in new[] { false, true }) {
                 var current = new AddinSettings();
                 bool requireAuth = scenario != "incomplete-cancel";
                 if (!requireAuth) current.AppPassword = "";
                 var events = new List<string>();
                 SettingsForm.Reset(); SettingsForm.NextResult = scenario.EndsWith("cancel") ? DialogResult.Cancel : DialogResult.OK;
+                SettingsForm.VerifyResult = scenario != "proof-expired";
+                NextcloudConnectionState.CommitFails = scenario == "state-commit-failure";
+                NextcloudConnectionState.ConnectionRestored = configuration => {
+                    Check(current.ServerUrl == configuration.ServerUrl && current.Username == configuration.Username
+                        && current.AppPassword == configuration.AppPassword,
+                        "ConnectionRestored observers see the newly saved runtime credentials");
+                    events.Add("connection_restored");
+                };
                 MessageBox.Reset();
                 var workflow = new SettingsWorkflowController(null,
                     () => current,
@@ -3306,14 +3498,23 @@ internal static class SettingsWorkflowTests {
                 Check(SettingsForm.Disposed, "Dialog disposed on every outcome");
                 Check(current.Username == (saved ? "new" : "old"), "Runtime state follows successful persistence only");
                 Check(events.Contains("ifb") == saved, "IFB applies only after successful commit");
-                Check(MessageBox.Calls == (scenario == "persist-failure" ? 1 : 0), "Only a write error displays the persistence error");
+                Check(MessageBox.Calls == (scenario == "persist-failure" || scenario == "proof-expired" || scenario == "state-commit-failure" ? 1 : 0), "Persistence or verification failures display a concrete error");
+                Check(NextcloudConnectionState.Commits == (saved ? 1 : 0), "Only a fully saved verified connection releases the pause");
+                Check(events.Contains("connection_restored") == saved, "Only successful durable recovery notifies cleanup observers");
                 if (scenario.EndsWith("cancel")) Check(!events.Exists(value => value != "dispatch"), "Cancellation has no persistence or runtime side effects");
-                if (scenario == "save") Check(events.IndexOf("persist:new") < events.IndexOf("runtime:new") && events.IndexOf("settings_save_commit") < events.IndexOf("ifb"), "Persistence precedes runtime and IFB");
+                if (scenario == "save") Check(events.IndexOf("persist:new") < events.IndexOf("runtime:new")
+                    && events.IndexOf("runtime:new") < events.IndexOf("connection_restored")
+                    && events.IndexOf("settings_save_commit") < events.IndexOf("ifb"), "Persistence and runtime precede recovery observers and IFB");
                 if (scenario == "validate-failure") Check(!events.Contains("persist:new"), "Validation failure does not save");
                 if (scenario == "commit-failure") Check(events.Contains("persist:old") && events.Contains("settings_save_commit_revert"), "Failed commit restores previous settings");
+                if (scenario == "proof-expired") Check(!events.Contains("persist:new"), "Expired verification never saves changed credentials");
+                if (scenario == "state-commit-failure") Check(events.Contains("persist:old")
+                    && events.IndexOf("runtime:new") >= 0 && events.IndexOf("runtime:old") > events.IndexOf("runtime:new"),
+                    "Failed durable verification restores the previous saved and runtime connection");
             }
             TestFailureMapping(); TestFreshSuccess(); TestTransportRecovery(); TestInitialSetup(); TestAuthenticationRecovery();
             TestOrdinaryFailures(); TestClosedAndChangedItems(); TestAutomation();
+            TestCredentialRemoval();
             Console.WriteLine("[OK] " + checks + " production settings-workflow save/cancel/failure and fresh action-entry assertions passed");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -3387,8 +3588,25 @@ internal sealed class TalkServiceConfiguration {
 }
 internal sealed class TalkServiceException : Exception {
     internal bool IsAuthenticationError;
+    internal HttpStatusCode StatusCode;
     internal bool IsTransportError { get { return false; } }
-    internal TalkServiceException(string message, bool authenticationError = false) : base(message) { IsAuthenticationError = authenticationError; }
+    internal TalkServiceException(string message, bool authenticationError = false) : base(message) {
+        IsAuthenticationError = authenticationError;
+        StatusCode = authenticationError ? HttpStatusCode.Unauthorized : HttpStatusCode.BadRequest;
+    }
+}
+internal sealed class BackendPolicyStatus {
+    internal readonly string Reason;
+    internal BackendPolicyStatus(bool endpoint, bool fetched, bool active, string mode, string reason, bool seat, bool valid, string state,
+        object share, object talk, object signature, object shareEditable, object talkEditable, object signatureEditable) { Reason = reason; }
+}
+internal sealed class ConnectionPauseStatus { internal string Reason = ""; }
+internal static class NextcloudConnectionState {
+    internal static string Proof = "", PauseReason = "";
+    private static string Key(TalkServiceConfiguration config) { return config.GetNormalizedBaseUrl() + "\n" + config.Username + "\n" + config.AppPassword; }
+    internal static bool HasFreshVerification(TalkServiceConfiguration config) { return Proof.Length > 0 && Proof == Key(config); }
+    internal static void MarkVerified(TalkServiceConfiguration config) { Proof = Key(config); }
+    internal static ConnectionPauseStatus GetStatus(TalkServiceConfiguration config) { return new ConnectionPauseStatus { Reason = PauseReason }; }
 }
 internal sealed class LoginFlowStart { internal string LoginUrl = "https://cloud.example.test/nextcloud/login/isolated-test"; }
 internal sealed class LoginFlowCredentials { internal string LoginName = "test-login", AppPassword = "test-only-password"; }
@@ -3414,11 +3632,14 @@ internal sealed class TalkLoginFlowService {
 internal sealed class TalkService {
     internal static int Verifications;
     internal static bool VerifyResult = true, AuthenticationRejected;
-    internal TalkService(TalkServiceConfiguration configuration) {}
+    private readonly TalkServiceConfiguration configuration;
+    internal TalkService(TalkServiceConfiguration configuration) { this.configuration = configuration; }
     internal bool VerifyConnection(out string response, bool retryRejectedCredentials = false) {
         Interlocked.Increment(ref Verifications);
         if (!retryRejectedCredentials) throw new Exception("Settings must explicitly verify credentials");
+        NextcloudConnectionState.Proof = "";
         if (AuthenticationRejected) throw new TalkServiceException("rejected", true);
+        if (VerifyResult) NextcloudConnectionState.MarkVerified(configuration);
         response = ""; return VerifyResult;
     }
 }
@@ -3438,6 +3659,7 @@ internal static class Strings {
     internal const string StatusMissingFields = "missing fields", StatusTestRunning = "testing", StatusTestFailureUnknown = "unknown failure";
     internal const string StatusTestSuccessVersionFormat = "version {0}", StatusTestSuccessFormat = "connected {0}", StatusTestFailure = "connection failed: {0}";
     internal const string ConnectionSignInRequired = "sign in again", ConnectionDiagnosticsDialogTitle = "Connection";
+    internal const string ConnectionRateLimited = "rate limited";
 }
 internal sealed class AuthForm : Form {
     internal AuthSettings Result = new AuthSettings();
@@ -3467,6 +3689,7 @@ internal sealed class AuthForm : Form {
     internal void LoginButton() { OnLoginFlowButtonClick(null, EventArgs.Empty); }
     internal Task LoginTask() { return StartLoginFlowAsync(); }
     internal Task SaveTask() { return SaveSettingsAsync(); }
+    internal Task SaveHandledTask() { return SaveSettingsWithErrorHandlingAsync(); }
     internal Task<bool> TestTask() { return TestConnectionAsync(); }
     internal void TlsChanged() { OnTlsSelectionChanged(null, EventArgs.Empty); }
     internal void ExistingConnection() {
@@ -3510,6 +3733,7 @@ internal static class ManagedAuthenticationTests {
         TalkLoginFlowService.StartRelease.Set(); TalkLoginFlowService.PollRelease.Set();
         TalkLoginFlowService.Starts = TalkLoginFlowService.Polls = BrowserLauncher.Calls = TalkService.Verifications = 0;
         TalkLoginFlowService.FailStart = TalkLoginFlowService.FailPoll = TalkService.AuthenticationRejected = false; TalkService.VerifyResult = true;
+        NextcloudConnectionState.Proof = NextcloudConnectionState.PauseReason = "";
     }
     private static void Complete(AuthForm form) { PumpUntil(() => !form._isBusy, "Login operation completes"); }
     [STAThread]
@@ -3540,7 +3764,7 @@ internal static class ManagedAuthenticationTests {
                 TalkLoginFlowService.PollRelease.Set(); Complete(form);
                 Check(!form._connectionSetupPending && !form._authenticationRejected && form.VerifiedTransitions == 1
                     && form.TlsApplies == 1 && form.TlsRestores == 1, "Verified automatic login finishes setup and restores temporary TLS");
-                Check(form.CloseCalls == 1 && form.DialogResult == DialogResult.OK && form.SaveRefreshes == 1
+                Check(form.CloseCalls == 1 && form.DialogResult == DialogResult.OK && form.SaveRefreshes == 0
                     && form.Result.Username == "test-login" && form.Result.AppPassword == "test-only-password"
                     && TalkService.Verifications == 1, "Managed login uses the real save path and closes once without duplicate verification");
                 form.ShowEvent(); form.BeginAuthentication(true); form.ShowEvent();
@@ -3617,7 +3841,7 @@ internal static class ManagedAuthenticationTests {
                     form.Result.ShowMainRibbonTab = ribbon;
                     form.Result.HasManagedNextcloudUrl = false;
                     form.BeginAuthentication(false); form.ShowEvent(); form.LoginButton(); Complete(form);
-                    Check(form.CloseCalls == 1 && form.SaveRefreshes == 1 && form.DialogResult == DialogResult.OK,
+                    Check(form.CloseCalls == 1 && form.SaveRefreshes == 0 && form.DialogResult == DialogResult.OK,
                         "Managed action login saves in full and authentication-only dialogs even without URL autostart");
                 }
             }
@@ -3628,10 +3852,19 @@ internal static class ManagedAuthenticationTests {
                     form.SaveRefreshThrows = outcome == "exception";
                     if (outcome == "unmanaged") form.Result.HasManagedAuthMode = false;
                     form.BeginAuthentication(false); form.LoginButton(); Complete(form);
-                    Check(form.VerifiedTransitions == 1 && form.CloseCalls == 0 && form.DialogResult != DialogResult.OK,
-                        "Unsuccessful save and unmanaged login never close automatically: " + outcome);
-                    Check(form.SaveRefreshes == (outcome == "unmanaged" ? 0 : 1), "Save uses existing refresh only for managed action login: " + outcome);
-                    if (outcome == "exception") Check(form.StatusText == Strings.SettingsSaveFailed, "Automatic save shares the save-button error handler");
+                    Check(form.VerifiedTransitions == 1 && form.CloseCalls == (outcome == "unmanaged" ? 0 : 1)
+                        && (form.DialogResult == DialogResult.OK) == (outcome != "unmanaged"),
+                        "Verified managed recovery saves without an ordinary request before commit; unmanaged login remains explicit: " + outcome);
+                    Check(form.SaveRefreshes == 0, "Verified credentials are not prematurely sent to backend/address-book refresh: " + outcome);
+                }
+            }
+            foreach (bool throws in new[] { false, true }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.ExistingConnection(); form.SaveRefreshResult = false; form.SaveRefreshThrows = throws;
+                    Task save = form.SaveHandledTask(); PumpUntil(() => save.IsCompleted, "Unchanged settings refresh completes"); save.GetAwaiter().GetResult();
+                    Check(form.CloseCalls == 0 && form.SaveRefreshes == 1, "Unchanged preference saves retain ordinary refresh failure handling");
+                    if (throws) Check(form.StatusText == Strings.SettingsSaveFailed, "Save-button error handler reports an unexpected refresh failure");
                 }
             }
             foreach (string changedField in new[] { "url", "username", "password", "incomplete" })
@@ -3654,7 +3887,7 @@ internal static class ManagedAuthenticationTests {
                     TalkService.VerifyResult = true; TalkService.AuthenticationRejected = false;
                     if (changedField == "incomplete") form._appPasswordTextBox.Text = "corrected-test-password";
                     save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Corrected draft save completes"); save.GetAwaiter().GetResult();
-                    Check(form.DialogResult == DialogResult.OK && form.CloseCalls == 1 && form.SaveRefreshes == 1,
+                    Check(form.DialogResult == DialogResult.OK && form.CloseCalls == 1 && form.SaveRefreshes == 0,
                         "Successful fresh verification permits normal settings save");
                     Check(form.Result.ServerUrl == form._serverUrlTextBox.Text && form.Result.Username == form._usernameTextBox.Text
                         && form.Result.AppPassword == form._appPasswordTextBox.Text, "Only the verified draft is returned");
@@ -3712,6 +3945,21 @@ internal static class ManagedAuthenticationTests {
                     Task save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Changed draft is rechecked"); save.GetAwaiter().GetResult();
                     Check(form.DialogResult != DialogResult.OK && TalkService.Verifications == 2,
                         "Save cannot reuse verification from before TLS or credential edits");
+                }
+            }
+            foreach (bool paused in new[] { false, true }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.ExistingConnection();
+                    if (!paused) form._appPasswordTextBox.Text = "changed-test-password";
+                    Task<bool> test = form.TestTask(); PumpUntil(() => test.IsCompleted, "Verification before expiry completes");
+                    Check(test.GetAwaiter().GetResult(), "Credential verification initially succeeds");
+                    NextcloudConnectionState.Proof = "";
+                    if (paused) NextcloudConnectionState.PauseReason = "auth_required";
+                    TalkService.VerifyResult = false;
+                    Task save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Expired verification is rechecked on Save"); save.GetAwaiter().GetResult();
+                    Check(form.DialogResult != DialogResult.OK && TalkService.Verifications == 2 && form.SaveRefreshes == 0,
+                        "Expired proof cannot save changed credentials or release an existing authentication pause");
                 }
             }
             Console.WriteLine("[OK] " + checks + " production authentication entry/login-flow assertions passed with isolated services");

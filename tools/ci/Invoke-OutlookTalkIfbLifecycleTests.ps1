@@ -488,6 +488,57 @@ namespace NcTalkOutlookAddIn.Settings
 
 namespace NcTalkOutlookAddIn.Services
 {
+    internal sealed class ConnectionPauseStatus
+    {
+        internal ConnectionPauseStatus(string reason, DateTime retry) { Reason = reason; RetryAfterUtc = retry; }
+        internal string Reason;
+        internal DateTime RetryAfterUtc;
+        internal bool IsPaused { get { return !string.IsNullOrEmpty(Reason); } }
+    }
+
+    internal sealed class VerifiedNextcloudIdentity
+    {
+        internal VerifiedNextcloudIdentity(TalkServiceConfiguration configuration, string uid)
+        { Configuration = configuration; BaseUrl = configuration.GetNormalizedBaseUrl(); UserId = uid; }
+        internal string BaseUrl, UserId;
+        internal TalkServiceConfiguration Configuration;
+    }
+
+    internal static class NextcloudConnectionState
+    {
+        internal static ConnectionPauseStatus Status = new ConnectionPauseStatus(string.Empty, DateTime.MinValue);
+        internal static VerifiedNextcloudIdentity Identity, ResolvedIdentity;
+        internal static event Action<VerifiedNextcloudIdentity> ConnectionRestored;
+        internal static ConnectionPauseStatus GetStatus(TalkServiceConfiguration configuration = null, string requestUrl = null) { return Status; }
+        internal static VerifiedNextcloudIdentity GetKnownIdentity(TalkServiceConfiguration configuration)
+        { return new VerifiedNextcloudIdentity(configuration, "alice"); }
+        internal static VerifiedNextcloudIdentity GetVerifiedIdentity() { return Status.IsPaused ? null : Identity; }
+        internal static VerifiedNextcloudIdentity ResolveVerifiedIdentity() { return Status.IsPaused ? null : Identity ?? ResolvedIdentity; }
+        internal static void Restore(VerifiedNextcloudIdentity identity)
+        {
+            Status = new ConnectionPauseStatus(string.Empty, DateTime.MinValue);
+            Identity = identity;
+            var handler = ConnectionRestored;
+            if (handler != null) { handler(identity); }
+        }
+        internal static void Reset() { Status = new ConnectionPauseStatus(string.Empty, DateTime.MinValue); Identity = ResolvedIdentity = null; }
+    }
+
+    internal sealed class FileLinkService
+    {
+        internal static int DeleteCount;
+        internal static string LastPassword;
+        internal static Action OnDelete;
+        private readonly TalkServiceConfiguration _configuration;
+        internal FileLinkService(TalkServiceConfiguration configuration) { _configuration = configuration; }
+        internal void DeleteShareFolder(string folder, CancellationToken token)
+        {
+            Interlocked.Increment(ref DeleteCount);
+            LastPassword = _configuration.AppPassword;
+            if (OnDelete != null) { OnDelete(); }
+        }
+    }
+
     internal sealed class NcHttpRequestOptions
     {
         internal string Method, Url, Accept;
@@ -597,6 +648,9 @@ internal sealed class TalkIfbLifecycleTests
         TestPolicyRequiredDeletion();
         TestUnconditionalDeletion();
         TestDeletionRetryAcrossRestart();
+        TestCleanupAuthenticationRecovery();
+        TestCleanupRetryAfterAndPolicyRejection();
+        TestComposeCleanupExecutionFailureAndStorage();
         TestPendingStoreMigration();
         TestSyncCoalescing();
         TestLobbyOnlySync();
@@ -987,6 +1041,166 @@ internal sealed class TalkIfbLifecycleTests
                 record.ServerBaseUrl,
                 "other@example.org",
                 "alice"));
+    }
+
+    private static void TestCleanupAuthenticationRecovery()
+    {
+        string root = NewTestRoot("cleanup-auth");
+        var current = NewSettings();
+        int talkDeletes = 0, policyCalls = 0;
+        string talkPassword = string.Empty;
+        FileLinkService.DeleteCount = 0;
+        NextcloudConnectionState.Status = new ConnectionPauseStatus("auth_required", DateTime.MinValue);
+        var origin = ComposeLifecycleOrigin.Create(NewConfiguration());
+        var share = new ComposeShareCleanupService();
+        var talk = new TalkRoomLifecycleCoordinator(root, "cleanup", () => current,
+            () => { Interlocked.Increment(ref policyCalls); return true; },
+            configuration => "alice", (configuration, token, eventRoom) =>
+            { Check("Talk cleanup uses newly saved password", configuration.AppPassword == "new-secret"); Interlocked.Increment(ref talkDeletes); });
+        try
+        {
+            share.Initialize(root, "cleanup");
+            Check("Compose cleanup accepts a durable descriptor during rejected authentication", share.QueueCleanup(
+                new[] { new ComposeShareCleanupRecord { RelativeFolder = "shares/owned", Origin = origin } }, "discard"));
+            Check("Talk cleanup accepts a durable descriptor during rejected authentication", talk.QueueDeletion("auth-room", true, NewConfiguration(), true));
+            Check("Rejected credentials pause both queues without consuming retry attempts", WaitUntil(() =>
+            {
+                var jobs = ReadComposeJobs(share);
+                var job = ReadCoordinatorRecord(talk, "auth-room");
+                return jobs.Count == 1 && jobs[0].ConnectionPaused && jobs[0].AttemptCount == 0
+                    && job != null && job.ConnectionPaused && job.AttemptCount == 0;
+            }));
+            Check("Paused Talk cleanup does not evaluate the deletion policy", policyCalls == 0 && talkDeletes == 0 && FileLinkService.DeleteCount == 0);
+            string serializedJobs = new JavaScriptSerializer().Serialize(ReadComposeJobs(share));
+            Check("Durable compose descriptors contain no password or credential snapshot", !serializedJobs.Contains("secret") && !serializedJobs.Contains("AppPassword") && !serializedJobs.Contains("Origin"));
+            current.AppPassword = string.Empty;
+            NextcloudConnectionState.Identity = null;
+            share.Dispose(); talk.Dispose();
+            share = new ComposeShareCleanupService();
+            talk = new TalkRoomLifecycleCoordinator(root, "cleanup", () => current, () => true,
+                configuration => "alice", (configuration, token, eventRoom) => { talkPassword = configuration.AppPassword; Interlocked.Increment(ref talkDeletes); });
+            share.Initialize(root, "cleanup"); talk.StartPendingProcessing();
+            Check("Credential removal and restart retain both pending cleanup jobs", ReadComposeJobs(share).Count == 1 && ReadCoordinatorRecord(talk, "auth-room") != null);
+            var newConfiguration = new TalkServiceConfiguration(current.ServerUrl, current.Username, "new-secret");
+            NextcloudConnectionState.Restore(new VerifiedNextcloudIdentity(newConfiguration, "other-user"));
+            Check("A different verified UID cannot resume either cleanup queue", ReadComposeJobs(share)[0].ConnectionPaused && ReadCoordinatorRecord(talk, "auth-room").ConnectionPaused);
+            current.AppPassword = "new-secret";
+            NextcloudConnectionState.Restore(new VerifiedNextcloudIdentity(newConfiguration, "alice"));
+            Check("Saving a verified same-account connection resumes both cleanup queues", WaitUntil(() => ReadComposeJobs(share).Count == 0 && ReadCoordinatorRecord(talk, "auth-room") == null));
+            Check("Both cleanup workers use newly saved credentials, never the captured password", FileLinkService.DeleteCount == 1 && FileLinkService.LastPassword == "new-secret" && talkPassword == "new-secret" && talkDeletes == 1);
+
+            NextcloudConnectionState.Status = new ConnectionPauseStatus("auth_required", DateTime.MinValue);
+            share.QueueCleanup(new[] { new ComposeShareCleanupRecord { RelativeFolder = "shares/restart-gap", Origin = origin } }, "discard");
+            talk.QueueDeletion("restart-gap", true, NewConfiguration(), false);
+            Check("Second jobs become durably paused", WaitUntil(() => ReadComposeJobs(share)[0].ConnectionPaused && ReadCoordinatorRecord(talk, "restart-gap").ConnectionPaused));
+            share.Dispose(); talk.Dispose();
+            NextcloudConnectionState.Reset();
+            NextcloudConnectionState.ResolvedIdentity = new VerifiedNextcloudIdentity(newConfiguration, "alice");
+            share = new ComposeShareCleanupService();
+            talk = new TalkRoomLifecycleCoordinator(root, "cleanup", () => current, () => true,
+                configuration => "alice", (configuration, token, eventRoom) => Interlocked.Increment(ref talkDeletes));
+            share.Initialize(root, "cleanup"); talk.StartPendingProcessing();
+            Check("Restart after verified save but before restore notification recovers paused jobs in the background", WaitUntil(() => ReadComposeJobs(share).Count == 0 && ReadCoordinatorRecord(talk, "restart-gap") == null));
+        }
+        finally { share.Dispose(); talk.Dispose(); NextcloudConnectionState.Reset(); FileLinkService.OnDelete = null; Directory.Delete(root, true); }
+    }
+
+    private static void TestCleanupRetryAfterAndPolicyRejection()
+    {
+        string root = NewTestRoot("cleanup-rate");
+        var configuration = NewConfiguration();
+        var identity = new VerifiedNextcloudIdentity(configuration, "alice");
+        var share = new ComposeShareCleanupService();
+        int talkDeletes = 0;
+        bool rejectDuringPolicy = true;
+        var talk = new TalkRoomLifecycleCoordinator(root, "rate", NewSettings,
+            () =>
+            {
+                if (rejectDuringPolicy) { NextcloudConnectionState.Status = new ConnectionPauseStatus("auth_required", DateTime.MinValue); return false; }
+                return true;
+            }, value => "alice", (value, token, eventRoom) => Interlocked.Increment(ref talkDeletes));
+        try
+        {
+            NextcloudConnectionState.Restore(identity);
+            talk.QueueDeletion("policy-401", true, configuration, true);
+            Check("A rejection during policy evaluation retains the accepted Talk deletion instead of treating the policy as disabled", WaitUntil(() =>
+            { var job = ReadCoordinatorRecord(talk, "policy-401"); return job != null && job.ConnectionPaused && job.AttemptCount == 0; }));
+            rejectDuringPolicy = false;
+            NextcloudConnectionState.Restore(identity);
+            Check("The preserved policy cleanup resumes after verified authentication", WaitUntil(() => ReadCoordinatorRecord(talk, "policy-401") == null));
+
+            DateTime retry = DateTime.UtcNow.AddMinutes(2);
+            NextcloudConnectionState.Status = new ConnectionPauseStatus("rate_limited", retry);
+            share.Initialize(root, "rate");
+            share.QueueCleanup(new[] { new ComposeShareCleanupRecord { RelativeFolder = "shares/rate", Origin = ComposeLifecycleOrigin.Create(configuration) } }, "discard");
+            talk.QueueDeletion("rate-room", true, configuration, false);
+            Check("HTTP 429 preserves both jobs until Retry-After without increasing attempts", WaitUntil(() =>
+            {
+                var jobs = ReadComposeJobs(share); var job = ReadCoordinatorRecord(talk, "rate-room");
+                return jobs.Count == 1 && jobs[0].NextAttemptUtc == retry && jobs[0].AttemptCount == 0
+                    && job != null && job.NextAttemptUtc == retry && job.AttemptCount == 0;
+            }));
+            NextcloudConnectionState.Restore(identity);
+            Check("Verified same-account recovery resumes rate-limited cleanup", WaitUntil(() => ReadComposeJobs(share).Count == 0 && ReadCoordinatorRecord(talk, "rate-room") == null));
+        }
+        finally { share.Dispose(); talk.Dispose(); NextcloudConnectionState.Reset(); Directory.Delete(root, true); }
+    }
+
+    private static void TestComposeCleanupExecutionFailureAndStorage()
+    {
+        string root = NewTestRoot("compose-execution");
+        var configuration = NewConfiguration();
+        var identity = new VerifiedNextcloudIdentity(configuration, "alice");
+        var origin = ComposeLifecycleOrigin.Create(configuration);
+        var service = new ComposeShareCleanupService();
+        try
+        {
+            NextcloudConnectionState.Restore(identity);
+            service.Initialize(root, "execution");
+            FileLinkService.OnDelete = () =>
+            {
+                NextcloudConnectionState.Status = new ConnectionPauseStatus("auth_required", DateTime.MinValue);
+                throw new InvalidOperationException("rejected");
+            };
+            service.QueueCleanup(new[] { new ComposeShareCleanupRecord { RelativeFolder = "shares/delete-401", Origin = origin } }, "discard");
+            Check("HTTP 401 returned by the actual compose deletion keeps its pending descriptor", WaitUntil(() =>
+            { var jobs = ReadComposeJobs(service); return jobs.Count == 1 && jobs[0].ConnectionPaused && jobs[0].AttemptCount == 0; }));
+            FileLinkService.OnDelete = null;
+            NextcloudConnectionState.Restore(identity);
+            Check("The failed compose DELETE resumes after verified sign-in", WaitUntil(() => ReadComposeJobs(service).Count == 0));
+            DateTime retry = DateTime.UtcNow.AddMinutes(2);
+            FileLinkService.OnDelete = () =>
+            {
+                NextcloudConnectionState.Status = new ConnectionPauseStatus("rate_limited", retry);
+                throw new InvalidOperationException("throttled");
+            };
+            service.QueueCleanup(new[] { new ComposeShareCleanupRecord { RelativeFolder = "shares/delete-429", Origin = origin } }, "discard");
+            Check("HTTP 429 returned by compose deletion preserves its retry deadline and attempt count", WaitUntil(() =>
+            { var jobs = ReadComposeJobs(service); return jobs.Count == 1 && !jobs[0].ConnectionPaused && jobs[0].NextAttemptUtc == retry && jobs[0].AttemptCount == 0; }));
+            FileLinkService.OnDelete = null;
+            NextcloudConnectionState.Restore(identity);
+            Check("The throttled compose DELETE resumes after recovery", WaitUntil(() => ReadComposeJobs(service).Count == 0));
+            service.Dispose();
+            string[] files = Directory.GetFiles(root, "compose-share-cleanup*");
+            foreach (string file in files) { File.WriteAllText(file, "unreadable"); }
+            service = new ComposeShareCleanupService();
+            service.Initialize(root, "execution");
+            Check("Unreadable compose storage rejects new cleanup without mutating memory", !service.QueueCleanup(
+                new[] { new ComposeShareCleanupRecord { RelativeFolder = "shares/unpersistable", Origin = origin } }, "discard") && ReadComposeJobs(service).Count == 0);
+            Check("Unreadable compose storage preserves existing recovery evidence", Array.TrueForAll(files, file => File.ReadAllText(file) == "unreadable"));
+        }
+        finally { service.Dispose(); FileLinkService.OnDelete = null; NextcloudConnectionState.Reset(); Directory.Delete(root, true); }
+    }
+
+    private static List<ComposeShareCleanupJob> ReadComposeJobs(ComposeShareCleanupService service)
+    {
+        var type = typeof(ComposeShareCleanupService);
+        object sync = type.GetField("_syncRoot", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(service);
+        lock (sync)
+        {
+            var state = (ComposeShareCleanupState)type.GetField("_state", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(service);
+            return new List<ComposeShareCleanupJob>(state.Records);
+        }
     }
 
     private static void TestPolicyRequiredDeletion()
@@ -1384,6 +1598,7 @@ internal sealed class TalkIfbLifecycleTests
                             record.ServerBaseUrl,
                         AccountLogin = record.AccountLogin,
                         AccountId = record.AccountId,
+                        ConnectionPaused = record.ConnectionPaused,
                         PendingDeletion =
                             record.PendingDeletion,
                         PolicyRequired =
@@ -2077,12 +2292,15 @@ internal sealed class TalkIfbLifecycleTests
         (Join-Path $SourceRoot "Services\TalkAppointmentSyncCoordinator.cs"),
         (Join-Path $SourceRoot "Services\TalkRoomLifecycleCoordinator.cs"),
         (Join-Path $SourceRoot "Services\TalkRoomLifecycleStore.cs"),
+        (Join-Path $SourceRoot "Services\ComposeShareCleanupService.cs"),
         (Join-Path $SourceRoot "Services\IfbRegistryStateStore.cs"),
         (Join-Path $SourceRoot "Services\IfbRegistryOwnershipManager.cs"),
         (Join-Path $SourceRoot "Services\IfbRegistryEndpoint.cs"),
         (Join-Path $SourceRoot "Models\TalkAppointmentSyncSnapshot.cs"),
         (Join-Path $SourceRoot "Models\NextcloudUser.cs"),
         (Join-Path $SourceRoot "Models\TalkRoomLifecycleRecord.cs"),
+        (Join-Path $SourceRoot "Models\ComposeShareCleanupRecord.cs"),
+        (Join-Path $SourceRoot "Models\ComposeLifecycleOrigin.cs"),
         (Join-Path $SourceRoot "Utilities\AppDataPaths.cs"),
         (Join-Path $SourceRoot "Utilities\LogCategories.cs"),
         (Join-Path $SourceRoot "Utilities\NextcloudUriValidator.cs")

@@ -222,6 +222,7 @@ namespace NcTalkOutlookAddIn.UI
 
                 _connectionSetupPending = false;
                 _authenticationRejected = false;
+                _backendPolicyStatus = null;
                 ApplyBackendPolicyStatus("login_verified");
                 SetStatus(Strings.StatusLoginFlowSuccess, false);
                 loginVerified = true;
@@ -308,6 +309,7 @@ namespace NcTalkOutlookAddIn.UI
                 {
                     _connectionSetupPending = false;
                     _authenticationRejected = false;
+                    _backendPolicyStatus = null;
                     ApplyBackendPolicyStatus("connection_verified");
                     DiagnosticsLogger.Log(LogCategories.Core, "Connection test succeeded (Response=" + (string.IsNullOrEmpty(responseMessage) ? "OK" : responseMessage) + ").");
                     string suffix = string.IsNullOrEmpty(responseMessage)
@@ -396,6 +398,16 @@ namespace NcTalkOutlookAddIn.UI
                 _backendPolicyStatus = null;
                 ApplyBackendPolicyStatus("authentication_rejected");
                 SetStatus(Strings.ConnectionSignInRequired, true);
+                return;
+            }
+            if (ex != null && (int)ex.StatusCode == 429)
+            {
+                _authenticationRejected = false;
+                _backendPolicyStatus = new BackendPolicyStatus(
+                    true, false, false, "local", "rate_limited", false, false, string.Empty,
+                    null, null, null, null, null, null);
+                ApplyBackendPolicyStatus("connection_rate_limited");
+                SetStatus(Strings.ConnectionRateLimited, true);
                 return;
             }
             string message = ex != null && !string.IsNullOrWhiteSpace(ex.Message)

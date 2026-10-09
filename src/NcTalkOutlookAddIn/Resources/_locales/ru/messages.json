@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "Не удалось удалить сохранённые учётные данные. Повторите попытку."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud временно ограничивает запросы. Подождите и повторите попытку позже."
+  },
+  "connection_reauthenticate": {
+    "message": "Войти снова"
+  },
+  "options_remove_credentials_button": {
+    "message": "Удалить сохранённые учётные данные"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Удалить сохранённые учётные данные из этого профиля Outlook? Сначала завершите текущие загрузки и другие действия NC Connector."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Удаляет сохранённые имя пользователя и пароль приложения из этого профиля Outlook. Адрес Nextcloud и остальные настройки сохраняются. Пароль приложения в Nextcloud не удаляется."
+  },
+  "connection_auth_required": {
+    "message": "Вход в Nextcloud больше не действителен. Войдите снова."
+  },
+  "options_remove_credentials_success": {
+    "message": "Сохранённые учётные данные удалены. Войдите снова на вкладке «Общие»."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Сначала завершите текущие загрузки, затем повторите попытку."
+  },
   "send_policy_check_failed": {
     "message": "Не удалось выполнить централизованные требования к отправке этого сообщения. Сообщение не отправлено. Проверьте подключение или обратитесь к администратору."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "NC Connector Backend сейчас недоступен."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud отклонил сохранённые учётные данные. Войдите снова в настройках NC Connector."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud временно ограничивает запросы. Соблюдайте указанное время ожидания."
   },
   "send_policy_signature_warning": {
     "message": "Не удалось загрузить централизованную подпись для этого сообщения. Сообщение всё равно можно отправить."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Подключите NC Connector к своей учётной записи Nextcloud. Войдите через браузер или введите имя пользователя и пароль приложения."
-  },
-  "connection_sign_in_required": {
-    "message": "Не удалось войти в Nextcloud. Пожалуйста, войдите снова."
   },
   "options_base_url_label": {
     "message": "URL Nextcloud"

@@ -3,7 +3,6 @@
 // See LICENSE.txt for details.
 
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Settings;
 using Outlook = Microsoft.Office.Interop.Outlook;
@@ -94,17 +93,20 @@ namespace NcTalkOutlookAddIn
                 + ", reason="
                 + (reason ?? string.Empty)
                 + ").");
-            Task.Run(
-                () =>
-                {
-                    for (int i = 0; i < pending.Count; i++)
-                    {
-                        _composeShareCleanupService
-                            .TryDeleteComposeShareFolder(
-                                pending[i],
-                                reason);
-                    }
-                });
+            if (!_composeShareCleanupService.QueueCleanup(pending, reason))
+            {
+                LogFileLinkMessage("Compose share cleanup could not be accepted by durable storage; remote files are preserved.");
+            }
+        }
+
+        private void InitializeComposeShareCleanup(string dataDirectory, string profileScope)
+        {
+            _composeShareCleanupService.Initialize(dataDirectory, profileScope);
+        }
+
+        private void DisposeComposeShareCleanup()
+        {
+            _composeShareCleanupService.Dispose();
         }
 
         internal void CaptureSeparatePasswordSignatureSnapshot(

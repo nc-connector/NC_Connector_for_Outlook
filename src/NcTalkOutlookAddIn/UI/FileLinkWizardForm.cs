@@ -365,7 +365,7 @@ namespace NcTalkOutlookAddIn.UI
                     "Manual share folder preflight failed with service error.",
                     ex);
                 MessageBox.Show(
-                    ex.Message,
+                    PolicyUiHelper.GetConnectionFailureMessage(ex, ex.Message),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -565,7 +565,8 @@ namespace NcTalkOutlookAddIn.UI
                 UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Share creation failed.", ex);
                 MessageBox.Show(
-                    string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardCreateFailedFormat, ex.Message),
+                    PolicyUiHelper.GetConnectionFailureMessage(ex,
+                        string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardCreateFailedFormat, ex.Message)),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     ex.IsAuthenticationError ? MessageBoxIcon.Warning : MessageBoxIcon.Error);

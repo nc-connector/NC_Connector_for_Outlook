@@ -77,7 +77,8 @@ namespace NcTalkOutlookAddIn.Settings
 
         internal void Commit(
             Action<Stream> writeContent,
-            Func<string, bool> isHealthySettingsFile)
+            Func<string, bool> isHealthySettingsFile,
+            bool replaceBackupWithNewContent = false)
         {
             if (writeContent == null)
             {
@@ -106,7 +107,12 @@ namespace NcTalkOutlookAddIn.Settings
 
                 bool primaryHealthy = File.Exists(_primaryPath) && isHealthySettingsFile(_primaryPath);
                 bool backupHealthy = File.Exists(_backupPath) && isHealthySettingsFile(_backupPath);
-                if (primaryHealthy)
+                if (replaceBackupWithNewContent)
+                {
+                    // Explicit credential removal must not leave a recoverable copy in the backup.
+                    ReplaceWithCopy(pendingPath, _backupPath);
+                }
+                else if (primaryHealthy)
                 {
                     ReplaceWithCopy(_primaryPath, _backupPath);
                 }

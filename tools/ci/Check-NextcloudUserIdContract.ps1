@@ -110,8 +110,6 @@ namespace NcTalkOutlookAddIn.Services
         internal static NcHttpRequestOptions LastOptions;
         internal static NcHttpResponse NextResponse;
 
-        internal static void ConfirmVerifiedAuthentication(TalkServiceConfiguration configuration, long requestSequence) { }
-
         internal NcHttpClient(TalkServiceConfiguration configuration)
         {
             LastAuthenticationLogin = configuration.Username;
@@ -123,6 +121,12 @@ namespace NcTalkOutlookAddIn.Services
             LastOptions = options;
             return NextResponse;
         }
+    }
+
+    internal static class NextcloudConnectionState
+    {
+        internal static void AssertRequestAllowed(TalkServiceConfiguration configuration, bool verification = false) { }
+        internal static void RecordVerifiedIdentity(TalkServiceConfiguration configuration, string userId, long requestSequence, bool verification) { }
     }
 }
 

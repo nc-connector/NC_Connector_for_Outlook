@@ -615,8 +615,8 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string SendPolicyFailureModeInvalid { get { return Get("send_policy_failure_mode_invalid", "The centrally configured setting ‘SendPolicyFailureMode’ is invalid. ‘failopen’ applies. Please contact your administrator."); } }
         internal static string SendPolicyNextcloudUnavailable { get { return Get("send_policy_nextcloud_unavailable", "Nextcloud is currently unreachable."); } }
         internal static string SendPolicyBackendUnavailable { get { return Get("send_policy_backend_unavailable", "The NC Connector Backend is currently unavailable."); } }
-        internal static string SendPolicyAuthenticationRejected { get { return Get("send_policy_authentication_rejected", "Nextcloud rejected the saved credentials. Sign in again in the NC Connector settings."); } }
-        internal static string SendPolicyRateLimited { get { return Get("send_policy_rate_limited", "Nextcloud is temporarily limiting requests. Please observe the specified waiting time."); } }
+        internal static string SendPolicyAuthenticationRejected { get { return ConnectionAuthRequired; } }
+        internal static string SendPolicyRateLimited { get { return ConnectionRateLimited; } }
         internal static string SendPolicyCheckFailed { get { return Get("send_policy_check_failed", "The central sending requirements for this message could not be fulfilled. The message has not been sent. Check the connection or contact your administrator."); } }
         internal static string SendPolicySignatureWarning { get { return Get("send_policy_signature_warning", "The central signature intended for this message could not be loaded. The message can still be sent."); } }
         internal static string SendPolicyAttachmentWarning { get { return Get("send_policy_attachment_warning", "The attachments could not be shared through NC Connector as required. They remain as normal attachments. The message can still be sent."); } }
@@ -783,7 +783,16 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string ErrorMissingCredentials { get { return Get("error_credentials_missing", "Please configure server URL, username, and app password in the settings first."); } }
         internal static string ConnectionSetupTitle { get { return Get("connection_setup_title", "Connect to Nextcloud"); } }
         internal static string ConnectionSetupMessage { get { return Get("connection_setup_message", "Please connect NC Connector to your Nextcloud account. Sign in through your browser or enter your username and app password."); } }
-        internal static string ConnectionSignInRequired { get { return Get("connection_sign_in_required", "Sign-in to Nextcloud was not successful. Please sign in again."); } }
+        internal static string ConnectionSignInRequired { get { return ConnectionAuthRequired; } }
+        internal static string ConnectionAuthRequired { get { return Get("connection_auth_required", "The Nextcloud sign-in is no longer valid. Please sign in again."); } }
+        internal static string ConnectionRateLimited { get { return Get("connection_rate_limited", "Nextcloud is currently limiting requests. Please wait and try again later."); } }
+        internal static string ConnectionReauthenticate { get { return Get("connection_reauthenticate", "Sign in again"); } }
+        internal static string OptionsRemoveCredentialsButton { get { return Get("options_remove_credentials_button", "Remove saved credentials"); } }
+        internal static string OptionsRemoveCredentialsHint { get { return Get("options_remove_credentials_hint", "Removes the saved username and app password from this Outlook profile. Your Nextcloud URL and other settings are kept. The app password in Nextcloud is not deleted."); } }
+        internal static string OptionsRemoveCredentialsConfirm { get { return Get("options_remove_credentials_confirm", "Remove saved credentials from this Outlook profile? Please finish running uploads and other NC Connector actions first."); } }
+        internal static string OptionsRemoveCredentialsSuccess { get { return Get("options_remove_credentials_success", "The saved credentials have been removed. Please sign in again under General."); } }
+        internal static string OptionsRemoveCredentialsFailed { get { return Get("options_remove_credentials_failed", "The saved credentials could not be removed. Please try again."); } }
+        internal static string OptionsRemoveCredentialsBusy { get { return Get("options_remove_credentials_busy", "Please finish running uploads first and try again afterwards."); } }
         internal static string ErrorNoAppointment { get { return Get("outlook_error_no_appointment", "Could not determine the current appointment item."); } }
         internal static string ConfirmReplaceRoom { get { return Get("outlook_confirm_replace_room", "A Talk room already exists for this appointment. Replace it?"); } }
         internal static string ErrorAttachRoomToAppointment { get { return Get("outlook_error_attach_room_to_appointment", "The Talk room could not be added to the appointment. The previous appointment content was kept."); } }

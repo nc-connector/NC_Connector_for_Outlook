@@ -439,6 +439,30 @@ internal static class OutlookSecurityRegressionTests
                 Check("Valid backup restores the primary", transaction.TryRestorePrimaryFromBackup(healthy));
             }
             Check("Restored primary equals the valid backup", File.ReadAllText(primary) == "valid:first");
+            using (transaction.AcquireLock())
+            {
+                transaction.Commit(stream => Write(stream, "valid:preferences-without-credentials"), healthy, true);
+            }
+            Check("Credential removal writes cleared primary", File.ReadAllText(primary) == "valid:preferences-without-credentials");
+            Check("Credential removal replaces the recoverable backup", File.ReadAllText(transaction.BackupPath) == "valid:preferences-without-credentials");
+            File.WriteAllText(primary, "corrupt-after-removal", Encoding.UTF8);
+            using (transaction.AcquireLock())
+            {
+                Check("Cleared backup still supports recovery", transaction.TryRestorePrimaryFromBackup(healthy));
+            }
+            Check("Backup recovery cannot restore removed credentials", File.ReadAllText(primary) == "valid:preferences-without-credentials");
+            bool invalidRemovalRejected = false;
+            try
+            {
+                using (transaction.AcquireLock())
+                {
+                    transaction.Commit(stream => Write(stream, "invalid-removal"), healthy, true);
+                }
+            }
+            catch (InvalidDataException) { invalidRemovalRejected = true; }
+            Check("Invalid removal leaves valid settings and backup intact", invalidRemovalRejected
+                && File.ReadAllText(primary) == "valid:preferences-without-credentials"
+                && File.ReadAllText(transaction.BackupPath) == "valid:preferences-without-credentials");
             Check("Atomic settings transaction leaves no temp files", Directory.GetFiles(directory, "*.tmp").Length == 0);
         }
         finally
@@ -659,6 +683,7 @@ namespace NcTalkOutlookAddIn.Settings {
     }
 }
 namespace NcTalkOutlookAddIn.Utilities {
+    internal static class AppDataPaths { internal static string EnsureLocalRootDirectory() { throw new InvalidOperationException("Use the isolated fixture path."); } }
     internal static class LogCategories { internal const string Api = "api", Core = "core"; }
     internal static class DiagnosticsLogger {
         internal static void Log(string category, string message) { }
@@ -672,6 +697,18 @@ namespace NcTalkOutlookAddIn.Utilities {
         internal const string ConnectionFailureTlsSummary = "tls", ConnectionFailureTlsGuidance = "tls";
         internal const string ConnectionFailureGenericSummary = "generic", ConnectionFailureGenericGuidance = "generic";
         internal const string ManagedTlsPolicyInvalid = "invalid tls";
+        internal const string ErrorCredentialsNotVerified = "credentials not verified", ConnectionAuthRequired = "sign in again", ConnectionRateLimited = "wait and retry";
+    }
+}
+namespace NcTalkOutlookAddIn.Services {
+    internal static class NextcloudCapabilitiesService { internal static void ClearCache() { } }
+    internal static class NextcloudUserIdentityService {
+        internal static void ClearCache() { }
+        internal static string ResolveCurrentUserId(TalkServiceConfiguration configuration, bool forceRefresh) {
+            NextcloudConnectionState.AssertRequestAllowed(configuration);
+            NextcloudConnectionState.RecordVerifiedIdentity(configuration, "canonical-user", 0, false);
+            return "canonical-user";
+        }
     }
 }
 internal static class HttpRequestPauseTests {
@@ -687,6 +724,7 @@ internal static class HttpRequestPauseTests {
             VerifyRejectedCredentials = verify, ForceFreshConnection = true };
     }
     public static int Main() {
+        string stateDirectory = Path.Combine(Path.GetTempPath(), "nc4ol-pause-state-" + Guid.NewGuid().ToString("N"));
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         string url = "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port + "/pause-fixture";
@@ -711,6 +749,9 @@ internal static class HttpRequestPauseTests {
         server.Start();
         try {
             var configuration = new TalkServiceConfiguration("https://pause.example.test/nextcloud", "fixture-user", "fixture-password");
+            NextcloudConnectionState.Initialize(stateDirectory, "fixture-profile", configuration);
+            int restored = 0;
+            NextcloudConnectionState.ConnectionRestored += identity => { restored++; };
             var client = new NcHttpClient(configuration);
             statusCode = 401;
             NcHttpResponse rejected = client.Send(Options(url));
@@ -725,21 +766,71 @@ internal static class HttpRequestPauseTests {
             NcHttpResponse verified = client.Send(Options(url, true));
             Check("Explicit verification is permitted for rejected credentials", verified.StatusCode == HttpStatusCode.OK && requests == before + 1);
             Check("An HTTP success alone cannot resume unverified authentication", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized && requests == before + 1);
-            NcHttpClient.ConfirmVerifiedAuthentication(configuration, verified.RequestSequence);
-            Check("Validated authentication resumes matching background requests", client.Send(Options(url)).StatusCode == HttpStatusCode.OK && requests == before + 2);
+            NextcloudConnectionState.RecordVerifiedIdentity(configuration, "canonical-user", verified.RequestSequence, true);
+            Check("A successful draft test records proof but does not resume requests", NextcloudConnectionState.HasFreshVerification(configuration)
+                && client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized && restored == 0);
+            var proofsField = typeof(NextcloudConnectionState).GetField("Proofs", BindingFlags.Static | BindingFlags.NonPublic);
+            var proofs = (System.Collections.IDictionary)proofsField.GetValue(null);
+            foreach (System.Collections.DictionaryEntry entry in proofs) {
+                entry.Value.GetType().GetField("VerifiedAtUtc", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(entry.Value, DateTime.UtcNow.AddMinutes(-6));
+            }
+            Check("Expired verification proof cannot authorize a save", !NextcloudConnectionState.HasFreshVerification(configuration));
+            NextcloudConnectionState.RecordVerifiedIdentity(configuration, "canonical-user", verified.RequestSequence, true);
+            NextcloudConnectionState.CommitVerifiedSavedConnection(configuration);
+            Check("Verified saved authentication resumes matching background requests", client.Send(Options(url)).StatusCode == HttpStatusCode.OK && requests == before + 2 && restored == 1);
+            Check("Committed identity retains the canonical account", NextcloudConnectionState.GetVerifiedIdentity().UserId == "canonical-user");
 
-            var recordFailure = typeof(NcHttpClient).GetMethod("RecordRequestFailure", BindingFlags.Instance | BindingFlags.NonPublic);
-            recordFailure.Invoke(client, new object[] { rejected });
+            NextcloudConnectionState.RecordResponse(configuration, url, true, rejected);
             Check("A late old rejection cannot undo a newer verified sign-in", client.Send(Options(url)).StatusCode == HttpStatusCode.OK);
+            var badDraft = new TalkServiceConfiguration(configuration.BaseUrl, configuration.Username, "bad-draft-password");
             statusCode = 401;
+            new NcHttpClient(badDraft).Send(Options(url, true));
+            Check("A rejected draft cannot pause the working saved connection", !NextcloudConnectionState.GetStatus().IsPaused);
             rejected = client.Send(Options(url));
-            NcHttpClient.ConfirmVerifiedAuthentication(configuration, verified.RequestSequence);
-            Check("An older verification cannot clear a newer rejection", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized);
+            Check("Rejection invalidates an older verification proof", !NextcloudConnectionState.HasFreshVerification(configuration));
+            before = requests;
+            NextcloudConnectionState.Shutdown();
+            NextcloudConnectionState.Initialize(stateDirectory, "fixture-profile", configuration);
+            Check("Rejected authentication stays paused after restart", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized && requests == before);
+            Check("Known cleanup ownership survives a paused restart", NextcloudConnectionState.GetKnownIdentity(configuration).UserId == "canonical-user"
+                && NextcloudConnectionState.GetVerifiedIdentity() == null);
             statusCode = 200;
             var updatedConfiguration = new TalkServiceConfiguration(configuration.BaseUrl, configuration.Username, "new-fixture-password");
             var updatedClient = new NcHttpClient(updatedConfiguration);
-            Check("Changed credentials can be checked without clearing old rejected credentials", updatedClient.Send(Options(url, true)).StatusCode == HttpStatusCode.OK
+            verified = updatedClient.Send(Options(url, true));
+            Check("Changed credentials can be checked without clearing old rejected credentials", verified.StatusCode == HttpStatusCode.OK
                 && client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized);
+            NextcloudConnectionState.RecordVerifiedIdentity(updatedConfiguration, "canonical-user", verified.RequestSequence, true);
+            NextcloudConnectionState.BeginVerification(updatedConfiguration);
+            Check("Starting a new test invalidates any previous successful proof", !NextcloudConnectionState.HasFreshVerification(updatedConfiguration));
+            NextcloudConnectionState.RecordVerifiedIdentity(updatedConfiguration, "canonical-user", verified.RequestSequence, true);
+            NextcloudConnectionState.CommitVerifiedSavedConnection(updatedConfiguration);
+            before = requests;
+            Check("A delayed worker cannot replay a replaced password", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized && requests == before);
+            Check("Saved replacement credentials resume ordinary requests", updatedClient.Send(Options(url)).StatusCode == HttpStatusCode.OK);
+            NextcloudConnectionState.Shutdown();
+            NextcloudConnectionState.Initialize(stateDirectory, "fixture-profile", updatedConfiguration);
+            Check("Committed recovery remains usable after restart", updatedClient.Send(Options(url)).StatusCode == HttpStatusCode.OK);
+            var storeField = typeof(NextcloudConnectionState).GetField("_store", BindingFlags.Static | BindingFlags.NonPublic);
+            object store = storeField.GetValue(null);
+            var writable = store.GetType().GetField("_writeAllowed", BindingFlags.Instance | BindingFlags.NonPublic);
+            writable.SetValue(store, false);
+            statusCode = 401;
+            NcHttpResponse writeFailure = updatedClient.Send(Options(url));
+            Check("State write failure retains the readable HTTP 401 and runtime pause", writeFailure.StatusCode == HttpStatusCode.Unauthorized
+                && NextcloudConnectionState.GetStatus().Reason == "auth_required");
+            statusCode = 200;
+            verified = updatedClient.Send(Options(url, true));
+            NextcloudConnectionState.RecordVerifiedIdentity(updatedConfiguration, "canonical-user", verified.RequestSequence, true);
+            bool failedCommit = false;
+            int restoredBeforeFailedCommit = restored;
+            try { NextcloudConnectionState.CommitVerifiedSavedConnection(updatedConfiguration); }
+            catch (InvalidOperationException) { failedCommit = true; }
+            Check("Failed persistent commit cannot clear a pause or emit recovery", failedCommit && restored == restoredBeforeFailedCommit
+                && NextcloudConnectionState.GetStatus().Reason == "auth_required");
+            writable.SetValue(store, true);
+            NextcloudConnectionState.CommitVerifiedSavedConnection(updatedConfiguration);
 
             statusCode = 429;
             retryAfter = "120";
@@ -754,19 +845,33 @@ internal static class HttpRequestPauseTests {
             Check("Changed user, password and explicit verification cannot bypass server backoff", (int)delayed.StatusCode == 429 && requests == before);
             DateTime retainedDeadline = HttpFailureDiagnostics.ReadRetryAfterUtc(delayed.Headers);
             Check("Locally paused requests retain rather than extend the deadline", Math.Abs((retainedDeadline - firstDeadline).TotalSeconds) < 1.1);
-            var otherServer = new NcHttpClient(new TalkServiceConfiguration("https://other.example.test/nextcloud", "fixture-user", "fixture-password"));
-            Check("Another Nextcloud server is not paused", otherServer.Send(Options(url)).StatusCode == HttpStatusCode.OK && requests == before + 1);
-
-            var retryField = typeof(NcHttpClient).GetField("ServerRetryAfterUtc", BindingFlags.Static | BindingFlags.NonPublic);
-            var deadlines = (Dictionary<string, DateTime>)retryField.GetValue(null);
-            deadlines[configuration.GetNormalizedBaseUrl()] = DateTime.UtcNow.AddSeconds(-1);
-            Check("Expired server backoff permits requests again", updatedClient.Send(Options(url)).StatusCode == HttpStatusCode.OK);
-            Check("Expiry of server backoff does not clear rejected credentials", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized);
             var anonymous = Options(url);
             anonymous.IncludeAuthHeader = false;
+            Check("Login flow also honors the server retry deadline", (int)updatedClient.Send(anonymous).StatusCode == 429 && requests == before);
+            NextcloudConnectionState.Shutdown();
+            NextcloudConnectionState.Initialize(stateDirectory, "fixture-profile", updatedConfiguration);
+            Check("Server retry deadlines survive restart", (int)updatedClient.Send(anonymous).StatusCode == 429 && requests == before);
+            Check("Another origin is not rate-limited", !NextcloudConnectionState.GetRequestStatus(updatedConfiguration,
+                "https://other.example.test/nextcloud", true, false).IsPaused);
+            var emptyConfiguration = new TalkServiceConfiguration(updatedConfiguration.BaseUrl, "", "");
+            NextcloudConnectionState.RemoveSavedCredentials(emptyConfiguration);
+            Check("Removing credentials does not reset server backoff", (int)updatedClient.Send(anonymous).StatusCode == 429 && requests == before);
+            NextcloudConnectionState.Shutdown();
+            NextcloudConnectionState.Initialize(stateDirectory, "fixture-profile", emptyConfiguration);
+            Check("Removed credentials and retained backoff stay effective after restart", (int)updatedClient.Send(anonymous).StatusCode == 429 && requests == before);
+
+            var stateField = typeof(NextcloudConnectionState).GetField("_state", BindingFlags.Static | BindingFlags.NonPublic);
+            var state = (PersistedNextcloudConnectionState)stateField.GetValue(null);
+            state.RetryAfterUtc = DateTime.UtcNow.AddSeconds(-1);
+            Check("Expired server backoff permits explicit sign-in again", updatedClient.Send(Options(url, true)).StatusCode == HttpStatusCode.OK);
+            Check("Expiry of server backoff does not authorize stale credentials", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized);
             Check("Unauthenticated login flow requests do not reuse rejected authentication", client.Send(anonymous).StatusCode == HttpStatusCode.OK);
+            before = requests;
+            Check("Removing credentials blocks delayed workers without network requests", updatedClient.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized && requests == before);
+            Check("Removing credentials retains known cleanup ownership", NextcloudConnectionState.GetKnownIdentity(updatedConfiguration).UserId == "canonical-user");
+            Check("Connection-state persistence contains no clear-text credentials", !File.ReadAllText(Directory.GetFiles(stateDirectory, "connection-state-*.dat")[0]).Contains("fixture-password"));
         }
-        finally { listener.Stop(); server.Join(2000); }
+        finally { NextcloudConnectionState.Shutdown(); listener.Stop(); server.Join(2000); Directory.Delete(stateDirectory, true); }
         return failures == 0 ? 0 : 1;
     }
 }
@@ -774,6 +879,10 @@ internal static class HttpRequestPauseTests {
     $httpPauseSources = @(
         $httpPauseSource,
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\NcHttpClient.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\NextcloudConnectionState.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\ProtectedJsonStateStore.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\DurableFileReplace.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceException.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceConfiguration.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpFailureDiagnostics.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpAuthUtilities.cs"),
@@ -880,6 +989,15 @@ internal static class PolicyRefreshPauseTests {
         }
     }
     Write-Host "[OK] Nextcloud and update HTTP paths enforce the central managed TLS guard before network I/O"
+
+    $lifecycleSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'src\NcTalkOutlookAddIn\NextcloudTalkAddIn.Lifecycle.cs') -Raw
+    $startupTls = $lifecycleSource.IndexOf('TryApplyTransportSecurityFromSettings("startup", false)', [StringComparison]::Ordinal)
+    $connectionStateInit = $lifecycleSource.IndexOf('NextcloudConnectionState.Initialize(', [StringComparison]::Ordinal)
+    $shareCleanupInit = $lifecycleSource.IndexOf('InitializeComposeShareCleanup(', [StringComparison]::Ordinal)
+    if ($startupTls -lt 0 -or $connectionStateInit -le $startupTls -or $shareCleanupInit -le $connectionStateInit) {
+        throw 'Managed TLS must be applied before connection-recovery timers and cleanup workers start.'
+    }
+    Write-Host '[OK] Startup applies managed TLS before connection and cleanup recovery can start network requests'
 
     $settingsFormPath = Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\UI\SettingsForm.cs"
     $settingsFormSource = Get-Content -LiteralPath $settingsFormPath -Raw

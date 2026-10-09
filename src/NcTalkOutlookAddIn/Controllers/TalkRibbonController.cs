@@ -239,7 +239,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 {
                     NextcloudTalkAddIn.LogTalkMessage("Talk room could not be created: " + ex.Message);
                     MessageBox.Show(
-                        string.Format(Strings.ErrorCreateRoom, ex.Message),
+                        PolicyUiHelper.GetConnectionFailureMessage(ex,
+                            string.Format(Strings.ErrorCreateRoom, ex.Message)),
                         Strings.DialogTitle,
                         MessageBoxButtons.OK,
                         ex.IsAuthenticationError ? MessageBoxIcon.Warning : MessageBoxIcon.Error);

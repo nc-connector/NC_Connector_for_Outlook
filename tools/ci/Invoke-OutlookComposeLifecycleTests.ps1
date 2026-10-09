@@ -650,7 +650,7 @@ $deleteMethod = Read-Source "src\NcTalkOutlookAddIn\Services\ComposeShareCleanup
 Assert-Contains `
     "Compose cleanup method is present" `
     $deleteMethod `
-    "internal bool TryDeleteComposeShareFolder("
+    "internal bool QueueCleanup("
 Assert-NotContains `
     "Password delivery does not own remote cleanup" `
     $compose `
@@ -660,13 +660,13 @@ Assert-NotContains `
     $deleteMethod `
     "Microsoft.Office.Interop"
 Assert-Contains `
-    "Compose cleanup requires its captured origin" `
+    "Compose cleanup persists the captured canonical account" `
     $deleteMethod `
-    "entry.Origin == null || !entry.Origin.IsComplete()"
+    "entry.Origin.AccountId"
 Assert-Contains `
-    "Compose cleanup uses its captured origin" `
+    "Compose cleanup uses the current verified account credentials" `
     $deleteMethod `
-    "entry.Origin.ToConfiguration()"
+    "new FileLinkService(identity.Configuration)"
 Assert-NotContains `
     "Compose cleanup never falls back to current settings" `
     $deleteMethod `

@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "保存済みの認証情報を削除できませんでした。もう一度お試しください。"
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloudが一時的にリクエストを制限しています。しばらく待ってから再試行してください。"
+  },
+  "connection_reauthenticate": {
+    "message": "再ログイン"
+  },
+  "options_remove_credentials_button": {
+    "message": "保存済みの認証情報を削除"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "この Outlook プロファイルから保存済みの認証情報を削除しますか？先に進行中のアップロードとその他の NC Connector の操作を完了してください。"
+  },
+  "options_remove_credentials_hint": {
+    "message": "この Outlook プロファイルに保存されたユーザー名とアプリパスワードを削除します。Nextcloud の URL とその他の設定は保持されます。Nextcloud 側のアプリパスワードは削除されません。"
+  },
+  "connection_auth_required": {
+    "message": "Nextcloudへのログインが無効になりました。もう一度ログインしてください。"
+  },
+  "options_remove_credentials_success": {
+    "message": "保存済みの認証情報を削除しました。「一般」から再度ログインしてください。"
+  },
+  "options_remove_credentials_busy": {
+    "message": "先に進行中のアップロードを完了してから、もう一度お試しください。"
+  },
   "send_policy_check_failed": {
     "message": "このメッセージの中央送信要件を満たせませんでした。メッセージは送信されていません。接続を確認するか、管理者にお問い合わせください。"
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "現在、NC Connector Backend を利用できません。"
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud が保存済みの認証情報を拒否しました。NC Connector の設定で再度ログインしてください。"
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud が一時的にリクエストを制限しています。指定された待機時間を守ってください。"
   },
   "send_policy_signature_warning": {
     "message": "このメッセージに使用する中央管理の署名を読み込めませんでした。メッセージはそのまま送信できます。"
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "NC Connector を Nextcloud アカウントに接続してください。ブラウザーからログインするか、ユーザー名とアプリパスワードを入力してください。"
-  },
-  "connection_sign_in_required": {
-    "message": "Nextcloud へのログインに失敗しました。もう一度ログインしてください。"
   },
   "options_base_url_label": {
     "message": "Nextcloud のURL"

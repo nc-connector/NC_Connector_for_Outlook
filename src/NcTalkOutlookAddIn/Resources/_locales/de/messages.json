@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "Die gespeicherten Zugangsdaten konnten nicht entfernt werden. Bitte versuchen Sie es erneut."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud begrenzt derzeit die Anfragen. Bitte warten Sie und versuchen Sie es später erneut."
+  },
+  "connection_reauthenticate": {
+    "message": "Erneut anmelden"
+  },
+  "options_remove_credentials_button": {
+    "message": "Gespeicherte Zugangsdaten entfernen"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Gespeicherte Zugangsdaten aus diesem Outlook-Profil entfernen? Bitte beenden Sie vorher laufende Uploads und andere NC Connector-Aktionen."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Entfernt den gespeicherten Benutzernamen und das App-Passwort aus diesem Outlook-Profil. Nextcloud-URL und übrige Einstellungen bleiben erhalten. Das App-Passwort in Nextcloud wird nicht gelöscht."
+  },
+  "connection_auth_required": {
+    "message": "Die Anmeldung bei Nextcloud ist nicht mehr gültig. Bitte melden Sie sich erneut an."
+  },
+  "options_remove_credentials_success": {
+    "message": "Die gespeicherten Zugangsdaten wurden entfernt. Bitte melden Sie sich unter „Allgemein“ erneut an."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Bitte beenden Sie zuerst laufende Uploads und versuchen Sie es danach erneut."
+  },
   "send_policy_check_failed": {
     "message": "Die für diese Nachricht geltenden zentralen Versandvorgaben konnten nicht umgesetzt werden. Die Nachricht wurde nicht gesendet. Prüfen Sie die Verbindung oder wenden Sie sich an Ihren Administrator."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "Das NC Connector Backend ist derzeit nicht verfügbar."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud hat die gespeicherten Zugangsdaten abgelehnt. Melden Sie sich in den NC-Connector-Einstellungen erneut an."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud begrenzt Anfragen vorübergehend. Bitte beachten Sie die angegebene Wartezeit."
   },
   "send_policy_signature_warning": {
     "message": "Die für diese Nachricht vorgesehene zentrale Signatur konnte nicht geladen werden. Die Nachricht kann trotzdem gesendet werden."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Bitte verbinden Sie NC Connector mit Ihrem Nextcloud-Konto. Melden Sie sich über den Browser an oder geben Sie Ihre Zugangsdaten mit App-Passwort ein."
-  },
-  "connection_sign_in_required": {
-    "message": "Die Anmeldung bei Nextcloud war nicht erfolgreich. Bitte melden Sie sich erneut an."
   },
   "options_base_url_label": {
     "message": "Nextcloud-URL"

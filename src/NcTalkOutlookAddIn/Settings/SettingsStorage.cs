@@ -96,6 +96,16 @@ namespace NcTalkOutlookAddIn.Settings
             SaveCore(settings, true);
         }
 
+        internal void RemoveSavedCredentials(AddinSettings settings)
+        {
+            if (settings == null || !string.IsNullOrEmpty(settings.Username)
+                || !string.IsNullOrEmpty(settings.AppPassword))
+            {
+                throw new ArgumentException("Credential removal requires cleared credentials.", "settings");
+            }
+            SaveCore(settings, true, true);
+        }
+
         private AddinSettings LoadUnderLock()
         {
             _automaticSaveBlocked = false;
@@ -176,7 +186,7 @@ namespace NcTalkOutlookAddIn.Settings
             return ApplyManagedSetupPolicy(new AddinSettings());
         }
 
-        private void SaveCore(AddinSettings settings, bool userInitiated)
+        private void SaveCore(AddinSettings settings, bool userInitiated, bool replaceBackupWithNewContent = false)
         {
             if (settings == null)
             {
@@ -195,9 +205,14 @@ namespace NcTalkOutlookAddIn.Settings
                 AddinSettings persistedSettings = ApplyManagedSetupPolicy(settings.Clone());
                 using (_settingsFileTransaction.AcquireLock())
                 {
+                    if (!userInitiated && !IsAutomaticSaveConnectionCurrent(persistedSettings))
+                    {
+                        return;
+                    }
                     _settingsFileTransaction.Commit(
                         stream => SaveToXmlStream(stream, persistedSettings, _profileName),
-                        IsSettingsFileHealthy);
+                        IsSettingsFileHealthy,
+                        replaceBackupWithNewContent);
                     _automaticSaveBlocked = false;
                 }
             }
@@ -205,6 +220,49 @@ namespace NcTalkOutlookAddIn.Settings
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Failed to save profile settings XML.", ex);
                 throw;
+            }
+        }
+
+        private bool IsAutomaticSaveConnectionCurrent(AddinSettings candidate)
+        {
+            try
+            {
+                if (!File.Exists(_filePath))
+                {
+                    bool emptyNewProfile = !File.Exists(_settingsFileTransaction.BackupPath)
+                        && string.IsNullOrEmpty(candidate.Username) && string.IsNullOrEmpty(candidate.AppPassword);
+                    if (!emptyNewProfile)
+                    {
+                        DiagnosticsLogger.Log(LogCategories.Core,
+                            "Automatic settings save skipped because no primary file confirms the saved connection.");
+                    }
+                    return emptyNewProfile;
+                }
+                bool passwordReadFailed;
+                AddinSettings saved = ApplyManagedSetupPolicy(LoadFromXmlFile(_filePath, out passwordReadFailed));
+                if (passwordReadFailed)
+                {
+                    _automaticSaveBlocked = true;
+                    DiagnosticsLogger.Log(LogCategories.Core,
+                        "Automatic settings save skipped because the saved credentials could not be read.");
+                    return false;
+                }
+                bool matches = string.Equals(candidate.ServerUrl ?? string.Empty, saved.ServerUrl ?? string.Empty, StringComparison.Ordinal)
+                    && string.Equals(candidate.Username ?? string.Empty, saved.Username ?? string.Empty, StringComparison.Ordinal)
+                    && string.Equals(candidate.AppPassword ?? string.Empty, saved.AppPassword ?? string.Empty, StringComparison.Ordinal);
+                if (!matches)
+                {
+                    DiagnosticsLogger.Log(LogCategories.Core,
+                        "Automatic settings save skipped because the saved connection changed after the snapshot was captured.");
+                }
+                return matches;
+            }
+            catch (Exception ex)
+            {
+                _automaticSaveBlocked = true;
+                DiagnosticsLogger.LogException(LogCategories.Core,
+                    "Automatic settings save skipped because the current saved connection could not be read.", ex);
+                return false;
             }
         }
 

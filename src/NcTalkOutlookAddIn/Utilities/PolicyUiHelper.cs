@@ -24,6 +24,11 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return Strings.ManagedTlsPolicyInvalid;
             }
+            string connectionNotice = GetConnectionNotice(status);
+            if (!string.IsNullOrEmpty(connectionNotice))
+            {
+                return connectionNotice;
+            }
             if (status != null && status.IsEndpointMissing)
             {
                 return Strings.EnterpriseRolloutBackendRequired;
@@ -67,6 +72,11 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string GetPolicyWarningMessage(BackendPolicyStatus status)
         {
+            string connectionNotice = GetConnectionNotice(status);
+            if (!string.IsNullOrEmpty(connectionNotice))
+            {
+                return connectionNotice;
+            }
             if (status == null || !status.EndpointAvailable)
             {
                 return string.Empty;
@@ -90,6 +100,26 @@ namespace NcTalkOutlookAddIn.Utilities
                 return Strings.PolicyWarningNoSeat;
             }
             return GetSeatNotice(status);
+        }
+
+        internal static string GetConnectionNotice(BackendPolicyStatus status)
+        {
+            if (status == null) { return string.Empty; }
+            if (string.Equals(status.Reason, "authentication_rejected", StringComparison.Ordinal)
+                || string.Equals(status.Reason, "auth_required", StringComparison.Ordinal))
+            {
+                return Strings.ConnectionAuthRequired;
+            }
+            return string.Equals(status.Reason, "rate_limited", StringComparison.Ordinal)
+                ? Strings.ConnectionRateLimited : string.Empty;
+        }
+
+        internal static string GetConnectionFailureMessage(Exception failure, string fallbackMessage = "")
+        {
+            var serviceFailure = failure as NcTalkOutlookAddIn.Services.TalkServiceException;
+            if (serviceFailure == null) { return fallbackMessage; }
+            if (serviceFailure.IsAuthenticationError) { return Strings.ConnectionAuthRequired; }
+            return (int)serviceFailure.StatusCode == 429 ? Strings.ConnectionRateLimited : fallbackMessage;
         }
 
         private static string GetSeatNotice(BackendPolicyStatus status)
@@ -229,6 +259,8 @@ namespace NcTalkOutlookAddIn.Utilities
 
         internal static string GetSeparatePasswordUnavailableTooltip(BackendPolicyStatus status)
         {
+            string connectionNotice = GetConnectionNotice(status);
+            if (!string.IsNullOrEmpty(connectionNotice)) { return connectionNotice; }
             if (status == null || !status.EndpointAvailable)
             {
                 return Strings.SharingPasswordSeparateBackendRequiredTooltip;

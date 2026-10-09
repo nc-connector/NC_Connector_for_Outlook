@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "No se han podido eliminar las credenciales guardadas. Inténtelo de nuevo."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud está limitando temporalmente las solicitudes. Espere e inténtelo más tarde."
+  },
+  "connection_reauthenticate": {
+    "message": "Iniciar sesión de nuevo"
+  },
+  "options_remove_credentials_button": {
+    "message": "Eliminar las credenciales guardadas"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "¿Eliminar las credenciales guardadas de este perfil de Outlook? Primero finalice las subidas y las demás acciones de NC Connector en curso."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Elimina el nombre de usuario y la contraseña de aplicación guardados en este perfil de Outlook. Se conservan la URL de Nextcloud y los demás ajustes. La contraseña de aplicación en Nextcloud no se elimina."
+  },
+  "connection_auth_required": {
+    "message": "El inicio de sesión en Nextcloud ya no es válido. Vuelva a iniciar sesión."
+  },
+  "options_remove_credentials_success": {
+    "message": "Se han eliminado las credenciales guardadas. Vuelva a iniciar sesión en General."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Primero finalice las subidas en curso y vuelva a intentarlo."
+  },
   "send_policy_check_failed": {
     "message": "No se pudieron cumplir los requisitos centrales de envío de este mensaje. El mensaje no se ha enviado. Compruebe la conexión o contacte con su administrador."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "El NC Connector Backend no está disponible en este momento."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud ha rechazado las credenciales guardadas. Vuelva a iniciar sesión en la configuración de NC Connector."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud está limitando temporalmente las solicitudes. Respete el tiempo de espera indicado."
   },
   "send_policy_signature_warning": {
     "message": "No se pudo cargar la firma central prevista para este mensaje. El mensaje puede enviarse de todos modos."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Conecta NC Connector con tu cuenta de Nextcloud. Inicia sesión a través del navegador o introduce tu nombre de usuario y contraseña de aplicación."
-  },
-  "connection_sign_in_required": {
-    "message": "No se ha podido iniciar sesión en Nextcloud. Vuelve a iniciar sesión."
   },
   "options_base_url_label": {
     "message": "URL de Nextcloud"

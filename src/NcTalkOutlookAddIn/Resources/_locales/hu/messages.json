@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "A mentett bejelentkezési adatokat nem sikerült eltávolítani. Próbálja újra."
+  },
+  "connection_rate_limited": {
+    "message": "A Nextcloud átmenetileg korlátozza a kéréseket. Várjon, majd próbálja újra később."
+  },
+  "connection_reauthenticate": {
+    "message": "Újra bejelentkezés"
+  },
+  "options_remove_credentials_button": {
+    "message": "Mentett bejelentkezési adatok eltávolítása"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Eltávolítja a mentett bejelentkezési adatokat ebből a Outlook-profilból? Előbb fejezze be a folyamatban lévő feltöltéseket és a többi NC Connector-műveletet."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Eltávolítja a mentett felhasználónevet és alkalmazásjelszót ebből a Outlook-profilból. A Nextcloud URL-címe és a többi beállítás megmarad. A Nextcloudban lévő alkalmazásjelszó nem törlődik."
+  },
+  "connection_auth_required": {
+    "message": "A Nextcloud-bejelentkezés már nem érvényes. Jelentkezzen be újra."
+  },
+  "options_remove_credentials_success": {
+    "message": "A mentett bejelentkezési adatok eltávolítva. Jelentkezzen be újra az Általános lapon."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Előbb fejezze be a folyamatban lévő feltöltéseket, majd próbálja újra."
+  },
   "send_policy_check_failed": {
     "message": "Az üzenetre vonatkozó központi küldési előírásokat nem sikerült teljesíteni. Az üzenet nem lett elküldve. Ellenőrizze a kapcsolatot, vagy forduljon a rendszergazdához."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "Az NC Connector Backend jelenleg nem érhető el."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "A Nextcloud elutasította a mentett bejelentkezési adatokat. Jelentkezzen be újra az NC Connector beállításaiban."
-  },
-  "send_policy_rate_limited": {
-    "message": "A Nextcloud átmenetileg korlátozza a kéréseket. Tartsa be a megadott várakozási időt."
   },
   "send_policy_signature_warning": {
     "message": "Az ehhez az üzenethez előírt központi aláírást nem sikerült betölteni. Az üzenet ennek ellenére elküldhető."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Csatlakoztassa az NC Connectort a Nextcloud-fiókjához. Jelentkezzen be böngészőn keresztül, vagy adja meg a felhasználónevét és az alkalmazásjelszavát."
-  },
-  "connection_sign_in_required": {
-    "message": "Nem sikerült bejelentkezni a Nextcloudba. Kérjük, jelentkezzen be újra."
   },
   "options_base_url_label": {
     "message": "Nextcloud URL-cím"

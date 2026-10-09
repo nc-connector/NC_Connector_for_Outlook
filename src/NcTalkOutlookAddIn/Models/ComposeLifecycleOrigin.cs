@@ -20,6 +20,8 @@ namespace NcTalkOutlookAddIn.Models
 
         public string AccountFingerprint { get; set; }
 
+        public string AccountId { get; set; }
+
         internal static ComposeLifecycleOrigin Create(
             TalkServiceConfiguration configuration)
         {
@@ -30,11 +32,13 @@ namespace NcTalkOutlookAddIn.Models
 
             string serverUrl = configuration.GetNormalizedBaseUrl();
             string username = (configuration.Username ?? string.Empty).Trim();
+            VerifiedNextcloudIdentity identity = NextcloudConnectionState.GetKnownIdentity(configuration);
             return new ComposeLifecycleOrigin
             {
                 ServerUrl = serverUrl,
                 Username = username,
                 AppPassword = configuration.AppPassword ?? string.Empty,
+                AccountId = identity != null ? identity.UserId : string.Empty,
                 AccountFingerprint = BuildFingerprint(serverUrl, username)
             };
         }
@@ -60,6 +64,7 @@ namespace NcTalkOutlookAddIn.Models
                 ServerUrl = ServerUrl,
                 Username = Username,
                 AppPassword = AppPassword,
+                AccountId = AccountId,
                 AccountFingerprint = AccountFingerprint
             };
         }

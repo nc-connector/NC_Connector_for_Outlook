@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using NcTalkOutlookAddIn.Utilities;
@@ -79,20 +78,8 @@ namespace NcTalkOutlookAddIn.Services
     // Internal HTTP client wrapper that keeps auth/header/timeout behavior consistent.
     internal sealed class NcHttpClient
     {
-        private sealed class AuthenticationState
-        {
-            internal long RejectedSequence;
-            internal long VerifiedSequence;
-        }
-
-        private static readonly object PauseSync = new object();
-        private static readonly Dictionary<string, AuthenticationState> AuthenticationStates =
-            new Dictionary<string, AuthenticationState>(StringComparer.Ordinal);
-        private static readonly Dictionary<string, DateTime> ServerRetryAfterUtc =
-            new Dictionary<string, DateTime>(StringComparer.Ordinal);
         private static long _requestSequence;
-        private readonly string _serverKey;
-        private readonly string _authenticationKey;
+        private readonly TalkServiceConfiguration _configuration;
         private readonly string _username;
         private readonly string _appPassword;
 
@@ -105,14 +92,7 @@ namespace NcTalkOutlookAddIn.Services
 
             _username = configuration.Username ?? string.Empty;
             _appPassword = configuration.AppPassword ?? string.Empty;
-            _serverKey = configuration.GetNormalizedBaseUrl();
-            _authenticationKey = BuildAuthenticationKey(configuration);
-        }
-
-        internal NcHttpClient(string username, string appPassword)
-        {
-            _username = username ?? string.Empty;
-            _appPassword = appPassword ?? string.Empty;
+            _configuration = configuration;
         }
 
         internal NcHttpResponse Send(NcHttpRequestOptions options)
@@ -127,11 +107,20 @@ namespace NcTalkOutlookAddIn.Services
             }
             options.CancellationToken.ThrowIfCancellationRequested();
             string method = string.IsNullOrWhiteSpace(options.Method) ? "GET" : options.Method.Trim().ToUpperInvariant();
-            NcHttpResponse paused;
-            if (options.IncludeAuthHeader
-                && TryGetPausedResponse(options.VerifyRejectedCredentials, out paused))
+            ConnectionPauseStatus pause = NextcloudConnectionState.GetRequestStatus(
+                _configuration, options.Url, options.VerifyRejectedCredentials, options.IncludeAuthHeader);
+            if (pause.IsPaused)
             {
-                return paused;
+                return new NcHttpResponse
+                {
+                    HasHttpResponse = true,
+                    StatusCode = pause.Reason == "rate_limited" ? (HttpStatusCode)429 : HttpStatusCode.Unauthorized,
+                    Headers = pause.Reason == "rate_limited"
+                        ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            { "Retry-After", pause.RetryAfterUtc.ToString("R", CultureInfo.InvariantCulture) }
+                        } : null
+                };
             }
             var result = new NcHttpResponse
             {
@@ -268,10 +257,7 @@ namespace NcTalkOutlookAddIn.Services
                 result.StatusCode = response.StatusCode;
                 result.ContentType = response.ContentType ?? string.Empty;
                 result.Headers = CopyHeaders(response.Headers);
-                if (options.IncludeAuthHeader)
-                {
-                    RecordRequestFailure(result);
-                }
+                NextcloudConnectionState.RecordResponse(_configuration, options.Url, options.IncludeAuthHeader, result);
 
                 using (Stream stream = response.GetResponseStream() ?? Stream.Null)
                 {
@@ -360,114 +346,6 @@ namespace NcTalkOutlookAddIn.Services
                 }
             }
             return result;
-        }
-
-        internal static void ConfirmVerifiedAuthentication(
-            TalkServiceConfiguration configuration, long requestSequence)
-        {
-            string key = BuildAuthenticationKey(configuration);
-            lock (PauseSync)
-            {
-                AuthenticationState state;
-                if (!AuthenticationStates.TryGetValue(key, out state))
-                {
-                    state = new AuthenticationState();
-                    AuthenticationStates[key] = state;
-                }
-                state.VerifiedSequence = Math.Max(state.VerifiedSequence, requestSequence);
-            }
-            DiagnosticsLogger.Log(LogCategories.Api, "Verified Nextcloud authentication may resume matching requests.");
-        }
-
-        private bool TryGetPausedResponse(bool verifyRejectedCredentials, out NcHttpResponse response)
-        {
-            response = null;
-            if (string.IsNullOrEmpty(_serverKey) || string.IsNullOrEmpty(_authenticationKey))
-            {
-                return false;
-            }
-            lock (PauseSync)
-            {
-                DateTime retryAt;
-                if (ServerRetryAfterUtc.TryGetValue(_serverKey, out retryAt))
-                {
-                    if (retryAt > DateTime.UtcNow)
-                    {
-                        response = new NcHttpResponse
-                        {
-                            HasHttpResponse = true,
-                            StatusCode = (HttpStatusCode)429,
-                            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                            {
-                                { "Retry-After", retryAt.ToString("R", CultureInfo.InvariantCulture) }
-                            }
-                        };
-                        return true;
-                    }
-                    ServerRetryAfterUtc.Remove(_serverKey);
-                }
-                AuthenticationState state;
-                if (!verifyRejectedCredentials
-                    && AuthenticationStates.TryGetValue(_authenticationKey, out state)
-                    && state.RejectedSequence > state.VerifiedSequence)
-                {
-                    response = new NcHttpResponse
-                    {
-                        HasHttpResponse = true,
-                        StatusCode = HttpStatusCode.Unauthorized
-                    };
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private void RecordRequestFailure(NcHttpResponse response)
-        {
-            if (string.IsNullOrEmpty(_serverKey) || string.IsNullOrEmpty(_authenticationKey))
-            {
-                return;
-            }
-            lock (PauseSync)
-            {
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    AuthenticationState state;
-                    if (!AuthenticationStates.TryGetValue(_authenticationKey, out state))
-                    {
-                        state = new AuthenticationState();
-                        AuthenticationStates[_authenticationKey] = state;
-                    }
-                    state.RejectedSequence = Math.Max(state.RejectedSequence, response.RequestSequence);
-                    DiagnosticsLogger.Log(LogCategories.Api, "HTTP 401: matching authenticated requests are paused until verified sign-in.");
-                }
-                else if ((int)response.StatusCode == 429)
-                {
-                    DateTime retryAt = HttpFailureDiagnostics.ReadRetryAfterUtc(response.Headers);
-                    DateTime existing;
-                    if (!ServerRetryAfterUtc.TryGetValue(_serverKey, out existing) || retryAt > existing)
-                    {
-                        ServerRetryAfterUtc[_serverKey] = retryAt;
-                    }
-                    DiagnosticsLogger.Log(LogCategories.Api, "HTTP 429: server requests are paused until "
-                        + retryAt.ToString("O", CultureInfo.InvariantCulture) + ".");
-                }
-            }
-        }
-
-        private static string BuildAuthenticationKey(TalkServiceConfiguration configuration)
-        {
-            if (configuration == null)
-            {
-                return string.Empty;
-            }
-            byte[] input = Encoding.UTF8.GetBytes((configuration.Username ?? string.Empty).Trim()
-                + "\n" + (configuration.AppPassword ?? string.Empty));
-            using (SHA256 hash = SHA256.Create())
-            {
-                return configuration.GetNormalizedBaseUrl() + "\n"
-                    + Convert.ToBase64String(hash.ComputeHash(input));
-            }
         }
 
         private static byte[] ReadResponseBytes(

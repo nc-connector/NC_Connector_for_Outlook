@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "De opgeslagen inloggegevens konden niet worden verwijderd. Probeer het opnieuw."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud beperkt tijdelijk het aantal verzoeken. Wacht even en probeer het later opnieuw."
+  },
+  "connection_reauthenticate": {
+    "message": "Opnieuw aanmelden"
+  },
+  "options_remove_credentials_button": {
+    "message": "Opgeslagen inloggegevens verwijderen"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Opgeslagen inloggegevens uit dit Outlook-profiel verwijderen? Rond eerst lopende uploads en andere NC Connector-acties af."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Verwijdert de opgeslagen gebruikersnaam en het app-wachtwoord uit dit Outlook-profiel. De Nextcloud-URL en andere instellingen blijven behouden. Het app-wachtwoord in Nextcloud wordt niet verwijderd."
+  },
+  "connection_auth_required": {
+    "message": "Uw aanmelding bij Nextcloud is niet meer geldig. Meld u opnieuw aan."
+  },
+  "options_remove_credentials_success": {
+    "message": "De opgeslagen inloggegevens zijn verwijderd. Meld u opnieuw aan onder Algemeen."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Rond eerst lopende uploads af en probeer het daarna opnieuw."
+  },
   "send_policy_check_failed": {
     "message": "Aan de centrale verzendeisen voor dit bericht kon niet worden voldaan. Het bericht is niet verzonden. Controleer de verbinding of neem contact op met uw beheerder."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "De NC Connector Backend is momenteel niet beschikbaar."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud heeft de opgeslagen inloggegevens geweigerd. Meld u opnieuw aan in de instellingen van NC Connector."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud beperkt tijdelijk het aantal aanvragen. Houd rekening met de aangegeven wachttijd."
   },
   "send_policy_signature_warning": {
     "message": "De centrale handtekening voor dit bericht kon niet worden geladen. Het bericht kan toch worden verzonden."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Verbind NC Connector met uw Nextcloud-account. Log in via uw browser of voer uw gebruikersnaam en app-wachtwoord in."
-  },
-  "connection_sign_in_required": {
-    "message": "Het inloggen bij Nextcloud is niet gelukt. Log opnieuw in."
   },
   "options_base_url_label": {
     "message": "Nextcloud-URL"

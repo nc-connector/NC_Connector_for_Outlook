@@ -175,6 +175,7 @@
     <Compile Include="Services\TalkServiceConfiguration.cs" />
     <Compile Include="Services\TalkServiceException.cs" />
     <Compile Include="Services\NcHttpClient.cs" />
+    <Compile Include="Services\NextcloudConnectionState.cs" />
     <Compile Include="Services\NextcloudCapabilitiesService.cs" />
     <Compile Include="Services\NextcloudUserIdentityService.cs" />
     <Compile Include="Services\TalkService.cs" />

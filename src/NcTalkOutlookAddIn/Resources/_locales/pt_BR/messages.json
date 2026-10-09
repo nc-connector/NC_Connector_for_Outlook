@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "Não foi possível remover as credenciais salvas. Tente novamente."
+  },
+  "connection_rate_limited": {
+    "message": "O Nextcloud está limitando temporariamente as solicitações. Aguarde e tente novamente mais tarde."
+  },
+  "connection_reauthenticate": {
+    "message": "Entrar novamente"
+  },
+  "options_remove_credentials_button": {
+    "message": "Remover credenciais salvas"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Remover as credenciais salvas deste perfil do Outlook? Primeiro conclua os envios e as outras ações do NC Connector em andamento."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Remove o nome de usuário e a senha de aplicativo salvos neste perfil do Outlook. A URL do Nextcloud e as outras configurações são mantidas. A senha de aplicativo no Nextcloud não é excluída."
+  },
+  "connection_auth_required": {
+    "message": "Seu acesso ao Nextcloud não é mais válido. Entre novamente."
+  },
+  "options_remove_credentials_success": {
+    "message": "As credenciais salvas foram removidas. Entre novamente em Geral."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Primeiro conclua os envios em andamento e tente novamente."
+  },
   "send_policy_check_failed": {
     "message": "Não foi possível cumprir os requisitos centrais de envio desta mensagem. A mensagem não foi enviada. Verifique a conexão ou entre em contato com seu administrador."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "O NC Connector Backend está indisponível no momento."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "O Nextcloud rejeitou as credenciais salvas. Entre novamente nas configurações do NC Connector."
-  },
-  "send_policy_rate_limited": {
-    "message": "O Nextcloud está limitando temporariamente as solicitações. Respeite o tempo de espera indicado."
   },
   "send_policy_signature_warning": {
     "message": "Não foi possível carregar a assinatura central prevista para esta mensagem. A mensagem ainda pode ser enviada."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Conecte o NC Connector à sua conta do Nextcloud. Entre pelo navegador ou digite seu nome de usuário e a senha do aplicativo."
-  },
-  "connection_sign_in_required": {
-    "message": "Não foi possível entrar no Nextcloud. Entre novamente."
   },
   "options_base_url_label": {
     "message": "URL do Nextcloud"

@@ -22,6 +22,11 @@ namespace NcTalkOutlookAddIn.Services
         private readonly TalkServiceConfiguration _configuration;
         private readonly NcHttpClient _httpClient;
 
+        internal static void ClearCache()
+        {
+            lock (CacheSync) { Cache.Clear(); }
+        }
+
         internal NextcloudCapabilitiesService(TalkServiceConfiguration configuration)
         {
             if (configuration == null)
@@ -40,6 +45,7 @@ namespace NcTalkOutlookAddIn.Services
                 throw new TalkServiceException(Strings.ErrorMissingCredentials, true, 0, null);
             }
 
+            NextcloudConnectionState.AssertRequestAllowed(_configuration, verifyRejectedCredentials);
             string cacheKey = BuildCacheKey(_configuration);
             CacheSlot slot;
             lock (CacheSync)

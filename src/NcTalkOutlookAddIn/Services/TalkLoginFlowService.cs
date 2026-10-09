@@ -17,7 +17,7 @@ namespace NcTalkOutlookAddIn.Services
         private const string DeviceName = "NC Connector for Outlook";
         private readonly string _baseUrl;
         private readonly JavaScriptSerializer _serializer = new JavaScriptSerializer();
-        private readonly NcHttpClient _httpClient = new NcHttpClient(string.Empty, string.Empty);
+        private readonly NcHttpClient _httpClient;
 
         internal TalkLoginFlowService(string baseUrl)
         {
@@ -25,6 +25,7 @@ namespace NcTalkOutlookAddIn.Services
             _baseUrl = NextcloudUriValidator.TryNormalizeBaseUrl(baseUrl, out normalizedBaseUrl)
                 ? normalizedBaseUrl
                 : string.Empty;
+            _httpClient = new NcHttpClient(new TalkServiceConfiguration(_baseUrl, string.Empty, string.Empty));
         }
 
         internal LoginFlowStart StartLoginFlow()

@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "Saved credentials could not be removed. Please try again."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud is temporarily limiting requests. Please wait and try again later."
+  },
+  "connection_reauthenticate": {
+    "message": "Sign in again"
+  },
+  "options_remove_credentials_button": {
+    "message": "Remove saved credentials"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Remove saved credentials from this Outlook profile? Please finish any ongoing uploads and other NC Connector actions first."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Removes the saved username and app password from this Outlook profile. The Nextcloud URL and other settings are retained. The app password in Nextcloud is not deleted."
+  },
+  "connection_auth_required": {
+    "message": "Your Nextcloud sign-in is no longer valid. Please sign in again."
+  },
+  "options_remove_credentials_success": {
+    "message": "Saved credentials have been removed. Please sign in again under General."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Please finish ongoing uploads first, then try again."
+  },
   "send_policy_check_failed": {
     "message": "The central sending requirements for this message could not be fulfilled. The message has not been sent. Check the connection or contact your administrator."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "The NC Connector Backend is currently unavailable."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud rejected the saved credentials. Sign in again in the NC Connector settings."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud is temporarily limiting requests. Please observe the specified waiting time."
   },
   "send_policy_signature_warning": {
     "message": "The central signature intended for this message could not be loaded. The message can still be sent."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Please connect NC Connector to your Nextcloud account. Sign in through your browser or enter your username and app password."
-  },
-  "connection_sign_in_required": {
-    "message": "Sign-in to Nextcloud was not successful. Please sign in again."
   },
   "options_base_url_label": {
     "message": "Nextcloud URL"

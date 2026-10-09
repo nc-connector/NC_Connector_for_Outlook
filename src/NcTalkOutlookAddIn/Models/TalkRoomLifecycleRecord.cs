@@ -34,6 +34,8 @@ namespace NcTalkOutlookAddIn.Models
 
         public bool PolicyRequired { get; set; }
 
+        public bool ConnectionPaused { get; set; }
+
         public int AttemptCount { get; set; }
 
         public DateTime NextAttemptUtc { get; set; }

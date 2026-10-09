@@ -16,6 +16,11 @@ namespace NcTalkOutlookAddIn.Services
         private static readonly Dictionary<string, string> CurrentUserIdCache =
             new Dictionary<string, string>(StringComparer.Ordinal);
 
+        internal static void ClearCache()
+        {
+            lock (CacheSync) { CurrentUserIdCache.Clear(); }
+        }
+
         internal static string ResolveCurrentUserId(TalkServiceConfiguration configuration, bool forceRefresh = false, bool verifyRejectedCredentials = false)
         {
             if (configuration == null)
@@ -27,6 +32,7 @@ namespace NcTalkOutlookAddIn.Services
                 throw new InvalidOperationException("Nextcloud credentials are incomplete.");
             }
 
+            NextcloudConnectionState.AssertRequestAllowed(configuration, verifyRejectedCredentials);
             string baseUrl = configuration.GetNormalizedBaseUrl();
             string cacheKey = baseUrl + "\n" + (configuration.Username ?? string.Empty).Trim();
             if (!forceRefresh)
@@ -96,10 +102,7 @@ namespace NcTalkOutlookAddIn.Services
                     response.ResponseText);
             }
 
-            if (verifyRejectedCredentials)
-            {
-                NcHttpClient.ConfirmVerifiedAuthentication(configuration, response.RequestSequence);
-            }
+            NextcloudConnectionState.RecordVerifiedIdentity(configuration, userId, response.RequestSequence, verifyRejectedCredentials);
             lock (CacheSync)
             {
                 CurrentUserIdCache[cacheKey] = userId;

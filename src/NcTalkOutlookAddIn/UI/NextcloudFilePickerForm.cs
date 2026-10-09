@@ -592,7 +592,7 @@ namespace NcTalkOutlookAddIn.UI
                     "Nextcloud picker folder load failed.",
                     ex);
                 MessageBox.Show(
-                    ex.Message,
+                    PolicyUiHelper.GetConnectionFailureMessage(ex, ex.Message),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -930,7 +930,7 @@ namespace NcTalkOutlookAddIn.UI
                     "Nextcloud picker folder snapshot failed.",
                     ex);
                 MessageBox.Show(
-                    ex.Message,
+                    PolicyUiHelper.GetConnectionFailureMessage(ex, ex.Message),
                     Strings.DialogTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);

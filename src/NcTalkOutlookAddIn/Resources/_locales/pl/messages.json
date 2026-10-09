@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "Nie udało się usunąć zapisanych danych logowania. Spróbuj ponownie."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud tymczasowo ogranicza liczbę żądań. Poczekaj i spróbuj ponownie później."
+  },
+  "connection_reauthenticate": {
+    "message": "Zaloguj się ponownie"
+  },
+  "options_remove_credentials_button": {
+    "message": "Usuń zapisane dane logowania"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Usunąć zapisane dane logowania z tego profilu Outlooka? Najpierw zakończ trwające przesyłanie plików i inne działania NC Connector."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Usuwa zapisaną nazwę użytkownika i hasło aplikacji z tego profilu Outlooka. Adres URL Nextcloud i pozostałe ustawienia zostaną zachowane. Hasło aplikacji w Nextcloud nie zostanie usunięte."
+  },
+  "connection_auth_required": {
+    "message": "Logowanie do Nextcloud nie jest już ważne. Zaloguj się ponownie."
+  },
+  "options_remove_credentials_success": {
+    "message": "Zapisane dane logowania zostały usunięte. Zaloguj się ponownie w zakładce Ogólne."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Najpierw zakończ trwające przesyłanie plików, a następnie spróbuj ponownie."
+  },
   "send_policy_check_failed": {
     "message": "Nie udało się spełnić centralnych wymagań wysyłania dla tej wiadomości. Wiadomość nie została wysłana. Sprawdź połączenie lub skontaktuj się z administratorem."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "NC Connector Backend jest obecnie niedostępny."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud odrzucił zapisane dane logowania. Zaloguj się ponownie w ustawieniach NC Connector."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud tymczasowo ogranicza liczbę żądań. Przestrzegaj wskazanego czasu oczekiwania."
   },
   "send_policy_signature_warning": {
     "message": "Nie udało się wczytać centralnego podpisu przeznaczonego dla tej wiadomości. Wiadomość można mimo to wysłać."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Połącz NC Connector ze swoim kontem Nextcloud. Zaloguj się przez przeglądarkę lub wpisz nazwę użytkownika i hasło aplikacji."
-  },
-  "connection_sign_in_required": {
-    "message": "Logowanie do Nextcloud nie powiodło się. Zaloguj się ponownie."
   },
   "options_base_url_label": {
     "message": "URL Nextcloud"

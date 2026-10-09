@@ -276,7 +276,15 @@ namespace NcTalkOutlookAddIn
                 _settingsStorage != null
                     ? _settingsStorage.DataDirectory
                     : string.Empty,
-                OutlookProfileScope);
+                OutlookProfileScope,
+                settings =>
+                {
+                    if (_settingsStorage == null)
+                    {
+                        throw new InvalidOperationException("Profile settings storage is unavailable.");
+                    }
+                    _settingsStorage.RemoveSavedCredentials(settings);
+                });
         }
 
         public bool OnGetMainRibbonTabVisible(IRibbonControl control)

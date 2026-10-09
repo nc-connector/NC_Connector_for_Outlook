@@ -1,4 +1,31 @@
 {
+  "options_remove_credentials_failed": {
+    "message": "Impossibile rimuovere le credenziali salvate. Riprova."
+  },
+  "connection_rate_limited": {
+    "message": "Nextcloud sta limitando temporaneamente le richieste. Attendi e riprova più tardi."
+  },
+  "connection_reauthenticate": {
+    "message": "Accedi di nuovo"
+  },
+  "options_remove_credentials_button": {
+    "message": "Rimuovi le credenziali salvate"
+  },
+  "options_remove_credentials_confirm": {
+    "message": "Rimuovere le credenziali salvate da questo profilo Outlook? Prima completare i caricamenti e le altre azioni di NC Connector in corso."
+  },
+  "options_remove_credentials_hint": {
+    "message": "Rimuove il nome utente e la password per applicazione salvati in questo profilo Outlook. L’URL di Nextcloud e le altre impostazioni vengono mantenuti. La password per applicazione in Nextcloud non viene eliminata."
+  },
+  "connection_auth_required": {
+    "message": "L’accesso a Nextcloud non è più valido. Accedi di nuovo."
+  },
+  "options_remove_credentials_success": {
+    "message": "Le credenziali salvate sono state rimosse. Accedi di nuovo nella scheda Generale."
+  },
+  "options_remove_credentials_busy": {
+    "message": "Completa prima i caricamenti in corso, poi riprova."
+  },
   "send_policy_check_failed": {
     "message": "Non è stato possibile soddisfare i requisiti centrali di invio per questo messaggio. Il messaggio non è stato inviato. Verifichi la connessione o contatti l’amministratore."
   },
@@ -10,12 +37,6 @@
   },
   "send_policy_backend_unavailable": {
     "message": "Il NC Connector Backend non è attualmente disponibile."
-  },
-  "send_policy_authentication_rejected": {
-    "message": "Nextcloud ha rifiutato le credenziali salvate. Acceda nuovamente nelle impostazioni di NC Connector."
-  },
-  "send_policy_rate_limited": {
-    "message": "Nextcloud sta limitando temporaneamente le richieste. Rispetti il tempo di attesa indicato."
   },
   "send_policy_signature_warning": {
     "message": "Non è stato possibile caricare la firma centrale prevista per questo messaggio. Il messaggio può comunque essere inviato."
@@ -241,9 +262,6 @@
   },
   "connection_setup_message": {
     "message": "Collega NC Connector al tuo account Nextcloud. Accedi tramite il browser oppure inserisci il nome utente e la password dell’app."
-  },
-  "connection_sign_in_required": {
-    "message": "L’accesso a Nextcloud non è riuscito. Accedi di nuovo."
   },
   "options_base_url_label": {
     "message": "URL Nextcloud"
