@@ -102,6 +102,7 @@ namespace NcTalkOutlookAddIn.UI
         private bool _allowEmptyUpload;
         private bool _shareFinalized;
         private bool _closeAfterCancellation;
+        private bool _closeRequested;
         private CancellationTokenSource _queueStorageCancellation;
         private Task _queueStorageTask = Task.CompletedTask;
         private int _queueStorageRequestId;
@@ -194,6 +195,8 @@ namespace NcTalkOutlookAddIn.UI
         internal FileLinkResult Result { get; private set; }
 
         internal bool UnexpectedFailureObserved { get; private set; }
+
+        internal bool CancelledByUser { get; private set; }
 
         internal FileLinkRequest RequestSnapshot
         {

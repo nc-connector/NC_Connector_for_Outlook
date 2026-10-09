@@ -72,6 +72,7 @@ namespace NcTalkOutlookAddIn.Controllers
             if (launchOptions != null)
             {
                 launchOptions.SharedLocalPaths.Clear();
+                launchOptions.CancelledByUser = false;
                 launchOptions.UnexpectedFailureObserved = false;
             }
             if (_owner == null || mail == null)
@@ -203,6 +204,8 @@ namespace NcTalkOutlookAddIn.Controllers
                 DialogResult wizardResult = wizard.ShowDialog();
                 if (launchOptions != null)
                 {
+                    launchOptions.CancelledByUser = wizardResult != DialogResult.OK
+                        && wizard.CancelledByUser;
                     launchOptions.UnexpectedFailureObserved = wizard.UnexpectedFailureObserved;
                 }
                 if (wizardResult == DialogResult.OK && wizard.Result != null)

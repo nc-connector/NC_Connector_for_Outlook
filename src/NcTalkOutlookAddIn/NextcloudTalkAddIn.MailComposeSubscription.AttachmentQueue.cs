@@ -255,7 +255,13 @@ namespace NcTalkOutlookAddIn
                     {
                         try
                         {
-                            if (accepted) { RemoveSharedAttachmentOriginals(originals, launchOptions.SharedLocalPaths); }
+                            if (accepted || launchOptions.CancelledByUser)
+                            {
+                                RemoveAttachmentOriginals(
+                                    originals,
+                                    launchOptions.SharedLocalPaths,
+                                    !accepted && launchOptions.CancelledByUser);
+                            }
                         }
                         finally
                         {

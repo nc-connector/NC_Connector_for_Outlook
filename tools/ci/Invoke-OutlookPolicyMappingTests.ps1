@@ -511,20 +511,62 @@ internal static class OutlookPolicyMappingTests
 
         NcHttpClient.NextResponse = new NcHttpResponse { HasHttpResponse = true, StatusCode = HttpStatusCode.NotFound };
         BackendPolicyStatus missingBackend = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
+        var managedSettings = new AddinSettings { IsEnterpriseRollout = true };
         Check("Missing backend remains a failed availability check without a license or seat refusal", !missingBackend.EndpointAvailable && !missingBackend.FetchSucceeded
-            && missingBackend.Reason == "backend_unavailable" && missingBackend.IsServiceUnavailable
+            && missingBackend.Reason == "backend_missing" && missingBackend.IsEndpointMissing && missingBackend.IsServiceUnavailable
             && !missingBackend.PolicyActive && !PolicyUiHelper.HasBackendSeatEntitlement(missingBackend)
             && missingBackend.LicenseStatus == string.Empty && missingBackend.AccessStatus == string.Empty && missingBackend.SeatState == string.Empty
             && PolicyUiHelper.GetPolicyWarningMessage(missingBackend) == string.Empty
             && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(missingBackend) == Strings.SharingPasswordSeparateBackendRequiredTooltip);
+        Check("HTTP 404 without backend status explains the Enterprise Rollout backend requirement",
+            PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, missingBackend) == Strings.EnterpriseRolloutBackendRequired);
+        Check("Missing optional backend does not introduce an Enterprise Rollout warning",
+            PolicyUiHelper.GetEnterpriseRolloutNotice(new AddinSettings(), missingBackend) == string.Empty);
+        Check("An unknown Enterprise Rollout check does not claim the backend is missing",
+            PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, null) == Strings.EnterpriseRolloutStatusUnavailable);
         Check("Null backend keeps backend-required tooltip", PolicyUiHelper.GetPolicyWarningMessage(null) == string.Empty
             && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(null) == Strings.SharingPasswordSeparateBackendRequiredTooltip);
+        NcHttpClient.NextResponse = new NcHttpResponse
+        {
+            HasHttpResponse = true,
+            StatusCode = HttpStatusCode.NotFound,
+            ParsedJson = new Dictionary<string, object>
+            {
+                { "status", new Dictionary<string, object>
+                    { { "seat_assigned", true }, { "is_valid", true }, { "seat_state", "active" } } },
+                { "policy", new Dictionary<string, object> { { "share", new Dictionary<string, object>() } } },
+                { "policy_editable", new Dictionary<string, object> { { "share", new Dictionary<string, object>() } } }
+            }
+        };
+        BackendPolicyStatus valid404 = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
+        Check("Valid backend JSON with HTTP 404 remains an active policy", valid404.FetchSucceeded
+            && valid404.EndpointAvailable && valid404.IsDomainActive("share") && !valid404.IsEndpointMissing);
+        Check("Valid active backend status with HTTP 404 permits Enterprise Rollout",
+            PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, valid404) == string.Empty);
+        NcHttpClient.NextResponse.ParsedJson = new Dictionary<string, object> { { "status", "malformed" } };
+        BackendPolicyStatus malformed404 = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
+        Check("Malformed backend status is not classified as an absent optional backend", !malformed404.FetchSucceeded
+            && malformed404.Reason == "invalid_payload" && !malformed404.IsEndpointMissing);
+        Check("Malformed HTTP 404 status keeps the Enterprise Rollout retrieval failure notice",
+            PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, malformed404) == Strings.EnterpriseRolloutStatusUnavailable);
+        foreach (HttpStatusCode code in new[] { HttpStatusCode.InternalServerError, HttpStatusCode.ServiceUnavailable,
+            HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, (HttpStatusCode)429 })
+        {
+            NcHttpClient.NextResponse = new NcHttpResponse { HasHttpResponse = true, StatusCode = code };
+            BackendPolicyStatus failed = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
+            Check("Other failures never become optional backend absence: " + code, !failed.FetchSucceeded && !failed.IsEndpointMissing);
+            Check("Other HTTP errors do not claim Enterprise Rollout backend absence: " + code,
+                PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, failed) == Strings.EnterpriseRolloutStatusUnavailable);
+        }
         NcHttpClient.NextResponse = new NcHttpResponse { TransportException = new InvalidOperationException("Offline test") };
         BackendPolicyStatus unavailableBackend = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
         Check("Fetch failure is not misreported as no seat or expired license", unavailableBackend.EndpointAvailable && !unavailableBackend.FetchSucceeded
+            && !unavailableBackend.IsEndpointMissing && unavailableBackend.Reason == "nextcloud_unavailable"
             && PolicyUiHelper.GetPolicyWarningMessage(unavailableBackend) == Strings.PolicyWarningBackendUnavailable
             && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(unavailableBackend) == Strings.PolicyWarningBackendUnavailable
             && !PolicyUiHelper.HasBackendSeatEntitlement(unavailableBackend));
+        Check("Transport failure keeps the Enterprise Rollout retrieval failure notice",
+            PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, unavailableBackend) == Strings.EnterpriseRolloutStatusUnavailable);
         NcHttpClient.NextResponse = null;
         foreach (var malformed in new Dictionary<string, object>[] {
             null,
@@ -2360,7 +2402,7 @@ internal static class OutlookPolicyUiTests
     private static void TestBackendPolicyAvailabilitySnapshot()
     {
         foreach (string mode in new[] { "community", "pro" })
-        foreach (string reason in new[] { "nextcloud_unavailable", "backend_unavailable", "rate_limited", "authentication_rejected", "invalid_payload", "check_failed" })
+        foreach (string reason in new[] { "nextcloud_unavailable", "backend_unavailable", "backend_missing", "rate_limited", "authentication_rejected", "invalid_payload", "check_failed" })
         {
             object owner = New("NextcloudTalkAddIn");
             object configuration = New("Services.TalkServiceConfiguration", "https://cloud.example.test/nextcloud", "alice", "test-only");
@@ -2371,14 +2413,21 @@ internal static class OutlookPolicyUiTests
             object failure = Status(D(), D(), true, mode, "active");
             Set(failure, "FetchSucceeded", false);
             Set(failure, "Reason", reason);
+            if (reason == "backend_missing") Set(failure, "EndpointAvailable", false);
             if (reason == "rate_limited") Set(failure, "RetryAfterUtc", DateTime.UtcNow.AddMinutes(2));
             Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshotIfCurrent", configuration, failure, "test_failed_refresh", 2L), confirmed), "Failed current check retains the account's last confirmed policy");
             Check((DateTime)Field(owner, "_emailSignaturePolicyCacheFetchedAtUtc") == successAt, "Failed current check does not renew the confirmed policy timestamp");
             object[] currentArgs = { configuration, null };
             Check((bool)Method(owner.GetType(), "TryGetCurrentBackendPolicyCheck", 2).Invoke(owner, currentArgs)
                 && object.ReferenceEquals(currentArgs[1], failure), "Current failed check is observable separately from the last confirmed policy");
-            bool outage = reason == "nextcloud_unavailable" || reason == "backend_unavailable" || reason == "rate_limited";
+            bool outage = reason == "nextcloud_unavailable" || reason == "backend_unavailable" || reason == "backend_missing" || reason == "rate_limited";
             Check((bool)Get(currentArgs[1], "IsServiceUnavailable") == outage, "Authentication, invalid payload and technical failure cannot become an offline exception");
+            if (reason == "backend_missing")
+            {
+                string message = (string)Method(T("NextcloudTalkAddIn+MailComposeSubscription"), "GetSendPolicyFailureMessage", 1).Invoke(null, new[] { failure });
+                string expected = (string)T("Utilities.Strings").GetProperty("SendPolicyBackendUnavailable", Flags).GetValue(null, null);
+                Check(message == expected, "A missing required backend must not be reported as an unavailable Nextcloud server");
+            }
             var retained = (Task)Call(owner, "GetEmailSignaturePolicyStatusAsync", configuration, "test_recent_failure");
             Check(retained.IsCompleted && object.ReferenceEquals(Get(retained, "Result"), confirmed), "Recent failure does not refetch or hide confirmed policy knowledge");
 

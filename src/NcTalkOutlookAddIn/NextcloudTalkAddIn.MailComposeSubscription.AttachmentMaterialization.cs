@@ -684,29 +684,37 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private void RemoveSharedAttachmentOriginals(
+            private void RemoveAttachmentOriginals(
                 List<AttachmentShareOriginal> originals,
-                IList<string> sharedLocalPaths)
+                IList<string> sharedLocalPaths,
+                bool cancelledByUser)
             {
-                if (!CanApplyComposeChanges || sharedLocalPaths == null || sharedLocalPaths.Count == 0)
+                if (!CanApplyComposeChanges
+                    || (!cancelledByUser && (sharedLocalPaths == null || sharedLocalPaths.Count == 0)))
                 {
                     return;
                 }
                 var shared = new HashSet<FileLinkSelection>(FileLinkSelection.IdentityComparer);
-                foreach (string path in sharedLocalPaths)
+                if (!cancelledByUser)
                 {
-                    if (!string.IsNullOrWhiteSpace(path))
+                    foreach (string path in sharedLocalPaths)
                     {
-                        shared.Add(new FileLinkSelection(FileLinkSelectionType.File, path));
+                        if (!string.IsNullOrWhiteSpace(path))
+                        {
+                            shared.Add(new FileLinkSelection(FileLinkSelectionType.File, path));
+                        }
                     }
                 }
+                string reason = cancelledByUser ? "cancelled_originals" : "shared_originals";
+                int removedCount = 0;
                 _attachmentSuppressed = true;
                 try
                 {
                     foreach (AttachmentShareOriginal original in originals)
                     {
                         if (original.Attachment == null
-                            || !shared.Contains(new FileLinkSelection(FileLinkSelectionType.File, original.LocalPath))
+                            || (!cancelledByUser
+                                && !shared.Contains(new FileLinkSelection(FileLinkSelectionType.File, original.LocalPath)))
                             || IsHiddenAttachment(original.Attachment))
                         {
                             continue;
@@ -718,19 +726,24 @@ namespace NcTalkOutlookAddIn
                                 return;
                             }
                             original.Attachment.Delete();
+                            removedCount++;
                         }
                         catch (Exception ex)
                         {
                             DiagnosticsLogger.LogException(
                                 LogCategories.FileLink,
-                                "Failed to remove an original attachment after successful sharing (composeKey=" + _composeKey + ").",
+                                "Failed to remove an original attachment (composeKey=" + _composeKey
+                                    + ", reason=" + reason + ").",
                                 ex);
                         }
                     }
                 }
                 finally
                 {
-                    EndAttachmentSuppression("shared_originals");
+                    LogFileLink("Compose attachment originals removed (composeKey=" + _composeKey
+                        + ", reason=" + reason
+                        + ", removed=" + removedCount.ToString(CultureInfo.InvariantCulture) + ").");
+                    EndAttachmentSuppression(reason);
                 }
             }
 

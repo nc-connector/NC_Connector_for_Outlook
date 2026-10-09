@@ -78,6 +78,11 @@ namespace NcTalkOutlookAddIn.Models
 
         internal DateTime RetryAfterUtc { get; set; }
 
+        internal bool IsEndpointMissing
+        {
+            get { return !FetchSucceeded && !EndpointAvailable && Reason == "backend_missing"; }
+        }
+
         internal bool IsServiceUnavailable
         {
             get
@@ -85,6 +90,7 @@ namespace NcTalkOutlookAddIn.Models
                 return !FetchSucceeded
                        && (Reason == "nextcloud_unavailable"
                            || Reason == "backend_unavailable"
+                           || IsEndpointMissing
                            || Reason == "rate_limited");
             }
         }

@@ -62,7 +62,7 @@ namespace NcTalkOutlookAddIn.Services
                 return BuildLocalStatus(
                     endpointAvailable: false,
                     fetchSucceeded: false,
-                    reason: "backend_unavailable");
+                    reason: "backend_missing");
             }
 
             DiagnosticsLogger.LogException(LogCategories.Core, "Policy status endpoint unavailable (status=" + (int)statusCode + ").", null);

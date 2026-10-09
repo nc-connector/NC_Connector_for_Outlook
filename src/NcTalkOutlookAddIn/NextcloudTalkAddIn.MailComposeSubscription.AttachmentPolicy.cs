@@ -48,6 +48,8 @@ namespace NcTalkOutlookAddIn
                 internal long ThresholdBytes { get; set; }
 
                 internal bool EnterpriseRolloutBlocked { get; set; }
+
+                internal bool BackendRequired { get; set; }
             }
 
             private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
@@ -225,6 +227,8 @@ namespace NcTalkOutlookAddIn
                     ? local.LocalSettings : new AddinSettings();
                 AttachmentAutomationSettings resolved = BuildAttachmentAutomationSettings(
                     settings.ResolvePolicyDefaults(policyStatus), settings);
+                resolved.BackendRequired = settings.IsEnterpriseRollout
+                    || (policyStatus != null && policyStatus.IsDomainActive("share"));
                 resolved.ThresholdMandatory = resolved.OfferAboveEnabled
                     && policyStatus != null
                     && policyStatus.IsLocked("share", "attachments_min_size_mb")
@@ -294,7 +298,8 @@ namespace NcTalkOutlookAddIn
                         return BlockSendPolicyFailure(ref cancel, null, true);
                     }
                 }
-                if (checkCurrent && !check.FetchSucceeded)
+                if (checkCurrent && !check.FetchSucceeded
+                    && (!check.IsEndpointMissing || settings.BackendRequired))
                 {
                     if (check.IsServiceUnavailable && (current == null || !current.SendPolicyFailClosed))
                     {
@@ -335,7 +340,8 @@ namespace NcTalkOutlookAddIn
                 }
                 var configuration = new TalkServiceConfiguration(current.ServerUrl, current.Username, current.AppPassword);
                 BackendPolicyStatus check;
-                if (!_owner.TryGetCurrentBackendPolicyCheck(configuration, out check) || check.FetchSucceeded)
+                if (!_owner.TryGetCurrentBackendPolicyCheck(configuration, out check) || check.FetchSucceeded
+                    || (check.IsEndpointMissing && !settings.BackendRequired))
                 {
                     return false;
                 }

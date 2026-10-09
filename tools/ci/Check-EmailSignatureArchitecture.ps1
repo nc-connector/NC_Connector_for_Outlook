@@ -746,7 +746,7 @@ public static class SignatureSendGateRegression
         internal bool FetchSucceeded = true, SeatEntitled = true;
         internal string Reason = "confirmed";
         internal EmailSignaturePolicy Signature = new EmailSignaturePolicy();
-        internal bool IsServiceUnavailable { get { return !FetchSucceeded && (Reason == "nextcloud_unavailable" || Reason == "backend_unavailable" || Reason == "rate_limited"); } }
+        internal bool IsServiceUnavailable { get { return !FetchSucceeded && (Reason == "nextcloud_unavailable" || Reason == "backend_unavailable" || Reason == "backend_missing" || Reason == "rate_limited"); } }
     }
     private static class PolicyUiHelper { internal static bool HasBackendSeatEntitlement(BackendPolicyStatus status) { return status != null && status.FetchSucceeded && status.SeatEntitled; } }
     private sealed class EmailSignaturePolicyService
@@ -834,7 +834,7 @@ public static class SignatureSendGateRegression
             initial.State.Check = new BackendPolicyStatus { FetchSucceeded = false, Reason = "nextcloud_unavailable" };
             Check(Send(initial) == !closed && initial.Warnings == 0 && initial.Schedules > 0,
                 "Unknown policy allows normal mail silently by default; explicit failclosed blocks only Send");
-            foreach (string reason in new[] { "nextcloud_unavailable", "backend_unavailable", "rate_limited", "authentication_rejected", "check_failed", "invalid_payload" })
+            foreach (string reason in new[] { "nextcloud_unavailable", "backend_unavailable", "backend_missing", "rate_limited", "authentication_rejected", "check_failed", "invalid_payload" })
             {
                 var current = new BackendPolicyStatus { FetchSucceeded = false, Reason = reason };
                 bool outage = current.IsServiceUnavailable;

@@ -153,9 +153,9 @@ $attachmentSettingsFreshness = Get-MethodSlice `
 $requiredAttachmentNotice = Get-MethodSlice `
     $attachmentPolicy `
     "private static void ShowRequiredAttachmentRoutingNotice()"
-$removeSharedAttachments = Get-MethodSlice `
+$removeAttachmentOriginals = Get-MethodSlice `
     $attachmentMaterialization `
-    "private void RemoveSharedAttachmentOriginals("
+    "private void RemoveAttachmentOriginals("
 $removeLastAttachmentBatch = Get-MethodSlice `
     $attachmentMaterialization `
     "private void RemoveLastAddedAttachmentBatch("
@@ -360,12 +360,12 @@ Assert-Precedes `
     "CancellationToken.None"
 Assert-Precedes `
     "Successful sharing preserves hidden attachments" `
-    $removeSharedAttachments `
+    $removeAttachmentOriginals `
     "IsHiddenAttachment(original.Attachment)" `
     "original.Attachment.Delete();"
 Assert-Contains `
     "Successful sharing only removes files present in the completed upload plan" `
-    $removeSharedAttachments `
+    $removeAttachmentOriginals `
     "shared.Contains(new FileLinkSelection(FileLinkSelectionType.File, original.LocalPath))"
 Assert-Precedes `
     "Completed local paths are published only after body insertion" `
@@ -969,7 +969,7 @@ public static class AttachmentHandoffRegression
     public static void Run()
     {
         CheckAttachmentModeNotices();
-        foreach (string scenario in new[] { "cancel", "success", "subset", "queue-rejected", "prefetch-failed", "upload-failed", "closed", "removed", "sent" })
+        foreach (string scenario in new[] { "cancel", "cancel-after-error", "cancel-sent", "success", "subset", "queue-rejected", "prefetch-failed", "upload-failed", "closed", "removed", "sent" })
         {
             var compose = new Subscription();
             Outlook.Attachment first = compose._mail.Attachments.Add("A.pdf");
@@ -980,7 +980,9 @@ public static class AttachmentHandoffRegression
             Outlook.Attachment later = null;
             compose._owner.WizardAction = (mail, options) =>
             {
-                if (scenario == "sent") { compose._sendAccepted = true; }
+                if (scenario == "sent" || scenario == "cancel-sent") { compose._sendAccepted = true; }
+                options.CancelledByUser = scenario == "cancel" || scenario == "cancel-after-error" || scenario == "cancel-sent";
+                options.UnexpectedFailureObserved = scenario == "cancel-after-error";
                 later = mail.Attachments.Add("A.pdf"); // Same name must never transfer ownership.
                 foreach (FileLinkSelection item in options.InitialSelections)
                 {
@@ -997,28 +999,33 @@ public static class AttachmentHandoffRegression
             catch (InvalidOperationException)
             { Check(scenario == "prefetch-failed" || scenario == "upload-failed", "Unexpected flow error: " + scenario); }
             if (scenario == "success") { Check(first.Deleted && second.Deleted && !later.Deleted, "Successful sharing did not remove only exact originals."); }
+            else if (scenario == "cancel" || scenario == "cancel-after-error")
+            { Check(first.Deleted && second.Deleted && !later.Deleted, "Cancellation did not discard only the adopted original attachments: " + scenario); }
             else if (scenario == "subset") { Check(!first.Deleted && second.Deleted && !later.Deleted, "Removing a file from the wizard removed its native original."); }
             else if (scenario != "removed") { Check(!first.Deleted && !second.Deleted, "Unsuccessful sharing deleted native attachments: " + scenario); }
             Check(!compose.FlowRunning && compose.CleanupCalls == 1, "Flow state or temporary-file cleanup leaked: " + scenario);
             Check(compose._owner.UiDispatches == 1, "Original cleanup did not marshal to the Outlook UI: " + scenario);
-            Check(compose._owner.Invalidations == (scenario == "upload-failed" || scenario == "prefetch-failed" ? 1 : 0),
+            Check(compose._owner.Invalidations == (scenario == "upload-failed" || scenario == "prefetch-failed" || scenario == "cancel-after-error" ? 1 : 0),
                 "User cancellation was confused with service failure: " + scenario);
         }
 
-        foreach (bool success in new[] { false, true })
+        foreach (string outcome in new[] { "success", "cancel", "failure" })
         {
             var compose = new Subscription();
             var original = compose._mail.Attachments.Add("same.pdf");
             var unrelated = compose._mail.Attachments.Add("same.pdf");
             var hidden = compose._mail.Attachments.Add("logo.png");
             hidden.Hidden = true;
-            compose._owner.Accept = success;
+            compose._owner.Accept = outcome == "success";
             compose._owner.WizardAction = (mail, options) =>
-            { options.SharedLocalPaths.Add(original.LocalPath); };
+            {
+                options.CancelledByUser = outcome == "cancel";
+                if (outcome == "success") { options.SharedLocalPaths.Add(original.LocalPath); }
+            };
             Task flow = compose.StartQueued(original);
             compose._owner.Prefetch.SetResult(true);
             flow.GetAwaiter().GetResult();
-            Check(original.Deleted == success && !unrelated.Deleted && !hidden.Deleted,
+            Check(original.Deleted == (outcome != "failure") && !unrelated.Deleted && !hidden.Deleted,
                 "Before-add sharing used filenames instead of the event attachment identity.");
             Check(!compose.FlowRunning, "Queued attachment flow did not release state.");
             Check(original.Releases == 1 && unrelated.Releases == 0, "Owned COM references leaked or borrowed references were released.");
@@ -1058,7 +1065,7 @@ $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__QUEUED_FLOW__",
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__FINALIZE_FLOW__", (Get-MethodSlice $attachmentQueue "private async Task FinalizeAttachmentShareFlowAsync("))
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__COLLECT__", $collectAttachments)
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__CAPTURE_BEFORE_ADD__", (Get-MethodSlice $attachmentMaterialization "private void CaptureBeforeAddAttachmentOriginal("))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__REMOVE_SHARED__", $removeSharedAttachments)
+$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__REMOVE_SHARED__", $removeAttachmentOriginals)
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__RELEASE_ORIGINALS__", (Get-MethodSlice $attachmentMaterialization "private static void ReleaseAttachmentShareOriginals("))
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__ATTACHMENT_MODE_INFO__", (Get-MethodSlice $fileLinkWizard "private string BuildAttachmentModeInfoText()"))
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__FORMAT_MEGABYTES__", (Get-MethodSlice (Read-Source "src\NcTalkOutlookAddIn\Utilities\SizeFormatting.cs") "internal static string FormatMegabytes("))
@@ -1066,6 +1073,78 @@ Add-Type -TypeDefinition $attachmentHandoffHarness -Language CSharp -IgnoreWarni
 [AttachmentHandoffRegression]::Run()
 Write-Host "[OK] Exact attachment ownership, successful subset sharing, cancellation, changed collection, hidden resources, queue rejection and failed prefetch/upload"
 Write-Host "[OK] Attachment wizard notices: direct/pre-add always, preserved threshold reason, exact boundary, unknown triggers and mixed batches"
+
+$wizardClosingHarness = @'
+using System;
+using System.Threading;
+
+public static class AttachmentWizardClosingRegression
+{
+    private enum CloseReason { UserClosing, WindowsShutDown, FormOwnerClosing }
+    private sealed class FormClosingEventArgs
+    {
+        internal CloseReason CloseReason;
+        internal bool Cancel;
+    }
+    private class BaseForm
+    {
+        protected virtual void OnFormClosing(FormClosingEventArgs e) { }
+    }
+    private sealed class Wizard : BaseForm
+    {
+        internal bool _shareFinalized, _closeAfterCancellation, _closeRequested;
+        internal CancellationTokenSource _cancellationSource;
+        internal bool CancelledByUser { get; private set; }
+        internal bool Close(CloseReason reason)
+        {
+            var args = new FormClosingEventArgs { CloseReason = reason };
+            OnFormClosing(args);
+            return !args.Cancel;
+        }
+        __CLOSING__
+    }
+    public static void Run()
+    {
+        var cancelled = new Wizard();
+        if (!cancelled.Close(CloseReason.UserClosing) || !cancelled.CancelledByUser)
+        { throw new Exception("Cancel/window X did not record the user's cancellation."); }
+        foreach (CloseReason reason in new[] { CloseReason.WindowsShutDown, CloseReason.FormOwnerClosing })
+        {
+            var shutdown = new Wizard();
+            if (!shutdown.Close(reason) || shutdown.CancelledByUser)
+            { throw new Exception("Host shutdown was mistaken for an attachment cancellation."); }
+        }
+        var finished = new Wizard { _shareFinalized = true };
+        if (!finished.Close(CloseReason.UserClosing) || finished.CancelledByUser)
+        { throw new Exception("Successful sharing was mistaken for cancellation."); }
+        using (var source = new CancellationTokenSource())
+        {
+            var uploading = new Wizard { _cancellationSource = source };
+            if (uploading.Close(CloseReason.UserClosing) || !uploading.CancelledByUser
+                || !source.IsCancellationRequested || !uploading._closeAfterCancellation)
+            { throw new Exception("Cancelling an active upload lost the user's intent."); }
+            uploading._cancellationSource = null;
+            if (!uploading.Close(CloseReason.UserClosing) || !uploading.CancelledByUser)
+            { throw new Exception("Deferred close lost the attachment cancellation."); }
+        }
+        using (var source = new CancellationTokenSource())
+        {
+            var shutdown = new Wizard { _cancellationSource = source };
+            if (shutdown.Close(CloseReason.FormOwnerClosing) || shutdown.CancelledByUser)
+            { throw new Exception("Host close during upload discarded attachments."); }
+            shutdown._cancellationSource = null;
+            if (!shutdown.Close(CloseReason.UserClosing) || shutdown.CancelledByUser)
+            { throw new Exception("Deferred host close was reclassified as user cancellation."); }
+        }
+    }
+}
+'@
+$wizardClosingHarness = $wizardClosingHarness.Replace("__CLOSING__", (Get-MethodSlice (Read-Source "src\NcTalkOutlookAddIn\UI\FileLinkWizardForm.Upload.cs") "protected override void OnFormClosing("))
+Add-Type -TypeDefinition $wizardClosingHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
+[AttachmentWizardClosingRegression]::Run()
+Assert-Contains "Wizard cancellation is propagated separately from failure" $fileLinkWizardUi "&& wizard.CancelledByUser;"
+Assert-Contains "Successful wizard results do not discard unshared originals" $fileLinkWizardUi "launchOptions.CancelledByUser = wizardResult != DialogResult.OK"
+Write-Host "[OK] Attachment cancellation distinguishes user close, active upload, successful completion and host shutdown"
 
 # Exercise delayed attachment evaluation and removal with the production methods.
 $attachmentSendRaceHarness = @'
@@ -1371,13 +1450,37 @@ public static class AttachmentSendGateRegression
         internal bool FetchSucceeded, Always, ThresholdMandatory, RolloutBlocked;
         internal string Reason = "";
         internal int ThresholdMb = 10;
+        internal bool IsEndpointMissing { get { return Reason == "backend_missing"; } }
         internal bool IsServiceUnavailable
-        { get { return !FetchSucceeded && (Reason == "nextcloud_unavailable" || Reason == "backend_unavailable" || Reason == "rate_limited"); } }
+        { get { return !FetchSucceeded && (Reason == "nextcloud_unavailable" || Reason == "backend_unavailable" || IsEndpointMissing || Reason == "rate_limited"); } }
+        internal bool IsDomainActive(string domain) { return FetchSucceeded && (Always || ThresholdMandatory); }
+        internal bool IsLocked(string domain, string key) { return ThresholdMandatory; }
+        internal bool HasPolicyKey(string domain, string key) { return ThresholdMandatory; }
     }
     private sealed class AddinSettings
     {
         internal bool IsEnterpriseRollout, SendPolicyFailClosed;
         internal string ServerUrl = "https://cloud.example.test", Username = "user", AppPassword = "test-only";
+        internal bool SharingAttachmentsAlwaysConnector, SharingAttachmentsOfferAboveEnabled;
+        internal int SharingAttachmentsOfferAboveMb = 10;
+        internal AddinSettings ResolvePolicyDefaults(BackendPolicyStatus status)
+        {
+            return new AddinSettings
+            {
+                SharingAttachmentsAlwaysConnector = SharingAttachmentsAlwaysConnector || (status != null && status.Always),
+                SharingAttachmentsOfferAboveEnabled = SharingAttachmentsOfferAboveEnabled || (status != null && status.ThresholdMandatory),
+                SharingAttachmentsOfferAboveMb = status != null ? status.ThresholdMb : SharingAttachmentsOfferAboveMb
+            };
+        }
+    }
+    private static class PolicyUiHelper
+    {
+        internal static string GetEnterpriseRolloutNotice(AddinSettings settings, BackendPolicyStatus status)
+        { return status.RolloutBlocked ? "rollout-blocked" : string.Empty; }
+    }
+    private static class OutlookAttachmentAutomationGuardService
+    {
+        internal static int NormalizeThresholdMb(int value) { return Math.Max(1, value); }
     }
     private sealed class Owner
     {
@@ -1408,6 +1511,7 @@ public static class AttachmentSendGateRegression
         internal readonly List<string> Logs = new List<string>();
         internal bool Validate(ref bool cancel)
         { MessageBox.Notices.Clear(); Warnings = Blocks = 0; return TryValidateAttachmentPolicyBeforeSend(ref cancel); }
+        internal bool Pause() { return PauseUnavailableAttachmentAutomation(ReadAttachmentAutomationSettings(), TotalBytes); }
         internal void Know(BackendPolicyStatus status, BackendPolicyStatus check, bool closed)
         {
             _owner.Confirmed = status;
@@ -1420,20 +1524,11 @@ public static class AttachmentSendGateRegression
         { CountCalls++; totalBytes = TotalBytes; return AttachmentCount; }
         private void BeginAttachmentAutomationSettingsRefresh() { RefreshCalls++; }
         private AttachmentAutomationSettings ReadLocalAttachmentAutomationSettings()
-        { return new AttachmentAutomationSettings { LocalSettings = _owner._currentSettings, AlwaysConnector = LocalAlways }; }
-        private static AttachmentAutomationSettings ApplyAttachmentAutomationPolicy(AttachmentAutomationSettings local, BackendPolicyStatus status)
         {
-            return new AttachmentAutomationSettings
-            {
-                LocalSettings = local.LocalSettings,
-                AlwaysConnector = status.Always || local.AlwaysConnector,
-                ThresholdMandatory = status.ThresholdMandatory,
-                OfferAboveEnabled = status.ThresholdMandatory,
-                EnterpriseRolloutBlocked = status.RolloutBlocked,
-                ThresholdMb = status.ThresholdMb,
-                ThresholdBytes = (long)status.ThresholdMb * 1024L * 1024L
-            };
+            _owner._currentSettings.SharingAttachmentsAlwaysConnector = LocalAlways;
+            return ApplyAttachmentAutomationPolicy(new AttachmentAutomationSettings { LocalSettings = _owner._currentSettings }, null);
         }
+        private void ShowSendPolicyWarning() { }
         private void RecordSendPolicyWarning(bool signature, bool attachments, BackendPolicyStatus check)
         { if (!attachments || signature || !check.IsServiceUnavailable) { throw new InvalidOperationException("Wrong attachment warning"); } Warnings++; }
         private bool BlockSendPolicyFailure(ref bool cancel, BackendPolicyStatus check, bool unknown)
@@ -1446,6 +1541,9 @@ public static class AttachmentSendGateRegression
         __INVALIDATE_SETTINGS__
         __SEND_GATE__
         __REQUIRED_NOTICE__
+        __APPLY_POLICY__
+        __BUILD_SETTINGS__
+        __PAUSE_AUTOMATION__
     }
     private static void Check(bool condition, string message)
     { if (!condition) { throw new InvalidOperationException(message); } }
@@ -1453,7 +1551,7 @@ public static class AttachmentSendGateRegression
     {
         foreach (bool closed in new[] { false, true })
         {
-            foreach (string checkState in new[] { "online", "nextcloud_unavailable", "backend_unavailable", "rate_limited", "authentication_rejected", "invalid_payload", "check_failed", "pending" })
+            foreach (string checkState in new[] { "online", "nextcloud_unavailable", "backend_unavailable", "backend_missing", "rate_limited", "authentication_rejected", "invalid_payload", "check_failed", "pending" })
             {
                 foreach (string rule in new[] { "none", "always", "threshold-required", "threshold-optional", "refused" })
                 {
@@ -1516,6 +1614,41 @@ public static class AttachmentSendGateRegression
             bool emptyCancel = false;
             Check(empty.Validate(ref emptyCancel) && !emptyCancel && empty.RefreshCalls == 0 && empty.Warnings == 0,
                 "No relevant attachment still checked or enforced a rule.");
+
+            foreach (BackendPolicyStatus previous in new[] { null, new BackendPolicyStatus { FetchSucceeded = true } })
+            {
+                var localOnly = new Subscription { LocalAlways = true };
+                localOnly.Know(previous, new BackendPolicyStatus { Reason = "backend_missing" }, closed);
+                Check(!localOnly.Pause() && localOnly.Warnings == 0,
+                    "A missing optional backend paused local attachment sharing.");
+                bool localCancel = false;
+                Check(!localOnly.Validate(ref localCancel) && localCancel && localOnly.Warnings == 0
+                    && MessageBox.Notices.Count == 1,
+                    "A missing optional backend bypassed local AlwaysConnector with native attachments.");
+                localOnly.AttachmentCount = 0;
+                localCancel = false;
+                Check(localOnly.Validate(ref localCancel) && !localCancel && localOnly.Warnings == 0,
+                    "Discarded attachment originals still blocked the attachment Send gate.");
+            }
+
+            foreach (bool managed in new[] { false, true })
+            {
+                var requiredBackend = new Subscription { LocalAlways = true };
+                requiredBackend._owner._currentSettings.IsEnterpriseRollout = managed;
+                requiredBackend.Know(managed ? null : new BackendPolicyStatus { FetchSucceeded = true, Always = true },
+                    new BackendPolicyStatus { Reason = "backend_missing" }, closed);
+                Check(requiredBackend.Pause(), "A required or previously used backend was treated as optional.");
+                bool missingCancel = false;
+                Check(requiredBackend.Validate(ref missingCancel) == !closed && missingCancel == closed,
+                    "Missing required backend ignored the selected outage mode.");
+            }
+
+            foreach (string failure in new[] { "nextcloud_unavailable", "backend_unavailable", "authentication_rejected", "invalid_payload", "rate_limited" })
+            {
+                var failedLocal = new Subscription { LocalAlways = true };
+                failedLocal.Know(null, new BackendPolicyStatus { Reason = failure }, closed);
+                Check(failedLocal.Pause(), "A real failure was mistaken for a missing optional backend: " + failure);
+            }
         }
 
         var freshRefusal = new Subscription();
@@ -1543,8 +1676,12 @@ $attachmentSendGateHarness = $attachmentSendGateHarness.Replace("__REFRESH_SETTI
 $attachmentSendGateHarness = $attachmentSendGateHarness.Replace("__INVALIDATE_SETTINGS__", (Get-MethodSlice $attachmentPolicy "internal void RefreshAttachmentAutomationSettings()"))
 $attachmentSendGateHarness = $attachmentSendGateHarness.Replace("__SEND_GATE__", $attachmentSendGate)
 $attachmentSendGateHarness = $attachmentSendGateHarness.Replace("__REQUIRED_NOTICE__", $requiredAttachmentNotice)
+$attachmentSendGateHarness = $attachmentSendGateHarness.Replace("__APPLY_POLICY__", (Get-MethodSlice $attachmentPolicy "private static AttachmentAutomationSettings ApplyAttachmentAutomationPolicy("))
+$attachmentSendGateHarness = $attachmentSendGateHarness.Replace("__BUILD_SETTINGS__", (Get-MethodSlice $attachmentPolicy "private static AttachmentAutomationSettings BuildAttachmentAutomationSettings("))
+$attachmentSendGateHarness = $attachmentSendGateHarness.Replace("__PAUSE_AUTOMATION__", (Get-MethodSlice $attachmentPolicy "private bool PauseUnavailableAttachmentAutomation("))
 Add-Type -TypeDefinition $attachmentSendGateHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
 [AttachmentSendGateRegression]::Run()
 Write-Host "[OK] Attachment Send matrix: fail modes, locked threshold, availability, rate limiting, authentication, unknown state, account change and Seat refusal"
+Write-Host "[OK] Missing optional backend permits local automation; managed/remembered backend rules and actual outages retain their enforcement"
 
 Write-Host "All Outlook compose lifecycle regression checks passed."

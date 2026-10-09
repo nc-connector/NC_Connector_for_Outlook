@@ -23,6 +23,11 @@ namespace NcTalkOutlookAddIn.UI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            if (!_closeRequested)
+            {
+                _closeRequested = true;
+                CancelledByUser = !_shareFinalized && e.CloseReason == CloseReason.UserClosing;
+            }
             if (!_shareFinalized && _cancellationSource != null)
             {
                 _closeAfterCancellation = true;

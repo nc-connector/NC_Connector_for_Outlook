@@ -37,6 +37,8 @@ namespace NcTalkOutlookAddIn.Models
 
         internal IList<string> SharedLocalPaths { get; private set; }
 
+        internal bool CancelledByUser { get; set; }
+
         internal bool UnexpectedFailureObserved { get; set; }
     }
 }

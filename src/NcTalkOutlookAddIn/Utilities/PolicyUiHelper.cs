@@ -24,6 +24,10 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return Strings.ManagedTlsPolicyInvalid;
             }
+            if (status != null && status.IsEndpointMissing)
+            {
+                return Strings.EnterpriseRolloutBackendRequired;
+            }
             if (status == null || !status.FetchSucceeded)
             {
                 return Strings.EnterpriseRolloutStatusUnavailable;

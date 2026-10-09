@@ -171,7 +171,7 @@ namespace NcTalkOutlookAddIn
                            + (check.RetryAfterUtc > DateTime.UtcNow
                                ? " " + check.RetryAfterUtc.ToLocalTime().ToString("T", CultureInfo.CurrentCulture) : string.Empty);
                 }
-                return check != null && check.Reason == "backend_unavailable"
+                return check != null && (check.Reason == "backend_unavailable" || check.IsEndpointMissing)
                     ? Strings.SendPolicyBackendUnavailable : Strings.SendPolicyNextcloudUnavailable;
             }
 

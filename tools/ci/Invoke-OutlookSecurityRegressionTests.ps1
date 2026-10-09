@@ -225,9 +225,9 @@ internal static class OutlookSecurityRegressionTests
         {
             CheckInvalidBackendStatus("Successful HTTP requires a complete status payload", FetchBackendStatus(200, body));
             BackendPolicyStatus missing = FetchBackendStatus(404, body);
-            Check("Ordinary HTTP 404 is backend unavailability, not a confirmed policy or Seat refusal", !missing.FetchSucceeded
+            Check("Ordinary HTTP 404 identifies the missing endpoint, not a confirmed policy or Seat refusal", !missing.FetchSucceeded
                 && !missing.EndpointAvailable && !missing.PolicyActive && !missing.SeatAssigned
-                && missing.Reason == "backend_unavailable" && missing.IsServiceUnavailable);
+                && missing.Reason == "backend_missing" && missing.IsEndpointMissing && missing.IsServiceUnavailable);
         }
 
         foreach (int code in new[] { 301, 400, 401, 403, 409, 429, 500, 502, 503, 504, 507 })
