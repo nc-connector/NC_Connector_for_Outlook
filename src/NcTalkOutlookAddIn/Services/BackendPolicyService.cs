@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
@@ -42,9 +43,10 @@ namespace NcTalkOutlookAddIn.Services
             }
             string endpointUrl = baseUrl.TrimEnd('/') + StatusEndpointPath;
 
-            IDictionary<string, object> payload;
-            HttpStatusCode statusCode;
-            bool httpOk = ExecuteJsonRequest(endpointUrl, out statusCode, out payload);
+            NcHttpResponse response = ExecuteJsonRequest(endpointUrl);
+            IDictionary<string, object> payload = response.ParsedJson;
+            HttpStatusCode statusCode = response.StatusCode;
+            bool httpOk = response.HasHttpResponse && (int)statusCode >= 200 && (int)statusCode < 300;
 
             // Some installations return this endpoint's valid JSON with HTTP 404.
             IDictionary<string, object> normalized = NormalizePayload(payload);
@@ -59,15 +61,28 @@ namespace NcTalkOutlookAddIn.Services
                 DiagnosticsLogger.LogException(LogCategories.Core, "Policy status endpoint missing: " + endpointUrl, null);
                 return BuildLocalStatus(
                     endpointAvailable: false,
-                    fetchSucceeded: true,
-                    reason: "endpoint_missing");
+                    fetchSucceeded: false,
+                    reason: "backend_unavailable");
             }
 
             DiagnosticsLogger.LogException(LogCategories.Core, "Policy status endpoint unavailable (status=" + (int)statusCode + ").", null);
-            return BuildLocalStatus(
+            string failureReason = !response.HasHttpResponse
+                ? "nextcloud_unavailable"
+                : (statusCode == HttpStatusCode.Unauthorized
+                    ? "authentication_rejected"
+                    : ((int)statusCode == 429 ? "rate_limited"
+                        : ((int)statusCode == 500 || (int)statusCode == 502
+                           || (int)statusCode == 503 || (int)statusCode == 504
+                            ? "backend_unavailable" : "check_failed")));
+            BackendPolicyStatus failure = BuildLocalStatus(
                 endpointAvailable: true,
                 fetchSucceeded: false,
-                reason: "endpoint_unavailable");
+                reason: failureReason);
+            if (failureReason == "rate_limited")
+            {
+                failure.RetryAfterUtc = ReadRetryAfterUtc(response);
+            }
+            return failure;
         }
 
         internal static BackendPolicyStatus ParseStatus(IDictionary<string, object> payload)
@@ -179,11 +194,8 @@ namespace NcTalkOutlookAddIn.Services
                 emailSignatureEditable: null);
         }
 
-        private bool ExecuteJsonRequest(string url, out HttpStatusCode statusCode, out IDictionary<string, object> parsed)
+        private NcHttpResponse ExecuteJsonRequest(string url)
         {
-            statusCode = 0;
-            parsed = null;
-
             NcHttpResponse response = _httpClient.Send(new NcHttpRequestOptions
             {
                 Method = "GET",
@@ -204,12 +216,29 @@ namespace NcTalkOutlookAddIn.Services
                 {
                     DiagnosticsLogger.LogException(LogCategories.Core, "Policy status request failed without HTTP response.", null);
                 }
-                return false;
             }
+            return response;
+        }
 
-            statusCode = response.StatusCode;
-            parsed = response.ParsedJson;
-            return (int)statusCode >= 200 && (int)statusCode < 300;
+        private static DateTime ReadRetryAfterUtc(NcHttpResponse response)
+        {
+            string value;
+            if (response.Headers != null && response.Headers.TryGetValue("Retry-After", out value))
+            {
+                int seconds;
+                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out seconds)
+                    && seconds >= 0)
+                {
+                    return DateTime.UtcNow.AddSeconds(seconds);
+                }
+                DateTimeOffset retryAt;
+                if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out retryAt))
+                {
+                    return retryAt.UtcDateTime;
+                }
+            }
+            return DateTime.UtcNow.AddMinutes(1);
         }
 
         private static IDictionary<string, object> NormalizePayload(IDictionary<string, object> payload)

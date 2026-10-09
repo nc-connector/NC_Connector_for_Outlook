@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Az üzenetre vonatkozó központi küldési előírásokat nem sikerült teljesíteni. Az üzenet nem lett elküldve. Ellenőrizze a kapcsolatot, vagy forduljon a rendszergazdához."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "A központi „SendPolicyFailureMode” beállítás érvénytelen. A „failopen” mód érvényes. Forduljon a rendszergazdához."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "A Nextcloud jelenleg nem érhető el."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "Az NC Connector Backend jelenleg nem érhető el."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "A Nextcloud elutasította a mentett bejelentkezési adatokat. Jelentkezzen be újra az NC Connector beállításaiban."
+  },
+  "send_policy_rate_limited": {
+    "message": "A Nextcloud átmenetileg korlátozza a kéréseket. Tartsa be a megadott várakozási időt."
+  },
+  "send_policy_signature_warning": {
+    "message": "Az ehhez az üzenethez előírt központi aláírást nem sikerült betölteni. Az üzenet ennek ellenére elküldhető."
+  },
+  "send_policy_attachment_warning": {
+    "message": "A mellékleteket nem sikerült az előírások szerint megosztani az NC Connectoron keresztül. Normál mellékletként megmaradnak. Az üzenet ennek ellenére elküldhető."
+  },
+  "send_policy_combined_warning": {
+    "message": "A központi aláírást és a mellékletek kötelező megosztását nem sikerült teljesen végrehajtani. Az üzenet ennek ellenére elküldhető; a nem megosztott fájlok normál mellékletként megmaradnak."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "Szervezete megköveteli a központi küldési házirendek betartását. Az üzenet nem lett elküldve. A kapcsolat helyreállítása után próbálja újra."
+  },
   "managed_auth_mode_invalid": {
     "message": "A központilag beállított bejelentkezési mód érvénytelen. A Nextcloud-bejelentkezés van kiválasztva, de nem indul el automatikusan. Forduljon a rendszergazdához."
   },
@@ -849,7 +879,7 @@
     "message": "A mellékletekre vonatkozó szabályok frissítése folyamatban van. Kérjük, próbálja meg egy pillanat múlva újra elküldeni az üzenetet."
   },
   "outlook_attachment_routing_required": {
-    "message": "A mellékletek jelenlegi beállításai megkövetelik a fájlok NC Connectoron keresztüli megosztását. Kérjük, használja a Nextcloud megosztási varázslóját ezeknek a fájloknak a megosztásához."
+    "message": "Az üzenet mellékleteit az NC Connectoron keresztül kell megosztani. Ossza meg a fájlokat, vagy távolítsa el az érintett mellékleteket. Az üzenet nem lett elküldve."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "A mellékletmód aktív. A kijelölt mellékletek az NC Connectoron keresztül lesznek megosztva."
@@ -951,10 +981,10 @@
     "message": "A licenc lejárt. Az aktív, hozzárendelt Seattel rendelkező felhasználók a türelmi idő alatt tovább használhatják a Pro funkciókat."
   },
   "email_signature_policy_unavailable": {
-    "message": "Az aláírási házirend még nem érhető el. Ellenőrizze a Nextcloud-kapcsolatot, és próbálja újra elküldeni az üzenetet."
+    "message": "A központi küldési házirendeket nem sikerült ellenőrizni. Szervezete csak sikeres ellenőrzés után engedélyezi a küldést. Ellenőrizze a Nextcloud-kapcsolatot és az NC Connector Backend elérhetőségét. Az üzenet nem lett elküldve, és piszkozatként menthető."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "Az e-mail-aláírást nem sikerült biztonságosan frissíteni. Az üzenet nem lett elküldve. Próbálja újra elküldeni."
+    "message": "A kötelező központi aláírást nem sikerült megfelelően beszúrni vagy frissíteni. Az üzenet nem lett elküldve. Próbálja újra. Ha a probléma továbbra is fennáll, forduljon az ügyfélszolgálathoz."
   },
   "policy_license_expired": {
     "message": "A licence lejárt, és a türelmi idő véget ért. A Pro funkciók már nem érhetők el. Az alapfunkciókat továbbra is használhatja."

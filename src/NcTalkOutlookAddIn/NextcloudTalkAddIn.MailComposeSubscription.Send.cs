@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Windows.Forms;
 using NcTalkOutlookAddIn.Controllers;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
@@ -18,17 +19,32 @@ namespace NcTalkOutlookAddIn
         // Handles send validation and separate-password preparation.
         internal sealed partial class MailComposeSubscription
         {
+            private bool _sendPolicySignatureWarning;
+            private bool _sendPolicyAttachmentWarning;
+            private BackendPolicyStatus _sendPolicyWarningCheck;
+            private string _lastSendPolicyWarning = string.Empty;
+            private bool _sendAccepted;
+
             private void OnSend(ref bool cancel)
             {
                 if (_disposed || cancel)
                 {
                     return;
                 }
-                if (!TryValidateAttachmentPolicyBeforeSend(ref cancel)
+                _sendPolicySignatureWarning = false;
+                _sendAccepted = false;
+                _sendPolicyAttachmentWarning = false;
+                _sendPolicyWarningCheck = null;
+                if (!TryValidateKnownSendPolicyBeforeSend(ref cancel)
+                    || !TryValidateAttachmentPolicyBeforeSend(ref cancel)
                     || !TryFinalizeEmailSignatureBeforeSend(ref cancel))
                 {
                     return;
                 }
+                ShowSendPolicyWarning();
+                _sendAccepted = true;
+                _emailSignatureTimer.Stop();
+                _emailSignatureRequestGeneration++;
 
                 // Send provides the final account and recipients. The primary may then stay
                 // in Outbox, so password delivery follows this action, not later transport.
@@ -76,6 +92,87 @@ namespace NcTalkOutlookAddIn
                     + passwordDispatchCount.ToString(
                         CultureInfo.InvariantCulture)
                     + ").");
+            }
+
+            private bool TryValidateKnownSendPolicyBeforeSend(ref bool cancel)
+            {
+                _owner.EnsureSettingsLoaded();
+                var settings = _owner._currentSettings;
+                var configuration = new TalkServiceConfiguration(settings.ServerUrl, settings.Username, settings.AppPassword);
+                BackendPolicyStatus known;
+                if (_owner.TryGetCachedEmailSignaturePolicyStatus(configuration, out known)
+                    && known.FetchSucceeded)
+                {
+                    return true;
+                }
+                ScheduleEmailSignatureApplication("send_policy_initial_check");
+                if (!settings.SendPolicyFailClosed)
+                {
+                    return true;
+                }
+                BackendPolicyStatus check;
+                _owner.TryGetCurrentBackendPolicyCheck(configuration, out check);
+                return BlockSendPolicyFailure(ref cancel, check, true);
+            }
+
+            private void RecordSendPolicyWarning(bool signature, bool attachments, BackendPolicyStatus check)
+            {
+                _sendPolicySignatureWarning |= signature;
+                _sendPolicyAttachmentWarning |= attachments;
+                _sendPolicyWarningCheck = check;
+            }
+
+            private void ShowSendPolicyWarning()
+            {
+                if (!_sendPolicySignatureWarning && !_sendPolicyAttachmentWarning)
+                {
+                    _lastSendPolicyWarning = string.Empty;
+                    return;
+                }
+                string body = _sendPolicySignatureWarning && _sendPolicyAttachmentWarning
+                    ? Strings.SendPolicyCombinedWarning
+                    : (_sendPolicySignatureWarning ? Strings.SendPolicySignatureWarning : Strings.SendPolicyAttachmentWarning);
+                string message = GetSendPolicyFailureMessage(_sendPolicyWarningCheck) + " " + body;
+                if (!string.Equals(_lastSendPolicyWarning, message, StringComparison.Ordinal))
+                {
+                    _lastSendPolicyWarning = message;
+                    _owner.ShowComposeWarning(message);
+                }
+            }
+
+            private bool BlockSendPolicyFailure(ref bool cancel, BackendPolicyStatus check, bool unknown)
+            {
+                cancel = true;
+                string message = unknown
+                    ? Strings.EmailSignaturePolicyUnavailable
+                    : (check == null || !check.IsServiceUnavailable
+                        ? Strings.SendPolicyCheckFailed
+                        : GetSendPolicyFailureMessage(check) + " " + Strings.SendPolicyUnavailableBlocked);
+                if (check != null && check.Reason == "authentication_rejected")
+                {
+                    message = Strings.SendPolicyAuthenticationRejected + " "
+                              + (unknown ? Strings.EmailSignaturePolicyUnavailable : Strings.SendPolicyCheckFailed);
+                }
+                else if (unknown && check != null && check.Reason == "rate_limited")
+                {
+                    message = GetSendPolicyFailureMessage(check) + " " + message;
+                }
+                DiagnosticsLogger.Log(LogCategories.Core,
+                    "Send policy blocked (unknown=" + unknown + ", reason=" + (check != null ? check.Reason : "pending") + ").");
+                MessageBox.Show(message, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            private static string GetSendPolicyFailureMessage(BackendPolicyStatus check)
+            {
+                if (check != null && check.Reason == "rate_limited")
+                {
+                    return Strings.SendPolicyRateLimited
+                           + (check.RetryAfterUtc > DateTime.UtcNow
+                               ? " " + check.RetryAfterUtc.ToLocalTime().ToString("T", CultureInfo.CurrentCulture) : string.Empty);
+                }
+                return check != null && check.Reason == "backend_unavailable"
+                    ? Strings.SendPolicyBackendUnavailable : Strings.SendPolicyNextcloudUnavailable;
             }
 
             private void CapturePasswordDispatchRecipients()

@@ -310,12 +310,14 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed with service error.", ex);
                 FlushBufferedUploadProgress();
                 ShowUploadError(ex.Message);
             }
             catch (Exception ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed unexpectedly.", ex);
                 FlushBufferedUploadProgress();
                 ShowUploadError(ex.Message);
@@ -403,6 +405,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Empty upload preparation failed with service error.",
@@ -411,6 +414,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Empty upload preparation failed unexpectedly.",

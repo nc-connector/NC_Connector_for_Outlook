@@ -50,6 +50,13 @@ $nonPersistedProperties = @(
     "ManagedNextcloudUrlSource",
     "ManagedNextcloudUrlLocked"
 )
+foreach ($match in [regex]::Matches($settings, '\[XmlIgnore\]\s*public\s+(?:[\w\?<>]+)\s+(?<name>\w+)\s*\{')) {
+    $propertyName = $match.Groups["name"].Value
+    $nonPersistedProperties += $propertyName
+    if ($savedKeys.Contains($propertyName) -or $loadedKeys.Contains($propertyName)) {
+        $failures.Add("SettingsStorage must not persist runtime-only AddinSettings.$propertyName.")
+    }
+}
 
 foreach ($key in $savedKeys) {
     $propertyName = if ($specialSavedKeyToProperty.ContainsKey($key)) { $specialSavedKeyToProperty[$key] } else { $key }

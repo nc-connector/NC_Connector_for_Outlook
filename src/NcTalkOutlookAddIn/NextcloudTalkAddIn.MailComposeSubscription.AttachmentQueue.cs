@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
@@ -33,19 +34,18 @@ namespace NcTalkOutlookAddIn
 
                 internal string Trigger { get; set; }
 
-                internal int BaselineAttachmentCount { get; set; }
             }
 
             private async Task StartComposeAttachmentShareFlowAsync(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
             {
                 OutlookAttachmentAutomationGuardService.GuardState guardState;
-                if (_owner.TryGetAttachmentAutomationGuardState("start_flow", _composeKey, out guardState))
+                if (_beforeAddShareFlowRunning
+                    || _owner.TryGetAttachmentAutomationGuardState("start_flow", _composeKey, out guardState))
                 {
                     return;
                 }
-                var removeIndices = new List<int>();
+                var originals = new List<AttachmentShareOriginal>();
                 var tempFiles = new List<string>();
-
                 var launchOptions = new FileLinkWizardLaunchOptions
                 {
                     AttachmentMode = true,
@@ -53,138 +53,65 @@ namespace NcTalkOutlookAddIn
                     AttachmentTotalBytes = Math.Max(0, totalBytes),
                     AttachmentThresholdMb = Math.Max(1, thresholdMb),
                     AttachmentLastName = lastAdded != null ? (lastAdded.Name ?? string.Empty) : string.Empty,
-                    AttachmentLastSizeBytes = lastAdded != null ? Math.Max(0, lastAdded.SizeBytes) : 0,
-                    OnInitialQueueAdopted = () =>
-                        RemoveAttachmentsByIndices(
-                            removeIndices,
-                            "share_flow")
+                    AttachmentLastSizeBytes = lastAdded != null ? Math.Max(0, lastAdded.SizeBytes) : 0
                 };
                 launchOptions.PrepareInitialSelections = () =>
-                    PrepareComposeAttachmentSelections(
-                        launchOptions,
-                        removeIndices,
-                        tempFiles);
+                    PrepareComposeAttachmentSelections(launchOptions, originals, tempFiles);
+
+                _beforeAddShareFlowRunning = true;
+                _attachmentSuppressed = true;
+                bool accepted = false;
+                ExceptionDispatchInfo failure = null;
                 try
                 {
-                    bool wizardAccepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
+                    accepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
                     LogFileLink(
-                        "Compose attachment flow completed (composeKey="
-                        + _composeKey
-                        + ", trigger="
-                        + launchOptions.AttachmentTrigger
-                        + ", queued="
-                        + launchOptions.InitialSelections.Count.ToString(CultureInfo.InvariantCulture)
-                        + ", wizardAccepted="
-                        + wizardAccepted.ToString(CultureInfo.InvariantCulture)
-                        + ").");
+                        "Compose attachment flow completed (composeKey=" + _composeKey
+                        + ", trigger=" + launchOptions.AttachmentTrigger
+                        + ", wizardAccepted=" + accepted.ToString(CultureInfo.InvariantCulture) + ").");
+                }
+                catch (Exception ex)
+                {
+                    failure = ExceptionDispatchInfo.Capture(ex);
+                    launchOptions.UnexpectedFailureObserved = !(ex is OperationCanceledException);
+                }
+                try
+                {
+                    await FinalizeAttachmentShareFlowAsync(originals, launchOptions, accepted);
+                }
+                catch (Exception ex)
+                {
+                    if (failure == null) { failure = ExceptionDispatchInfo.Capture(ex); }
                 }
                 finally
                 {
                     CleanupTemporaryFiles(tempFiles);
                 }
+                if (failure != null) { failure.Throw(); }
             }
 
             private bool PrepareComposeAttachmentSelections(
                 FileLinkWizardLaunchOptions launchOptions,
-                List<int> removeIndices,
+                List<AttachmentShareOriginal> originals,
                 List<string> tempFiles)
             {
-                if (_disposed || _mail == null)
+                if (!CanApplyComposeChanges || _mail == null)
                 {
                     return false;
                 }
-
-                // Capture positions after prefetch, in the same STA call that accepts
-                // the queue and removes its originals before entering the modal loop.
+                // Keep owned attachment identities through the wizard, never stale collection positions.
                 var selections = new List<FileLinkSelection>();
-                CollectAttachmentSelectionsForShare(selections, removeIndices, tempFiles);
+                CollectAttachmentSelectionsForShare(selections, originals, tempFiles);
                 if (selections.Count == 0)
                 {
                     LogFileLink("Compose attachment flow skipped (composeKey=" + _composeKey + ", reason=no_collectible_files).");
                     return false;
                 }
-
                 foreach (FileLinkSelection selection in selections)
                 {
                     launchOptions.InitialSelections.Add(selection);
                 }
                 return true;
-            }
-
-            private void StartBeforeAddAttachmentShareFlow(
-                string trigger,
-                AttachmentBatchEntry candidate,
-                string localPath,
-                int thresholdMb,
-                bool cleanupLocalPathAfterFlow)
-            {
-                int baselineAttachmentCount = ReadComposeAttachmentCount("before_add_single_baseline");
-                RunAttachmentFlowTask(
-                    StartBeforeAddAttachmentShareFlowAsync(trigger, candidate, localPath, thresholdMb, cleanupLocalPathAfterFlow, baselineAttachmentCount),
-                    "Compose before-attachment-add share flow failed");
-            }
-
-            private async Task StartBeforeAddAttachmentShareFlowAsync(
-                string trigger,
-                AttachmentBatchEntry candidate,
-                string localPath,
-                int thresholdMb,
-                bool cleanupLocalPathAfterFlow,
-                int baselineAttachmentCount)
-            {
-                if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
-                {
-                    LogFileLink("Compose before-attachment-add share flow skipped (composeKey=" + _composeKey + ", reason=missing_local_path).");
-                    return;
-                }
-                if (_beforeAddShareFlowRunning)
-                {
-                    QueueBeforeAddAttachmentShareFlow(trigger, candidate, localPath, thresholdMb, cleanupLocalPathAfterFlow);
-                    return;
-                }
-                var launchOptions = new FileLinkWizardLaunchOptions
-                {
-                    AttachmentMode = true,
-                    AttachmentTrigger = string.IsNullOrWhiteSpace(trigger) ? "threshold_preadd" : trigger,
-                    AttachmentTotalBytes = Math.Max(0, candidate != null ? candidate.SizeBytes : 0),
-                    AttachmentThresholdMb = Math.Max(1, thresholdMb),
-                    AttachmentLastName = candidate != null ? (candidate.Name ?? string.Empty) : string.Empty,
-                    AttachmentLastSizeBytes = Math.Max(0, candidate != null ? candidate.SizeBytes : 0)
-                };
-                launchOptions.InitialSelections.Add(new FileLinkSelection(FileLinkSelectionType.File, localPath));
-
-                _beforeAddShareFlowRunning = true;
-                _attachmentSuppressed = true;
-                _pendingAddedBatch.Clear();
-                try
-                {
-                    bool wizardAccepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
-                    LogFileLink(
-                        "Compose before-attachment-add share flow completed (composeKey="
-                        + _composeKey
-                        + ", trigger="
-                        + launchOptions.AttachmentTrigger
-                        + ", wizardAccepted="
-                        + wizardAccepted.ToString(CultureInfo.InvariantCulture)
-                        + ", attachment="
-                        + (candidate != null ? (candidate.Name ?? string.Empty) : string.Empty)
-                        + ").");
-                }
-                finally
-                {
-                    RemoveSuppressedBeforeAddAttachmentByName(
-                        candidate != null ? candidate.Name : string.Empty,
-                        candidate != null ? candidate.SizeBytes : 0,
-                        baselineAttachmentCount,
-                        "before_add_single");
-                    if (cleanupLocalPathAfterFlow)
-                    {
-                        CleanupTemporaryFiles(new List<string> { localPath });
-                    }
-                    EndAttachmentSuppression("before_add_single");
-                    _beforeAddShareFlowRunning = false;
-                    RestartBeforeAddShareTimerIfNeeded();
-                }
             }
 
             private void QueueBeforeAddAttachmentShareFlow(
@@ -204,14 +131,14 @@ namespace NcTalkOutlookAddIn
                 {
                     Candidate = new AttachmentBatchEntry
                     {
+                        OriginalAttachment = candidate != null ? candidate.OriginalAttachment : null,
                         Name = candidate != null ? (candidate.Name ?? string.Empty) : string.Empty,
                         SizeBytes = Math.Max(0, candidate != null ? candidate.SizeBytes : 0)
                     },
                     LocalPath = localPath,
                     ThresholdMb = Math.Max(1, thresholdMb),
                     CleanupLocalPathAfterFlow = cleanupLocalPathAfterFlow,
-                    Trigger = string.IsNullOrWhiteSpace(trigger) ? "always_preadd" : trigger,
-                    BaselineAttachmentCount = ReadComposeAttachmentCount("before_add_queue_baseline")
+                    Trigger = string.IsNullOrWhiteSpace(trigger) ? "always_preadd" : trigger
                 });
 
                 LogFileLink(
@@ -251,78 +178,117 @@ namespace NcTalkOutlookAddIn
                 _beforeAddShareFlowRunning = true;
                 var batch = new List<BeforeAddShareEntry>(_pendingBeforeAddShareEntries);
                 _pendingBeforeAddShareEntries.Clear();
-
+                var originals = new List<AttachmentShareOriginal>();
+                var temporaryFiles = new List<string>();
                 var launchOptions = new FileLinkWizardLaunchOptions
                 {
                     AttachmentMode = true,
-                    AttachmentTrigger = "always_preadd_batch"
+                    AttachmentTrigger = batch.TrueForAll(entry => entry != null
+                        && string.Equals(entry.Trigger, "threshold_preadd", StringComparison.OrdinalIgnoreCase))
+                        ? "threshold" : "always"
                 };
-                var temporaryFiles = new List<string>();
-                long totalBytes = 0;
-                int thresholdMb = 1;
-                string lastName = string.Empty;
-                long lastSize = 0;
+                launchOptions.PrepareInitialSelections = () =>
+                {
+                    if (!CanApplyComposeChanges) { return false; }
+                    var selections = new List<FileLinkSelection>();
+                    foreach (BeforeAddShareEntry entry in batch)
+                    {
+                        CaptureBeforeAddAttachmentOriginal(entry.Candidate, selections, originals, temporaryFiles);
+                    }
+                    foreach (FileLinkSelection selection in selections) { launchOptions.InitialSelections.Add(selection); }
+                    return selections.Count > 0;
+                };
 
+                bool accepted = false;
+                ExceptionDispatchInfo failure = null;
                 try
                 {
-                    for (int i = 0; i < batch.Count; i++)
+                    foreach (BeforeAddShareEntry entry in batch)
                     {
-                        BeforeAddShareEntry entry = batch[i];
-                        if (entry == null || string.IsNullOrWhiteSpace(entry.LocalPath) || !File.Exists(entry.LocalPath))
-                        {
-                            continue;
-                        }
-
-                        launchOptions.InitialSelections.Add(new FileLinkSelection(FileLinkSelectionType.File, entry.LocalPath));
-                        totalBytes += Math.Max(0, entry.Candidate != null ? entry.Candidate.SizeBytes : 0);
-                        thresholdMb = Math.Max(thresholdMb, Math.Max(1, entry.ThresholdMb));
-                        lastName = entry.Candidate != null ? (entry.Candidate.Name ?? string.Empty) : string.Empty;
-                        lastSize = Math.Max(0, entry.Candidate != null ? entry.Candidate.SizeBytes : 0);
-                        if (entry.CleanupLocalPathAfterFlow)
-                        {
-                            temporaryFiles.Add(entry.LocalPath);
-                        }
+                        if (entry == null) { continue; }
+                        if (entry.CleanupLocalPathAfterFlow) { temporaryFiles.Add(entry.LocalPath); }
+                        launchOptions.AttachmentTotalBytes += Math.Max(0, entry.Candidate != null ? entry.Candidate.SizeBytes : 0);
+                        launchOptions.AttachmentThresholdMb = Math.Max(launchOptions.AttachmentThresholdMb, entry.ThresholdMb);
+                        launchOptions.AttachmentLastName = entry.Candidate != null ? entry.Candidate.Name : string.Empty;
+                        launchOptions.AttachmentLastSizeBytes = Math.Max(0, entry.Candidate != null ? entry.Candidate.SizeBytes : 0);
                     }
-                    if (launchOptions.InitialSelections.Count == 0)
+                    if (batch.Count > 0)
                     {
-                        LogFileLink("Compose before-attachment-add queued share flow skipped (composeKey=" + _composeKey + ", reason=no_collectible_files).");
-                        return;
+                        _attachmentSuppressed = true;
+                        _pendingAddedBatch.Clear();
+                        accepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
+                        LogFileLink(
+                            "Compose queued attachment flow completed (composeKey=" + _composeKey
+                            + ", queued=" + batch.Count.ToString(CultureInfo.InvariantCulture)
+                            + ", wizardAccepted=" + accepted.ToString(CultureInfo.InvariantCulture) + ").");
                     }
-
-                    launchOptions.AttachmentTotalBytes = Math.Max(0, totalBytes);
-                    launchOptions.AttachmentThresholdMb = thresholdMb;
-                    launchOptions.AttachmentLastName = lastName;
-                    launchOptions.AttachmentLastSizeBytes = lastSize;
-
-                    _attachmentSuppressed = true;
-                    _pendingAddedBatch.Clear();
-                    bool wizardAccepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
-                    LogFileLink(
-                        "Compose before-attachment-add queued share flow completed (composeKey="
-                        + _composeKey
-                        + ", queued="
-                        + batch.Count.ToString(CultureInfo.InvariantCulture)
-                        + ", selected="
-                        + launchOptions.InitialSelections.Count.ToString(CultureInfo.InvariantCulture)
-                        + ", wizardAccepted="
-                        + wizardAccepted.ToString(CultureInfo.InvariantCulture)
-                        + ").");
+                }
+                catch (Exception ex)
+                {
+                    failure = ExceptionDispatchInfo.Capture(ex);
+                    launchOptions.UnexpectedFailureObserved = !(ex is OperationCanceledException);
+                }
+                try
+                {
+                    await FinalizeAttachmentShareFlowAsync(originals, launchOptions, accepted);
+                }
+                catch (Exception ex)
+                {
+                    if (failure == null) { failure = ExceptionDispatchInfo.Capture(ex); }
                 }
                 finally
                 {
-                    for (int i = 0; i < batch.Count; i++)
-                    {
-                        BeforeAddShareEntry entry = batch[i];
-                        RemoveSuppressedBeforeAddAttachmentByName(
-                            entry != null && entry.Candidate != null ? entry.Candidate.Name : string.Empty,
-                            entry != null && entry.Candidate != null ? entry.Candidate.SizeBytes : 0,
-                            entry != null ? entry.BaselineAttachmentCount : 0,
-                            "before_add_batch");
-                    }
                     CleanupTemporaryFiles(temporaryFiles);
-                    EndAttachmentSuppression("before_add_batch");
-                    _beforeAddShareFlowRunning = false;
-                    RestartBeforeAddShareTimerIfNeeded();
+                }
+                if (failure != null) { failure.Throw(); }
+            }
+
+            private async Task FinalizeAttachmentShareFlowAsync(
+                List<AttachmentShareOriginal> originals,
+                FileLinkWizardLaunchOptions launchOptions,
+                bool accepted)
+            {
+                bool stateReleased = false;
+                try
+                {
+                    await _owner.RunOnOutlookUiThreadAsync(() =>
+                    {
+                        try
+                        {
+                            if (accepted) { RemoveSharedAttachmentOriginals(originals, launchOptions.SharedLocalPaths); }
+                        }
+                        finally
+                        {
+                            try { ReleaseAttachmentShareOriginals(originals); }
+                            finally
+                            {
+                                _beforeAddShareFlowRunning = false;
+                                stateReleased = true;
+                                EndAttachmentSuppression("share_flow_complete");
+                                if (!accepted && launchOptions.UnexpectedFailureObserved)
+                                {
+                                    AddinSettings current = _owner._currentSettings;
+                                    if (current != null)
+                                    {
+                                        var configuration = new TalkServiceConfiguration(current.ServerUrl, current.Username, current.AppPassword);
+                                        _owner.InvalidateCurrentBackendPolicyCheck(configuration);
+                                        BeginAttachmentAutomationSettingsRefresh();
+                                        ScheduleEmailSignatureApplication("attachment_failure");
+                                    }
+                                }
+                                RestartBeforeAddShareTimerIfNeeded();
+                            }
+                        }
+                        return true;
+                    });
+                }
+                finally
+                {
+                    if (!stateReleased)
+                    {
+                        _attachmentSuppressed = false;
+                        _beforeAddShareFlowRunning = false;
+                    }
                 }
             }
 

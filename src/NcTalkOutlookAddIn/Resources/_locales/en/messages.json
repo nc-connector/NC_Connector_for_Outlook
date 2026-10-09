@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "The central sending requirements for this message could not be fulfilled. The message has not been sent. Check the connection or contact your administrator."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "The centrally configured setting ‘SendPolicyFailureMode’ is invalid. ‘failopen’ applies. Please contact your administrator."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "Nextcloud is currently unreachable."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "The NC Connector Backend is currently unavailable."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud rejected the saved credentials. Sign in again in the NC Connector settings."
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud is temporarily limiting requests. Please observe the specified waiting time."
+  },
+  "send_policy_signature_warning": {
+    "message": "The central signature intended for this message could not be loaded. The message can still be sent."
+  },
+  "send_policy_attachment_warning": {
+    "message": "The attachments could not be shared through NC Connector as required. They remain as normal attachments. The message can still be sent."
+  },
+  "send_policy_combined_warning": {
+    "message": "The central signature and required attachment sharing could not be completed. The message can still be sent; files that were not shared remain as normal attachments."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "Your organization requires enforcement of the central sending policies. The message has not been sent. Try again after the connection is restored."
+  },
   "managed_auth_mode_invalid": {
     "message": "The centrally configured sign-in method is invalid. Login with Nextcloud is selected without starting automatically. Please contact your administrator."
   },
@@ -876,7 +906,7 @@
     "message": "Attachment rules are being updated. Please try sending again in a moment."
   },
   "outlook_attachment_routing_required": {
-    "message": "The current attachment settings require files to be shared with NC Connector. Please use the Nextcloud sharing wizard to share these files."
+    "message": "The attachments for this message must be shared through NC Connector. Share the files or remove the affected attachments. The message has not been sent."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "Attachment mode is active. Selected attachments will be shared with NC Connector."
@@ -978,10 +1008,10 @@
     "message": "Your license has expired. Users with an active assigned Seat can continue using Pro features during the grace period."
   },
   "email_signature_policy_unavailable": {
-    "message": "The signature policy is not available yet. Please check the connection to your Nextcloud and try sending again."
+    "message": "The central sending policies could not be checked. Your organization allows sending only after a successful check. Check the Nextcloud connection and availability of the NC Connector Backend. The message has not been sent and can be saved as a draft."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "The email signature could not be updated safely. Your message has not been sent. Please try sending again."
+    "message": "The required central signature could not be inserted or updated correctly. The message has not been sent. Please try again. If the problem persists, contact support."
   },
   "policy_license_expired": {
     "message": "Your license has expired and the grace period has ended. Pro features are no longer available. You can still use the basic features."

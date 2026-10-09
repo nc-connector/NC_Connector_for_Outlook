@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Aan de centrale verzendeisen voor dit bericht kon niet worden voldaan. Het bericht is niet verzonden. Controleer de verbinding of neem contact op met uw beheerder."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "De centrale instelling ‘SendPolicyFailureMode’ is ongeldig. ‘failopen’ wordt gebruikt. Neem contact op met uw beheerder."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "Nextcloud is momenteel niet bereikbaar."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "De NC Connector Backend is momenteel niet beschikbaar."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud heeft de opgeslagen inloggegevens geweigerd. Meld u opnieuw aan in de instellingen van NC Connector."
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud beperkt tijdelijk het aantal aanvragen. Houd rekening met de aangegeven wachttijd."
+  },
+  "send_policy_signature_warning": {
+    "message": "De centrale handtekening voor dit bericht kon niet worden geladen. Het bericht kan toch worden verzonden."
+  },
+  "send_policy_attachment_warning": {
+    "message": "De bijlagen konden niet zoals vereist via NC Connector worden gedeeld. Ze blijven als gewone bijlagen behouden. Het bericht kan toch worden verzonden."
+  },
+  "send_policy_combined_warning": {
+    "message": "De centrale handtekening en het verplichte delen van bijlagen konden niet worden voltooid. Het bericht kan toch worden verzonden; niet-gedeelde bestanden blijven als gewone bijlagen behouden."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "Uw organisatie vereist naleving van de centrale verzendregels. Het bericht is niet verzonden. Probeer het opnieuw zodra de verbinding is hersteld."
+  },
   "managed_auth_mode_invalid": {
     "message": "De centraal ingestelde aanmeldmethode is ongeldig. Aanmelden met Nextcloud is geselecteerd, maar wordt niet automatisch gestart. Neem contact op met uw beheerder."
   },
@@ -849,7 +879,7 @@
     "message": "De regels voor bijlagen worden bijgewerkt. Probeer het bericht over een ogenblik opnieuw te verzenden."
   },
   "outlook_attachment_routing_required": {
-    "message": "De huidige instellingen voor bijlagen vereisen dat bestanden met NC Connector worden gedeeld. Gebruik de Nextcloud-wizard voor delen om deze bestanden te delen."
+    "message": "De bijlagen van dit bericht moeten via NC Connector worden gedeeld. Deel de bestanden of verwijder de betreffende bijlagen. Het bericht is niet verzonden."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "Bijlagenmodus is actief. Geselecteerde bijlagen worden gedeeld met NC Connector."
@@ -951,10 +981,10 @@
     "message": "Uw licentie is verlopen. Gebruikers met een actief toegewezen Seat kunnen de Pro-functies tijdens de respijtperiode blijven gebruiken."
   },
   "email_signature_policy_unavailable": {
-    "message": "Het handtekeningbeleid is nog niet beschikbaar. Controleer de verbinding met uw Nextcloud en probeer opnieuw te verzenden."
+    "message": "De centrale verzendregels konden niet worden gecontroleerd. Uw organisatie staat verzending alleen toe na een geslaagde controle. Controleer de verbinding met Nextcloud en de beschikbaarheid van de NC Connector Backend. Het bericht is niet verzonden en kan als concept worden opgeslagen."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "De e-mailhandtekening kon niet veilig worden bijgewerkt. Uw bericht is niet verzonden. Probeer opnieuw te verzenden."
+    "message": "De verplichte centrale handtekening kon niet correct worden ingevoegd of bijgewerkt. Het bericht is niet verzonden. Probeer het opnieuw. Neem contact op met ondersteuning als het probleem blijft bestaan."
   },
   "policy_license_expired": {
     "message": "Uw licentie is verlopen en de respijtperiode is afgelopen. De Pro-functies zijn niet meer beschikbaar. U kunt de basisfuncties blijven gebruiken."

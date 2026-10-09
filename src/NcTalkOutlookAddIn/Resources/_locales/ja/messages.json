@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "このメッセージの中央送信要件を満たせませんでした。メッセージは送信されていません。接続を確認するか、管理者にお問い合わせください。"
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "中央設定「SendPolicyFailureMode」が無効です。「failopen」が適用されます。管理者にお問い合わせください。"
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "現在、Nextcloud に接続できません。"
+  },
+  "send_policy_backend_unavailable": {
+    "message": "現在、NC Connector Backend を利用できません。"
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud が保存済みの認証情報を拒否しました。NC Connector の設定で再度ログインしてください。"
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud が一時的にリクエストを制限しています。指定された待機時間を守ってください。"
+  },
+  "send_policy_signature_warning": {
+    "message": "このメッセージに使用する中央管理の署名を読み込めませんでした。メッセージはそのまま送信できます。"
+  },
+  "send_policy_attachment_warning": {
+    "message": "必要な方法で NC Connector を使って添付ファイルを共有できませんでした。通常の添付ファイルとして保持されます。メッセージはそのまま送信できます。"
+  },
+  "send_policy_combined_warning": {
+    "message": "中央管理の署名と必須の添付ファイル共有を完了できませんでした。メッセージはそのまま送信できます。共有されなかったファイルは通常の添付ファイルとして保持されます。"
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "組織は中央の送信ポリシーの適用を必須としています。メッセージは送信されていません。接続が復旧した後に再試行してください。"
+  },
   "managed_auth_mode_invalid": {
     "message": "一元設定されたログイン方法が無効です。Nextcloud でのログインが選択されますが、自動では開始されません。管理者にお問い合わせください。"
   },
@@ -849,7 +879,7 @@
     "message": "添付ファイルのルールを更新しています。しばらくしてからもう一度送信してください。"
   },
   "outlook_attachment_routing_required": {
-    "message": "現在の添付ファイル設定では、NC Connector を使用してファイルを共有する必要があります。Nextcloud 共有ウィザードを使用してこれらのファイルを共有してください。"
+    "message": "このメッセージの添付ファイルは NC Connector で共有する必要があります。ファイルを共有するか、該当する添付ファイルを削除してください。メッセージは送信されていません。"
   },
   "sharing_attachment_mode_reason_always": {
     "message": "添付ファイルモードが有効です。選択した添付ファイルは NC Connector で共有されます。"
@@ -951,10 +981,10 @@
     "message": "ライセンスの有効期限が切れています。有効なシートが割り当てられているユーザーは、猶予期間中もPro機能を引き続き利用できます。"
   },
   "email_signature_policy_unavailable": {
-    "message": "署名ポリシーはまだ利用できません。Nextcloudへの接続を確認して、もう一度送信してください。"
+    "message": "中央の送信ポリシーを確認できませんでした。組織は確認が成功した場合にのみ送信を許可しています。Nextcloud への接続と NC Connector Backend の利用可否を確認してください。メッセージは送信されておらず、下書きとして保存できます。"
   },
   "email_signature_send_reconcile_failed": {
-    "message": "メール署名を安全に更新できませんでした。メッセージは送信されていません。もう一度送信してください。"
+    "message": "必須の中央管理署名を正しく挿入または更新できませんでした。メッセージは送信されていません。再試行してください。問題が続く場合はサポートにお問い合わせください。"
   },
   "policy_license_expired": {
     "message": "ライセンスの有効期限が切れ、猶予期間も終了しました。Pro 機能は利用できません。基本機能は引き続き利用できます。"

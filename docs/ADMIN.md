@@ -129,7 +129,7 @@ To return a setting to local control, remove its managed value from every regist
 
 Enterprise Rollout ends only when none of the listed values remains. Stored credentials and local settings remain. Removing the URL value does not restore an earlier server address automatically.
 
-The mode limits NC Connector functions, not ordinary Outlook mail. It is not a data-loss-prevention policy.
+Enterprise Rollout limits NC Connector functions, not ordinary Outlook mail. The explicit `SendPolicyFailureMode=failclosed` setting additionally prevents sending while central sending requirements are still unknown. A confirmed missing, paused, or invalid Seat disables protected functions but does not block ordinary mail. This is not a data-loss-prevention policy.
 
 <a id="registry-übersicht"></a>
 
@@ -164,6 +164,29 @@ For switches, use `REG_DWORD` with `0` for off and `1` for on. The strings `fals
 | `DefaultsSource` | `REG_SZ`, `local` / `backend` | Selects and locks the default-values source. An explicit backend setting takes priority. | Backend setting, then user selection, then `local` |
 
 Automatic sign-in starts only from Share or Talk when credentials are incomplete. The active URL must match the registry URL. Opening Settings normally does not start sign-in or close the dialog automatically.
+
+<a id="versand-bei-dienstausfällen"></a>
+<a id="sending-during-service-outages"></a>
+
+### Sending during service outages
+
+| Value | Type / values | Effect | Without a managed value |
+| --- | --- | --- | --- |
+| `SendPolicyFailureMode` | `REG_SZ`, `failopen` / `failclosed` | Determines whether sending can continue when Nextcloud or the backend is unavailable and a signature or attachment rule applies. Users cannot change this setting. | `failopen` |
+
+An invalid value uses `failopen` and produces a configuration notice in Settings and the log. Presence activates Enterprise Rollout even with `failopen` or invalid data. Registry changes require an Outlook restart.
+
+| Situation for the current message | `failopen` | `failclosed` |
+| --- | --- | --- |
+| Confirmed no applicable signature or attachment rule | Send normally without a policy warning. | Send normally without a policy warning. |
+| Policy state is unknown, for example on the first start while the server is unavailable | Send normally; do not invent a signature or attachment warning. | Block only when Send is clicked, until the central requirements can be checked. Drafts can still be saved. |
+| An applicable rule is known, but Nextcloud or the backend is unavailable | Send with a non-modal warning when the rule cannot be fulfilled; unshared files remain normal attachments. A correctly usable cached signature is applied without an unnecessary warning. | Block sending until availability is confirmed and the rule is fulfilled. Cached policy alone does not replace this check. |
+| A known applicable rule is not fulfilled and a service check is still pending | Block until the rule is fulfilled or an outage is confirmed. A fulfilled cached signature permits sending without a warning. | Block until the check succeeds and the rule is fulfilled. |
+| Services are available, but a required signature cannot be inserted or attachments still need sharing | Block sending with an explanation and a corrective action. | Same behavior. |
+
+Rules are evaluated for each message, not for the whole Outlook session. A signature applies only to its matching sender and enabled message type. An attachment rule applies only when **Always use NC Connector** is effective or a centrally mandatory threshold is exceeded. A local optional upload offer is not a mandatory threshold.
+
+No sending-policy dialog appears at Outlook startup. Relevant notices appear while composing, replying, forwarding, adding affected attachments, or using Share or Talk; blocking errors appear on Send. A failed Share or Talk action does not impose requirements on later ordinary messages. Authentication rejection, missing permissions, insufficient storage, and local processing errors are not outage exceptions. HTTP `429` is a temporary request limit; observe any server-provided waiting time. A blocked message is never resent automatically.
 
 <a id="verwaltete-transportsicherheit-tls"></a>
 <a id="managed-transport-security-tls"></a>
@@ -283,7 +306,9 @@ In share templates, `{LINK_INTRO}` and `{LINK_LABEL}` adapt to the selected link
 
 Configure attachment automation under **Share → Attachments**. It can always route attachments through NC Connector or offer NC Connector above a size threshold. The link target can be ZIP download or share page; ZIP download is the default when no value is set. Manual shares always link to the share page.
 
-Outlook or Exchange can reject an attachment before NC Connector receives it. In that case, select the file directly through **Insert Nextcloud share**. A mandatory attachment policy can block sending while an affected file remains attached normally.
+Outlook or Exchange can reject an attachment before NC Connector receives it. In that case, select the file directly through **Insert Nextcloud share**. A locked central size threshold makes sharing mandatory when exceeded; a locally configured upload offer does not. While services are available, a mandatory attachment rule blocks sending while an affected file remains attached normally. During service outages, [SendPolicyFailureMode](#sending-during-service-outages) applies.
+
+Original attachments remain until their files have been shared successfully and the share link has been inserted into the message. Cancelling the wizard or a failed upload or insertion preserves them. If files are removed from the wizard selection, only the originals actually shared are removed; later additions and unrelated same-name files remain.
 
 <a id="ungesendete-mail-und-freigabebereinigung"></a>
 <a id="unsent-mail-and-share-cleanup"></a>
@@ -462,6 +487,7 @@ First check the path, registry view, data type, and spelling against the tables.
 | URL, URL lock, main tab | An invalid URL is not used; an invalid lock does not lock the URL; an invalid ribbon value leaves the main tab visible. Correct the value in the active path. |
 | Sign-in method | The selection remains locked to Login Flow and automatic start is disabled. Set `LoginFlow` or `Manual` as `REG_SZ`. |
 | Default-values source | Without a higher-priority backend setting, locked `local` is used. Set `local` or `backend` as `REG_SZ`. |
+| Sending during outages | An invalid `SendPolicyFailureMode` uses `failopen` and produces a configuration notice. Set `failopen` or `failclosed` as `REG_SZ`. |
 | TLS | Invalid values or three disabled switches block server requests, including sign-in and update checks. Correct the values or selected TLS mode. |
 | Logging | The affected field uses its default; the connection is not blocked. |
 | Update notices | Notices remain off. The version check continues. |
@@ -561,7 +587,7 @@ For **Apache**, check the rewrite modules, `AllowOverride`, and the rewrite base
 4. If automation does not start, check **Share → Attachments**. If Outlook has already rejected the attachment, select the file directly in the sharing wizard.
 5. Narrow down the problem with a small file and review the matching time range in the `FILELINK` log.
 
-If sending asks you to wait briefly for a policy check, keep the message open and send it again. The notice does not mean that an upload failed.
+If sending is blocked because central requirements could not be checked, verify `SendPolicyFailureMode`, restore service availability, keep the message open, and send it again after the check succeeds. This notice does not mean that an upload failed. Original attachments remain after a cancelled or failed sharing attempt; review them before retrying.
 
 <a id="verwaltete-signatur-fehlt-oder-steht-falsch"></a>
 <a id="managed-signature-is-missing-or-misplaced"></a>
@@ -570,7 +596,7 @@ If sending asks you to wait briefly for a policy check, keep the message open an
 
 Check the seat, signature assignment, actual **From** address, and the switches for new messages, replies, and forwards. For duplicate signatures, also check Outlook's own signature configuration.
 
-If Outlook reports that the signature policy is not yet available, check the Nextcloud connection and try sending again. If the signature cannot be updated, keep the message open and provide the error message and matching log period to support.
+During an outage, sending follows [SendPolicyFailureMode](#sending-during-service-outages). A warning about a missing signature is shown only for a signature known to apply to that message, not merely because a policy lookup failed. With `failclosed`, an unknown policy also blocks Send until checked. If the required signature cannot be inserted while services are available, sending remains blocked in both modes. Keep the message open and provide the error message and matching log period to support.
 
 <a id="einstellungen-können-nicht-geladen-oder-gespeichert-werden"></a>
 

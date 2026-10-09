@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Les exigences centrales d’envoi pour ce message n’ont pas pu être satisfaites. Le message n’a pas été envoyé. Vérifiez la connexion ou contactez votre administrateur."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "Le paramètre central « SendPolicyFailureMode » est invalide. Le mode « failopen » s’applique. Contactez votre administrateur."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "Nextcloud est actuellement inaccessible."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "Le NC Connector Backend est actuellement indisponible."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud a refusé les identifiants enregistrés. Reconnectez-vous dans les paramètres de NC Connector."
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud limite temporairement les requêtes. Respectez le délai d’attente indiqué."
+  },
+  "send_policy_signature_warning": {
+    "message": "La signature centrale prévue pour ce message n’a pas pu être chargée. Le message peut néanmoins être envoyé."
+  },
+  "send_policy_attachment_warning": {
+    "message": "Les pièces jointes n’ont pas pu être partagées via NC Connector comme requis. Elles restent des pièces jointes ordinaires. Le message peut néanmoins être envoyé."
+  },
+  "send_policy_combined_warning": {
+    "message": "La signature centrale et le partage obligatoire des pièces jointes n’ont pas pu être finalisés. Le message peut néanmoins être envoyé ; les fichiers non partagés restent des pièces jointes ordinaires."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "Votre organisation exige l’application des règles centrales d’envoi. Le message n’a pas été envoyé. Réessayez après le rétablissement de la connexion."
+  },
   "managed_auth_mode_invalid": {
     "message": "La méthode de connexion configurée de manière centralisée est invalide. La connexion avec Nextcloud est sélectionnée, mais ne démarre pas automatiquement. Contactez votre administrateur."
   },
@@ -849,7 +879,7 @@
     "message": "Les règles relatives aux pièces jointes sont en cours de mise à jour. Veuillez réessayer d’envoyer votre message dans un instant."
   },
   "outlook_attachment_routing_required": {
-    "message": "Les paramètres actuels des pièces jointes exigent que les fichiers soient partagés avec NC Connector. Veuillez utiliser l’assistant de partage Nextcloud pour partager ces fichiers."
+    "message": "Les pièces jointes de ce message doivent être partagées via NC Connector. Partagez les fichiers ou supprimez les pièces jointes concernées. Le message n’a pas été envoyé."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "Le mode pièces jointes est actif. Les pièces jointes sélectionnées seront partagées avec NC Connector."
@@ -951,10 +981,10 @@
     "message": "Votre licence a expiré. Les utilisateurs disposant d’un Seat attribué et actif peuvent continuer à utiliser les fonctions Pro pendant le délai de grâce."
   },
   "email_signature_policy_unavailable": {
-    "message": "La politique de signature n’est pas encore disponible. Vérifiez la connexion à votre Nextcloud et réessayez d’envoyer le message."
+    "message": "Les règles centrales d’envoi n’ont pas pu être vérifiées. Votre organisation n’autorise l’envoi qu’après une vérification réussie. Vérifiez la connexion à Nextcloud et la disponibilité du NC Connector Backend. Le message n’a pas été envoyé et peut être enregistré comme brouillon."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "La signature du courriel n’a pas pu être mise à jour en toute sécurité. Votre message n’a pas été envoyé. Réessayez de l’envoyer."
+    "message": "La signature centrale obligatoire n’a pas pu être insérée ou mise à jour correctement. Le message n’a pas été envoyé. Réessayez. Si le problème persiste, contactez le support."
   },
   "policy_license_expired": {
     "message": "Votre licence a expiré et le délai de grâce est terminé. Les fonctionnalités Pro ne sont plus disponibles. Vous pouvez continuer à utiliser les fonctionnalités de base."

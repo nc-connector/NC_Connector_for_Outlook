@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Non è stato possibile soddisfare i requisiti centrali di invio per questo messaggio. Il messaggio non è stato inviato. Verifichi la connessione o contatti l’amministratore."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "L’impostazione centrale «SendPolicyFailureMode» non è valida. Viene applicato «failopen». Contatti l’amministratore."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "Nextcloud non è attualmente raggiungibile."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "Il NC Connector Backend non è attualmente disponibile."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud ha rifiutato le credenziali salvate. Acceda nuovamente nelle impostazioni di NC Connector."
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud sta limitando temporaneamente le richieste. Rispetti il tempo di attesa indicato."
+  },
+  "send_policy_signature_warning": {
+    "message": "Non è stato possibile caricare la firma centrale prevista per questo messaggio. Il messaggio può comunque essere inviato."
+  },
+  "send_policy_attachment_warning": {
+    "message": "Non è stato possibile condividere gli allegati tramite NC Connector come richiesto. Rimangono allegati normali. Il messaggio può comunque essere inviato."
+  },
+  "send_policy_combined_warning": {
+    "message": "Non è stato possibile completare la firma centrale e la condivisione obbligatoria degli allegati. Il messaggio può comunque essere inviato; i file non condivisi rimangono allegati normali."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "La sua organizzazione richiede il rispetto delle regole centrali di invio. Il messaggio non è stato inviato. Riprovi dopo il ripristino della connessione."
+  },
   "managed_auth_mode_invalid": {
     "message": "Il metodo di accesso configurato centralmente non è valido. È selezionato l’accesso con Nextcloud, ma non viene avviato automaticamente. Contatta l’amministratore."
   },
@@ -849,7 +879,7 @@
     "message": "Le regole per gli allegati sono in fase di aggiornamento. Riprova a inviare il messaggio tra un momento."
   },
   "outlook_attachment_routing_required": {
-    "message": "Le impostazioni attuali degli allegati richiedono che i file vengano condivisi con NC Connector. Usa la procedura guidata di condivisione di Nextcloud per condividere questi file."
+    "message": "Gli allegati di questo messaggio devono essere condivisi tramite NC Connector. Condivida i file o rimuova gli allegati interessati. Il messaggio non è stato inviato."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "La modalità allegati è attiva. Gli allegati selezionati verranno condivisi con NC Connector."
@@ -951,10 +981,10 @@
     "message": "La licenza è scaduta. Gli utenti con un Seat assegnato e attivo possono continuare a utilizzare le funzioni Pro durante il periodo di tolleranza."
   },
   "email_signature_policy_unavailable": {
-    "message": "La policy delle firme non è ancora disponibile. Verifichi la connessione al suo Nextcloud e riprovi a inviare il messaggio."
+    "message": "Non è stato possibile verificare le regole centrali di invio. La sua organizzazione consente l’invio solo dopo una verifica riuscita. Verifichi la connessione a Nextcloud e la disponibilità del NC Connector Backend. Il messaggio non è stato inviato e può essere salvato come bozza."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "Non è stato possibile aggiornare la firma email in modo sicuro. Il messaggio non è stato inviato. Riprovi a inviarlo."
+    "message": "Non è stato possibile inserire o aggiornare correttamente la firma centrale obbligatoria. Il messaggio non è stato inviato. Riprovi. Se il problema persiste, contatti l’assistenza."
   },
   "policy_license_expired": {
     "message": "La licenza è scaduta e il periodo di tolleranza è terminato. Le funzionalità Pro non sono più disponibili. È possibile continuare a utilizzare le funzionalità di base."

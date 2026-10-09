@@ -21,17 +21,32 @@ namespace NcTalkOutlookAddIn
         private string _emailSignaturePolicyCacheKey = string.Empty;
         private Task<BackendPolicyStatus> _emailSignaturePolicyFetchTask;
         private string _emailSignaturePolicyFetchKey = string.Empty;
+        private BackendPolicyStatus _backendPolicyLastCheck;
+        private string _backendPolicyLastCheckKey = string.Empty;
+        private DateTime _backendPolicyLastCheckedAtUtc;
+        private long _backendPolicyRequestSequence;
+        private long _backendPolicyStoredSequence;
 
         internal BackendPolicyStatus FetchBackendPolicyStatus(TalkServiceConfiguration configuration, string trigger)
         {
+            long requestSequence;
+            lock (_emailSignaturePolicyCacheSync)
+            {
+                requestSequence = ++_backendPolicyRequestSequence;
+            }
             try
             {
                 var service = new BackendPolicyService(configuration);
                 BackendPolicyStatus status = service.FetchStatus();
-                if (status != null && status.FetchSucceeded)
+                // Availability is separate from the last confirmed policy, including refusals.
+                StoreBackendPolicySnapshotIfCurrent(configuration, status, trigger, requestSequence);
+                lock (_emailSignaturePolicyCacheSync)
                 {
-                    // Every confirmed response updates the shared account snapshot, including refusals.
-                    StoreBackendPolicySnapshot(configuration, status, trigger);
+                    if (requestSequence < _backendPolicyStoredSequence
+                        && string.Equals(_backendPolicyLastCheckKey, BuildEmailSignaturePolicyCacheKey(configuration), StringComparison.Ordinal))
+                    {
+                        status = _backendPolicyLastCheck;
+                    }
                 }
                 LogCore(
                     "Backend policy status fetched (trigger=" + (trigger ?? "n/a")
@@ -48,6 +63,7 @@ namespace NcTalkOutlookAddIn
             catch (Exception ex)
             {
                 DiagnosticsLogger.LogException(LogCategories.Core, "Backend policy status fetch failed (trigger=" + (trigger ?? "n/a") + ").", ex);
+                StoreBackendPolicySnapshotIfCurrent(configuration, null, trigger, requestSequence);
                 return null;
             }
         }
@@ -59,14 +75,14 @@ namespace NcTalkOutlookAddIn
             string cacheKey = BuildEmailSignaturePolicyCacheKey(configuration);
             lock (_emailSignaturePolicyCacheSync)
             {
-                if (_emailSignaturePolicyCache != null
-                    && string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal)
-                    && DateTime.UtcNow - _emailSignaturePolicyCacheFetchedAtUtc <= EmailSignaturePolicyCacheLifetime)
+                if (_backendPolicyLastCheck != null
+                    && string.Equals(_backendPolicyLastCheckKey, cacheKey, StringComparison.Ordinal)
+                    && IsBackendPolicyCheckCurrent())
                 {
-                    LogCore("Email signature policy cache hit (trigger=" + (trigger ?? "n/a") + ").");
-                    return Task.FromResult(_emailSignaturePolicyCache);
+                    BackendPolicyStatus effective = string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal)
+                        ? _emailSignaturePolicyCache : null;
+                    return Task.FromResult(effective ?? _backendPolicyLastCheck);
                 }
-
                 if (_emailSignaturePolicyFetchTask != null
                     && string.Equals(_emailSignaturePolicyFetchKey, cacheKey, StringComparison.Ordinal))
                 {
@@ -88,9 +104,8 @@ namespace NcTalkOutlookAddIn
         {
             // Called by background workers; never wait for HTTP from a ribbon or Send callback.
             BackendPolicyStatus fetched = FetchBackendPolicyStatus(configuration, trigger);
-            return fetched != null && fetched.FetchSucceeded
-                ? fetched
-                : StoreBackendPolicySnapshot(configuration, fetched, trigger);
+            BackendPolicyStatus known;
+            return TryGetCachedEmailSignaturePolicyStatus(configuration, out known) ? known : fetched;
         }
 
         internal bool TryGetCachedEmailSignaturePolicyStatus(
@@ -107,6 +122,37 @@ namespace NcTalkOutlookAddIn
             }
         }
 
+        internal bool TryGetCurrentBackendPolicyCheck(
+            TalkServiceConfiguration configuration, out BackendPolicyStatus check)
+        {
+            lock (_emailSignaturePolicyCacheSync)
+            {
+                check = string.Equals(_backendPolicyLastCheckKey, BuildEmailSignaturePolicyCacheKey(configuration), StringComparison.Ordinal)
+                    ? _backendPolicyLastCheck : null;
+                return check != null && IsBackendPolicyCheckCurrent();
+            }
+        }
+
+        internal void InvalidateCurrentBackendPolicyCheck(TalkServiceConfiguration configuration)
+        {
+            lock (_emailSignaturePolicyCacheSync)
+            {
+                if (string.Equals(_backendPolicyLastCheckKey, BuildEmailSignaturePolicyCacheKey(configuration), StringComparison.Ordinal))
+                {
+                    _backendPolicyLastCheckedAtUtc = DateTime.MinValue;
+                }
+            }
+        }
+
+        private bool IsBackendPolicyCheckCurrent()
+        {
+            TimeSpan lifetime = _backendPolicyLastCheck.FetchSucceeded
+                ? EmailSignaturePolicyCacheLifetime : TimeSpan.FromSeconds(15);
+            return DateTime.UtcNow - _backendPolicyLastCheckedAtUtc <= lifetime
+                   || (!_backendPolicyLastCheck.FetchSucceeded
+                       && _backendPolicyLastCheck.RetryAfterUtc > DateTime.UtcNow);
+        }
+
         private async Task<BackendPolicyStatus> FetchAndCacheEmailSignaturePolicyStatusAsync(
             TalkServiceConfiguration configuration,
             string cacheKey,
@@ -114,11 +160,11 @@ namespace NcTalkOutlookAddIn
         {
             BackendPolicyStatus fetched = await Task.Run(
                 () => FetchBackendPolicyStatus(configuration, trigger)).ConfigureAwait(false);
-            BackendPolicyStatus effective = fetched != null && fetched.FetchSucceeded
-                ? fetched
-                : StoreBackendPolicySnapshot(configuration, fetched, trigger);
+            BackendPolicyStatus effective;
             lock (_emailSignaturePolicyCacheSync)
             {
+                effective = string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal)
+                    ? _emailSignaturePolicyCache : fetched;
                 if (string.Equals(_emailSignaturePolicyFetchKey, cacheKey, StringComparison.Ordinal))
                 {
                     _emailSignaturePolicyFetchTask = null;
@@ -128,12 +174,23 @@ namespace NcTalkOutlookAddIn
             return effective;
         }
 
-        private BackendPolicyStatus StoreBackendPolicySnapshot(
-            TalkServiceConfiguration configuration, BackendPolicyStatus fetched, string trigger)
+        private BackendPolicyStatus StoreBackendPolicySnapshotIfCurrent(
+            TalkServiceConfiguration configuration, BackendPolicyStatus fetched, string trigger, long requestSequence)
         {
             string cacheKey = BuildEmailSignaturePolicyCacheKey(configuration);
             lock (_emailSignaturePolicyCacheSync)
             {
+                if (requestSequence < _backendPolicyStoredSequence)
+                {
+                    return string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal)
+                        ? _emailSignaturePolicyCache : fetched;
+                }
+                _backendPolicyStoredSequence = requestSequence;
+                _backendPolicyLastCheck = fetched ?? new BackendPolicyStatus(
+                    true, false, false, "local", "check_failed", false, false,
+                    string.Empty, null, null, null, null, null, null);
+                _backendPolicyLastCheckKey = cacheKey;
+                _backendPolicyLastCheckedAtUtc = DateTime.UtcNow;
                 if (fetched != null && fetched.FetchSucceeded)
                 {
                     _emailSignaturePolicyCache = fetched;

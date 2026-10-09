@@ -131,7 +131,7 @@ Um eine Einstellung wieder lokal freizugeben, ihre Vorgabe aus allen verwendeten
 
 Enterprise Rollout endet erst, wenn keiner der aufgeführten Werte mehr vorhanden ist. Gespeicherte Zugangsdaten und lokale Einstellungen bleiben erhalten. Eine früher verwendete Serveradresse wird durch das Entfernen der URL-Vorgabe nicht automatisch wiederhergestellt.
 
-Der Modus beschränkt NC-Connector-Funktionen, nicht den normalen Outlook-Versand. Er ersetzt keine Sicherheitsrichtlinie zur Verhinderung von Datenabfluss.
+Enterprise Rollout beschränkt NC-Connector-Funktionen, nicht den normalen Outlook-Versand. Die ausdrückliche Vorgabe `SendPolicyFailureMode=failclosed` verhindert zusätzlich den Versand, solange die zentralen Versandvorgaben noch unbekannt sind. Ein bestätigt fehlender, pausierter oder ungültiger Seat deaktiviert geschützte Funktionen, blockiert aber keine normale Mail. Dies ersetzt keine Sicherheitsrichtlinie zur Verhinderung von Datenabfluss.
 
 <a id="registry-übersicht"></a>
 <a id="registry-reference"></a>
@@ -167,6 +167,29 @@ Für Schalter `REG_DWORD` mit `0` = aus und `1` = an verwenden. Die Texte `false
 | `DefaultsSource` | `REG_SZ`, `local` / `backend` | Legt die Quelle der Standardwerte fest und sperrt die Auswahl. Eine ausdrückliche Backend-Vorgabe hat Vorrang. | Backend-Vorgabe, sonst Benutzerauswahl, sonst `local` |
 
 Der automatische Login startet nur über Freigabe oder Talk bei unvollständigen Zugangsdaten. Die verwendete URL muss der Registry-URL entsprechen. Das normale Öffnen der Einstellungen startet keine Anmeldung und schließt den Dialog auch nicht automatisch.
+
+<a id="versand-bei-dienstausfällen"></a>
+<a id="sending-during-service-outages"></a>
+
+### Versand bei Dienstausfällen
+
+| Wert | Typ / Werte | Wirkung | Ohne Vorgabe |
+| --- | --- | --- | --- |
+| `SendPolicyFailureMode` | `REG_SZ`, `failopen` / `failclosed` | Bestimmt, ob der Versand bei nicht verfügbarer Nextcloud oder nicht verfügbarem Backend trotz zutreffender Signatur- oder Anhangsregel fortgesetzt werden darf. Benutzer können diese Vorgabe nicht ändern. | `failopen` |
+
+Ein ungültiger Wert ergibt `failopen` und einen Konfigurationshinweis in Einstellungen und Log. Die Existenz aktiviert Enterprise Rollout, auch bei `failopen` oder ungültigem Inhalt. Registry-Änderungen benötigen einen Outlook-Neustart.
+
+| Zustand der aktuellen Mail | `failopen` | `failclosed` |
+| --- | --- | --- |
+| Bestätigt keine zutreffende Signatur- oder Anhangsregel | Normal senden, ohne Policy-Warnung. | Normal senden, ohne Policy-Warnung. |
+| Policy-Zustand unbekannt, etwa beim ersten Start mit nicht verfügbarem Server | Normal senden; keine Signatur- oder Anhangswarnung erfinden. | Erst beim Klick auf Senden blockieren, bis die zentralen Vorgaben geprüft werden können. Entwürfe bleiben speicherbar. |
+| Zutreffende Regel bekannt, aber Nextcloud oder Backend nicht verfügbar | Mit nicht modalem Hinweis senden, wenn die Regel nicht erfüllt werden kann; ungeteilte Dateien bleiben normale Anhänge. Eine korrekt nutzbare zwischengespeicherte Signatur wird ohne unnötige Warnung eingefügt. | Versand blockieren, bis Verfügbarkeit bestätigt und die Regel erfüllt ist. Eine zwischengespeicherte Policy allein ersetzt die Prüfung nicht. |
+| Bekannte zutreffende Regel nicht erfüllt und Dienstprüfung noch ausstehend | Blockieren, bis die Regel erfüllt oder ein Ausfall bestätigt ist. Eine korrekt eingefügte zwischengespeicherte Signatur erlaubt den Versand ohne Warnung. | Blockieren, bis die Prüfung erfolgreich und die Regel erfüllt ist. |
+| Dienste verfügbar, aber vorgeschriebene Signatur nicht einfügbar oder Anhänge noch nicht geteilt | Versand mit Erklärung und Handlungshinweis blockieren. | Gleiches Verhalten. |
+
+Regeln werden für die einzelne Mail ausgewertet, nicht für die gesamte Outlook-Sitzung. Eine Signatur gilt nur für den passenden Absender und aktivierten Nachrichtentyp. Eine Anhangsregel greift nur bei wirksamem **Immer über NC Connector** oder überschrittenem zentral verbindlichem Schwellwert. Ein lokales optionales Uploadangebot ist kein verbindlicher Schwellwert.
+
+Beim Outlook-Start erscheint kein Versandrichtlinien-Dialog. Relevante Hinweise erscheinen beim Verfassen, Antworten, Weiterleiten, Hinzufügen betroffener Anhänge oder bei Freigabe-/Talk-Aktionen; blockierende Fehler erst beim Senden. Eine fehlgeschlagene Freigabe- oder Talk-Aktion erzeugt keine Vorgaben für spätere normale Mails. Abgelehnte Zugangsdaten, fehlende Berechtigungen, voller Speicher und lokale Verarbeitungsfehler sind keine Ausfallausnahmen. HTTP `429` ist eine vorübergehende Anfragenbegrenzung; eine vom Server genannte Wartezeit beachten. Eine blockierte Mail wird nie automatisch erneut gesendet.
 
 <a id="verwaltete-transportsicherheit-tls"></a>
 <a id="managed-transport-security-tls"></a>
@@ -289,7 +312,9 @@ Bei Freigabevorlagen passen sich `{LINK_INTRO}` und `{LINK_LABEL}` an das gewäh
 
 Die Anhangsautomatisierung wird unter **Freigabe → Anhänge** eingerichtet. Sie kann Anhänge immer über NC Connector senden oder die Nutzung ab einem Schwellwert anbieten. Das Linkziel ist wahlweise ZIP-Download oder Freigabeseite; ohne Vorgabe gilt ZIP-Download. Manuelle Freigaben verlinken auf die Freigabeseite.
 
-Outlook oder Exchange kann einen Anhang abweisen, bevor NC Connector ihn erhält. In diesem Fall die Datei direkt über **Nextcloud-Freigabe einfügen** auswählen. Eine verbindliche Anhangsrichtlinie kann den Versand verhindern, solange ein betroffener Anhang noch normal an der Mail hängt.
+Outlook oder Exchange kann einen Anhang abweisen, bevor NC Connector ihn erhält. In diesem Fall die Datei direkt über **Nextcloud-Freigabe einfügen** auswählen. Ein zentral gesperrter Größen-Schwellwert macht das Teilen bei Überschreitung verbindlich; ein lokales Uploadangebot nicht. Bei verfügbaren Diensten verhindert eine verbindliche Anhangsregel den Versand, solange eine betroffene Datei noch normal an der Mail hängt. Bei Dienstausfällen gilt [SendPolicyFailureMode](#versand-bei-dienstausfällen).
+
+Originalanhänge bleiben erhalten, bis ihre Dateien erfolgreich geteilt wurden und der Freigabelink in die Mail eingefügt wurde. Abbruch des Assistenten sowie fehlgeschlagener Upload oder Einfügung erhalten die Anhänge. Werden Dateien aus der Assistentenauswahl entfernt, werden nur die tatsächlich geteilten Originale gelöscht; spätere Ergänzungen und andere gleichnamige Dateien bleiben erhalten.
 
 <a id="ungesendete-mail-und-freigabebereinigung"></a>
 <a id="unsent-mail-and-share-cleanup"></a>
@@ -470,6 +495,7 @@ Zuerst Pfad, Registry-Ansicht, Datentyp und Schreibweise anhand der Tabellen pr�
 | URL, URL-Sperre, Haupttab | Ungültige URL wird nicht verwendet; ungültige Sperre sperrt die URL nicht; ungültiger Ribbonwert lässt den Haupttab sichtbar. Wert im wirksamen Pfad korrigieren. |
 | Anmeldeart | Auswahl bleibt auf Login Flow gesperrt, der automatische Start entfällt. `LoginFlow` oder `Manual` als `REG_SZ` setzen. |
 | Standardwertquelle | Ohne vorrangige Backend-Vorgabe wird gesperrtes `local` verwendet. `local` oder `backend` als `REG_SZ` setzen. |
+| Versand bei Ausfällen | Ein ungültiges `SendPolicyFailureMode` ergibt `failopen` mit Konfigurationshinweis. `failopen` oder `failclosed` als `REG_SZ` setzen. |
 | TLS | Ungültige Werte oder drei ausgeschaltete Schalter verhindern Serveranfragen, auch Anmeldung und Update-Prüfung. Werte beziehungsweise gewählten TLS-Modus korrigieren. |
 | Logging | Das betroffene Feld verwendet seinen Standard; die Verbindung wird nicht blockiert. |
 | Update-Hinweise | Hinweise bleiben ausgeschaltet. Die Versionsabfrage läuft weiter. |
@@ -570,7 +596,7 @@ Bei **Apache** Rewrite-Module, `AllowOverride` und Rewrite Base prüfen; nach Ä
 4. Bei ausbleibender Automatisierung die Einstellungen unter **Freigabe → Anhänge** kontrollieren. Hat Outlook den Anhang bereits abgelehnt, die Datei direkt im Freigabe-Assistenten auswählen.
 5. Mit einer kleinen Datei eingrenzen und das zugehörige Zeitfenster im `FILELINK`-Log auswerten.
 
-Wird beim Senden um einen kurzen Moment für die Richtlinienprüfung gebeten, die Mail geöffnet lassen und erneut senden. Die Meldung bedeutet nicht, dass ein Upload fehlgeschlagen ist.
+Wird der Versand wegen ungeprüfter zentraler Vorgaben blockiert, `SendPolicyFailureMode` prüfen, die Dienste wieder verfügbar machen, die Mail geöffnet lassen und nach erfolgreicher Prüfung erneut senden. Der Hinweis bedeutet nicht, dass ein Upload fehlgeschlagen ist. Originalanhänge bleiben nach abgebrochenem oder fehlgeschlagenem Teilen erhalten; vor einem neuen Versuch kontrollieren.
 
 <a id="verwaltete-signatur-fehlt-oder-steht-falsch"></a>
 <a id="managed-signature-is-missing-or-misplaced"></a>
@@ -579,7 +605,7 @@ Wird beim Senden um einen kurzen Moment für die Richtlinienprüfung gebeten, di
 
 Seat, Signaturzuweisung, tatsächliche **Von**-Adresse und die Schalter für neue Mail, Antwort oder Weiterleitung prüfen. Bei doppelter Signatur zusätzlich Outlooks eigene Signaturkonfiguration kontrollieren.
 
-Meldet Outlook eine noch nicht verfügbare Signaturrichtlinie, die Nextcloud-Verbindung prüfen und das Senden erneut versuchen. Kann die Signatur nicht aktualisiert werden, die Mail geöffnet lassen und die Fehlermeldung mit dem passenden Logzeitraum an den Support geben.
+Bei einem Ausfall richtet sich der Versand nach [SendPolicyFailureMode](#versand-bei-dienstausfällen). Eine Warnung über die fehlende Signatur erscheint nur bei einer für diese Mail bekannt zutreffenden Signatur, nicht allein wegen einer fehlgeschlagenen Policy-Abfrage. Bei `failclosed` blockiert auch ein unbekannter Policy-Zustand das Senden bis zur Prüfung. Kann eine vorgeschriebene Signatur trotz verfügbarer Dienste nicht eingefügt werden, bleibt der Versand in beiden Modi gesperrt. Die Mail geöffnet lassen und die Fehlermeldung mit passendem Logzeitraum an den Support geben.
 
 <a id="einstellungen-können-nicht-geladen-oder-gespeichert-werden"></a>
 <a id="settings-cannot-be-loaded-or-saved"></a>

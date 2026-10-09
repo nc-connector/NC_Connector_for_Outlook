@@ -81,6 +81,11 @@ namespace NcTalkOutlookAddIn.Controllers
             FileLinkWizardLaunchOptions launchOptions,
             bool allowAuthenticationRecovery = false)
         {
+            if (launchOptions != null)
+            {
+                launchOptions.SharedLocalPaths.Clear();
+                launchOptions.UnexpectedFailureObserved = false;
+            }
             if (_owner == null || mail == null)
             {
                 return false;
@@ -113,6 +118,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 }
                 if (launchFailure != null)
                 {
+                    if (launchOptions != null && !(launchFailure is OperationCanceledException))
+                    {
+                        launchOptions.UnexpectedFailureObserved = true;
+                    }
                     var serviceFailure = launchFailure as TalkServiceException;
                     bool authenticationFailed = serviceFailure != null && serviceFailure.IsAuthenticationError;
                     bool itemOpen = await _owner.RunOnOutlookUiThreadAsync(
@@ -239,7 +248,12 @@ namespace NcTalkOutlookAddIn.Controllers
                     }
                 }
 
-                if (wizard.ShowDialog() == DialogResult.OK && wizard.Result != null)
+                DialogResult wizardResult = wizard.ShowDialog();
+                if (launchOptions != null)
+                {
+                    launchOptions.UnexpectedFailureObserved = wizard.UnexpectedFailureObserved;
+                }
+                if (wizardResult == DialogResult.OK && wizard.Result != null)
                 {
                     string languageOverride = settings.ResolvePolicyDefaults(policyStatus).ShareBlockLang;
                     bool plainTextCompose = MailBodyInsertionController.IsPlainTextMail(mail);
@@ -303,6 +317,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     }
                     catch (Exception ex)
                     {
+                        if (launchOptions != null) { launchOptions.UnexpectedFailureObserved = true; }
                         NextcloudTalkAddIn.LogFileLinkMessage("Share template rendering blocked: " + ex.Message);
                         MessageBox.Show(
                             string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
@@ -325,7 +340,7 @@ namespace NcTalkOutlookAddIn.Controllers
                                 ? string.Empty
                                 : MailInteropController.ResolveMailInspectorIdentityKey(mail),
                             isInlineResponse);
-                    if (composeSubscription == null)
+                    if (composeSubscription == null || !composeSubscription.CanApplyComposeChanges)
                     {
                         _owner.QueueCreatedShareCleanup(
                             composeKey,
@@ -340,6 +355,7 @@ namespace NcTalkOutlookAddIn.Controllers
                         : _owner.TryInsertHtmlIntoMail(mail, html);
                     if (!inserted)
                     {
+                        if (launchOptions != null) { launchOptions.UnexpectedFailureObserved = true; }
                         _owner.QueueCreatedShareCleanup(
                             composeKey,
                             wizard.Result,
@@ -363,6 +379,13 @@ namespace NcTalkOutlookAddIn.Controllers
                             languageOverride,
                             policyStatus,
                             origin);
+                    }
+                    if (launchOptions != null)
+                    {
+                        foreach (string localPath in wizard.GetSharedLocalPaths())
+                        {
+                            launchOptions.SharedLocalPaths.Add(localPath);
+                        }
                     }
                     return true;
                 }

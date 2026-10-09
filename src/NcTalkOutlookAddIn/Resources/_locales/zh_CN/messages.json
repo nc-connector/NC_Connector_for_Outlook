@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "无法满足此邮件的中央发送要求。邮件尚未发送。请检查连接或联系管理员。"
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "中央设置“SendPolicyFailureMode”无效。将使用“failopen”。请联系管理员。"
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "目前无法连接到 Nextcloud。"
+  },
+  "send_policy_backend_unavailable": {
+    "message": "NC Connector Backend 目前不可用。"
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud 拒绝了已保存的凭据。请在 NC Connector 设置中重新登录。"
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud 正在临时限制请求。请遵守指定的等待时间。"
+  },
+  "send_policy_signature_warning": {
+    "message": "无法加载此邮件应使用的中央签名。邮件仍可发送。"
+  },
+  "send_policy_attachment_warning": {
+    "message": "无法按要求通过 NC Connector 分享附件。附件将保留为普通附件。邮件仍可发送。"
+  },
+  "send_policy_combined_warning": {
+    "message": "无法完成中央签名和必需的附件分享。邮件仍可发送；未分享的文件将保留为普通附件。"
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "您的组织要求执行中央发送策略。邮件尚未发送。请在连接恢复后重试。"
+  },
   "managed_auth_mode_invalid": {
     "message": "集中配置的登录方式无效。已选择通过 Nextcloud 登录，但不会自动启动。请联系管理员。"
   },
@@ -849,7 +879,7 @@
     "message": "正在更新附件规则。请稍后重试发送。"
   },
   "outlook_attachment_routing_required": {
-    "message": "当前附件设置要求通过 NC Connector 分享文件。请使用 Nextcloud 分享向导分享这些文件。"
+    "message": "此邮件的附件必须通过 NC Connector 分享。请分享文件或移除相关附件。邮件尚未发送。"
   },
   "sharing_attachment_mode_reason_always": {
     "message": "附件模式已启用。所选附件将通过 NC Connector 分享。"
@@ -951,10 +981,10 @@
     "message": "您的许可证已过期。已分配有效席位的用户可以在宽限期内继续使用 Pro 功能。"
   },
   "email_signature_policy_unavailable": {
-    "message": "签名策略暂时不可用。请检查与 Nextcloud 的连接，然后重新尝试发送。"
+    "message": "无法检查中央发送策略。您的组织仅允许在成功检查后发送。请检查 Nextcloud 连接和 NC Connector Backend 的可用性。邮件尚未发送，可保存为草稿。"
   },
   "email_signature_send_reconcile_failed": {
-    "message": "无法安全更新电子邮件签名。您的邮件尚未发送。请重新尝试发送。"
+    "message": "无法正确插入或更新必需的中央签名。邮件尚未发送。请重试。如果问题持续，请联系支持人员。"
   },
   "policy_license_expired": {
     "message": "您的许可证已过期，宽限期也已结束。Pro 功能不再可用。您仍可使用基本功能。"

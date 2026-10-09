@@ -23,7 +23,7 @@ namespace NcTalkOutlookAddIn
         {
             private void OnAttachmentAdd(Outlook.Attachment attachment)
             {
-                if (_disposed
+                if (!CanApplyComposeChanges
                     || _attachmentSuppressed
                     || IsHiddenAttachment(attachment))
                 {
@@ -47,7 +47,8 @@ namespace NcTalkOutlookAddIn
 
             private void OnBeforeAttachmentAdd(Outlook.Attachment attachment, ref bool cancel)
             {
-                if (_disposed
+                if (!CanApplyComposeChanges
+                    || cancel
                     || _attachmentSuppressed
                     || IsHiddenAttachment(attachment))
                 {
@@ -55,16 +56,14 @@ namespace NcTalkOutlookAddIn
                 }
                 AttachmentAutomationSettings settings =
                     ReadAttachmentAutomationSettings();
+                string candidatePath = string.Empty;
+                bool candidatePathIsTemporary = false;
+                bool candidateQueued = false;
                 try
                 {
                     OutlookAttachmentAutomationGuardService.GuardState guardState;
                     if (_owner.TryGetAttachmentAutomationGuardState("before_add", _composeKey, out guardState))
                     {
-                        if (settings.AlwaysConnector)
-                        {
-                            cancel = true;
-                            ShowRequiredAttachmentRoutingNotice();
-                        }
                         return;
                     }
 
@@ -78,19 +77,12 @@ namespace NcTalkOutlookAddIn
                     }
 
                     AttachmentBatchEntry candidate;
-                    string candidatePath;
-                    bool candidatePathIsTemporary;
                     if (!TryBuildBeforeAddAttachmentCandidate(attachment, out candidate, out candidatePath, out candidatePathIsTemporary))
                     {
                         LogFileLink(
                             "Compose before-attachment-add preflight skipped (composeKey="
                             + _composeKey
                             + ", reason=candidate_unavailable).");
-                        if (settings.AlwaysConnector)
-                        {
-                            cancel = true;
-                            ShowRequiredAttachmentRoutingNotice();
-                        }
                         return;
                     }
 
@@ -107,6 +99,8 @@ namespace NcTalkOutlookAddIn
                         + (settings.AlwaysConnector ? "always" : "threshold")
                         + ").");
 
+                    // The event argument is borrowed; acquire an owned reference after the host adds it.
+                    candidate.OriginalAttachment = attachment;
                     bool shouldIntercept = settings.AlwaysConnector
                                            || (settings.OfferAboveEnabled && candidate.SizeBytes > settings.ThresholdBytes);
                     if (!shouldIntercept)
@@ -121,10 +115,15 @@ namespace NcTalkOutlookAddIn
                             + ").");
                         return;
                     }
+                    if (PauseUnavailableAttachmentAutomation(settings, candidate.SizeBytes)
+                        || !CanApplyComposeChanges)
+                    {
+                        return;
+                    }
                     if (settings.AlwaysConnector)
                     {
-                        cancel = true;
                         QueueBeforeAddAttachmentShareFlow("always_preadd", candidate, candidatePath, settings.ThresholdMb, candidatePathIsTemporary);
+                        candidateQueued = true;
                         return;
                     }
                     if (_attachmentPromptOpen)
@@ -144,6 +143,10 @@ namespace NcTalkOutlookAddIn
                     ComposeAttachmentPromptDecision decision;
                     try
                     {
+                        if (!CanApplyComposeChanges)
+                        {
+                            return;
+                        }
                         decision = ComposeAttachmentPromptForm.ShowPrompt(
                             _owner._mailInteropController.TryCreateMailInspectorDialogOwner(_mail),
                             reasonText);
@@ -152,16 +155,20 @@ namespace NcTalkOutlookAddIn
                     {
                         _attachmentPromptOpen = false;
                     }
+                    if (!CanApplyComposeChanges)
+                    {
+                        return;
+                    }
                     if (decision == ComposeAttachmentPromptDecision.Share)
                     {
-                        cancel = true;
                         LogFileLink(
                             "Compose before-attachment-add threshold decision (composeKey="
                             + _composeKey
                             + ", decision=share, attachment="
                             + (candidate.Name ?? string.Empty)
                             + ").");
-                        StartBeforeAddAttachmentShareFlow("threshold_preadd", candidate, candidatePath, settings.ThresholdMb, candidatePathIsTemporary);
+                        QueueBeforeAddAttachmentShareFlow("threshold_preadd", candidate, candidatePath, settings.ThresholdMb, candidatePathIsTemporary);
+                        candidateQueued = true;
                         return;
                     }
                     if (decision == ComposeAttachmentPromptDecision.RemoveLast)
@@ -186,21 +193,23 @@ namespace NcTalkOutlookAddIn
                 }
                 catch (Exception ex)
                 {
-                    if (settings.AlwaysConnector)
-                    {
-                        cancel = true;
-                        ShowRequiredAttachmentRoutingNotice();
-                    }
                     DiagnosticsLogger.LogException(
                         LogCategories.FileLink,
-                        "Compose before-attachment-add preflight failed (composeKey=" + _composeKey + ").",
+                        "Compose before-attachment-add preflight failed; retaining the native attachment (composeKey=" + _composeKey + ").",
                         ex);
+                }
+                finally
+                {
+                    if (candidatePathIsTemporary && !candidateQueued)
+                    {
+                        CleanupTemporaryFiles(new List<string> { candidatePath });
+                    }
                 }
             }
 
             private void OnPropertyChange(string name)
             {
-                if (_disposed)
+                if (!CanApplyComposeChanges)
                 {
                     return;
                 }
@@ -242,7 +251,7 @@ namespace NcTalkOutlookAddIn
 
             private void ScheduleAttachmentEvaluation()
             {
-                if (_disposed)
+                if (!CanApplyComposeChanges)
                 {
                     return;
                 }
@@ -280,6 +289,10 @@ namespace NcTalkOutlookAddIn
             private async void OnBeforeAddShareTimerTick(object sender, EventArgs e)
             {
                 _beforeAddShareTimer.Stop();
+                if (!CanApplyComposeChanges)
+                {
+                    return;
+                }
 
                 try
                 {
@@ -296,7 +309,7 @@ namespace NcTalkOutlookAddIn
 
             private async Task EvaluateAttachmentAutomationAsync()
             {
-                if (_disposed || _attachmentSuppressed)
+                if (!CanApplyComposeChanges || _attachmentSuppressed)
                 {
                     return;
                 }
@@ -315,6 +328,10 @@ namespace NcTalkOutlookAddIn
                 }
 
                 AttachmentAutomationSettings settings = await ReadAttachmentAutomationSettingsAsync();
+                if (!CanApplyComposeChanges || _attachmentSuppressed)
+                {
+                    return;
+                }
                 if (!settings.AlwaysConnector && !settings.OfferAboveEnabled)
                 {
                     _pendingAddedBatch.Clear();
@@ -352,6 +369,7 @@ namespace NcTalkOutlookAddIn
 
                 if (settings.AlwaysConnector)
                 {
+                    if (PauseUnavailableAttachmentAutomation(settings, totalBytes) || !CanApplyComposeChanges) { return; }
                     await StartComposeAttachmentShareFlowAsync("always", totalBytes, settings.ThresholdMb, lastAdded);
                     return;
                 }
@@ -359,6 +377,7 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
+                if (PauseUnavailableAttachmentAutomation(settings, totalBytes) || !CanApplyComposeChanges) { return; }
                 string reasonText = string.Format(
                     CultureInfo.CurrentCulture,
                     Strings.AttachmentPromptReason,
@@ -376,6 +395,10 @@ namespace NcTalkOutlookAddIn
                 ComposeAttachmentPromptDecision decision;
                 try
                 {
+                    if (!CanApplyComposeChanges)
+                    {
+                        return;
+                    }
                     decision = ComposeAttachmentPromptForm.ShowPrompt(
                         _owner._mailInteropController.TryCreateMailInspectorDialogOwner(_mail),
                         reasonText);
@@ -384,7 +407,8 @@ namespace NcTalkOutlookAddIn
                 {
                     _attachmentPromptOpen = false;
                 }
-                if (_owner.TryGetAttachmentAutomationGuardState("prompt_action", _composeKey, out guardState))
+                if (!CanApplyComposeChanges
+                    || _owner.TryGetAttachmentAutomationGuardState("prompt_action", _composeKey, out guardState))
                 {
                     return;
                 }

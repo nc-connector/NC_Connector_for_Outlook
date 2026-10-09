@@ -45,7 +45,7 @@ namespace NcTalkOutlookAddIn
 
             private void ScheduleEmailSignatureApplication(string reason)
             {
-                if (_disposed)
+                if (_disposed || _sendAccepted)
                 {
                     return;
                 }
@@ -199,7 +199,7 @@ namespace NcTalkOutlookAddIn
                 TalkServiceConfiguration configuration,
                 BackendPolicyStatus policyStatus)
             {
-                if (_disposed || generation != _emailSignatureRequestGeneration)
+                if (_disposed || _sendAccepted || generation != _emailSignatureRequestGeneration)
                 {
                     LogEmailSignature(
                         "stale policy result ignored (generation="
@@ -230,6 +230,15 @@ namespace NcTalkOutlookAddIn
                 }
 
                 _emailSignatureStateStable = false;
+                BackendPolicyStatus check;
+                if (settings != null && !settings.SendPolicyFailClosed
+                    && IsEmailSignatureRequiredForCurrentMessage(policyStatus, settings)
+                    && _owner.TryGetCurrentBackendPolicyCheck(configuration, out check)
+                    && check.IsServiceUnavailable)
+                {
+                    RecordSendPolicyWarning(true, false, check);
+                    ShowSendPolicyWarning();
+                }
                 ScheduleEmailSignatureRetry(reason, result.Source);
             }
 
@@ -317,8 +326,8 @@ namespace NcTalkOutlookAddIn
                 {
                     return EmailSignatureSuccess("not_compose");
                 }
-                if (!string.IsNullOrEmpty(
-                    PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus)))
+                if (policyStatus != null && policyStatus.FetchSucceeded
+                    && !PolicyUiHelper.HasBackendSeatEntitlement(policyStatus))
                 {
                     return ClearManagedEmailSignature("enterprise_rollout_unavailable");
                 }
@@ -557,8 +566,8 @@ namespace NcTalkOutlookAddIn
                 bool hasPolicy = _owner.TryGetCachedEmailSignaturePolicyStatus(
                     configuration,
                     out policyStatus);
-                if (!string.IsNullOrEmpty(
-                    PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus)))
+                if (hasPolicy && policyStatus.FetchSucceeded
+                    && !PolicyUiHelper.HasBackendSeatEntitlement(policyStatus))
                 {
                     // Disable managed insertion without making the rollout seat an Outlook send gate.
                     EmailSignatureApplicationResult cleanup =
@@ -568,10 +577,6 @@ namespace NcTalkOutlookAddIn
                     {
                         LogEmailSignature("Managed signature cleanup could not finish while rollout access is unavailable.");
                     }
-                    if (!hasPolicy || policyStatus == null || !policyStatus.FetchSucceeded)
-                    {
-                        ScheduleEmailSignatureApplication("enterprise_rollout_access_retry");
-                    }
                     return true;
                 }
                 if (!hasPolicy
@@ -579,11 +584,26 @@ namespace NcTalkOutlookAddIn
                     || !policyStatus.FetchSucceeded)
                 {
                     ScheduleEmailSignatureApplication("send_policy_required");
-                    cancel = true;
-                    return BlockEmailSignatureSend(
-                        ref cancel,
-                        "policy_unavailable",
-                        true);
+                    // The shared send gate handles the explicit failclosed unknown-state rule.
+                    return true;
+                }
+
+                bool required = IsEmailSignatureRequiredForCurrentMessage(policyStatus, settings);
+                if (settings.SendPolicyFailClosed && IsEmailSignatureRequirementUncertain(policyStatus, settings))
+                {
+                    ScheduleEmailSignatureApplication("send_signature_identity_or_kind_pending");
+                    return BlockSendPolicyFailure(ref cancel, null, true);
+                }
+                BackendPolicyStatus currentCheck;
+                bool checkCurrent = _owner.TryGetCurrentBackendPolicyCheck(configuration, out currentCheck);
+                if (required && !checkCurrent)
+                {
+                    ScheduleEmailSignatureApplication("send_service_check_required");
+                }
+                if (required && settings.SendPolicyFailClosed
+                    && (!checkCurrent || !currentCheck.FetchSucceeded))
+                {
+                    return BlockSendPolicyFailure(ref cancel, currentCheck, !checkCurrent);
                 }
 
                 if (_composeSurfaceState == ComposeSurfaceState.Detached)
@@ -598,6 +618,15 @@ namespace NcTalkOutlookAddIn
                     }
 
                     DeferEmailSignatureApplication("send_reconcile_required", "send_detached");
+                    if (!required)
+                    {
+                        return true;
+                    }
+                    if (!settings.SendPolicyFailClosed && checkCurrent && currentCheck.IsServiceUnavailable)
+                    {
+                        RecordSendPolicyWarning(true, false, currentCheck);
+                        return true;
+                    }
                     cancel = true;
                     return BlockEmailSignatureSend(
                         ref cancel,
@@ -619,6 +648,19 @@ namespace NcTalkOutlookAddIn
                 }
 
                 ScheduleEmailSignatureApplication("send_reconcile_failed");
+                if (!required)
+                {
+                    return true;
+                }
+                if (!settings.SendPolicyFailClosed && checkCurrent && currentCheck.IsServiceUnavailable)
+                {
+                    RecordSendPolicyWarning(true, false, currentCheck);
+                    return true;
+                }
+                if (checkCurrent && !currentCheck.FetchSucceeded)
+                {
+                    return BlockSendPolicyFailure(ref cancel, currentCheck, false);
+                }
                 cancel = true;
                 return BlockEmailSignatureSend(
                     ref cancel,
@@ -627,6 +669,40 @@ namespace NcTalkOutlookAddIn
                         finalResult.Source,
                         "policy_unavailable",
                         StringComparison.OrdinalIgnoreCase));
+            }
+
+            private bool IsEmailSignatureRequiredForCurrentMessage(BackendPolicyStatus status, AddinSettings settings)
+            {
+                if (status == null || !status.FetchSucceeded || !PolicyUiHelper.HasBackendSeatEntitlement(status))
+                {
+                    return false;
+                }
+                EmailSignaturePolicy policy = new EmailSignaturePolicyService(status, settings).Resolve();
+                string sender = EmailSignaturePolicyService.NormalizeEmail(ResolveCurrentSenderEmail());
+                return policy.Active && !string.IsNullOrWhiteSpace(sender)
+                       && string.Equals(sender, policy.UserEmail, StringComparison.OrdinalIgnoreCase)
+                       && ShouldInsertEmailSignature(policy, ResolveEmailSignatureComposeKind());
+            }
+
+            private bool IsEmailSignatureRequirementUncertain(BackendPolicyStatus status, AddinSettings settings)
+            {
+                EmailSignaturePolicy policy = new EmailSignaturePolicyService(status, settings).Resolve();
+                if (!policy.Active)
+                {
+                    return false;
+                }
+                string sender = EmailSignaturePolicyService.NormalizeEmail(ResolveCurrentSenderEmail());
+                if (string.IsNullOrWhiteSpace(sender) || string.IsNullOrWhiteSpace(policy.UserEmail))
+                {
+                    return true;
+                }
+                if (!string.Equals(sender, policy.UserEmail, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+                EmailSignatureComposeKind kind = ResolveEmailSignatureComposeKind();
+                return kind == EmailSignatureComposeKind.Unknown
+                       || (kind == EmailSignatureComposeKind.Response && policy.OnReply != policy.OnForward);
             }
 
             private bool BlockEmailSignatureSend(

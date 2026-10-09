@@ -103,6 +103,7 @@ namespace NcTalkOutlookAddIn.Services
         internal HttpStatusCode StatusCode;
         internal Exception TransportException;
         internal IDictionary<string, object> ParsedJson;
+        internal IDictionary<string, string> Headers;
     }
 
     internal sealed class NcHttpClient
@@ -224,20 +225,45 @@ internal static class OutlookSecurityRegressionTests
         {
             CheckInvalidBackendStatus("Successful HTTP requires a complete status payload", FetchBackendStatus(200, body));
             BackendPolicyStatus missing = FetchBackendStatus(404, body);
-            Check("Ordinary HTTP 404 without backend status remains endpoint missing", missing.FetchSucceeded
-                && !missing.EndpointAvailable && !missing.PolicyActive && missing.Reason == "endpoint_missing");
+            Check("Ordinary HTTP 404 is backend unavailability, not a confirmed policy or Seat refusal", !missing.FetchSucceeded
+                && !missing.EndpointAvailable && !missing.PolicyActive && !missing.SeatAssigned
+                && missing.Reason == "backend_unavailable" && missing.IsServiceUnavailable);
         }
 
-        foreach (int code in new[] { 301, 400, 401, 403, 409, 429, 500, 503 })
+        foreach (int code in new[] { 301, 400, 401, 403, 409, 429, 500, 502, 503, 504, 507 })
         {
             BackendPolicyStatus rejected = FetchBackendStatus(code, StatusPayload(true, true, "active", "pro"));
+            string expectedReason = code == 401 ? "authentication_rejected"
+                : code == 429 ? "rate_limited"
+                : code == 500 || code == 502 || code == 503 || code == 504 ? "backend_unavailable" : "check_failed";
+            bool outage = code == 429 || code == 500 || code == 502 || code == 503 || code == 504;
             Check("HTTP " + code + " cannot be rescued by a valid-looking body", !rejected.FetchSucceeded
-                && rejected.EndpointAvailable && !rejected.PolicyActive && rejected.Reason == "endpoint_unavailable");
+                && rejected.EndpointAvailable && !rejected.PolicyActive && !rejected.SeatAssigned
+                && rejected.Reason == expectedReason && rejected.IsServiceUnavailable == outage);
+            if (code == 429) Check("Rate limit without a usable server delay uses a bounded fallback", rejected.RetryAfterUtc > DateTime.UtcNow
+                && rejected.RetryAfterUtc <= DateTime.UtcNow.AddMinutes(1));
         }
         NcHttpClient.NextResponse = new NcHttpResponse { TransportException = new IOException("Simulated offline transport") };
         BackendPolicyStatus offline = new BackendPolicyService(new TalkServiceConfiguration("https://cloud.example.test", "test-user", "test-only")).FetchStatus();
         Check("Transport failure is not a confirmed backend absence or refusal", !offline.FetchSucceeded
-            && offline.EndpointAvailable && offline.Reason == "endpoint_unavailable");
+            && offline.EndpointAvailable && !offline.PolicyActive && !offline.SeatAssigned
+            && offline.Reason == "nextcloud_unavailable" && offline.IsServiceUnavailable);
+
+        DateTime before = DateTime.UtcNow;
+        BackendPolicyStatus delayed = FetchBackendStatus(429, "{}", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { "Retry-After", "120" } });
+        Check("HTTP 429 honors server Retry-After seconds", delayed.Reason == "rate_limited" && delayed.IsServiceUnavailable
+            && delayed.RetryAfterUtc >= before.AddSeconds(120) && delayed.RetryAfterUtc <= DateTime.UtcNow.AddSeconds(120));
+        DateTime retryAt = DateTime.UtcNow.AddMinutes(5);
+        retryAt = new DateTime(retryAt.Ticks - retryAt.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+        delayed = FetchBackendStatus(429, "{}", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { "retry-after", retryAt.ToString("R", System.Globalization.CultureInfo.InvariantCulture) } });
+        Check("HTTP 429 honors Retry-After HTTP dates", delayed.RetryAfterUtc == retryAt);
+        foreach (string retryValue in new[] { "not-a-delay", "-1", "999999999999999999999999" })
+        {
+            before = DateTime.UtcNow;
+            delayed = FetchBackendStatus(429, "{}", new Dictionary<string, string> { { "Retry-After", retryValue } });
+            Check("Malformed Retry-After uses the fallback without accepting a negative delay", delayed.RetryAfterUtc >= before.AddMinutes(1)
+                && delayed.RetryAfterUtc <= DateTime.UtcNow.AddMinutes(1));
+        }
     }
 
     private static string StatusPayload(bool assigned, bool valid, string seatState, string mode)
@@ -249,7 +275,7 @@ internal static class OutlookSecurityRegressionTests
             + "\"policy_editable\":{\"share\":{},\"talk\":{},\"email_signature\":{}}}";
     }
 
-    private static BackendPolicyStatus FetchBackendStatus(int code, string body)
+    private static BackendPolicyStatus FetchBackendStatus(int code, string body, IDictionary<string, string> headers = null)
     {
         IDictionary<string, object> parsed = null;
         try { parsed = NcJson.DeserializeObject(body); }
@@ -258,7 +284,8 @@ internal static class OutlookSecurityRegressionTests
         {
             HasHttpResponse = true,
             StatusCode = (HttpStatusCode)code,
-            ParsedJson = parsed
+            ParsedJson = parsed,
+            Headers = headers
         };
         BackendPolicyStatus status = new BackendPolicyService(new TalkServiceConfiguration(
             "https://cloud.example.test/nextcloud", "test-user", "test-only")).FetchStatus();
@@ -272,7 +299,7 @@ internal static class OutlookSecurityRegressionTests
     private static void CheckInvalidBackendStatus(string name, BackendPolicyStatus status)
     {
         Check(name, !status.FetchSucceeded && status.EndpointAvailable && !status.PolicyActive
-            && !status.SeatAssigned && status.Reason == "invalid_payload");
+            && !status.SeatAssigned && status.Reason == "invalid_payload" && !status.IsServiceUnavailable);
     }
 
     private static void TestNextcloudUriBoundary()

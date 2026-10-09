@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Centrální požadavky na odeslání této zprávy se nepodařilo splnit. Zpráva nebyla odeslána. Zkontrolujte připojení nebo se obraťte na správce."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "Centrální nastavení „SendPolicyFailureMode“ je neplatné. Použije se „failopen“. Obraťte se na správce."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "Nextcloud je momentálně nedostupný."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "NC Connector Backend je momentálně nedostupný."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud odmítl uložené přihlašovací údaje. Přihlaste se znovu v nastavení NC Connector."
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud dočasně omezuje požadavky. Dodržte uvedenou čekací dobu."
+  },
+  "send_policy_signature_warning": {
+    "message": "Centrální podpis určený pro tuto zprávu se nepodařilo načíst. Zprávu lze přesto odeslat."
+  },
+  "send_policy_attachment_warning": {
+    "message": "Přílohy se nepodařilo sdílet přes NC Connector podle požadavků. Zůstanou jako běžné přílohy. Zprávu lze přesto odeslat."
+  },
+  "send_policy_combined_warning": {
+    "message": "Centrální podpis a požadované sdílení příloh se nepodařilo dokončit. Zprávu lze přesto odeslat; nesdílené soubory zůstanou jako běžné přílohy."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "Vaše organizace vyžaduje dodržení centrálních zásad odesílání. Zpráva nebyla odeslána. Zkuste to znovu po obnovení připojení."
+  },
   "managed_auth_mode_invalid": {
     "message": "Centrálně nastavený způsob přihlášení je neplatný. Je vybráno přihlášení přes Nextcloud, ale nespustí se automaticky. Obraťte se na správce."
   },
@@ -849,7 +879,7 @@
     "message": "Pravidla pro přílohy se právě aktualizují. Zkuste zprávu za chvíli odeslat znovu."
   },
   "outlook_attachment_routing_required": {
-    "message": "Aktuální nastavení příloh vyžaduje sdílení souborů přes NC Connector. Ke sdílení těchto souborů použijte průvodce sdílením Nextcloud."
+    "message": "Přílohy této zprávy musí být sdíleny přes NC Connector. Sdílejte soubory nebo odeberte příslušné přílohy. Zpráva nebyla odeslána."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "Režim příloh je aktivní. Vybrané přílohy budou sdíleny přes NC Connector."
@@ -951,10 +981,10 @@
     "message": "Licence vypršela. Uživatelé s aktivně přiřazeným seatem mohou funkce Pro používat během ochranné lhůty."
   },
   "email_signature_policy_unavailable": {
-    "message": "Zásady podpisu zatím nejsou dostupné. Zkontrolujte připojení k vašemu Nextcloudu a zkuste zprávu odeslat znovu."
+    "message": "Centrální zásady odesílání se nepodařilo ověřit. Vaše organizace povoluje odesílání až po úspěšném ověření. Zkontrolujte připojení k Nextcloudu a dostupnost NC Connector Backendu. Zpráva nebyla odeslána a lze ji uložit jako koncept."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "E-mailový podpis se nepodařilo bezpečně aktualizovat. Zpráva nebyla odeslána. Zkuste ji odeslat znovu."
+    "message": "Požadovaný centrální podpis se nepodařilo správně vložit nebo aktualizovat. Zpráva nebyla odeslána. Zkuste to znovu. Pokud problém přetrvává, obraťte se na podporu."
   },
   "policy_license_expired": {
     "message": "Platnost vaší licence vypršela a ochranná lhůta skončila. Funkce Pro již nejsou dostupné. Základní funkce můžete nadále používat."

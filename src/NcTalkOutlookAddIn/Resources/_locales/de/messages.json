@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Die für diese Nachricht geltenden zentralen Versandvorgaben konnten nicht umgesetzt werden. Die Nachricht wurde nicht gesendet. Prüfen Sie die Verbindung oder wenden Sie sich an Ihren Administrator."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "Die zentrale Einstellung „SendPolicyFailureMode“ ist ungültig. Es gilt „failopen“. Bitte wenden Sie sich an Ihren Administrator."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "Nextcloud ist derzeit nicht erreichbar."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "Das NC Connector Backend ist derzeit nicht verfügbar."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud hat die gespeicherten Zugangsdaten abgelehnt. Melden Sie sich in den NC-Connector-Einstellungen erneut an."
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud begrenzt Anfragen vorübergehend. Bitte beachten Sie die angegebene Wartezeit."
+  },
+  "send_policy_signature_warning": {
+    "message": "Die für diese Nachricht vorgesehene zentrale Signatur konnte nicht geladen werden. Die Nachricht kann trotzdem gesendet werden."
+  },
+  "send_policy_attachment_warning": {
+    "message": "Die Anhänge konnten nicht wie vorgegeben über NC Connector geteilt werden. Sie bleiben als normale Anhänge erhalten. Die Nachricht kann trotzdem gesendet werden."
+  },
+  "send_policy_combined_warning": {
+    "message": "Die zentrale Signatur und das vorgeschriebene Teilen der Anhänge konnten nicht vollständig umgesetzt werden. Die Nachricht kann trotzdem gesendet werden; nicht geteilte Dateien bleiben als normale Anhänge erhalten."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "Ihre Organisation verlangt die Durchsetzung der zentralen Versandvorgaben. Die Nachricht wurde nicht gesendet. Versuchen Sie es nach Wiederherstellung der Verbindung erneut."
+  },
   "managed_auth_mode_invalid": {
     "message": "Die zentral konfigurierte Anmeldeart ist ungültig. Login mit Nextcloud ist ausgewählt, startet aber nicht automatisch. Bitte wenden Sie sich an Ihren Administrator."
   },
@@ -876,7 +906,7 @@
     "message": "Die Anhangsregeln werden gerade aktualisiert. Bitte versuchen Sie das Senden in einem Moment erneut."
   },
   "outlook_attachment_routing_required": {
-    "message": "Die aktuellen Anhangseinstellungen schreiben das Teilen über NC Connector vor. Bitte teilen Sie diese Dateien über den Nextcloud-Freigabeassistenten."
+    "message": "Für diese Nachricht müssen die Anhänge über NC Connector geteilt werden. Teilen Sie die Dateien oder entfernen Sie die betroffenen Anhänge. Die Nachricht wurde nicht gesendet."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "Anhänge werden in diesem Modus immer über NC Connector geteilt."
@@ -978,10 +1008,10 @@
     "message": "Ihre Lizenz ist abgelaufen. Benutzer mit aktiv zugeteiltem Seat können die Pro-Funktionen während der Nachfrist weiterhin nutzen."
   },
   "email_signature_policy_unavailable": {
-    "message": "Die Signaturrichtlinie ist noch nicht verfügbar. Bitte prüfen Sie die Verbindung zu Ihrer Nextcloud und versuchen Sie das Senden erneut."
+    "message": "Die zentralen Versandvorgaben konnten nicht geprüft werden. Ihre Organisation erlaubt den Versand erst nach erfolgreicher Prüfung. Prüfen Sie die Nextcloud-Verbindung und die Verfügbarkeit des NC Connector Backends. Die Nachricht wurde nicht gesendet und kann als Entwurf gespeichert werden."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "Die E-Mail-Signatur konnte nicht sicher aktualisiert werden. Ihre Nachricht wurde nicht gesendet. Bitte versuchen Sie das Senden erneut."
+    "message": "Die vorgeschriebene zentrale Signatur konnte nicht korrekt eingefügt oder aktualisiert werden. Die Nachricht wurde nicht gesendet. Bitte versuchen Sie es erneut. Besteht das Problem weiterhin, wenden Sie sich an den Support."
   },
   "policy_license_expired": {
     "message": "Ihre Lizenz ist abgelaufen und die Nachfrist ist beendet. Die Pro-Funktionen sind nicht mehr verfügbar. Sie können die Basisfunktionen weiterhin nutzen."

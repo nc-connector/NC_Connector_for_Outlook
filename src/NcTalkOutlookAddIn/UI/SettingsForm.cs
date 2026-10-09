@@ -817,6 +817,15 @@ namespace NcTalkOutlookAddIn.UI
             }
             ApplyPolicyDefaultsToControls();
 
+            if (Result.HasManagedSendPolicyFailureMode && !Result.IsManagedSendPolicyFailureModeValid)
+            {
+                warningVisible = true;
+                _policyWarningPanel.Visible = true;
+                _policyWarningTextLabel.Text = string.IsNullOrWhiteSpace(_policyWarningTextLabel.Text)
+                    ? Strings.SendPolicyFailureModeInvalid
+                    : _policyWarningTextLabel.Text + Environment.NewLine + Strings.SendPolicyFailureModeInvalid;
+            }
+
             DiagnosticsLogger.Log(
                 LogCategories.Core,
                 "Policy status applied in settings (trigger=" + (trigger ?? "n/a")

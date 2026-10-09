@@ -76,6 +76,19 @@ namespace NcTalkOutlookAddIn.Models
 
         internal string Reason { get; private set; }
 
+        internal DateTime RetryAfterUtc { get; set; }
+
+        internal bool IsServiceUnavailable
+        {
+            get
+            {
+                return !FetchSucceeded
+                       && (Reason == "nextcloud_unavailable"
+                           || Reason == "backend_unavailable"
+                           || Reason == "rate_limited");
+            }
+        }
+
         internal bool SeatAssigned { get; private set; }
 
         internal bool IsValid { get; private set; }

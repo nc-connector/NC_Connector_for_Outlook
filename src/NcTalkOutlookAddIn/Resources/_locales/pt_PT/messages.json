@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Não foi possível cumprir os requisitos centrais de envio desta mensagem. A mensagem não foi enviada. Verifique a ligação ou contacte o seu administrador."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "A configuração central «SendPolicyFailureMode» é inválida. Será usado «failopen». Contacte o seu administrador."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "O Nextcloud está inacessível de momento."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "O NC Connector Backend está indisponível de momento."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "O Nextcloud rejeitou as credenciais guardadas. Inicie sessão novamente nas definições do NC Connector."
+  },
+  "send_policy_rate_limited": {
+    "message": "O Nextcloud está a limitar temporariamente os pedidos. Respeite o tempo de espera indicado."
+  },
+  "send_policy_signature_warning": {
+    "message": "Não foi possível carregar a assinatura central prevista para esta mensagem. A mensagem pode ser enviada na mesma."
+  },
+  "send_policy_attachment_warning": {
+    "message": "Não foi possível partilhar os anexos através do NC Connector conforme exigido. Permanecem como anexos normais. A mensagem pode ser enviada na mesma."
+  },
+  "send_policy_combined_warning": {
+    "message": "Não foi possível concluir a assinatura central e a partilha obrigatória dos anexos. A mensagem pode ser enviada na mesma; os ficheiros não partilhados permanecem como anexos normais."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "A sua organização exige o cumprimento das políticas centrais de envio. A mensagem não foi enviada. Tente novamente após o restabelecimento da ligação."
+  },
   "managed_auth_mode_invalid": {
     "message": "O método de início de sessão configurado centralmente é inválido. O início de sessão com Nextcloud está selecionado, mas não é iniciado automaticamente. Contacte o administrador."
   },
@@ -849,7 +879,7 @@
     "message": "As regras dos anexos estão a ser atualizadas. Tente enviar novamente dentro de momentos."
   },
   "outlook_attachment_routing_required": {
-    "message": "As definições atuais dos anexos exigem que os ficheiros sejam partilhados com o NC Connector. Utilize o assistente de partilha do Nextcloud para partilhar estes ficheiros."
+    "message": "Os anexos desta mensagem têm de ser partilhados através do NC Connector. Partilhe os ficheiros ou remova os anexos afetados. A mensagem não foi enviada."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "O modo de anexos está ativo. Os anexos selecionados serão partilhados com o NC Connector."
@@ -951,10 +981,10 @@
     "message": "A sua licença expirou. Os utilizadores com um Seat atribuído e ativo podem continuar a utilizar as funcionalidades Pro durante o período de tolerância."
   },
   "email_signature_policy_unavailable": {
-    "message": "A política de assinatura ainda não está disponível. Verifique a ligação ao seu Nextcloud e tente enviar novamente."
+    "message": "Não foi possível verificar as políticas centrais de envio. A sua organização permite o envio apenas após uma verificação bem-sucedida. Verifique a ligação ao Nextcloud e a disponibilidade do NC Connector Backend. A mensagem não foi enviada e pode ser guardada como rascunho."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "Não foi possível atualizar a assinatura de email em segurança. A sua mensagem não foi enviada. Tente enviar novamente."
+    "message": "Não foi possível inserir ou atualizar corretamente a assinatura central obrigatória. A mensagem não foi enviada. Tente novamente. Se o problema persistir, contacte o suporte."
   },
   "policy_license_expired": {
     "message": "A sua licença expirou e o período de tolerância terminou. As funcionalidades Pro já não estão disponíveis. Pode continuar a utilizar as funcionalidades básicas."

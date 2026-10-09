@@ -450,12 +450,14 @@ foreach ($required in @(
     @{ Pattern = '\bGetEmailSignaturePolicyStatusAsync\s*\('; Message = 'Asynchronous signature policy accessor is missing.' },
     @{ Pattern = '\bTryGetCachedEmailSignaturePolicyStatus\s*\('; Message = 'Send gate has no synchronous cached-policy accessor.' },
     @{ Pattern = 'string\.Equals\(_emailSignaturePolicyCacheKey,\s*cacheKey'; Message = 'Signature policy cache is not scoped to the active backend credentials.' },
-    @{ Pattern = 'DateTime\.UtcNow\s*-\s*_emailSignaturePolicyCacheFetchedAtUtc\s*<=\s*EmailSignaturePolicyCacheLifetime'; Message = 'Signature policy cache lifetime is not applied to normal compose reads.' },
+    @{ Pattern = 'DateTime\.UtcNow\s*-\s*_backendPolicyLastCheckedAtUtc\s*<=\s*lifetime'; Message = 'Current policy check lifetime is not applied to normal compose reads.' },
     @{ Pattern = 'return\s+_emailSignaturePolicyFetchTask\s*;'; Message = 'Concurrent signature policy reads do not join the in-flight request.' },
     @{ Pattern = '\bTask\.Run\s*\('; Message = 'Backend signature policy fetch is not moved off the Outlook UI thread.' },
     @{ Pattern = '\.ConfigureAwait\(false\)'; Message = 'Backend signature policy fetch captures the Outlook UI context.' },
     @{ Pattern = '\bfetched\.FetchSucceeded\b'; Message = 'Failed policy responses can overwrite the last successful cache value.' },
-    @{ Pattern = 'using last successful snapshot'; Message = 'Policy cache has no logged last-known-good fallback.' }
+    @{ Pattern = 'using last successful snapshot'; Message = 'Policy cache has no logged last-known-good fallback.' },
+    @{ Pattern = '\bTryGetCurrentBackendPolicyCheck\s*\('; Message = 'Current service availability is not separate from confirmed policy knowledge.' },
+    @{ Pattern = '\bRetryAfterUtc\s*>\s*DateTime\.UtcNow'; Message = 'Backend retry delays do not suppress early automatic rechecks.' }
 )) {
     Require-Pattern $PolicySource $required.Pattern $required.Message
 }
@@ -465,8 +467,18 @@ $onSendBlock = Get-CSharpMethodBlock $SendSource 'OnSend'
 if ($null -eq $onSendBlock) {
     Add-Failure 'Mail compose OnSend handler could not be parsed.'
 } else {
+    Require-PatternBeforeLiteral $onSendBlock 'TryValidateKnownSendPolicyBeforeSend\s*\(\s*ref\s+cancel\s*\)' 'TryFinalizeEmailSignatureBeforeSend' 'The explicit failclosed unknown-state gate must precede signature enforcement.'
     Require-PatternBeforeLiteral $onSendBlock 'TryFinalizeEmailSignatureBeforeSend\s*\(\s*ref\s+cancel\s*\)' '_owner.DispatchSeparatePasswordMails' 'Signature send gate must run before separate password mails are dispatched.'
     Require-Order $onSendBlock '_passwordDispatchQueue.Clear();' '_owner.DispatchSeparatePasswordMails' 'Separate password queue is not consumed before direct dispatch.'
+}
+
+$unknownSendGate = Get-CSharpMethodBlock $SendSource 'TryValidateKnownSendPolicyBeforeSend'
+if ($null -eq $unknownSendGate) {
+    Add-Failure 'The common send-policy knowledge gate is missing.'
+} else {
+    Require-Pattern $unknownSendGate 'if\s*\(\s*!settings\.SendPolicyFailClosed\s*\)\s*\{\s*return\s+true\s*;' 'Unknown policy must permit normal send without an invented warning in failopen.'
+    Require-Pattern $unknownSendGate '\bBlockSendPolicyFailure\(\s*ref\s+cancel\s*,\s*check\s*,\s*true\s*\)' 'Explicit failclosed must explain an unknown policy only at send.'
+    Forbid-Pattern $unknownSendGate '\bGetEmailSignaturePolicyStatusAsync\s*\(|\bFetchBackendPolicyStatus\s*\(|\.Wait\s*\(|GetAwaiter\(\)\.GetResult\(' 'The shared send gate blocks on network policy work.'
 }
 
 $signatureSendGate = Get-CSharpMethodBlock $SignatureSource 'TryFinalizeEmailSignatureBeforeSend'
@@ -475,7 +487,11 @@ if ($null -eq $signatureSendGate) {
 } else {
     Require-Pattern $signatureSendGate '\bTryGetCachedEmailSignaturePolicyStatus\s*\(' 'Signature send gate does not use the cached policy snapshot.'
     Require-Pattern $signatureSendGate '\bBlockEmailSignatureSend\s*\(\s*ref\s+cancel\s*,' 'Signature send gate has no fail-closed cancellation path.'
-    Require-Pattern $signatureSendGate 'BlockEmailSignatureSend\(\s*ref\s+cancel\s*,\s*"policy_unavailable"\s*,\s*true\s*\)' 'Missing policy must select the policy-unavailable explanation.'
+    Require-Pattern $signatureSendGate '\bIsEmailSignatureRequiredForCurrentMessage\s*\(' 'Signature enforcement must test applicability to this sender and message.'
+    Require-Pattern $signatureSendGate '\bTryGetCurrentBackendPolicyCheck\s*\(' 'Signature send enforcement must inspect current availability independently of cached policy.'
+    Require-Pattern $signatureSendGate 'required\s*&&\s*settings\.SendPolicyFailClosed' 'Failclosed must require current availability only for applicable signature policy.'
+    Require-Pattern $signatureSendGate '!settings\.SendPolicyFailClosed[\s\S]*?currentCheck\.IsServiceUnavailable[\s\S]*?RecordSendPolicyWarning\(\s*true\s*,\s*false\s*,\s*currentCheck\s*\)' 'Failopen signature warnings must require actual service unavailability.'
+    Forbid-Pattern $signatureSendGate 'BlockEmailSignatureSend\(\s*ref\s+cancel\s*,\s*"policy_unavailable"\s*,\s*true\s*\)' 'Missing policy alone must not become an unconditional signature send refusal.'
     Forbid-Pattern $signatureSendGate '\bGetEmailSignaturePolicyStatusAsync\s*\(|\bFetchBackendPolicyStatus\s*\(' 'Signature send gate performs network policy work.'
     Forbid-Pattern $signatureSendGate '\.Result\s*(?:[;,\)\]\}]|\?\?)|\.Wait\s*\(|GetAwaiter\(\)\.GetResult\(' 'Signature send gate blocks on an asynchronous operation.'
 }
@@ -520,7 +536,12 @@ public static class SignatureSendNoticeRegression
     }
     private sealed class BackendPolicyStatus
     {
+        internal BackendPolicyStatus() {}
+        internal BackendPolicyStatus(bool endpoint, bool fetched, bool active, string mode, string reason, bool assigned, bool valid, string seat,
+            object share, object talk, object signature, object shareEditable, object talkEditable, object signatureEditable)
+        { FetchSucceeded = fetched; Mode = mode; Reason = reason; }
         internal bool FetchSucceeded;
+        internal DateTime RetryAfterUtc;
         internal bool PolicyActive { get { return false; } }
         internal string AccessStatus = "test", Mode = "local", Reason = "test";
         internal bool IsDomainActive(string domain) { return false; }
@@ -548,6 +569,11 @@ public static class SignatureSendNoticeRegression
         private string _emailSignaturePolicyCacheKey = string.Empty;
         private Task<BackendPolicyStatus> _emailSignaturePolicyFetchTask;
         private string _emailSignaturePolicyFetchKey = string.Empty;
+        private BackendPolicyStatus _backendPolicyLastCheck;
+        private string _backendPolicyLastCheckKey = string.Empty;
+        private DateTime _backendPolicyLastCheckedAtUtc;
+        private long _backendPolicyRequestSequence;
+        private long _backendPolicyStoredSequence;
         private bool _emailSignatureStateStable = true;
         internal BackendPolicyStatus FetchResult { get { return BackendPolicyService.Result; } set { BackendPolicyService.Result = value; } }
         internal DateTime SnapshotTime { get { return _emailSignaturePolicyCacheFetchedAtUtc; } }
@@ -560,8 +586,10 @@ public static class SignatureSendNoticeRegression
 
         __CACHE_KEY__
         __CACHE_READ__
+        __CURRENT_CHECK__
+        __CHECK_FRESHNESS__
         __CACHE_FETCH__
-        __CACHE_STORE__
+        __CACHE_STORE_ORDERED__
         __BLOCK_SEND__
 
         internal void SeedExpiredSnapshot(TalkServiceConfiguration configuration, BackendPolicyStatus snapshot)
@@ -659,8 +687,10 @@ foreach ($method in @{
     '__CACHED_FETCH__' = 'GetEmailSignaturePolicyStatusAsync'
     '__CACHE_KEY__' = 'BuildEmailSignaturePolicyCacheKey'
     '__CACHE_READ__' = 'TryGetCachedEmailSignaturePolicyStatus'
+    '__CURRENT_CHECK__' = 'TryGetCurrentBackendPolicyCheck'
+    '__CHECK_FRESHNESS__' = 'IsBackendPolicyCheckCurrent'
     '__CACHE_FETCH__' = 'FetchAndCacheEmailSignaturePolicyStatusAsync'
-    '__CACHE_STORE__' = 'StoreBackendPolicySnapshot'
+    '__CACHE_STORE_ORDERED__' = 'StoreBackendPolicySnapshotIfCurrent'
 }.GetEnumerator()) {
     $methodSource = Get-CSharpMethodBlock $PolicySource $method.Value
     if (-not $methodSource) {
@@ -671,4 +701,206 @@ foreach ($method in @{
 $signatureNoticeHarness = $signatureNoticeHarness.Replace('__BLOCK_SEND__', $signatureSendBlocker)
 Add-Type -TypeDefinition $signatureNoticeHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
 [SignatureSendNoticeRegression]::Run()
-Write-Host "Email signature architecture OK: clear send notices, last-success cache, and exact WordEditor slots are wired."
+
+# Exercise the production send gates, not a second implementation of their decisions.
+$signatureSendHarness = @'
+using System;
+using System.Collections.Generic;
+
+public static class SignatureSendGateRegression
+{
+    private static int checks;
+    private static class Strings
+    {
+        internal const string DialogTitle = "dialog-title";
+        internal const string EmailSignaturePolicyUnavailable = "policy-unavailable";
+        internal const string EmailSignatureSendReconcileFailed = "reconcile-failed";
+    }
+    private enum MessageBoxButtons { OK }
+    private enum MessageBoxIcon { Warning }
+    private static class MessageBox
+    {
+        internal static string Message;
+        internal static void Show(string message, string title, MessageBoxButtons buttons, MessageBoxIcon icon) { Message = message; }
+    }
+    private enum ComposeSurfaceState { Inspector, InlineResponse, Detached }
+    private enum EmailSignatureComposeKind { New, Reply, Forward, Response, Unknown }
+    private sealed class AddinSettings
+    {
+        internal bool SendPolicyFailClosed;
+        internal string ServerUrl = "https://cloud.example.test", Username = "alice", AppPassword = "test-only";
+    }
+    private sealed class TalkServiceConfiguration
+    {
+        private readonly bool complete;
+        internal TalkServiceConfiguration(string url, string user, string password) { complete = url.Length > 0 && user.Length > 0 && password.Length > 0; }
+        internal bool IsComplete() { return complete; }
+    }
+    private sealed class EmailSignaturePolicy
+    {
+        internal bool Active = true, OnCompose = true, OnReply = true, OnForward = true;
+        internal string UserEmail = "alice@example.test";
+    }
+    private sealed class BackendPolicyStatus
+    {
+        internal bool FetchSucceeded = true, SeatEntitled = true;
+        internal string Reason = "confirmed";
+        internal EmailSignaturePolicy Signature = new EmailSignaturePolicy();
+        internal bool IsServiceUnavailable { get { return !FetchSucceeded && (Reason == "nextcloud_unavailable" || Reason == "backend_unavailable" || Reason == "rate_limited"); } }
+    }
+    private static class PolicyUiHelper { internal static bool HasBackendSeatEntitlement(BackendPolicyStatus status) { return status != null && status.FetchSucceeded && status.SeatEntitled; } }
+    private sealed class EmailSignaturePolicyService
+    {
+        private readonly BackendPolicyStatus status;
+        internal EmailSignaturePolicyService(BackendPolicyStatus value, AddinSettings settings) { status = value; }
+        internal EmailSignaturePolicy Resolve() { return status == null ? new EmailSignaturePolicy { Active = false } : status.Signature; }
+        internal static string NormalizeEmail(string value) { return value == null ? "" : value.Trim().ToLowerInvariant(); }
+    }
+    private sealed class Owner
+    {
+        internal AddinSettings _currentSettings = new AddinSettings();
+        internal BackendPolicyStatus Known, Check;
+        internal bool CheckFresh = true;
+        internal void EnsureSettingsLoaded() {}
+        internal bool TryGetCachedEmailSignaturePolicyStatus(TalkServiceConfiguration configuration, out BackendPolicyStatus status) { status = Known; return status != null; }
+        internal bool TryGetCurrentBackendPolicyCheck(TalkServiceConfiguration configuration, out BackendPolicyStatus status) { status = Check; return status != null && CheckFresh; }
+    }
+    private sealed class Timer { internal void Stop() {} }
+    private sealed class EmailSignatureApplicationResult { internal bool Success; internal string Source; }
+    private sealed class Compose
+    {
+        private bool _disposed;
+        private readonly Owner _owner = new Owner();
+        private readonly object _mail = new object();
+        private readonly Timer _emailSignatureTimer = new Timer();
+        private int _emailSignatureRequestGeneration, _emailSignatureReadyRetryCount;
+        private bool _emailSignatureStateStable;
+        private string _pendingEmailSignatureReason = "", _deferredEmailSignatureReason = "";
+        private ComposeSurfaceState _composeSurfaceState = ComposeSurfaceState.Inspector;
+        internal EmailSignatureApplicationResult ApplyResult = new EmailSignatureApplicationResult { Success = false, Source = "editor-unavailable" };
+        internal string Sender = "alice@example.test";
+        internal EmailSignatureComposeKind Kind = EmailSignatureComposeKind.New;
+        internal int Warnings, Blocks, Schedules, Applies;
+        internal readonly List<string> Log = new List<string>();
+        internal Owner State { get { return _owner; } }
+        internal void Detached(bool stable) { _composeSurfaceState = ComposeSurfaceState.Detached; _emailSignatureStateStable = stable; }
+        private void LogEmailSignature(string value) { Log.Add(value); }
+        private void ScheduleEmailSignatureApplication(string source) { Schedules++; }
+        private void DeferEmailSignatureApplication(string source, string reason) { _deferredEmailSignatureReason = source; }
+        private EmailSignatureApplicationResult ReconcileEmailSignatureWithoutBackendConfiguration(string source) { return ApplyResult; }
+        private EmailSignatureApplicationResult ClearManagedEmailSignature(string source) { return ApplyResult; }
+        private EmailSignatureApplicationResult ApplyEmailSignaturePolicy(BackendPolicyStatus status, AddinSettings settings, string source) { Applies++; return ApplyResult; }
+        private string ResolveCurrentSenderEmail() { return Sender; }
+        private EmailSignatureComposeKind ResolveEmailSignatureComposeKind() { return Kind; }
+        private void RecordSendPolicyWarning(bool signature, bool attachments, BackendPolicyStatus check)
+        {
+            Check(signature && !attachments && check != null && check.IsServiceUnavailable, "A signature warning must describe an actual outage");
+            Warnings++;
+        }
+        private bool BlockSendPolicyFailure(ref bool cancel, BackendPolicyStatus check, bool unknown) { cancel = true; Blocks++; return false; }
+        __UNKNOWN_GATE__
+        __SIGNATURE_GATE__
+        __REQUIRED__
+        __UNCERTAIN__
+        __SHOULD_INSERT__
+        __BLOCK_SIGNATURE__
+        internal bool Send(ref bool cancel)
+        {
+            if (_disposed || cancel) return !cancel;
+            return TryValidateKnownSendPolicyBeforeSend(ref cancel) && TryFinalizeEmailSignatureBeforeSend(ref cancel);
+        }
+    }
+    private static void Check(bool condition, string message) { checks++; if (!condition) throw new InvalidOperationException(message); }
+    private static Compose Configured(bool closed, BackendPolicyStatus current)
+    {
+        var compose = new Compose();
+        compose.State._currentSettings.SendPolicyFailClosed = closed;
+        compose.State.Known = new BackendPolicyStatus();
+        compose.State.Check = current;
+        return compose;
+    }
+    private static bool Send(Compose compose)
+    {
+        bool cancel = false;
+        bool accepted = compose.Send(ref cancel);
+        Check(accepted == !cancel, "The send gate return and Outlook cancel flag must agree");
+        return accepted;
+    }
+    public static void Run()
+    {
+        foreach (bool closed in new[] { false, true })
+        {
+            var initial = new Compose(); initial.State._currentSettings.SendPolicyFailClosed = closed;
+            initial.State.Check = new BackendPolicyStatus { FetchSucceeded = false, Reason = "nextcloud_unavailable" };
+            Check(Send(initial) == !closed && initial.Warnings == 0 && initial.Schedules > 0,
+                "Unknown policy allows normal mail silently by default; explicit failclosed blocks only Send");
+            foreach (string reason in new[] { "nextcloud_unavailable", "backend_unavailable", "rate_limited", "authentication_rejected", "check_failed", "invalid_payload" })
+            {
+                var current = new BackendPolicyStatus { FetchSucceeded = false, Reason = reason };
+                bool outage = current.IsServiceUnavailable;
+                var required = Configured(closed, current);
+                Check(Send(required) == (!closed && outage), "Known unfulfilled signature policy permits only failopen service outages: " + reason);
+                Check(required.Warnings == (!closed && outage ? 1 : 0), "Signature outage warning follows the actual allowed exception");
+                var cachedComplete = Configured(closed, current); cachedComplete.ApplyResult.Success = true;
+                Check(Send(cachedComplete) == !closed && cachedComplete.Warnings == 0, "A usable cached signature needs no failopen outage warning; failclosed still requires service confirmation");
+                var notApplicable = Configured(closed, current); notApplicable.State.Known.Signature.Active = false;
+                Check(Send(notApplicable) && notApplicable.Warnings == 0 && notApplicable.Blocks == 0, "Confirmed inactive signature policy never blocks or warns");
+                var otherSender = Configured(closed, current); otherSender.Sender = "bob@example.test";
+                Check(Send(otherSender) && otherSender.Warnings == 0, "Another Outlook sender has no signature requirement");
+                var noSeat = Configured(closed, current); noSeat.State.Known.SeatEntitled = false;
+                Check(Send(noSeat) && noSeat.Warnings == 0, "Confirmed missing Seat disables managed signature, never normal mail");
+                foreach (EmailSignatureComposeKind kind in new[] { EmailSignatureComposeKind.Reply, EmailSignatureComposeKind.Forward })
+                {
+                    var responseOff = Configured(closed, current); responseOff.Kind = kind;
+                    responseOff.State.Known.Signature.OnReply = false; responseOff.State.Known.Signature.OnForward = false;
+                    Check(Send(responseOff) && responseOff.Warnings == 0, "A disabled reply/forward signature creates no requirement");
+                }
+            }
+            var onlineFailure = Configured(closed, new BackendPolicyStatus());
+            Check(!Send(onlineFailure) && MessageBox.Message == Strings.EmailSignatureSendReconcileFailed && onlineFailure.Warnings == 0,
+                "A known required signature editor failure with available services blocks in both modes");
+            Check(!MessageBox.Message.Contains(onlineFailure.ApplyResult.Source), "Internal processing reasons stay out of user messages");
+            var onlineComplete = Configured(closed, new BackendPolicyStatus()); onlineComplete.ApplyResult.Success = true;
+            Check(Send(onlineComplete) && onlineComplete.Warnings == 0, "A fulfilled online signature permits sending without a warning");
+            var pending = Configured(closed, null);
+            Check(!Send(pending) && pending.Warnings == 0, "A pending service check does not bypass a known unmet signature requirement");
+            var pendingComplete = Configured(closed, null); pendingComplete.ApplyResult.Success = true;
+            Check(Send(pendingComplete) == !closed && pendingComplete.Warnings == 0, "Failopen can fulfil a cached signature while a service check is pending");
+            foreach (EmailSignatureComposeKind kind in new[] { EmailSignatureComposeKind.Unknown, EmailSignatureComposeKind.Response })
+            {
+                var uncertain = Configured(closed, new BackendPolicyStatus()); uncertain.Kind = kind;
+                uncertain.State.Known.Signature.OnReply = true; uncertain.State.Known.Signature.OnForward = false;
+                Check(Send(uncertain) == !closed && uncertain.Warnings == 0, "Unknown or ambiguous compose kinds are not guessed; explicit failclosed waits");
+            }
+            var unknownSender = Configured(closed, new BackendPolicyStatus()); unknownSender.Sender = "";
+            Check(Send(unknownSender) == !closed && unknownSender.Warnings == 0, "Unresolved sender follows uncertainty behavior, not an invented requirement");
+            var detached = Configured(closed, new BackendPolicyStatus()); detached.Detached(false);
+            Check(!Send(detached), "Known required signature cannot be bypassed by a detached unreconciled compose surface with online services");
+            var detachedPending = Configured(closed, null); detachedPending.Detached(false);
+            Check(!Send(detachedPending) && detachedPending.Warnings == 0, "A pending check does not bypass a known unreconciled detached signature");
+            var detachedDone = Configured(closed, new BackendPolicyStatus()); detachedDone.Detached(true);
+            Check(Send(detachedDone), "A detached inline transition preserves an unchanged successful reconciliation");
+            var detachedOutage = Configured(closed, new BackendPolicyStatus { FetchSucceeded = false, Reason = "nextcloud_unavailable" }); detachedOutage.Detached(false);
+            Check(Send(detachedOutage) == !closed && detachedOutage.Warnings == (!closed ? 1 : 0), "Detached compose obeys the same outage exception and availability requirement");
+            var cancelled = Configured(closed, new BackendPolicyStatus()); bool hostCancel = true;
+            Check(!cancelled.Send(ref hostCancel) && hostCancel && cancelled.Warnings == 0 && cancelled.Applies == 0, "An existing Outlook cancellation is not undone");
+        }
+        Console.WriteLine("Signature send gates OK: " + checks + " applicability, outage, uncertainty and strict-enforcement assertions.");
+    }
+}
+'@
+foreach ($method in @{
+    '__UNKNOWN_GATE__' = @($SendSource, 'TryValidateKnownSendPolicyBeforeSend')
+    '__SIGNATURE_GATE__' = @($SignatureSource, 'TryFinalizeEmailSignatureBeforeSend')
+    '__REQUIRED__' = @($SignatureSource, 'IsEmailSignatureRequiredForCurrentMessage')
+    '__UNCERTAIN__' = @($SignatureSource, 'IsEmailSignatureRequirementUncertain')
+    '__SHOULD_INSERT__' = @($SignatureSource, 'ShouldInsertEmailSignature')
+    '__BLOCK_SIGNATURE__' = @($SignatureSource, 'BlockEmailSignatureSend')
+}.GetEnumerator()) {
+    $methodSource = Get-CSharpMethodBlock $method.Value[0] $method.Value[1]
+    if (-not $methodSource) { throw "Signature send regression could not read $($method.Value[1])." }
+    $signatureSendHarness = $signatureSendHarness.Replace($method.Key, $methodSource)
+}
+Add-Type -TypeDefinition $signatureSendHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
+[SignatureSendGateRegression]::Run()
+Write-Host "Email signature architecture OK: policy-aware send gates, current availability, last-success cache, and exact WordEditor slots are wired."

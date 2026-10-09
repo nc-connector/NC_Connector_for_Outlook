@@ -46,16 +46,7 @@ namespace NcTalkOutlookAddIn.Services
             }
 
             string templateHtml = _status.GetPolicyString(Domain, KeyTemplate);
-            if (string.IsNullOrWhiteSpace(templateHtml))
-            {
-                return Inactive("signature_template_missing");
-            }
-
             string userEmail = NormalizeEmail(_status.GetPolicyString(Domain, KeyUserEmail));
-            if (string.IsNullOrWhiteSpace(userEmail))
-            {
-                return Inactive("signature_user_email_missing");
-            }
 
             AddinSettings effective = _settings.ResolvePolicyDefaults(_status);
             bool onCompose = effective.EmailSignatureOnCompose.GetValueOrDefault();

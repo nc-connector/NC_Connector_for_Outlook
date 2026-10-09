@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Xml.Serialization;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Utilities;
@@ -91,6 +92,22 @@ namespace NcTalkOutlookAddIn.Settings
         internal AuthenticationMode LocalAuthMode { get { return _localAuthMode; } }
         internal bool HasManagedAuthMode { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasAuthModePolicy; } }
         internal bool IsManagedAuthModeValid { get { return !HasManagedAuthMode || _managedSetupPolicy.IsAuthModePolicyValid; } }
+
+        [XmlIgnore]
+        public string SendPolicyFailureMode
+        {
+            get { return HasManagedSendPolicyFailureMode ? _managedSetupPolicy.SendPolicyFailureMode : "failopen"; }
+        }
+
+        [XmlIgnore]
+        public bool SendPolicyFailClosed
+        {
+            get { return string.Equals(SendPolicyFailureMode, "failclosed", StringComparison.Ordinal); }
+        }
+
+        internal bool HasManagedSendPolicyFailureMode { get { return _managedSetupPolicy != null && _managedSetupPolicy.HasSendPolicyFailureModePolicy; } }
+        internal bool IsManagedSendPolicyFailureModeValid { get { return !HasManagedSendPolicyFailureMode || _managedSetupPolicy.IsSendPolicyFailureModePolicyValid; } }
+        internal string ManagedSendPolicyFailureModeSource { get { return HasManagedSendPolicyFailureMode ? _managedSetupPolicy.SendPolicyFailureModeSource : string.Empty; } }
 
         public string DefaultsSource
         {

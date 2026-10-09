@@ -1,4 +1,34 @@
 {
+  "send_policy_check_failed": {
+    "message": "Nie udało się spełnić centralnych wymagań wysyłania dla tej wiadomości. Wiadomość nie została wysłana. Sprawdź połączenie lub skontaktuj się z administratorem."
+  },
+  "send_policy_failure_mode_invalid": {
+    "message": "Centralne ustawienie „SendPolicyFailureMode” jest nieprawidłowe. Obowiązuje „failopen”. Skontaktuj się z administratorem."
+  },
+  "send_policy_nextcloud_unavailable": {
+    "message": "Serwer Nextcloud jest obecnie nieosiągalny."
+  },
+  "send_policy_backend_unavailable": {
+    "message": "NC Connector Backend jest obecnie niedostępny."
+  },
+  "send_policy_authentication_rejected": {
+    "message": "Nextcloud odrzucił zapisane dane logowania. Zaloguj się ponownie w ustawieniach NC Connector."
+  },
+  "send_policy_rate_limited": {
+    "message": "Nextcloud tymczasowo ogranicza liczbę żądań. Przestrzegaj wskazanego czasu oczekiwania."
+  },
+  "send_policy_signature_warning": {
+    "message": "Nie udało się wczytać centralnego podpisu przeznaczonego dla tej wiadomości. Wiadomość można mimo to wysłać."
+  },
+  "send_policy_attachment_warning": {
+    "message": "Nie udało się udostępnić załączników przez NC Connector zgodnie z wymaganiami. Pozostają zwykłymi załącznikami. Wiadomość można mimo to wysłać."
+  },
+  "send_policy_combined_warning": {
+    "message": "Nie udało się zastosować centralnego podpisu i wymaganego udostępniania załączników. Wiadomość można mimo to wysłać; nieudostępnione pliki pozostają zwykłymi załącznikami."
+  },
+  "send_policy_unavailable_blocked": {
+    "message": "Twoja organizacja wymaga przestrzegania centralnych zasad wysyłania. Wiadomość nie została wysłana. Spróbuj ponownie po przywróceniu połączenia."
+  },
   "managed_auth_mode_invalid": {
     "message": "Centralnie skonfigurowana metoda logowania jest nieprawidłowa. Wybrano logowanie przez Nextcloud, ale nie uruchamia się ono automatycznie. Skontaktuj się z administratorem."
   },
@@ -849,7 +879,7 @@
     "message": "Trwa aktualizowanie reguł dotyczących załączników. Spróbuj ponownie wysłać wiadomość za chwilę."
   },
   "outlook_attachment_routing_required": {
-    "message": "Bieżące ustawienia załączników wymagają udostępniania plików przez NC Connector. Użyj kreatora udostępniania Nextcloud, aby udostępnić te pliki."
+    "message": "Załączniki tej wiadomości muszą być udostępnione przez NC Connector. Udostępnij pliki lub usuń odpowiednie załączniki. Wiadomość nie została wysłana."
   },
   "sharing_attachment_mode_reason_always": {
     "message": "Tryb załączników jest aktywny. Wybrane załączniki zostaną udostępnione przez NC Connector."
@@ -951,10 +981,10 @@
     "message": "Licencja wygasła. Użytkownicy z przypisanym aktywnym stanowiskiem mogą nadal korzystać z funkcji Pro w okresie karencji."
   },
   "email_signature_policy_unavailable": {
-    "message": "Zasady podpisu nie są jeszcze dostępne. Sprawdź połączenie z serwerem Nextcloud i spróbuj ponownie wysłać wiadomość."
+    "message": "Nie udało się sprawdzić centralnych zasad wysyłania. Twoja organizacja zezwala na wysyłanie dopiero po pomyślnym sprawdzeniu. Sprawdź połączenie z Nextcloud i dostępność NC Connector Backendu. Wiadomość nie została wysłana i można ją zapisać jako wersję roboczą."
   },
   "email_signature_send_reconcile_failed": {
-    "message": "Nie udało się bezpiecznie zaktualizować podpisu e-mail. Wiadomość nie została wysłana. Spróbuj wysłać ją ponownie."
+    "message": "Nie udało się prawidłowo wstawić lub zaktualizować wymaganego centralnego podpisu. Wiadomość nie została wysłana. Spróbuj ponownie. Jeśli problem nadal występuje, skontaktuj się z pomocą techniczną."
   },
   "policy_license_expired": {
     "message": "Twoja licencja wygasła, a okres karencji dobiegł końca. Funkcje Pro nie są już dostępne. Nadal możesz korzystać z funkcji podstawowych."

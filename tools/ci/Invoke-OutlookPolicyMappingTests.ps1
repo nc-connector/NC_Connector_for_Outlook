@@ -76,6 +76,7 @@ namespace NcTalkOutlookAddIn.Services
         internal HttpStatusCode StatusCode { get; set; }
         internal Exception TransportException { get; set; }
         internal IDictionary<string, object> ParsedJson { get; set; }
+        internal IDictionary<string, string> Headers { get; set; }
     }
 
     internal sealed class NcHttpClient
@@ -510,8 +511,11 @@ internal static class OutlookPolicyMappingTests
 
         NcHttpClient.NextResponse = new NcHttpResponse { HasHttpResponse = true, StatusCode = HttpStatusCode.NotFound };
         BackendPolicyStatus missingBackend = new BackendPolicyService(new TalkServiceConfiguration()).FetchStatus();
-        Check("Missing backend keeps local behavior without a license notice", !missingBackend.EndpointAvailable && missingBackend.FetchSucceeded
-            && !missingBackend.PolicyActive && PolicyUiHelper.GetPolicyWarningMessage(missingBackend) == string.Empty
+        Check("Missing backend remains a failed availability check without a license or seat refusal", !missingBackend.EndpointAvailable && !missingBackend.FetchSucceeded
+            && missingBackend.Reason == "backend_unavailable" && missingBackend.IsServiceUnavailable
+            && !missingBackend.PolicyActive && !PolicyUiHelper.HasBackendSeatEntitlement(missingBackend)
+            && missingBackend.LicenseStatus == string.Empty && missingBackend.AccessStatus == string.Empty && missingBackend.SeatState == string.Empty
+            && PolicyUiHelper.GetPolicyWarningMessage(missingBackend) == string.Empty
             && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(missingBackend) == Strings.SharingPasswordSeparateBackendRequiredTooltip);
         Check("Null backend keeps backend-required tooltip", PolicyUiHelper.GetPolicyWarningMessage(null) == string.Empty
             && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(null) == Strings.SharingPasswordSeparateBackendRequiredTooltip);
@@ -934,7 +938,7 @@ internal static class OutlookPolicyUiTests
     {
         return new Func<TConfig, string, TStatus>((configuration, trigger) => {
             if (owner != null && status != null && (bool)Get(status, "FetchSucceeded"))
-                Call(owner, "StoreBackendPolicySnapshot", configuration, status, trigger);
+                Call(owner, "StoreBackendPolicySnapshotIfCurrent", configuration, status, trigger, 2L);
             return (TStatus)status;
         });
     }
@@ -1425,6 +1429,8 @@ internal static class OutlookPolicyUiTests
             bool expectedEnabled = !expectedAlways && (useBackend ? threshold != null : !explicitChoice);
             int expectedThreshold = useBackend && threshold != null ? ((int)threshold == 0 ? 5 : (int)threshold) : 20;
             Check((bool)Get(actual, "AlwaysConnector") == expectedAlways && (bool)Get(actual, "OfferAboveEnabled") == expectedEnabled && (int)Get(actual, "ThresholdMb") == expectedThreshold && (long)Get(actual, "ThresholdBytes") == expectedThreshold * 1024L * 1024L, "Operative attachment policy case " + cases);
+            bool expectedMandatoryThreshold = seat == "active" && !editable && threshold != null && !expectedAlways;
+            Check((bool)Get(actual, "ThresholdMandatory") == expectedMandatoryThreshold, "Only an applicable locked backend threshold creates mandatory routing: " + cases);
             cases++;
         }
         foreach (object threshold in new object[] { null, 0, 1, 19, 10240 }) {
@@ -1434,35 +1440,99 @@ internal static class OutlookPolicyUiTests
                 Check(((NumericUpDown)Field(options, "_sharingAttachmentsOfferAboveMbUpDown")).Value == (threshold == null ? 20 : (int)threshold == 0 ? 5 : (int)threshold), "Threshold UI matches operative value");
             }
         }
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (bool editable in new[] { false, true })
+        foreach (object threshold in new object[] { null, 0, 1, 20 })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "SharingAttachmentsOfferAboveEnabled", true);
+            Set(local, "SharingAttachmentsOfferAboveMb", 7);
+            object rules = Call(subscription, "BuildAttachmentAutomationSettings", local, local);
+            Check(!(bool)Get(rules, "ThresholdMandatory"), "A local optional size offer cannot become a central obligation");
+            object status = Status(D("attachments_min_size_mb", threshold), D(), editable, mode, "active");
+            Set(status, "FetchSucceeded", false);
+            object unconfirmed = Call(subscription, "ApplyAttachmentAutomationPolicy", rules, status);
+            Check(!(bool)Get(unconfirmed, "ThresholdMandatory"), "Failed initial backend check cannot invent a mandatory threshold");
+        }
         Console.WriteLine("[OK] " + cases + " operative attachment combinations plus real threshold controls");
     }
     private static object Managed(object url, object locked, object ribbon, string source)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedTls(object system, object tls12, object tls13, string source = "TLS test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, system, tls12, tls13, null, null, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedLogging(object debug, object anonymize, string source = "Logging test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, null, null, null, null, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, debug, anonymize, null, null, null, null, null, null, null, null, source);
     }
     private static object ManagedUpdateNotify(object value)
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, null, null, null, null, null, null, "Update notification test");
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, value, null, null, null, null, null, null, null, "Update notification test");
     }
     private static object ManagedIfb(object enabled, object days, object cacheHours, object port, string source = "IFB test")
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, enabled, days, cacheHours, port, null, null, source);
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, enabled, days, cacheHours, port, null, null, null, source);
     }
     private static object ManagedDefaultsSource(object value)
     {
-        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, null, null, null, null, value, null, "Defaults source test");
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, null, null, null, null, value, null, null, "Defaults source test");
     }
     private static object ManagedAuthMode(object value, object url = null, object locked = null, object ribbon = null)
     {
-        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, value, "Authentication mode test");
+        return New("Settings.ManagedSetupPolicy", url, locked, ribbon, null, null, null, null, null, null, null, null, null, null, null, value, null, "Authentication mode test");
+    }
+    private static object ManagedSendPolicyFailureMode(object value, string source = "Send policy test")
+    {
+        return New("Settings.ManagedSetupPolicy", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, value, source);
+    }
+    private static void TestManagedSendPolicyFailureMode(string root)
+    {
+        foreach (object value in new object[] { null, "failopen", "failclosed", " FAILOPEN ", " FAILCLOSED ", "", "invalid", "0", 0, false, new byte[] { 1 } })
+        {
+            string text = value as string;
+            bool valid = value == null || string.Equals(text == null ? null : text.Trim(), "failopen", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text == null ? null : text.Trim(), "failclosed", StringComparison.OrdinalIgnoreCase);
+            bool present = value != null;
+            bool failClosed = valid && string.Equals(text == null ? null : text.Trim(), "failclosed", StringComparison.OrdinalIgnoreCase);
+            string expected = failClosed ? "failclosed" : "failopen";
+            object policy = ManagedSendPolicyFailureMode(value);
+            Check((bool)Get(policy, "HasSendPolicyFailureModePolicy") == present
+                && (bool)Get(policy, "IsSendPolicyFailureModePolicyValid") == valid
+                && (string)Get(policy, "SendPolicyFailureMode") == expected, "Send failure mode distinguishes presence, validity and effective mode");
+            object local = New("Settings.AddinSettings");
+            Call(local, "ApplyManagedSetupPolicy", policy);
+            Check((bool)Get(local, "SendPolicyFailClosed") == failClosed && (string)Get(local, "SendPolicyFailureMode") == expected
+                && (bool)Get(local, "HasManagedSendPolicyFailureMode") == present
+                && (bool)Get(local, "IsManagedSendPolicyFailureModeValid") == valid
+                && (bool)Get(local, "IsEnterpriseRollout") == present, "Send policy presence activates rollout without changing default failopen");
+            Check((string)Get(local, "ManagedSendPolicyFailureModeSource") == (present ? "Send policy test" : ""), "Send mode keeps its own registry source");
+            string xml = Serialize(local);
+            Check(!xml.Contains("SendPolicy"), "XML does not persist the administrative send failure mode");
+            object restored = RoundTrip(local, root);
+            Check(!(bool)Get(restored, "SendPolicyFailClosed") && !(bool)Get(restored, "HasManagedSendPolicyFailureMode"), "XML reload cannot make a managed send mode permanent");
+            object clone = Call(local, "Clone");
+            Check((bool)Get(clone, "SendPolicyFailClosed") == failClosed
+                && (bool)Get(clone, "HasManagedSendPolicyFailureMode") == present
+                && (bool)Get(clone, "IsManagedSendPolicyFailureModeValid") == valid, "Clone retains effective send mode and management metadata");
+            Call(clone, "ApplyManagedSetupPolicy", (object)null);
+            Check(!(bool)Get(clone, "SendPolicyFailClosed") && (string)Get(clone, "SendPolicyFailureMode") == "failopen"
+                && !(bool)Get(clone, "HasManagedSendPolicyFailureMode"), "Removing send policy restores failopen without a user override");
+            Check((bool)Get(local, "SendPolicyFailClosed") == failClosed, "Removing a cloned send policy does not alter the original");
+        }
+        Array policies = Array.CreateInstance(T("Settings.ManagedSetupPolicy"), 3);
+        policies.SetValue(ManagedAuthMode("Manual", "https://cloud.example.test"), 0);
+        policies.SetValue(ManagedSendPolicyFailureMode("invalid", "first send mode"), 1);
+        policies.SetValue(ManagedSendPolicyFailureMode("failclosed", "lower send mode"), 2);
+        object merged = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+        Check((string)Get(merged, "SendPolicyFailureMode") == "failopen" && !(bool)Get(merged, "IsSendPolicyFailureModePolicyValid")
+            && (string)Get(merged, "SendPolicyFailureModeSource") == "first send mode" && (bool)Get(merged, "HasNextcloudUrl"), "Invalid selected send mode masks lower mode independently of URL/authentication");
+        policies.SetValue(ManagedSendPolicyFailureMode("failclosed", "first send mode"), 1);
+        policies.SetValue(ManagedSendPolicyFailureMode("invalid", "lower send mode"), 2);
+        merged = Call(T("Settings.ManagedSetupPolicy"), "Resolve", policies);
+        Check((string)Get(merged, "SendPolicyFailureMode") == "failclosed" && (bool)Get(merged, "IsSendPolicyFailureModePolicyValid"), "Unused invalid send mode cannot override a valid higher-priority mode");
     }
     private static void TestManagedAuthMode(string root)
     {
@@ -2263,15 +2333,15 @@ internal static class OutlookPolicyUiTests
         }
         object owner = New("NextcloudTalkAddIn");
         object config = New("Services.TalkServiceConfiguration", "https://cloud.example.test", "alice", "test-only");
-        Call(owner, "StoreBackendPolicySnapshot", config, good, "test");
+        Call(owner, "StoreBackendPolicySnapshotIfCurrent", config, good, "test", 1L);
         DateTime previousSuccess = DateTime.UtcNow.AddMinutes(-30);
         owner.GetType().GetField("_emailSignaturePolicyCacheFetchedAtUtc", Flags).SetValue(owner, previousSuccess);
-        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshot", config, unavailable, "test"), good), "Failed refresh retains confirmed snapshot");
+        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshotIfCurrent", config, unavailable, "test", 2L), good), "Failed refresh retains confirmed snapshot");
         Check((DateTime)Field(owner, "_emailSignaturePolicyCacheFetchedAtUtc") == previousSuccess, "Failed refresh does not mark the retained snapshot fresh");
-        Call(owner, "StoreBackendPolicySnapshot", config, missing, "test");
-        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshot", config, unavailable, "test"), missing), "Fresh refusal replaces previous success");
+        Call(owner, "StoreBackendPolicySnapshotIfCurrent", config, missing, "test", 3L);
+        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshotIfCurrent", config, unavailable, "test", 4L), missing), "Fresh refusal replaces previous success");
         object other = New("Services.TalkServiceConfiguration", "https://cloud.example.test", "bob", "test-only");
-        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshot", other, unavailable, "test"), unavailable), "Rollout cache cannot cross account identity");
+        Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshotIfCurrent", other, unavailable, "test", 5L), unavailable), "Rollout cache cannot cross account identity");
         Set(rollout, "ServerUrl", "https://cloud.example.test");
         Set(rollout, "Username", "alice");
         Set(rollout, "AppPassword", "test-only");
@@ -2286,6 +2356,83 @@ internal static class OutlookPolicyUiTests
         object newRules = Call(openCompose, "ReadAttachmentAutomationSettings");
         Check((bool)Get(newRules, "EnterpriseRolloutBlocked") && !(bool)Get(newRules, "AlwaysConnector"), "Confirmed refusal immediately overrides an open compose's older routing rules");
         Console.WriteLine("[OK] Enterprise presence, registry precedence, ribbon, onboarding, seat parity, automation and cache checks");
+    }
+    private static void TestBackendPolicyAvailabilitySnapshot()
+    {
+        foreach (string mode in new[] { "community", "pro" })
+        foreach (string reason in new[] { "nextcloud_unavailable", "backend_unavailable", "rate_limited", "authentication_rejected", "invalid_payload", "check_failed" })
+        {
+            object owner = New("NextcloudTalkAddIn");
+            object configuration = New("Services.TalkServiceConfiguration", "https://cloud.example.test/nextcloud", "alice", "test-only");
+            object confirmed = Status(D(), D(), true, mode, "active");
+            Call(owner, "StoreBackendPolicySnapshotIfCurrent", configuration, confirmed, "test_confirmed", 1L);
+            DateTime successAt = DateTime.UtcNow.AddMinutes(-30);
+            owner.GetType().GetField("_emailSignaturePolicyCacheFetchedAtUtc", Flags).SetValue(owner, successAt);
+            object failure = Status(D(), D(), true, mode, "active");
+            Set(failure, "FetchSucceeded", false);
+            Set(failure, "Reason", reason);
+            if (reason == "rate_limited") Set(failure, "RetryAfterUtc", DateTime.UtcNow.AddMinutes(2));
+            Check(object.ReferenceEquals(Call(owner, "StoreBackendPolicySnapshotIfCurrent", configuration, failure, "test_failed_refresh", 2L), confirmed), "Failed current check retains the account's last confirmed policy");
+            Check((DateTime)Field(owner, "_emailSignaturePolicyCacheFetchedAtUtc") == successAt, "Failed current check does not renew the confirmed policy timestamp");
+            object[] currentArgs = { configuration, null };
+            Check((bool)Method(owner.GetType(), "TryGetCurrentBackendPolicyCheck", 2).Invoke(owner, currentArgs)
+                && object.ReferenceEquals(currentArgs[1], failure), "Current failed check is observable separately from the last confirmed policy");
+            bool outage = reason == "nextcloud_unavailable" || reason == "backend_unavailable" || reason == "rate_limited";
+            Check((bool)Get(currentArgs[1], "IsServiceUnavailable") == outage, "Authentication, invalid payload and technical failure cannot become an offline exception");
+            var retained = (Task)Call(owner, "GetEmailSignaturePolicyStatusAsync", configuration, "test_recent_failure");
+            Check(retained.IsCompleted && object.ReferenceEquals(Get(retained, "Result"), confirmed), "Recent failure does not refetch or hide confirmed policy knowledge");
+
+            owner.GetType().GetField("_backendPolicyLastCheckedAtUtc", Flags).SetValue(owner, DateTime.UtcNow.AddSeconds(-30));
+            currentArgs = new object[] { configuration, null };
+            Check((bool)Method(owner.GetType(), "TryGetCurrentBackendPolicyCheck", 2).Invoke(owner, currentArgs) == (reason == "rate_limited"), "Ordinary failed checks expire while server retry delays remain current");
+            foreach (object changed in new[] {
+                New("Services.TalkServiceConfiguration", "https://other.example.test/nextcloud", "alice", "test-only"),
+                New("Services.TalkServiceConfiguration", "https://cloud.example.test/other", "alice", "test-only"),
+                New("Services.TalkServiceConfiguration", "https://cloud.example.test/nextcloud", "bob", "test-only"),
+                New("Services.TalkServiceConfiguration", "https://cloud.example.test/nextcloud", "alice", "different-test-only") })
+            {
+                currentArgs = new object[] { changed, null };
+                Check(!(bool)Method(owner.GetType(), "TryGetCurrentBackendPolicyCheck", 2).Invoke(owner, currentArgs)
+                    && currentArgs[1] == null, "URL, subpath, account and credential changes cannot reuse another current check");
+                object[] cachedArgs = { changed, null };
+                Check(!(bool)Method(owner.GetType(), "TryGetCachedEmailSignaturePolicyStatus", 2).Invoke(owner, cachedArgs)
+                    && cachedArgs[1] == null, "URL, subpath, account and credential changes cannot reuse another policy snapshot");
+            }
+            object denied = Status(D(), D(), true, mode, "none");
+            Call(owner, "StoreBackendPolicySnapshotIfCurrent", configuration, denied, "test_confirmed_refusal", 3L);
+            currentArgs = new object[] { configuration, null };
+            Check((bool)Method(owner.GetType(), "TryGetCurrentBackendPolicyCheck", 2).Invoke(owner, currentArgs)
+                && object.ReferenceEquals(currentArgs[1], denied), "Fresh successful refusal replaces failed availability metadata");
+            Check(object.ReferenceEquals(Field(owner, "_emailSignaturePolicyCache"), denied), "Fresh personal Seat refusal replaces an older permission");
+        }
+        object initialOwner = New("NextcloudTalkAddIn");
+        object initialConfiguration = New("Services.TalkServiceConfiguration", "https://cloud.example.test", "alice", "test-only");
+        object initialFailure = Status(D(), D(), true, "community", "active");
+        Set(initialFailure, "FetchSucceeded", false);
+        Set(initialFailure, "Reason", "backend_unavailable");
+        Call(initialOwner, "StoreBackendPolicySnapshotIfCurrent", initialConfiguration, initialFailure, "test_first_start_backend_disabled", 1L);
+        Check(Field(initialOwner, "_emailSignaturePolicyCache") == null, "First-start backend absence cannot invent a confirmed no-policy or no-Seat state");
+        object[] firstCheckArgs = { initialConfiguration, null };
+        Check((bool)Method(initialOwner.GetType(), "TryGetCurrentBackendPolicyCheck", 2).Invoke(initialOwner, firstCheckArgs)
+            && object.ReferenceEquals(firstCheckArgs[1], initialFailure), "Unknown policy still retains truthful current backend failure metadata");
+        object orderedOwner = New("NextcloudTalkAddIn");
+        object olderAllowed = Status(D(), D(), true, "community", "active");
+        object newerRefused = Status(D(), D(), true, "community", "none");
+        Call(orderedOwner, "StoreBackendPolicySnapshotIfCurrent", initialConfiguration, newerRefused, "test_newer_refusal", 2L);
+        DateTime refusalAt = (DateTime)Field(orderedOwner, "_emailSignaturePolicyCacheFetchedAtUtc");
+        DateTime checkedAt = (DateTime)Field(orderedOwner, "_backendPolicyLastCheckedAtUtc");
+        foreach (object olderResult in new[] { olderAllowed, initialFailure, null })
+        {
+            Check(object.ReferenceEquals(Call(orderedOwner, "StoreBackendPolicySnapshotIfCurrent", initialConfiguration, olderResult, "test_older_completion", 1L), newerRefused), "An older in-flight completion cannot undo a newly confirmed personal refusal");
+            Check(object.ReferenceEquals(Field(orderedOwner, "_emailSignaturePolicyCache"), newerRefused)
+                && object.ReferenceEquals(Field(orderedOwner, "_backendPolicyLastCheck"), newerRefused)
+                && (DateTime)Field(orderedOwner, "_emailSignaturePolicyCacheFetchedAtUtc") == refusalAt
+                && (DateTime)Field(orderedOwner, "_backendPolicyLastCheckedAtUtc") == checkedAt, "Ignored older completion cannot renew or replace current policy and availability timestamps");
+        }
+        Call(orderedOwner, "StoreBackendPolicySnapshotIfCurrent", initialConfiguration, initialFailure, "test_newer_outage", 3L);
+        Check(object.ReferenceEquals(Field(orderedOwner, "_emailSignaturePolicyCache"), newerRefused)
+            && object.ReferenceEquals(Field(orderedOwner, "_backendPolicyLastCheck"), initialFailure), "A newer failed check updates availability without erasing the confirmed refusal");
+        Console.WriteLine("[OK] Account-scoped last-success policy and current availability/backoff transitions");
     }
     private static void TestConnectionOnboarding()
     {
@@ -2359,7 +2506,7 @@ internal static class OutlookPolicyUiTests
             object config = New("Services.TalkServiceConfiguration", Get(local, "ServerUrl"), Get(local, "Username"), Get(local, "AppPassword"));
             object good = Status(D(), D(), true, mode, "active");
             object denied = Status(D(), D(), true, mode, seat);
-            Call(owner, "StoreBackendPolicySnapshot", config, good, "test_seed");
+            Call(owner, "StoreBackendPolicySnapshotIfCurrent", config, good, "test_seed", 1L);
             using (Form form = (Form)New("UI.SettingsForm", local, null, good, null, Addressbook(), PolicyFetcher(denied, owner)))
             {
                 var refresh = (System.Threading.Tasks.Task<bool>)Call(form, "RefreshSettingsServerStateAsync", config, false, "test_refresh");
@@ -2386,6 +2533,7 @@ internal static class OutlookPolicyUiTests
             TestDefaultsSourcePrecedence(root);
             TestDefaultsSourceValues();
             TestManagedAuthMode(root);
+            TestManagedSendPolicyFailureMode(root);
             TestManagedLoginEligibility();
             TestLocalChoices(root);
             TestWizards();
@@ -2393,6 +2541,7 @@ internal static class OutlookPolicyUiTests
             TestSettingsLanguageControls(root);
             TestAttachmentAutomation();
             TestEnterpriseRollout(root);
+            TestBackendPolicyAvailabilitySnapshot();
             TestConnectionOnboarding();
             TestSettingsRefreshSnapshot();
             TestManagedTls(root);
@@ -2604,6 +2753,40 @@ internal static class ManagedIfbRuntimeTests {
         Check(!ManagedSetupPolicy.Load().HasAuthModePolicy && !ManagedSetupPolicy.Load().IsEnterpriseRollout,
             "Removing the final auth policy trigger removes managed rollout");
     }
+    private static void TestSendPolicyFailureModeRegistry() {
+        RegistryKey.Fixtures.Clear();
+        ManagedSetupPolicy absent = ManagedSetupPolicy.Load();
+        Check(!absent.HasSendPolicyFailureModePolicy && absent.IsSendPolicyFailureModePolicyValid
+            && absent.SendPolicyFailureMode == "failopen" && !absent.IsEnterpriseRollout, "Absent send policy defaults to failopen without managed rollout");
+        foreach (RegistryValueKind kind in new[] { RegistryValueKind.String, RegistryValueKind.ExpandString, RegistryValueKind.MultiString,
+            RegistryValueKind.DWord, RegistryValueKind.QWord, RegistryValueKind.Binary, RegistryValueKind.None, RegistryValueKind.Unknown })
+        foreach (object value in new object[] { "failopen", "failclosed", " FAILOPEN ", " FAILCLOSED ", "invalid", "", "0", null, 0, false, new[] { "failclosed" } })
+        for (int location = 0; location < Locations().Length; location++) {
+            RegistryKey.Fixtures.Clear();
+            Put(location, "sendpolicyfailuremode", value, kind);
+            for (int lower = location + 1; lower < Locations().Length; lower++) Put(lower, "SendPolicyFailureMode", "failclosed", RegistryValueKind.String);
+            ManagedSetupPolicy policy = ManagedSetupPolicy.Load();
+            string mode = value as string;
+            bool valid = kind == RegistryValueKind.String && (string.Equals(mode == null ? null : mode.Trim(), "failopen", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mode == null ? null : mode.Trim(), "failclosed", StringComparison.OrdinalIgnoreCase));
+            bool failClosed = valid && string.Equals(mode.Trim(), "failclosed", StringComparison.OrdinalIgnoreCase);
+            Check(policy.HasSendPolicyFailureModePolicy && policy.IsEnterpriseRollout && policy.IsSendPolicyFailureModePolicyValid == valid,
+                "Send mode accepts only REG_SZ values and retains first-present priority: " + kind + "/" + location);
+            Check(policy.SendPolicyFailureMode == (failClosed ? "failclosed" : "failopen"), "Malformed selected send mode masks lower entries and falls back to failopen");
+            Check(policy.SendPolicyFailureModeSource.StartsWith(location < (Environment.Is64BitOperatingSystem ? 2 : 1) ? "HKLM\\" : "HKCU\\"), "Send policy source belongs to its selected registry hive");
+        }
+        RegistryKey.Fixtures.Clear();
+        Put(0, "SendPolicyFailureMode", "failopen", RegistryValueKind.String);
+        Put(Locations().Length - 1, "SendPolicyFailureMode", "invalid", RegistryValueKind.String);
+        Put(Locations().Length - 1, "AuthMode", "Manual", RegistryValueKind.String);
+        Put(Locations().Length - 1, "NextcloudUrl", "https://cloud.example.test", RegistryValueKind.String);
+        ManagedSetupPolicy mixed = ManagedSetupPolicy.Load();
+        Check(mixed.SendPolicyFailureMode == "failopen" && mixed.IsSendPolicyFailureModePolicyValid && mixed.AuthMode == AuthenticationMode.Manual && mixed.HasNextcloudUrl,
+            "Valid send mode ignores lower invalid entries while other fields retain independent precedence");
+        RegistryKey.Fixtures.Clear();
+        Check(!ManagedSetupPolicy.Load().HasSendPolicyFailureModePolicy && !ManagedSetupPolicy.Load().IsEnterpriseRollout,
+            "Removing the last send-mode policy removes its managed state and rollout");
+    }
     private static void TestManager() {
         RegistryKey.Fixtures.Clear(); Put(0, "IfbEnabled", 1, RegistryValueKind.DWord);
         Put(0, "IfbDays", 60, RegistryValueKind.DWord); Put(0, "IfbCacheHours", 6, RegistryValueKind.DWord); Put(0, "IfbPort", 8888, RegistryValueKind.DWord);
@@ -2638,7 +2821,7 @@ internal static class ManagedIfbRuntimeTests {
         Check(FreeBusyServer.Stops > 0 && IfbRegistryOwnershipManager.Restores > 0, "Manager disposal stops and restores without rewriting managed enabled");
     }
     public static int Main() {
-        try { TestRegistryKindsAndPrecedence(); TestDefaultsSourceRegistry(); TestAuthModeRegistry(); TestManager(); Console.WriteLine("[OK] " + checks + " in-memory production IFB/defaults-source/auth-mode registry/manager assertions passed"); return 0; }
+        try { TestRegistryKindsAndPrecedence(); TestDefaultsSourceRegistry(); TestAuthModeRegistry(); TestSendPolicyFailureModeRegistry(); TestManager(); Console.WriteLine("[OK] " + checks + " in-memory production IFB/defaults-source/auth-mode/send-mode registry/manager assertions passed"); return 0; }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
 }

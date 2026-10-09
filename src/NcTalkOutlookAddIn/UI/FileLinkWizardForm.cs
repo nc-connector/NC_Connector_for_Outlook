@@ -193,6 +193,8 @@ namespace NcTalkOutlookAddIn.UI
 
         internal FileLinkResult Result { get; private set; }
 
+        internal bool UnexpectedFailureObserved { get; private set; }
+
         internal FileLinkRequest RequestSnapshot
         {
             get { return _requestSnapshot; }
@@ -201,6 +203,24 @@ namespace NcTalkOutlookAddIn.UI
         internal int QueuedSelectionCount
         {
             get { return _items.Count; }
+        }
+
+        internal IList<string> GetSharedLocalPaths()
+        {
+            var paths = new List<string>();
+            if (!_uploadCompleted || !_shareFinalized || Result == null
+                || _uploadContext == null || _uploadContext.Plan == null)
+            {
+                return paths;
+            }
+            foreach (FileLinkPlannedFile file in _uploadContext.Plan.Files)
+            {
+                if (file != null && !string.IsNullOrWhiteSpace(file.LocalPath))
+                {
+                    paths.Add(file.LocalPath);
+                }
+            }
+            return paths;
         }
 
 
@@ -336,6 +356,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Manual share folder preflight failed with service error.",
@@ -349,6 +370,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Manual share folder preflight failed unexpectedly.",
@@ -537,6 +559,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Share creation failed.", ex);
                 MessageBox.Show(
                     string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardCreateFailedFormat, ex.Message),
@@ -556,6 +579,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Share creation failed unexpectedly.", ex);
                 MessageBox.Show(
                     string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardCreateFailedFormat, ex.Message),
@@ -681,7 +705,9 @@ namespace NcTalkOutlookAddIn.UI
 
         private string BuildAttachmentModeInfoText()
         {
-            if (_launchOptions == null || string.Equals(_launchOptions.AttachmentTrigger, "always", StringComparison.OrdinalIgnoreCase))
+            if (_launchOptions == null
+                || !string.Equals(_launchOptions.AttachmentTrigger, "threshold", StringComparison.OrdinalIgnoreCase)
+                || _launchOptions.AttachmentTotalBytes <= (long)Math.Max(1, _launchOptions.AttachmentThresholdMb) * 1024L * 1024L)
             {
                 return Strings.FileLinkWizardAttachmentModeReasonAlways;
             }
@@ -727,6 +753,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
+                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Attachment mode finalize guard check failed.", ex);
                 return false;
             }

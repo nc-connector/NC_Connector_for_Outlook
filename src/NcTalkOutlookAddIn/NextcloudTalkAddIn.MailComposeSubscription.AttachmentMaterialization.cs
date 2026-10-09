@@ -41,15 +41,25 @@ namespace NcTalkOutlookAddIn
 
             private sealed class AttachmentBatchEntry
             {
+                internal Outlook.Attachment OriginalAttachment { get; set; }
+
                 internal string Name { get; set; }
 
                 internal long SizeBytes { get; set; }
             }
 
-            private int CountPolicyRelevantAttachments()
+            private sealed class AttachmentShareOriginal
+            {
+                internal Outlook.Attachment Attachment { get; set; }
+
+                internal string LocalPath { get; set; }
+            }
+
+            private int CountPolicyRelevantAttachments(out long totalBytes)
             {
                 Outlook.Attachments attachments = null;
                 int relevant = 0;
+                totalBytes = 0;
                 try
                 {
                     attachments = _mail != null ? _mail.Attachments : null;
@@ -64,6 +74,7 @@ namespace NcTalkOutlookAddIn
                                 && !IsHiddenAttachment(attachment))
                             {
                                 relevant++;
+                                totalBytes += Math.Max(0, attachment.Size);
                             }
                         }
                         finally
@@ -81,6 +92,7 @@ namespace NcTalkOutlookAddIn
                         LogCategories.FileLink,
                         "Failed to inspect attachments for required routing (composeKey=" + _composeKey + ").",
                         ex);
+                    totalBytes = long.MaxValue;
                     return int.MaxValue;
                 }
                 finally
@@ -468,7 +480,7 @@ namespace NcTalkOutlookAddIn
                 return string.Empty;
             }
 
-            private void CollectAttachmentSelectionsForShare(List<FileLinkSelection> selections, List<int> removeIndices, List<string> temporaryFiles)
+            private void CollectAttachmentSelectionsForShare(List<FileLinkSelection> selections, List<AttachmentShareOriginal> originals, List<string> temporaryFiles)
             {
                 Outlook.Attachments attachments = null;
                 try
@@ -501,7 +513,8 @@ namespace NcTalkOutlookAddIn
                             }
 
                             selections.Add(new FileLinkSelection(FileLinkSelectionType.File, localPath));
-                            removeIndices.Add(index);
+                            originals.Add(new AttachmentShareOriginal { Attachment = attachment, LocalPath = localPath });
+                            attachment = null;
                         }
                         catch (Exception ex)
                         {
@@ -545,12 +558,6 @@ namespace NcTalkOutlookAddIn
                 if (attachment == null)
                 {
                     return false;
-                }
-                string pathName = ReadAttachmentPathName(attachment);
-                if (!string.IsNullOrWhiteSpace(pathName) && File.Exists(pathName))
-                {
-                    localPath = pathName;
-                    return true;
                 }
                 string safeName = FileLinkPath.SanitizeComponent(attachmentName);
                 if (string.IsNullOrWhiteSpace(safeName))
@@ -613,38 +620,13 @@ namespace NcTalkOutlookAddIn
                 return Path.Combine(fallbackDirectory, fileName);
             }
 
-            private int ReadComposeAttachmentCount(string reason)
+            private void CaptureBeforeAddAttachmentOriginal(
+                AttachmentBatchEntry candidate,
+                List<FileLinkSelection> selections,
+                List<AttachmentShareOriginal> originals,
+                List<string> temporaryFiles)
             {
-                Outlook.Attachments attachments = null;
-                try
-                {
-                    attachments = _mail.Attachments;
-                    return attachments != null ? attachments.Count : 0;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to read compose attachment count (composeKey="
-                        + _composeKey
-                        + ", reason="
-                        + (reason ?? string.Empty)
-                        + ").",
-                        ex);
-                    return 0;
-                }
-                finally
-                {
-                    ComInteropScope.TryRelease(
-                        attachments,
-                        LogCategories.FileLink,
-                        "Failed to release COM object (compose attachments collection count).");
-                }
-            }
-
-            private void RemoveSuppressedBeforeAddAttachmentByName(string attachmentName, long sizeBytes, int baselineAttachmentCount, string reason)
-            {
-                if (string.IsNullOrWhiteSpace(attachmentName))
+                if (!CanApplyComposeChanges || candidate == null || candidate.OriginalAttachment == null)
                 {
                     return;
                 }
@@ -652,78 +634,127 @@ namespace NcTalkOutlookAddIn
                 Outlook.Attachments attachments = null;
                 try
                 {
-                    attachments = _mail.Attachments;
-                    if (attachments == null || attachments.Count <= Math.Max(0, baselineAttachmentCount))
-                    {
-                        return;
-                    }
-
-                    for (int index = attachments.Count; index >= 1; index--)
+                    attachments = _mail != null ? _mail.Attachments : null;
+                    int count = attachments != null ? attachments.Count : 0;
+                    for (int index = 1; index <= count; index++)
                     {
                         Outlook.Attachment attachment = null;
                         try
                         {
                             attachment = attachments[index];
-                            if (attachment == null)
+                            if (attachment == null || IsHiddenAttachment(attachment)
+                                || !ComInteropScope.AreSameObject(
+                                    attachment, candidate.OriginalAttachment,
+                                    LogCategories.FileLink, "Attachment", "BeforeAttachmentAdd"))
                             {
                                 continue;
                             }
-                            if (IsHiddenAttachment(attachment))
+                            foreach (AttachmentShareOriginal existing in originals)
                             {
-                                continue;
+                                if (ComInteropScope.AreSameObject(
+                                    attachment, existing.Attachment,
+                                    LogCategories.FileLink, "Attachment", "CapturedAttachment"))
+                                {
+                                    return;
+                                }
                             }
-
-                            string currentName = ReadAttachmentName(attachment);
-                            long currentSize = ReadAttachmentSizeBytes(attachment);
-                            if (!string.Equals(currentName, attachmentName, StringComparison.OrdinalIgnoreCase)
-                                || Math.Max(0, currentSize) != Math.Max(0, sizeBytes))
+                            string localPath;
+                            if (!TryResolveAttachmentLocalPath(attachment, ReadAttachmentName(attachment), temporaryFiles, out localPath))
                             {
-                                continue;
+                                return;
                             }
-
-                            attachments.Remove(index);
-                            LogFileLink(
-                                "Suppressed host attachment removed after before-add cancel (composeKey="
-                                + _composeKey
-                                + ", reason="
-                                + (reason ?? string.Empty)
-                                + ", attachment="
-                                + attachmentName
-                                + ").");
+                            selections.Add(new FileLinkSelection(FileLinkSelectionType.File, localPath));
+                            originals.Add(new AttachmentShareOriginal { Attachment = attachment, LocalPath = localPath });
+                            attachment = null;
                             return;
                         }
                         finally
                         {
                             ComInteropScope.TryRelease(
-                                attachment,
-                                LogCategories.FileLink,
-                                "Failed to release COM object (suppressed compose attachment).");
+                                attachment, LogCategories.FileLink,
+                                "Failed to release before-add attachment capture.");
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to remove suppressed compose attachment (composeKey="
-                        + _composeKey
-                        + ", attachment="
-                        + attachmentName
-                        + ").",
-                        ex);
                 }
                 finally
                 {
                     ComInteropScope.TryRelease(
-                        attachments,
-                        LogCategories.FileLink,
-                        "Failed to release COM object (suppressed compose attachments collection).");
+                        attachments, LogCategories.FileLink,
+                        "Failed to release before-add attachment collection.");
                 }
+            }
+
+            private void RemoveSharedAttachmentOriginals(
+                List<AttachmentShareOriginal> originals,
+                IList<string> sharedLocalPaths)
+            {
+                if (!CanApplyComposeChanges || sharedLocalPaths == null || sharedLocalPaths.Count == 0)
+                {
+                    return;
+                }
+                var shared = new HashSet<FileLinkSelection>(FileLinkSelection.IdentityComparer);
+                foreach (string path in sharedLocalPaths)
+                {
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        shared.Add(new FileLinkSelection(FileLinkSelectionType.File, path));
+                    }
+                }
+                _attachmentSuppressed = true;
+                try
+                {
+                    foreach (AttachmentShareOriginal original in originals)
+                    {
+                        if (original.Attachment == null
+                            || !shared.Contains(new FileLinkSelection(FileLinkSelectionType.File, original.LocalPath))
+                            || IsHiddenAttachment(original.Attachment))
+                        {
+                            continue;
+                        }
+                        try
+                        {
+                            if (!CanApplyComposeChanges)
+                            {
+                                return;
+                            }
+                            original.Attachment.Delete();
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticsLogger.LogException(
+                                LogCategories.FileLink,
+                                "Failed to remove an original attachment after successful sharing (composeKey=" + _composeKey + ").",
+                                ex);
+                        }
+                    }
+                }
+                finally
+                {
+                    EndAttachmentSuppression("shared_originals");
+                }
+            }
+
+            private static void ReleaseAttachmentShareOriginals(List<AttachmentShareOriginal> originals)
+            {
+                foreach (AttachmentShareOriginal original in originals)
+                {
+                    try
+                    {
+                        ComInteropScope.TryRelease(
+                            original.Attachment, LogCategories.FileLink,
+                            "Failed to release an original shared attachment.");
+                    }
+                    finally
+                    {
+                        original.Attachment = null;
+                    }
+                }
+                originals.Clear();
             }
 
             private void RemoveAttachmentsByIndices(List<int> indices, string reason)
             {
-                if (indices == null || indices.Count == 0)
+                if (!CanApplyComposeChanges || indices == null || indices.Count == 0)
                 {
                     return;
                 }
@@ -750,6 +781,10 @@ namespace NcTalkOutlookAddIn
                             continue;
                         }
 
+                        if (!CanApplyComposeChanges)
+                        {
+                            return;
+                        }
                         attachments.Remove(attachmentIndex);
                         removed++;
                     }
@@ -788,6 +823,10 @@ namespace NcTalkOutlookAddIn
 
             private void RemoveLastAddedAttachmentBatch(AttachmentBatchInfo lastAdded)
             {
+                if (!CanApplyComposeChanges)
+                {
+                    return;
+                }
                 int removeCount = lastAdded != null ? Math.Max(1, lastAdded.Count) : 1;
                 List<AttachmentSnapshot> attachments = SnapshotAttachments();
                 var removeIndices = new List<int>();

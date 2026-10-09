@@ -14,6 +14,7 @@ namespace NcTalkOutlookAddIn.Models
         internal FileLinkWizardLaunchOptions()
         {
             InitialSelections = new List<FileLinkSelection>();
+            SharedLocalPaths = new List<string>();
         }
 
         internal bool AttachmentMode { get; set; }
@@ -33,6 +34,10 @@ namespace NcTalkOutlookAddIn.Models
         internal Action OnInitialQueueAdopted { get; set; }
 
         internal IList<FileLinkSelection> InitialSelections { get; private set; }
+
+        internal IList<string> SharedLocalPaths { get; private set; }
+
+        internal bool UnexpectedFailureObserved { get; set; }
     }
 }
 

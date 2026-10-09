@@ -495,23 +495,45 @@ namespace NcTalkOutlookAddIn
             {
                 return;
             }
+            ShowComposeNotificationOnUiContext(string.Format(
+                CultureInfo.CurrentCulture, Strings.SharingPasswordMailNotificationSuccess,
+                recipientCount.ToString(CultureInfo.CurrentCulture)), ToolTipIcon.Info, notificationUiContext);
+        }
+
+        internal void ShowComposeWarning(string message)
+        {
+            SynchronizationContext context = _uiSynchronizationContext ?? SynchronizationContext.Current;
+            if (context == null || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+            try
+            {
+                context.Post(_ => ShowComposeNotificationOnUiContext(message, ToolTipIcon.Warning, context), null);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Compose warning could not be displayed.", ex);
+            }
+        }
+
+        private void ShowComposeNotificationOnUiContext(string message, ToolTipIcon icon, SynchronizationContext notificationUiContext)
+        {
             try
             {
                 var notifyIcon = new NotifyIcon();
                 notifyIcon.Icon = BrandingAssets.GetAppIcon(32);
                 notifyIcon.Visible = true;
                 notifyIcon.BalloonTipTitle = Strings.SharingPasswordMailNotificationTitle;
-                notifyIcon.BalloonTipText = string.Format(
-                    CultureInfo.CurrentCulture,
-                    Strings.SharingPasswordMailNotificationSuccess,
-                    recipientCount.ToString(CultureInfo.CurrentCulture));
+                notifyIcon.BalloonTipIcon = icon;
+                notifyIcon.BalloonTipText = message;
                 notifyIcon.ShowBalloonTip(5000);
                 ScheduleNotifyIconDispose(notifyIcon, 7000, notificationUiContext);
-                LogFileLink("Separate password notification shown (recipients=" + recipientCount.ToString(CultureInfo.InvariantCulture) + ").");
+                LogCore("Compose notification shown (icon=" + icon + ").");
             }
             catch (Exception ex)
             {
-                DiagnosticsLogger.LogException(LogCategories.FileLink, "Separate password notification failed on UI context.", ex);
+                DiagnosticsLogger.LogException(LogCategories.Core, "Compose notification failed on UI context.", ex);
             }
         }
 
@@ -964,6 +986,12 @@ namespace NcTalkOutlookAddIn
             {
                 DiagnosticsLogger.LogException(LogCategories.Core,
                     "Invalid managed logging value. Invalid DebugLoggingEnabled defaults to false; invalid LogAnonymizationEnabled defaults to true.", null);
+            }
+            if (settings != null && settings.HasManagedSendPolicyFailureMode && !settings.IsManagedSendPolicyFailureModeValid)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core,
+                    "Invalid managed SendPolicyFailureMode; failopen applies (source="
+                    + settings.ManagedSendPolicyFailureModeSource + ").", null);
             }
         }
 
