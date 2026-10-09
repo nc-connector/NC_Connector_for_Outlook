@@ -4,6 +4,31 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.4.4] - 2026-10-09
+
+### Added
+
+- Add the enterprise registry key `SendPolicyFailureMode` to choose `failopen` or `failclosed` for signature and attachment enforcement during service outages. See [Sending during service outages](docs/ADMIN.md#sending-during-service-outages).
+- Add "Sign in again" to connection notices and "Remove saved credentials" under Advanced, preserving the Nextcloud URL, preferences and pending cleanup.
+
+### Changed
+
+- Use `failopen` by default when Nextcloud or the backend is unavailable: allow sending and warn only if a known applicable signature or attachment rule cannot be fulfilled. Applicable rules remain enforced when services are available.
+- Cancelling automatic attachment sharing also removes the attachments adopted by that sharing wizard from the message.
+
+### Fixed
+
+- Prevent an unreachable Nextcloud URL or unavailable backend from blocking ordinary email sending under the default settings.
+- Check the current connection before opening Share or Talk and show the same actionable connection error in both workflows.
+- Keep locally configured attachment automation working when Nextcloud is reachable and the optional backend is not installed.
+- Show the actual reason for attachment automation when attachments must always use NC Connector, instead of an unrelated size threshold.
+- Enforce centrally required attachment-size thresholds when sending; local optional upload offers remain optional.
+- Preserve original attachments when uploading fails or the share link cannot be inserted, unless the user cancels the attachment-sharing wizard. After successful sharing, remove only attachments that were shared and linked in the message.
+- Verify changed credentials before saving and retain the saved connection when verification fails. Unchanged credentials do not prevent saving local preferences while offline.
+- Pause authenticated requests after HTTP 401, including across restarts, until verified credentials are saved. Honor HTTP 429 waiting times across background operations, login attempts and credential changes.
+- Preserve pending Share and Talk cleanup during connection pauses and resume it only for the same verified Nextcloud account.
+- Show that the backend is required when its endpoint is missing during Enterprise Rollout, instead of a generic connection-check notice.
+
 ## [3.4.3] - 2026-10-01
 
 ### Added

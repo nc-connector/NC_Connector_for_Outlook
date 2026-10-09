@@ -5,7 +5,7 @@
 
 # NC Connector for Outlook – Administration
 
-Installation, managed configuration, and troubleshooting for version 3.4.3.
+Installation, managed configuration, and troubleshooting for version 3.4.4.
 
 ## Contents
 
@@ -74,7 +74,7 @@ If Outlook is still open, Windows Installer can offer to close it cleanly. An un
 For an unattended installation with a log:
 
 ```powershell
-msiexec.exe /i "NCConnectorForOutlook-3.4.3.msi" /qn /norestart /L*v "$env:TEMP\NCConnectorForOutlook-install.log"
+msiexec.exe /i "NCConnectorForOutlook-3.4.4.msi" /qn /norestart /L*v "$env:TEMP\NCConnectorForOutlook-install.log"
 ```
 
 <a id="basisprüfungen"></a>
@@ -431,7 +431,7 @@ Close Outlook in every session and uninstall the add-in through **Windows Settin
 For an unattended uninstall with a log:
 
 ```powershell
-msiexec.exe /x "NCConnectorForOutlook-3.4.3.msi" /qn /norestart /L*v "$env:TEMP\NCConnectorForOutlook-uninstall.log"
+msiexec.exe /x "NCConnectorForOutlook-3.4.4.msi" /qn /norestart /L*v "$env:TEMP\NCConnectorForOutlook-uninstall.log"
 ```
 
 User settings, caches, and logs under `%LOCALAPPDATA%\NC4OL\` remain. The add-in can therefore still be signed in after reinstalling. For a completely fresh setup, rename the directory while Outlook is closed and after taking a backup. This resets the configuration of every Outlook profile stored there; pending Talk room deletions will no longer run.

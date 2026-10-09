@@ -5,8 +5,8 @@
     <InstallerPlatform>x64</InstallerPlatform>
 
     <BuildOutputDir Condition=" '$(BuildOutputDir)' == '' ">$(MSBuildProjectDirectory)\..\src\NcTalkOutlookAddIn\bin\Release\</BuildOutputDir>
-    <ProductVersion Condition=" '$(ProductVersion)' == '' ">3.4.3</ProductVersion>
-    <AssemblyVersion Condition=" '$(AssemblyVersion)' == '' ">3.4.3.0</AssemblyVersion>
+    <ProductVersion Condition=" '$(ProductVersion)' == '' ">3.4.4</ProductVersion>
+    <AssemblyVersion Condition=" '$(AssemblyVersion)' == '' ">3.4.4.0</AssemblyVersion>
 
     <IfbCleanupExe>$(MSBuildProjectDirectory)\IfbCleanup\bin\$(Configuration)\NcConnectorIfbCleanup.exe</IfbCleanupExe>
     <DefineConstants>BuildOutputDir=$(BuildOutputDir);ProductVersion=$(ProductVersion);AssemblyVersion=$(AssemblyVersion);IfbCleanupExe=$(IfbCleanupExe)</DefineConstants>
