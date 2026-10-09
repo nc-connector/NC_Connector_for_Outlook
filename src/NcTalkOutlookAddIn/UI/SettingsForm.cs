@@ -582,7 +582,13 @@ namespace NcTalkOutlookAddIn.UI
                 _tabControl.SelectedTab = _generalTab;
                 return;
             }
-            if (_authenticationRequired && _connectionSetupPending
+            bool credentialsChanged = !string.Equals(
+                    normalizedServerUrl,
+                    new TalkServiceConfiguration(Result.ServerUrl, Result.Username, Result.AppPassword).GetNormalizedBaseUrl(),
+                    StringComparison.Ordinal)
+                || !string.Equals(configuration.Username, Result.Username, StringComparison.Ordinal)
+                || !string.Equals(configuration.AppPassword, Result.AppPassword, StringComparison.Ordinal);
+            if ((_authenticationRequired || credentialsChanged) && _connectionSetupPending
                 && !await TestConnectionAsync())
             {
                 return;
@@ -718,10 +724,6 @@ namespace NcTalkOutlookAddIn.UI
                 }
 
                 _backendPolicyStatus = policyStatus;
-                if (configuration != null && configuration.IsComplete())
-                {
-                    _connectionSetupPending = false;
-                }
                 ApplyBackendPolicyStatus(trigger);
                 if (addressbookGeneration == _addressbookRefreshGeneration)
                 {

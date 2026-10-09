@@ -33,7 +33,7 @@ namespace NcTalkOutlookAddIn.Services
             _httpClient = new NcHttpClient(configuration);
         }
 
-        internal NextcloudCapabilitiesSnapshot GetSnapshot(bool forceRefresh, bool forceFreshConnection)
+        internal NextcloudCapabilitiesSnapshot GetSnapshot(bool forceRefresh, bool forceFreshConnection, bool verifyRejectedCredentials = false)
         {
             if (!_configuration.IsComplete())
             {
@@ -66,7 +66,7 @@ namespace NcTalkOutlookAddIn.Services
                     }
 
                     NextcloudCapabilitiesSnapshot snapshot = FetchSnapshot(
-                        forceFreshConnection);
+                        forceFreshConnection, verifyRejectedCredentials);
                     slot.Snapshot = snapshot;
                     slot.FetchedAtUtc = DateTime.UtcNow;
                     return snapshot;
@@ -109,7 +109,7 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        private NextcloudCapabilitiesSnapshot FetchSnapshot(bool forceFreshConnection)
+        private NextcloudCapabilitiesSnapshot FetchSnapshot(bool forceFreshConnection, bool verifyRejectedCredentials)
         {
             string url = _configuration.GetNormalizedBaseUrl()
                          + "/ocs/v2.php/cloud/capabilities?format=json";
@@ -121,7 +121,8 @@ namespace NcTalkOutlookAddIn.Services
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
                 ParseJson = true,
-                ForceFreshConnection = forceFreshConnection
+                ForceFreshConnection = forceFreshConnection,
+                VerifyRejectedCredentials = verifyRejectedCredentials
             });
 
             if (!response.HasHttpResponse)

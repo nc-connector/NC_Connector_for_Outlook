@@ -170,7 +170,7 @@ namespace NcTalkOutlookAddIn.Services
             }
         }
 
-        internal bool VerifyConnection(out string message)
+        internal bool VerifyConnection(out string message, bool retryRejectedCredentials = false)
         {
             EnsureConfiguration();
 
@@ -178,7 +178,7 @@ namespace NcTalkOutlookAddIn.Services
             // are validated against a new handshake and not masked by pooled keep-alive sockets.
             NextcloudCapabilitiesSnapshot snapshot =
                 new NextcloudCapabilitiesService(_configuration)
-                    .GetSnapshot(true, true);
+                    .GetSnapshot(true, true, retryRejectedCredentials);
             try
             {
                 NextcloudCapabilitiesService.RequireSupportedSnapshot(
@@ -192,7 +192,7 @@ namespace NcTalkOutlookAddIn.Services
 
             try
             {
-                NextcloudUserIdentityService.ResolveCurrentUserId(_configuration, true);
+                NextcloudUserIdentityService.ResolveCurrentUserId(_configuration, true, retryRejectedCredentials);
             }
             catch (TalkServiceException ex)
             {

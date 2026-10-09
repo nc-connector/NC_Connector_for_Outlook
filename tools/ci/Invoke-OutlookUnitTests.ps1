@@ -64,7 +64,7 @@ namespace NcTalkOutlookAddIn.Services
     {
         internal string Method, Url, Accept;
         internal int TimeoutMs;
-        internal bool IncludeAuthHeader, IncludeOcsApiHeader, ParseJson, ForceFreshConnection;
+        internal bool IncludeAuthHeader, IncludeOcsApiHeader, ParseJson, ForceFreshConnection, VerifyRejectedCredentials;
     }
 
     internal sealed class NcHttpResponse
@@ -74,14 +74,21 @@ namespace NcTalkOutlookAddIn.Services
         internal string ResponseText;
         internal IDictionary<string, object> ParsedJson;
         internal WebException TransportException;
+        internal long RequestSequence = 1;
     }
 
     internal sealed class NcHttpClient
     {
         internal static readonly Queue<NcHttpResponse> Responses = new Queue<NcHttpResponse>();
         internal static readonly List<NcHttpRequestOptions> Requests = new List<NcHttpRequestOptions>();
+        internal static int ConfirmedVerifications;
 
         internal NcHttpClient(TalkServiceConfiguration configuration) { }
+
+        internal static void ConfirmVerifiedAuthentication(TalkServiceConfiguration configuration, long requestSequence)
+        {
+            ConfirmedVerifications++;
+        }
 
         internal NcHttpResponse Send(NcHttpRequestOptions options)
         {
@@ -97,6 +104,7 @@ namespace NcTalkOutlookAddIn.Services
         {
             Responses.Clear();
             Requests.Clear();
+            ConfirmedVerifications = 0;
             foreach (NcHttpResponse response in responses) { Responses.Enqueue(response); }
         }
     }
@@ -305,6 +313,19 @@ internal static class OutlookUtilityTests
             && NcHttpClient.Requests[0].Url.EndsWith("/cloud/capabilities?format=json", StringComparison.Ordinal)
             && NcHttpClient.Requests[1].Url.EndsWith("/cloud/user?format=json", StringComparison.Ordinal)
             && NcHttpClient.Requests.All(request => request.IncludeAuthHeader && request.IncludeOcsApiHeader));
+        Check("Ordinary action checks cannot retry rejected credentials",
+            NcHttpClient.Requests.All(request => !request.VerifyRejectedCredentials)
+            && NcHttpClient.ConfirmedVerifications == 0);
+
+        NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), UserTestResponse("initial-user"));
+        Check("Explicit settings verification may retry rejected credentials", verifier.VerifyConnection(out message, true));
+        Check("Explicit verification marks both authenticated checks and confirms only the valid UID",
+            NcHttpClient.Requests.Count == 2 && NcHttpClient.Requests.All(request => request.VerifyRejectedCredentials)
+            && NcHttpClient.ConfirmedVerifications == 1);
+
+        NcHttpClient.Reset(CapabilitiesTestResponse("32.0.0"), UserTestResponse(string.Empty));
+        Check("An invalid UID cannot release an authentication pause", !verifier.VerifyConnection(out message, true)
+            && NcHttpClient.ConfirmedVerifications == 0);
 
         NcHttpClient.Reset(new NcHttpResponse());
         failure = CaptureConnectionFailure(() => verifier.VerifyConnection(out message));

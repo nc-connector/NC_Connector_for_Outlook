@@ -103,7 +103,12 @@ namespace NcTalkOutlookAddIn
             TalkServiceConfiguration configuration, string trigger)
         {
             // Called by background workers; never wait for HTTP from a ribbon or Send callback.
-            BackendPolicyStatus fetched = FetchBackendPolicyStatus(configuration, trigger);
+            BackendPolicyStatus fetched;
+            if (!TryGetCurrentBackendPolicyCheck(configuration, out fetched)
+                || fetched.FetchSucceeded)
+            {
+                fetched = FetchBackendPolicyStatus(configuration, trigger);
+            }
             BackendPolicyStatus known;
             return TryGetCachedEmailSignaturePolicyStatus(configuration, out known) ? known : fetched;
         }

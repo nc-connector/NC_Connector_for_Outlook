@@ -90,6 +90,7 @@ namespace NcTalkOutlookAddIn.Services
         internal bool IncludeOcsApiHeader { get; set; }
         internal bool ParseJson { get; set; }
         internal bool ForceFreshConnection { get; set; }
+        internal bool VerifyRejectedCredentials { get; set; }
     }
 
     internal sealed class NcHttpResponse
@@ -99,6 +100,7 @@ namespace NcTalkOutlookAddIn.Services
         internal IDictionary<string, object> ParsedJson { get; set; }
         internal string ResponseText { get; set; }
         internal Exception TransportException { get; set; }
+        internal long RequestSequence { get; set; }
     }
 
     internal sealed class NcHttpClient
@@ -107,6 +109,8 @@ namespace NcTalkOutlookAddIn.Services
         internal static string LastAuthenticationLogin;
         internal static NcHttpRequestOptions LastOptions;
         internal static NcHttpResponse NextResponse;
+
+        internal static void ConfirmVerifiedAuthentication(TalkServiceConfiguration configuration, long requestSequence) { }
 
         internal NcHttpClient(TalkServiceConfiguration configuration)
         {

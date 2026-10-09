@@ -48,6 +48,27 @@ namespace NcTalkOutlookAddIn.Utilities
 
     internal static class HttpFailureDiagnostics
     {
+        internal static DateTime ReadRetryAfterUtc(IDictionary<string, string> headers)
+        {
+            string value;
+            if (headers != null && headers.TryGetValue("Retry-After", out value))
+            {
+                int seconds;
+                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out seconds)
+                    && seconds >= 0)
+                {
+                    return DateTime.UtcNow.AddSeconds(seconds);
+                }
+                DateTimeOffset retryAt;
+                if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out retryAt))
+                {
+                    return retryAt.UtcDateTime;
+                }
+            }
+            return DateTime.UtcNow.AddMinutes(1);
+        }
+
         internal static HttpFailureInfo Analyze(WebException ex)
         {
             if (ex == null)

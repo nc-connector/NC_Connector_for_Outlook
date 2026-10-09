@@ -159,6 +159,7 @@ namespace NcTalkOutlookAddIn.UI
 
             _serverUrlTextBox.Text = normalizedUrl;
 
+            _connectionSetupPending = true;
             SetBusy(true);
             SetStatus(Strings.StatusLoginFlowStarting, false);
             SecurityProtocolType previousSecurityProtocol = ServicePointManager.SecurityProtocol;
@@ -196,7 +197,7 @@ namespace NcTalkOutlookAddIn.UI
                     _usernameTextBox.Text,
                     _appPasswordTextBox.Text));
                 string versionResponse = string.Empty;
-                bool verified = await Task.Run(() => verificationService.VerifyConnection(out versionResponse));
+                bool verified = await Task.Run(() => verificationService.VerifyConnection(out versionResponse, true));
                 if (IsDisposed || Disposing)
                 {
                     return;
@@ -284,6 +285,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             _serverUrlTextBox.Text = normalizedUrl;
 
+            _connectionSetupPending = true;
             SetBusy(true);
             SetStatus(Strings.StatusTestRunning, false);
             DiagnosticsLogger.Log(LogCategories.Core, "Connection test started (Server=" + normalizedUrl + ", User=" + user + ").");
@@ -297,7 +299,7 @@ namespace NcTalkOutlookAddIn.UI
 
                 var service = new TalkService(new TalkServiceConfiguration(normalizedUrl, user, appPassword));
                 string responseMessage = string.Empty;
-                bool success = await Task.Run(() => service.VerifyConnection(out responseMessage));
+                bool success = await Task.Run(() => service.VerifyConnection(out responseMessage, true));
                 if (IsDisposed || Disposing)
                 {
                     return false;

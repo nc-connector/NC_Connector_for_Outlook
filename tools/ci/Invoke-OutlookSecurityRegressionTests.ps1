@@ -637,6 +637,232 @@ internal static class OutlookSecurityRegressionTests
         exit $LASTEXITCODE
     }
 
+    $httpPauseSource = Join-Path $TempRoot "HttpRequestPauseTests.cs"
+    @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Text;
+using System.Threading;
+using NcTalkOutlookAddIn.Services;
+using NcTalkOutlookAddIn.Utilities;
+namespace NcTalkOutlookAddIn.Settings {
+    internal sealed class AddinSettings {
+        internal bool TransportTlsUseSystemDefault { get; set; }
+        internal bool TransportTlsEnable12 { get; set; }
+        internal bool TransportTlsEnable13 { get; set; }
+        internal bool HasManagedTransportTls { get; set; }
+        internal bool IsManagedTransportTlsValid { get { return true; } }
+    }
+}
+namespace NcTalkOutlookAddIn.Utilities {
+    internal static class LogCategories { internal const string Api = "api", Core = "core"; }
+    internal static class DiagnosticsLogger {
+        internal static void Log(string category, string message) { }
+        internal static void LogException(string category, string message, Exception ex) { }
+    }
+    internal static class Strings {
+        internal const string ConnectionFailureCertificateSummary = "certificate", ConnectionFailureCertificateGuidance = "certificate";
+        internal const string ConnectionFailureDnsSummary = "dns", ConnectionFailureDnsGuidance = "dns";
+        internal const string ConnectionFailureProxySummary = "proxy", ConnectionFailureProxyGuidance = "proxy";
+        internal const string ConnectionFailureTimeoutSummary = "timeout", ConnectionFailureTimeoutGuidance = "timeout";
+        internal const string ConnectionFailureTlsSummary = "tls", ConnectionFailureTlsGuidance = "tls";
+        internal const string ConnectionFailureGenericSummary = "generic", ConnectionFailureGenericGuidance = "generic";
+        internal const string ManagedTlsPolicyInvalid = "invalid tls";
+    }
+}
+internal static class HttpRequestPauseTests {
+    private static int failures, requests;
+    private static volatile int statusCode = 200;
+    private static volatile string retryAfter = "";
+    private static void Check(string name, bool result) {
+        Console.WriteLine((result ? "[OK] " : "[FAIL] ") + name);
+        if (!result) failures++;
+    }
+    private static NcHttpRequestOptions Options(string url, bool verify = false) {
+        return new NcHttpRequestOptions { Url = url, TimeoutMs = 2000, ParseJson = false,
+            VerifyRejectedCredentials = verify, ForceFreshConnection = true };
+    }
+    public static int Main() {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        string url = "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port + "/pause-fixture";
+        var server = new Thread(() => {
+            while (true) {
+                TcpClient client;
+                try { client = listener.AcceptTcpClient(); }
+                catch (SocketException) { break; }
+                catch (ObjectDisposedException) { break; }
+                catch (InvalidOperationException) { break; }
+                using (client) using (NetworkStream stream = client.GetStream()) {
+                    var reader = new StreamReader(stream, Encoding.ASCII, false, 1024, true);
+                    while (!string.IsNullOrEmpty(reader.ReadLine())) { }
+                    Interlocked.Increment(ref requests);
+                    string headers = string.IsNullOrEmpty(retryAfter) ? "" : "Retry-After: " + retryAfter + "\r\n";
+                    byte[] bytes = Encoding.ASCII.GetBytes("HTTP/1.1 " + statusCode + " Fixture\r\nContent-Length: 0\r\nConnection: close\r\n" + headers + "\r\n");
+                    stream.Write(bytes, 0, bytes.Length);
+                }
+            }
+        });
+        server.IsBackground = true;
+        server.Start();
+        try {
+            var configuration = new TalkServiceConfiguration("https://pause.example.test/nextcloud", "fixture-user", "fixture-password");
+            var client = new NcHttpClient(configuration);
+            statusCode = 401;
+            NcHttpResponse rejected = client.Send(Options(url));
+            Check("An actual HTTP 401 records the rejected authentication", rejected.StatusCode == HttpStatusCode.Unauthorized && requests == 1);
+            statusCode = 200;
+            int before = requests;
+            for (int i = 0; i < 4; i++) {
+                NcHttpResponse paused = new NcHttpClient(configuration).Send(Options(url));
+                Check("New HTTP client instances cannot retry rejected credentials", paused.StatusCode == HttpStatusCode.Unauthorized && paused.RequestSequence == 0);
+            }
+            Check("Fresh connections do not bypass the authentication pause", requests == before);
+            NcHttpResponse verified = client.Send(Options(url, true));
+            Check("Explicit verification is permitted for rejected credentials", verified.StatusCode == HttpStatusCode.OK && requests == before + 1);
+            Check("An HTTP success alone cannot resume unverified authentication", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized && requests == before + 1);
+            NcHttpClient.ConfirmVerifiedAuthentication(configuration, verified.RequestSequence);
+            Check("Validated authentication resumes matching background requests", client.Send(Options(url)).StatusCode == HttpStatusCode.OK && requests == before + 2);
+
+            var recordFailure = typeof(NcHttpClient).GetMethod("RecordRequestFailure", BindingFlags.Instance | BindingFlags.NonPublic);
+            recordFailure.Invoke(client, new object[] { rejected });
+            Check("A late old rejection cannot undo a newer verified sign-in", client.Send(Options(url)).StatusCode == HttpStatusCode.OK);
+            statusCode = 401;
+            rejected = client.Send(Options(url));
+            NcHttpClient.ConfirmVerifiedAuthentication(configuration, verified.RequestSequence);
+            Check("An older verification cannot clear a newer rejection", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized);
+            statusCode = 200;
+            var updatedConfiguration = new TalkServiceConfiguration(configuration.BaseUrl, configuration.Username, "new-fixture-password");
+            var updatedClient = new NcHttpClient(updatedConfiguration);
+            Check("Changed credentials can be checked without clearing old rejected credentials", updatedClient.Send(Options(url, true)).StatusCode == HttpStatusCode.OK
+                && client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized);
+
+            statusCode = 429;
+            retryAfter = "120";
+            NcHttpResponse limited = updatedClient.Send(Options(url));
+            DateTime firstDeadline = HttpFailureDiagnostics.ReadRetryAfterUtc(limited.Headers);
+            Check("An actual HTTP 429 retains its server delay", (int)limited.StatusCode == 429 && firstDeadline > DateTime.UtcNow.AddSeconds(115));
+            before = requests;
+            statusCode = 200;
+            retryAfter = "";
+            var anotherConfiguration = new TalkServiceConfiguration(configuration.BaseUrl, "another-user", "another-password");
+            NcHttpResponse delayed = new NcHttpClient(anotherConfiguration).Send(Options(url, true));
+            Check("Changed user, password and explicit verification cannot bypass server backoff", (int)delayed.StatusCode == 429 && requests == before);
+            DateTime retainedDeadline = HttpFailureDiagnostics.ReadRetryAfterUtc(delayed.Headers);
+            Check("Locally paused requests retain rather than extend the deadline", Math.Abs((retainedDeadline - firstDeadline).TotalSeconds) < 1.1);
+            var otherServer = new NcHttpClient(new TalkServiceConfiguration("https://other.example.test/nextcloud", "fixture-user", "fixture-password"));
+            Check("Another Nextcloud server is not paused", otherServer.Send(Options(url)).StatusCode == HttpStatusCode.OK && requests == before + 1);
+
+            var retryField = typeof(NcHttpClient).GetField("ServerRetryAfterUtc", BindingFlags.Static | BindingFlags.NonPublic);
+            var deadlines = (Dictionary<string, DateTime>)retryField.GetValue(null);
+            deadlines[configuration.GetNormalizedBaseUrl()] = DateTime.UtcNow.AddSeconds(-1);
+            Check("Expired server backoff permits requests again", updatedClient.Send(Options(url)).StatusCode == HttpStatusCode.OK);
+            Check("Expiry of server backoff does not clear rejected credentials", client.Send(Options(url)).StatusCode == HttpStatusCode.Unauthorized);
+            var anonymous = Options(url);
+            anonymous.IncludeAuthHeader = false;
+            Check("Unauthenticated login flow requests do not reuse rejected authentication", client.Send(anonymous).StatusCode == HttpStatusCode.OK);
+        }
+        finally { listener.Stop(); server.Join(2000); }
+        return failures == 0 ? 0 : 1;
+    }
+}
+'@ | Set-Content -LiteralPath $httpPauseSource -Encoding UTF8
+    $httpPauseSources = @(
+        $httpPauseSource,
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\NcHttpClient.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceConfiguration.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpFailureDiagnostics.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpAuthUtilities.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NcJson.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NextcloudUriValidator.cs")
+    )
+    $httpPauseExe = Join-Path $TempRoot "HttpRequestPauseTests.exe"
+    & $csc /nologo /target:exe "/out:$httpPauseExe" @references @httpPauseSources
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $httpPauseExe
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    $policyRefreshSource = Get-Content -LiteralPath (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\NextcloudTalkAddIn.PolicyTemplates.cs") -Raw
+    $policyRefreshEnd = $policyRefreshSource.IndexOf('        internal PasswordPolicyInfo FetchPasswordPolicyForTalkWizard', [StringComparison]::Ordinal)
+    if ($policyRefreshEnd -lt 0) { throw 'Production policy refresh section was not found.' }
+    $policyRefreshSource = $policyRefreshSource.Substring(0, $policyRefreshEnd) + @'
+        private static void LogCore(string message) { }
+    }
+}
+namespace NcTalkOutlookAddIn.Controllers { }
+namespace NcTalkOutlookAddIn.Utilities {
+    internal static class LogCategories { internal const string Core = "core"; }
+    internal static class DiagnosticsLogger { internal static void LogException(string category, string message, Exception ex) { } }
+}
+namespace NcTalkOutlookAddIn.Services {
+    internal sealed class TalkServiceConfiguration {
+        internal string Username = "fixture-user", AppPassword = "fixture-password";
+        internal string GetNormalizedBaseUrl() { return "https://refresh.example.test/nextcloud"; }
+    }
+    internal sealed class BackendPolicyService {
+        internal static BackendPolicyStatus Next;
+        internal static int Calls;
+        internal BackendPolicyService(TalkServiceConfiguration configuration) { }
+        internal BackendPolicyStatus FetchStatus() { Calls++; return Next; }
+    }
+}
+internal static class PolicyRefreshPauseTests {
+    private static BackendPolicyStatus Status(bool success, string reason) {
+        return new BackendPolicyStatus(true, success, success, "community", reason, success, success,
+            success ? "active" : "", null, null, null, null, null, null);
+    }
+    public static int Main() {
+        foreach (bool warm in new[] { false, true }) {
+            foreach (string reason in new[] { "authentication_rejected", "rate_limited", "nextcloud_unavailable", "check_failed" }) {
+                var owner = new NcTalkOutlookAddIn.NextcloudTalkAddIn();
+                var configuration = new TalkServiceConfiguration();
+                BackendPolicyStatus confirmed = Status(true, "active");
+                if (warm) {
+                    BackendPolicyService.Next = confirmed;
+                    owner.FetchBackendPolicyStatus(configuration, "fixture_warm");
+                }
+                BackendPolicyService.Next = Status(false, reason);
+                if (reason == "rate_limited") BackendPolicyService.Next.RetryAfterUtc = DateTime.UtcNow.AddMinutes(10);
+                owner.FetchBackendPolicyStatus(configuration, "fixture_failure");
+                int before = BackendPolicyService.Calls;
+                for (int i = 0; i < 4; i++) {
+                    BackendPolicyStatus resolved = owner.FetchEnterpriseRolloutPolicyStatus(configuration, "fixture_background");
+                    if (warm ? !object.ReferenceEquals(resolved, confirmed) : resolved.FetchSucceeded) {
+                        throw new Exception("Failed refresh lost known policy or invented unknown policy.");
+                    }
+                }
+                if (BackendPolicyService.Calls != before) throw new Exception("Enterprise refresh bypassed failed-check cooldown: " + reason);
+                Console.WriteLine("[OK] Enterprise background refresh honors " + reason + " cooldown; known policy=" + warm);
+                var checkedAt = typeof(NcTalkOutlookAddIn.NextcloudTalkAddIn).GetField("_backendPolicyLastCheckedAtUtc",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                checkedAt.SetValue(owner, DateTime.UtcNow.AddMinutes(-1));
+                owner.FetchEnterpriseRolloutPolicyStatus(configuration, "fixture_after_cooldown");
+                int expectedCalls = before + (reason == "rate_limited" ? 0 : 1);
+                if (BackendPolicyService.Calls != expectedCalls) throw new Exception("Retry-After and failed-check expiry differ from their deadlines: " + reason);
+                BackendPolicyService.Next = Status(true, "verified");
+                owner.FetchBackendPolicyStatus(configuration, "fixture_explicit_verified_refresh");
+                before = BackendPolicyService.Calls;
+                owner.FetchEnterpriseRolloutPolicyStatus(configuration, "fixture_background_resumed");
+                if (BackendPolicyService.Calls != before + 1) throw new Exception("Successful refresh unexpectedly cached the enterprise operational check.");
+            }
+        }
+        Console.WriteLine("[OK] Verified refresh resumes the existing fresh enterprise access checks");
+        return 0;
+    }
+}
+'@
+    $policyRefreshPath = Join-Path $TempRoot "PolicyRefreshPauseTests.cs"
+    Set-Content -LiteralPath $policyRefreshPath -Value $policyRefreshSource -Encoding UTF8
+    $policyRefreshExe = Join-Path $TempRoot "PolicyRefreshPauseTests.exe"
+    & $csc /nologo /target:exe "/out:$policyRefreshExe" @references $policyRefreshPath (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Models\BackendPolicyStatus.cs")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $policyRefreshExe
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
     foreach ($clientFile in @('NcHttpClient.cs', 'UpdateCheckService.cs')) {
         $clientSource = Get-Content -LiteralPath (Join-Path $ProjectRoot ("src\NcTalkOutlookAddIn\Services\" + $clientFile)) -Raw
         $guard = [regex]::Match($clientSource, '\bTransportSecurityConfigurator\s*\.\s*CreateRequest\s*\(')

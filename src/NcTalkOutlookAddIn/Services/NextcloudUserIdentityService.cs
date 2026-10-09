@@ -16,7 +16,7 @@ namespace NcTalkOutlookAddIn.Services
         private static readonly Dictionary<string, string> CurrentUserIdCache =
             new Dictionary<string, string>(StringComparer.Ordinal);
 
-        internal static string ResolveCurrentUserId(TalkServiceConfiguration configuration, bool forceRefresh = false)
+        internal static string ResolveCurrentUserId(TalkServiceConfiguration configuration, bool forceRefresh = false, bool verifyRejectedCredentials = false)
         {
             if (configuration == null)
             {
@@ -52,7 +52,8 @@ namespace NcTalkOutlookAddIn.Services
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = true,
                 ParseJson = true,
-                ForceFreshConnection = forceRefresh
+                ForceFreshConnection = forceRefresh,
+                VerifyRejectedCredentials = verifyRejectedCredentials
             });
 
             if (!response.HasHttpResponse)
@@ -95,6 +96,10 @@ namespace NcTalkOutlookAddIn.Services
                     response.ResponseText);
             }
 
+            if (verifyRejectedCredentials)
+            {
+                NcHttpClient.ConfirmVerifiedAuthentication(configuration, response.RequestSequence);
+            }
             lock (CacheSync)
             {
                 CurrentUserIdCache[cacheKey] = userId;

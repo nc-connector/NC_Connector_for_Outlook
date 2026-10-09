@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Net;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Utilities;
@@ -80,7 +79,7 @@ namespace NcTalkOutlookAddIn.Services
                 reason: failureReason);
             if (failureReason == "rate_limited")
             {
-                failure.RetryAfterUtc = ReadRetryAfterUtc(response);
+                failure.RetryAfterUtc = HttpFailureDiagnostics.ReadRetryAfterUtc(response.Headers);
             }
             return failure;
         }
@@ -218,27 +217,6 @@ namespace NcTalkOutlookAddIn.Services
                 }
             }
             return response;
-        }
-
-        private static DateTime ReadRetryAfterUtc(NcHttpResponse response)
-        {
-            string value;
-            if (response.Headers != null && response.Headers.TryGetValue("Retry-After", out value))
-            {
-                int seconds;
-                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out seconds)
-                    && seconds >= 0)
-                {
-                    return DateTime.UtcNow.AddSeconds(seconds);
-                }
-                DateTimeOffset retryAt;
-                if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal, out retryAt))
-                {
-                    return retryAt.UtcDateTime;
-                }
-            }
-            return DateTime.UtcNow.AddMinutes(1);
         }
 
         private static IDictionary<string, object> NormalizePayload(IDictionary<string, object> payload)

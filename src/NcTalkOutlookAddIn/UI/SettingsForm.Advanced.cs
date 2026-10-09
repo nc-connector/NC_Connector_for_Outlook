@@ -321,6 +321,10 @@ namespace NcTalkOutlookAddIn.UI
 
         private void OnTlsSelectionChanged(object sender, EventArgs e)
         {
+            if (!_suppressImmediateTlsApply && !_isBusy)
+            {
+                _connectionSetupPending = true;
+            }
             UpdateTlsOptionsState();
             ApplyTlsRuntimePreview("settings_tls_changed");
         }

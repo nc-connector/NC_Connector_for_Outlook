@@ -37,6 +37,10 @@ namespace NcTalkOutlookAddIn.Settings
     {
         internal bool IsEnterpriseRollout { get; set; }
         internal bool IsManagedTransportTlsValid { get { return true; } }
+        internal bool TransportTlsUseSystemDefault { get; set; }
+        internal bool TransportTlsEnable12 { get; set; }
+        internal bool TransportTlsEnable13 { get; set; }
+        internal bool HasManagedTransportTls { get; set; }
         internal bool? EmailSignatureOnCompose { get; set; }
         internal bool? EmailSignatureOnReply { get; set; }
         internal bool? EmailSignatureOnForward { get; set; }
@@ -868,6 +872,7 @@ internal static class OutlookPolicyMappingTests
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\EmailSignaturePolicyService.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\BackendPolicyService.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NcJson.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpFailureDiagnostics.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NextcloudUriValidator.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\PolicyUiHelper.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\WarningPanelUiHelper.cs"),
@@ -1365,10 +1370,12 @@ internal static class OutlookPolicyUiTests
             Task save = (Task)Call(options, "SaveSettingsAsync");
             DateTime deadline = DateTime.UtcNow.AddSeconds(15);
             while (!save.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
-            Check(save.IsCompleted, "Local settings save completes without a configured server");
+            Check(save.IsCompleted, "Incomplete credential draft is rejected without network access");
             save.GetAwaiter().GetResult();
             string xml = Serialize(Get(options, "Result"));
-            Check(xml.Contains("test-only-login") && !xml.Contains("<SharingDefault") && !xml.Contains("<TalkDefault") && !xml.Contains("<ShareBlockLang>"), "Actual credentials-only save leaves untouched policy choices absent");
+            Check(options.DialogResult != DialogResult.OK && !xml.Contains("test-only-login")
+                && !xml.Contains("<SharingDefault") && !xml.Contains("<TalkDefault") && !xml.Contains("<ShareBlockLang>"),
+                "Rejected incomplete credentials leave saved credentials and untouched policy choices unchanged");
         }
         Console.WriteLine("[OK] User edits, lock/unlock, XML persistence and actual credentials-only save");
     }
@@ -2360,7 +2367,6 @@ internal static class OutlookPolicyUiTests
             object result = Get(form, "Result");
             bool originalDebug = (bool)Get(result, "DebugLoggingEnabled");
             bool originalUpdate = (bool)Get(result, "UpdateNotifyEnabled");
-            ((TextBox)Field(form, "_usernameTextBox")).Text = "rollout-login";
             ((CheckBox)Field(form, "_debugLogCheckBox")).Checked = !originalDebug;
             ((CheckBox)Field(form, "_updateNotifyCheckBox")).Checked = !originalUpdate;
             Task save = (Task)Call(form, "SaveSettingsAsync");
@@ -2371,7 +2377,7 @@ internal static class OutlookPolicyUiTests
             bool hidden = object.Equals(ribbon, false);
             Check((form.DialogResult == DialogResult.OK) == !hidden, "Only authentication-only setup requires complete credentials before saving");
             Check((bool)Get(result, "DebugLoggingEnabled") == (hidden ? originalDebug : !originalDebug) && (bool)Get(result, "UpdateNotifyEnabled") == (hidden ? originalUpdate : !originalUpdate), "Visible managed Settings saves non-authentication preferences");
-            Check((string)Get(result, "Username") == (hidden ? "" : "rollout-login"), "Incomplete hidden setup cannot replace credentials");
+            Check((string)Get(result, "Username") == "", "Saving unrelated preferences does not change credentials");
         }
         object owner = New("NextcloudTalkAddIn");
         object config = New("Services.TalkServiceConfiguration", "https://cloud.example.test", "alice", "test-only");
@@ -2539,6 +2545,26 @@ internal static class OutlookPolicyUiTests
                 Call(form, "SetStatus", "late result", false);
                 Call(form, "HandleServiceFailure", "{0}", failure);
                 Check(form.IsDisposed, "Late network completion cannot reopen a cancelled settings form");
+            }
+        }
+        foreach (string reason in new[] { "authentication_rejected", "backend_missing", "nextcloud_unavailable", "confirmed" })
+        {
+            object local = New("Settings.AddinSettings");
+            Set(local, "ServerUrl", "https://cloud.example.test");
+            Set(local, "Username", "saved-login");
+            Set(local, "AppPassword", "saved-test-password");
+            object status = reason == "confirmed" ? Status(D(), D(), true, "community", "active")
+                : Call(T("Services.BackendPolicyService"), "BuildLocalStatus", reason != "backend_missing", false, reason);
+            using (Form form = Settings(local, status))
+            {
+                ((TextBox)Field(form, "_appPasswordTextBox")).Text = "changed-test-password";
+                object configuration = New("Services.TalkServiceConfiguration", "https://cloud.example.test", "saved-login", "changed-test-password");
+                Task refresh = (Task)Call(form, "RefreshSettingsServerStateAsync", configuration, false, "test_draft_refresh");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+                while (!refresh.IsCompleted && DateTime.UtcNow < deadline) { Application.DoEvents(); System.Threading.Thread.Sleep(1); }
+                Check(refresh.IsCompleted, "Inert backend/address-book refresh completes"); refresh.GetAwaiter().GetResult();
+                Check((bool)Field(form, "_connectionSetupPending"), "Backend/address-book refresh is never credential verification: " + reason);
+                Check((string)Get(Get(form, "Result"), "AppPassword") == "saved-test-password", "Server-state refresh does not overwrite saved credentials");
             }
         }
         Console.WriteLine("[OK] Friendly managed/local onboarding, incomplete saves, credential changes, seat parity and closed-form callbacks");
@@ -3303,6 +3329,7 @@ internal static class SettingsWorkflowTests {
     # Run the production authentication entry and login flow against controlled services.
     $authFormSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/UI/SettingsForm.cs') -Raw
     $authGeneralSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/UI/SettingsForm.General.cs') -Raw
+    $authAdvancedSource = Get-Content -LiteralPath (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/UI/SettingsForm.Advanced.cs') -Raw
     $authMethods = foreach ($entry in @(
         @($authFormSource, 'internal void BeginAuthentication('),
         @($authFormSource, 'protected override async void OnShown('),
@@ -3310,7 +3337,12 @@ internal static class SettingsWorkflowTests {
         @($authFormSource, 'private async Task SaveSettingsAsync('),
         @($authGeneralSource, 'private bool ShouldStartManagedLoginFlow('),
         @($authGeneralSource, 'private async void OnLoginFlowButtonClick('),
-        @($authGeneralSource, 'private async Task StartLoginFlowAsync(')
+        @($authGeneralSource, 'private async Task StartLoginFlowAsync('),
+        @($authGeneralSource, 'private async Task<bool> TestConnectionAsync('),
+        @($authGeneralSource, 'private void HandleServiceFailure('),
+        @($authGeneralSource, 'private static string ExtractFirstLine('),
+        @($authGeneralSource, 'private void OnGeneralValueChanged('),
+        @($authAdvancedSource, 'private void OnTlsSelectionChanged(')
     )) {
         $methodText = $entry[0]
         $methodStart = $methodText.IndexOf($entry[1], [StringComparison]::Ordinal)
@@ -3347,11 +3379,17 @@ internal sealed class AuthSettings {
 internal static class AddinSettings { internal static int NormalizeIfbPort(int port) { return port; } }
 internal sealed class TalkServiceConfiguration {
     private readonly string url, user, password;
+    internal string Username { get { return user; } }
+    internal string AppPassword { get { return password; } }
     internal TalkServiceConfiguration(string url, string user, string password) { this.url = url; this.user = user; this.password = password; }
     internal bool IsComplete() { return GetNormalizedBaseUrl().Length > 0 && !string.IsNullOrWhiteSpace(user) && !string.IsNullOrEmpty(password); }
     internal string GetNormalizedBaseUrl() { string normalized; return NextcloudUriValidator.TryNormalizeBaseUrl(url, out normalized) ? normalized : ""; }
 }
-internal sealed class TalkServiceException : Exception { internal TalkServiceException(string message) : base(message) {} }
+internal sealed class TalkServiceException : Exception {
+    internal bool IsAuthenticationError;
+    internal bool IsTransportError { get { return false; } }
+    internal TalkServiceException(string message, bool authenticationError = false) : base(message) { IsAuthenticationError = authenticationError; }
+}
 internal sealed class LoginFlowStart { internal string LoginUrl = "https://cloud.example.test/nextcloud/login/isolated-test"; }
 internal sealed class LoginFlowCredentials { internal string LoginName = "test-login", AppPassword = "test-only-password"; }
 internal sealed class TalkLoginFlowService {
@@ -3375,9 +3413,14 @@ internal sealed class TalkLoginFlowService {
 }
 internal sealed class TalkService {
     internal static int Verifications;
-    internal static bool VerifyResult = true;
+    internal static bool VerifyResult = true, AuthenticationRejected;
     internal TalkService(TalkServiceConfiguration configuration) {}
-    internal bool VerifyConnection(out string response) { Interlocked.Increment(ref Verifications); response = ""; return VerifyResult; }
+    internal bool VerifyConnection(out string response, bool retryRejectedCredentials = false) {
+        Interlocked.Increment(ref Verifications);
+        if (!retryRejectedCredentials) throw new Exception("Settings must explicitly verify credentials");
+        if (AuthenticationRejected) throw new TalkServiceException("rejected", true);
+        response = ""; return VerifyResult;
+    }
 }
 internal static class BrowserLauncher {
     internal static int Calls, ThreadId;
@@ -3392,6 +3435,9 @@ internal static class Strings {
     internal const string StatusServerUrlRequired = "url required", StatusInvalidServerUrl = "invalid url", StatusLoginFlowStarting = "starting";
     internal const string StatusLoginFlowBrowser = "browser", ErrorCredentialsNotVerified = "not verified", StatusLoginFlowFailure = "failure: {0}", StatusLoginFlowSuccess = "success";
     internal const string SettingsSaveFailed = "save failed", ManagedTlsPolicyInvalid = "invalid TLS", TransportTlsSelectionRequired = "TLS required", DialogTitle = "Test";
+    internal const string StatusMissingFields = "missing fields", StatusTestRunning = "testing", StatusTestFailureUnknown = "unknown failure";
+    internal const string StatusTestSuccessVersionFormat = "version {0}", StatusTestSuccessFormat = "connected {0}", StatusTestFailure = "connection failed: {0}";
+    internal const string ConnectionSignInRequired = "sign in again", ConnectionDiagnosticsDialogTitle = "Connection";
 }
 internal sealed class AuthForm : Form {
     internal AuthSettings Result = new AuthSettings();
@@ -3403,21 +3449,35 @@ internal sealed class AuthForm : Form {
     internal readonly CheckBox _ifbEnabledCheckBox = new CheckBox(), _debugLogCheckBox = new CheckBox(), _debugAnonymizeCheckBox = new CheckBox(), _updateNotifyCheckBox = new CheckBox();
     internal readonly ComboBox _ifbDaysCombo = new ComboBox(), _ifbCacheHoursCombo = new ComboBox();
     internal readonly NumericUpDown _ifbPortUpDown = new NumericUpDown();
-    internal bool _isBusy, _authenticationRequired, _authenticationRejected, _connectionSetupPending, _automaticLoginFlowPending;
+    internal bool _isBusy, _authenticationRequired, _authenticationRejected, _connectionSetupPending, _automaticLoginFlowPending, _suppressImmediateTlsApply;
+    internal object _backendPolicyStatus;
     internal bool TlsValid = true, SaveRefreshResult = true, SaveRefreshThrows, _ifbDefaultApplied;
-    internal int TlsApplies, TlsRestores, VerifiedTransitions, SaveRefreshes, CloseCalls, RepeatedVerification;
+    internal int TlsApplies, TlsRestores, VerifiedTransitions, SaveRefreshes, CloseCalls;
     internal string StatusText;
     internal AuthForm() {
         _serverUrlTextBox.Text = Result.ManagedNextcloudUrl;
         _loginFlowRadio.Checked = true;
         _tlsEnable12CheckBox.Checked = true;
         _tabControl.TabPages.Add(_generalTab);
+        _serverUrlTextBox.TextChanged += OnGeneralValueChanged;
+        _usernameTextBox.TextChanged += OnGeneralValueChanged;
+        _appPasswordTextBox.TextChanged += OnGeneralValueChanged;
     }
     internal void ShowEvent() { OnShown(EventArgs.Empty); }
     internal void LoginButton() { OnLoginFlowButtonClick(null, EventArgs.Empty); }
     internal Task LoginTask() { return StartLoginFlowAsync(); }
+    internal Task SaveTask() { return SaveSettingsAsync(); }
+    internal Task<bool> TestTask() { return TestConnectionAsync(); }
+    internal void TlsChanged() { OnTlsSelectionChanged(null, EventArgs.Empty); }
+    internal void ExistingConnection() {
+        _suppressImmediateTlsApply = true;
+        Result.ServerUrl = _serverUrlTextBox.Text = "https://cloud.example.test/nextcloud";
+        Result.Username = _usernameTextBox.Text = "saved-login";
+        Result.AppPassword = _appPasswordTextBox.Text = "saved-test-password";
+        _suppressImmediateTlsApply = false;
+        _connectionSetupPending = false;
+    }
     internal new void Close() { CloseCalls++; base.Close(); }
-    private Task<bool> TestConnectionAsync() { RepeatedVerification++; return Task.FromResult(true); }
     private Task<bool> RefreshSettingsServerStateAsync(TalkServiceConfiguration configuration, bool save, string source) {
         SaveRefreshes++;
         if (_isBusy || TlsApplies != TlsRestores) throw new Exception("Save started before login cleanup");
@@ -3426,6 +3486,9 @@ internal sealed class AuthForm : Form {
     }
     private int ParseComboValue(ComboBox combo, int fallback) { return fallback; }
     private void ApplyResponsiveLayout(bool width) {}
+    private void UpdateControlState() {}
+    private void UpdateTlsOptionsState() {}
+    private void ApplyTlsRuntimePreview(string source) {}
     private void ApplyBackendPolicyStatus(string source) { if (source == "login_verified") VerifiedTransitions++; }
     private void SetBusy(bool value) { _isBusy = value; }
     private void SetStatus(string message, bool error) { StatusText = message; }
@@ -3433,7 +3496,6 @@ internal sealed class AuthForm : Form {
         TlsApplies++; if (!TlsValid) throw new InvalidOperationException("Invalid managed TLS"); return ServicePointManager.SecurityProtocol;
     }
     private void RestoreTemporaryTls(SecurityProtocolType previous, string source) { TlsRestores++; }
-    private void HandleServiceFailure(string format, TalkServiceException ex) { SetStatus(string.Format(format, ex.Message), true); }
     __AUTH_METHODS__
 }
 internal static class ManagedAuthenticationTests {
@@ -3447,7 +3509,7 @@ internal static class ManagedAuthenticationTests {
     private static void Reset() {
         TalkLoginFlowService.StartRelease.Set(); TalkLoginFlowService.PollRelease.Set();
         TalkLoginFlowService.Starts = TalkLoginFlowService.Polls = BrowserLauncher.Calls = TalkService.Verifications = 0;
-        TalkLoginFlowService.FailStart = TalkLoginFlowService.FailPoll = false; TalkService.VerifyResult = true;
+        TalkLoginFlowService.FailStart = TalkLoginFlowService.FailPoll = TalkService.AuthenticationRejected = false; TalkService.VerifyResult = true;
     }
     private static void Complete(AuthForm form) { PumpUntil(() => !form._isBusy, "Login operation completes"); }
     [STAThread]
@@ -3480,7 +3542,7 @@ internal static class ManagedAuthenticationTests {
                     && form.TlsApplies == 1 && form.TlsRestores == 1, "Verified automatic login finishes setup and restores temporary TLS");
                 Check(form.CloseCalls == 1 && form.DialogResult == DialogResult.OK && form.SaveRefreshes == 1
                     && form.Result.Username == "test-login" && form.Result.AppPassword == "test-only-password"
-                    && form.RepeatedVerification == 0, "Managed login uses the real save path and closes once without duplicate verification");
+                    && TalkService.Verifications == 1, "Managed login uses the real save path and closes once without duplicate verification");
                 form.ShowEvent(); form.BeginAuthentication(true); form.ShowEvent();
                 Check(TalkLoginFlowService.Starts == 1 && !form._automaticLoginFlowPending, "Complete existing credentials suppress automatic login even on rejected-credential entry");
             }
@@ -3570,6 +3632,86 @@ internal static class ManagedAuthenticationTests {
                         "Unsuccessful save and unmanaged login never close automatically: " + outcome);
                     Check(form.SaveRefreshes == (outcome == "unmanaged" ? 0 : 1), "Save uses existing refresh only for managed action login: " + outcome);
                     if (outcome == "exception") Check(form.StatusText == Strings.SettingsSaveFailed, "Automatic save shares the save-button error handler");
+                }
+            }
+            foreach (string changedField in new[] { "url", "username", "password", "incomplete" })
+            foreach (bool rejected in new[] { false, true }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.ExistingConnection();
+                    if (changedField == "url") form._serverUrlTextBox.Text = "https://other.example.test";
+                    if (changedField == "username") form._usernameTextBox.Text = "new-login";
+                    if (changedField == "password") form._appPasswordTextBox.Text = "new-test-password";
+                    if (changedField == "incomplete") form._appPasswordTextBox.Text = "";
+                    TalkService.VerifyResult = false; TalkService.AuthenticationRejected = rejected;
+                    Task save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Rejected draft save completes"); save.GetAwaiter().GetResult();
+                    Check(form.CloseCalls == 0 && form.DialogResult != DialogResult.OK && form.SaveRefreshes == 0,
+                        "Unverified changed credentials cannot close or query backend/address book: " + changedField);
+                    Check(form.Result.ServerUrl == "https://cloud.example.test/nextcloud" && form.Result.Username == "saved-login"
+                        && form.Result.AppPassword == "saved-test-password", "Rejected draft retains the saved connection");
+                    Check(form._connectionSetupPending && !string.IsNullOrEmpty(form.StatusText), "Rejected draft stays editable with an error");
+                    if (rejected && changedField != "incomplete") Check(form.StatusText == Strings.ConnectionSignInRequired, "401 shows sign-in guidance");
+                    TalkService.VerifyResult = true; TalkService.AuthenticationRejected = false;
+                    if (changedField == "incomplete") form._appPasswordTextBox.Text = "corrected-test-password";
+                    save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Corrected draft save completes"); save.GetAwaiter().GetResult();
+                    Check(form.DialogResult == DialogResult.OK && form.CloseCalls == 1 && form.SaveRefreshes == 1,
+                        "Successful fresh verification permits normal settings save");
+                    Check(form.Result.ServerUrl == form._serverUrlTextBox.Text && form.Result.Username == form._usernameTextBox.Text
+                        && form.Result.AppPassword == form._appPasswordTextBox.Text, "Only the verified draft is returned");
+                }
+            }
+            foreach (string unchanged in new[] { "existing", "reverted", "unconfigured" }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.ExistingConnection();
+                    if (unchanged == "reverted") {
+                        form._appPasswordTextBox.Text = "temporary-draft";
+                        form._appPasswordTextBox.Text = form.Result.AppPassword;
+                    }
+                    if (unchanged == "unconfigured") {
+                        form.Result.ServerUrl = form._serverUrlTextBox.Text = "";
+                        form.Result.Username = form._usernameTextBox.Text = "";
+                        form.Result.AppPassword = form._appPasswordTextBox.Text = "";
+                    }
+                    TalkService.VerifyResult = false;
+                    Task save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Local preference save completes"); save.GetAwaiter().GetResult();
+                    Check(form.DialogResult == DialogResult.OK && TalkService.Verifications == 0,
+                        "Unchanged credentials do not block saving local preferences while offline: " + unchanged);
+                }
+            }
+            Reset();
+            using (var form = new AuthForm()) {
+                form.ExistingConnection(); form._appPasswordTextBox.Text = "new-test-password";
+                Task<bool> test = form.TestTask(); PumpUntil(() => test.IsCompleted, "Explicit verification completes");
+                Check(test.GetAwaiter().GetResult() && !form._connectionSetupPending, "Only successful verification clears pending setup");
+                TalkService.VerifyResult = false;
+                test = form.TestTask(); PumpUntil(() => test.IsCompleted, "Failed repeated verification completes");
+                Check(!test.GetAwaiter().GetResult() && form._connectionSetupPending, "A failed repeated test invalidates earlier verification");
+                Task save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Save after failed test completes"); save.GetAwaiter().GetResult();
+                Check(form.DialogResult != DialogResult.OK && form.SaveRefreshes == 0, "Save cannot reuse a superseded successful test");
+            }
+            Reset();
+            using (var form = new AuthForm()) {
+                form.ExistingConnection(); form._appPasswordTextBox.Text = "new-test-password";
+                Task<bool> test = form.TestTask(); PumpUntil(() => test.IsCompleted, "Explicit valid draft test completes");
+                Check(test.GetAwaiter().GetResult(), "Draft test succeeds");
+                Task save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Verified draft save completes"); save.GetAwaiter().GetResult();
+                Check(form.DialogResult == DialogResult.OK && TalkService.Verifications == 1,
+                    "An unchanged verified draft saves without duplicate authentication");
+            }
+            foreach (bool tlsChange in new[] { false, true }) {
+                Reset();
+                using (var form = new AuthForm()) {
+                    form.ExistingConnection(); form._appPasswordTextBox.Text = "new-test-password";
+                    Task<bool> test = form.TestTask(); PumpUntil(() => test.IsCompleted, "Draft test before further edits completes");
+                    Check(test.GetAwaiter().GetResult(), "Draft is initially verified");
+                    if (tlsChange) form.TlsChanged();
+                    else form._appPasswordTextBox.Text = "another-test-password";
+                    Check(form._connectionSetupPending, "Later TLS or credential edits invalidate verification");
+                    TalkService.VerifyResult = false;
+                    Task save = form.SaveTask(); PumpUntil(() => save.IsCompleted, "Changed draft is rechecked"); save.GetAwaiter().GetResult();
+                    Check(form.DialogResult != DialogResult.OK && TalkService.Verifications == 2,
+                        "Save cannot reuse verification from before TLS or credential edits");
                 }
             }
             Console.WriteLine("[OK] " + checks + " production authentication entry/login-flow assertions passed with isolated services");
