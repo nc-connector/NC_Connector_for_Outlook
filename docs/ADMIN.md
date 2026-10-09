@@ -480,7 +480,11 @@ If files or registration are missing, close Outlook and repair the MSI. If the p
 3. For HTTP `401`, sign in again; for `403`, check permissions and upstream access controls.
 4. Run the connection test again. If only one workstation is affected, compare its proxy, certificate, and endpoint-security configuration with a working workstation.
 
-After HTTP `401`, NC Connector pauses requests with those credentials for the current Outlook session. Verify the corrected credentials in Settings to resume. HTTP `429` pauses authenticated requests to that Nextcloud server until the server's waiting time has elapsed; changing credentials does not bypass that wait. Without a usable waiting time, the pause is one minute. An Enterprise Rollout notice that the backend is required means the administrator must install or enable it, not merely repeat the connection test.
+After HTTP `401`, NC Connector pauses authenticated requests, including across Outlook restarts. Choose **Sign in again**, enter valid credentials under **General**, and save. A successful connection test alone does not resume requests. HTTP `429` pauses requests to that Nextcloud server until its waiting time has elapsed; restarting Outlook or changing credentials does not bypass the wait. Without a usable waiting time, the pause is one minute. Pending Share and Talk cleanup remains stored and resumes only for the same verified Nextcloud account.
+
+Under **Advanced → Remove saved credentials**, you can remove the saved username and app password from the Outlook profile and its settings backup. The Nextcloud URL, preferences and pending cleanup remain intact. This does not revoke the app password in Nextcloud.
+
+An Enterprise Rollout notice that the backend is required means the administrator must install or enable it, not merely repeat the connection test.
 
 Clicking Share or Talk checks the Nextcloud connection again before opening the wizard. An unavailable server produces the same notice and offer to open Settings in both actions; a previous successful connection does not skip this check. After saving verified credentials, the action checks again before continuing. Cancelling setup or closing the original message/appointment ends the action. Attachment automation does not open sign-in Settings automatically; failed sharing preserves the original attachments. Ordinary sending continues to follow the configured `SendPolicyFailureMode`.
 
