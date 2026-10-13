@@ -4,6 +4,13 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.4.5] - 2026-10-13
+
+### Fixed
+
+- Exclude embedded and quoted signature images from attachment automation even when Outlook omits their hidden flag, so required attachment sharing does not block replies without real file attachments.
+- Start attachment automation for existing file attachments in forwarded messages and reopened drafts, both inline and in separate windows, without opening a duplicate sharing wizard when popping out an inline message.
+
 ## [3.4.4] - 2026-10-09
 
 ### Added
