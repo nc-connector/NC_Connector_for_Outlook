@@ -174,6 +174,15 @@ namespace NcTalkOutlookAddIn
 
             private static bool IsAttachmentReferencedInBody(string html, string contentId, string contentLocation)
             {
+                // Outlook does not use the DLL's binding redirects. Enter the existing loader scope
+                // before JIT resolves parser types, even when no template has been processed yet.
+                return HtmlTemplateSanitizer.RunWithHtmlDependencies(
+                    () => IsAttachmentReferencedInBodyCore(html, contentId, contentLocation));
+            }
+
+            [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+            private static bool IsAttachmentReferencedInBodyCore(string html, string contentId, string contentLocation)
+            {
                 if (string.IsNullOrWhiteSpace(html)) { return false; }
                 string expectedId = NormalizeAttachmentContentId(contentId);
                 string expectedLocation = (contentLocation ?? string.Empty).Trim();

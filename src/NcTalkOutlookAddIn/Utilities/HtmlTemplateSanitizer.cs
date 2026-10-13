@@ -109,7 +109,7 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
         private static readonly Lazy<HtmlSanitizer> Sanitizer = new Lazy<HtmlSanitizer>(CreateSanitizer, true);
         private static int _dependencyBootstrapDone;
         // Some dependency type initializers raise AssemblyResolve without a requester.
-        // Accept that case only while this thread is synchronously processing a template.
+        // Accept that case only while this thread is synchronously processing our HTML.
         [ThreadStatic]
         private static int _dependencyResolutionScopeDepth;
         private static readonly Regex RgbaColorRegex = new Regex(
@@ -136,6 +136,19 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
         static HtmlTemplateSanitizer()
         {
             EnsureSanitizerDependencies();
+        }
+
+        internal static T RunWithHtmlDependencies<T>(Func<T> operation)
+        {
+            _dependencyResolutionScopeDepth++;
+            try
+            {
+                return operation();
+            }
+            finally
+            {
+                _dependencyResolutionScopeDepth--;
+            }
         }
 
         internal static string SanitizeShareTemplateHtml(string html)

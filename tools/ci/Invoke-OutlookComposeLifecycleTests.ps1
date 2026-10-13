@@ -1,5 +1,6 @@
 Param(
-    [string]$ProjectRoot = "."
+    [string]$ProjectRoot = ".",
+    [string]$BuiltAddInPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -1890,7 +1891,18 @@ using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
 using AngleSharp.Css.Parser;
 using AngleSharp.Css.Values;
+using NcTalkOutlookAddIn.Utilities;
 using Outlook = AttachmentClassificationOutlook;
+namespace NcTalkOutlookAddIn.Utilities
+{
+    internal static class DiagnosticsLogger
+    {
+        internal static bool IsEnabled { get { return false; } }
+        internal static void Log(string category, string message) { }
+        internal static void LogException(string category, string message, Exception ex) { }
+    }
+    internal static class LogCategories { internal const string Core = "CORE"; }
+}
 namespace AttachmentClassificationOutlook
 {
     public enum OlBodyFormat { olFormatPlain = 1, olFormatHTML = 2, olFormatRichText = 3 }
@@ -2048,6 +2060,7 @@ public static class AttachmentClassificationRegression
         'private static object ReadOptionalAttachmentProperty(',
         'private static string NormalizeAttachmentContentId(',
         'private static bool IsAttachmentReferencedInBody(',
+        '[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]',
         'private static bool MatchesAttachmentBodyResource(',
         'private List<AttachmentSnapshot> SnapshotAttachments()',
         'private void RemoveAttachmentsByIndices('
@@ -2055,18 +2068,67 @@ public static class AttachmentClassificationRegression
     $classificationHarness = $classificationHarness.Replace('__METHODS__', ($classificationMethods -join "`r`n"))
     $sourcePath = Join-Path $classificationRoot 'AttachmentClassification.cs'
     [IO.File]::WriteAllText($sourcePath, $classificationHarness, [Text.UTF8Encoding]::new($false))
-    $exe = Join-Path $classificationRoot 'AttachmentClassification.exe'
+    $addInDirectory = Join-Path $classificationRoot 'addin'
+    New-Item -ItemType Directory -Path $addInDirectory | Out-Null
+    $library = Join-Path $addInDirectory 'AttachmentClassification.dll'
     $vendor = Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/vendor/htmlsanitizer'
-    $references = @('/reference:System.dll', '/reference:System.Core.dll')
+    $references = @('/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Numerics.dll', '/reference:System.Web.dll')
     Get-ChildItem $vendor -Filter '*.dll' | ForEach-Object {
         $references += "/reference:$($_.FullName)"
-        Copy-Item -LiteralPath $_.FullName -Destination $classificationRoot
+        Copy-Item -LiteralPath $_.FullName -Destination $addInDirectory
     }
-    Copy-Item -LiteralPath (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/app.config') -Destination ($exe + '.config')
-    & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /nowarn:1702 /target:exe "/out:$exe" @references $sourcePath
+    $sanitizerSource = Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/Utilities/HtmlTemplateSanitizer.cs'
+    $csc = "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+    & $csc /nologo /nowarn:1702 /optimize+ /target:library "/out:$library" @references $sourcePath $sanitizerSource
     if ($LASTEXITCODE -ne 0) { throw 'Attachment classification harness failed to compile.' }
-    & $exe
+    # Outlook hosts the DLL without adopting its .config; keep the host and dependencies separate.
+    $hostSource = @'
+using System;
+using System.Reflection;
+internal static class AttachmentHost
+{
+    public static int Main(string[] args)
+    {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+        try
+        {
+            Assembly assembly = Assembly.LoadFrom(args[0]);
+            Type regression = assembly.GetType("AttachmentClassificationRegression", false);
+            if (regression != null)
+            {
+                regression.GetMethod("Main").Invoke(null, null);
+            }
+            else
+            {
+                Type compose = assembly.GetType("NcTalkOutlookAddIn.NextcloudTalkAddIn+MailComposeSubscription", true);
+                MethodInfo match = compose.GetMethod("IsAttachmentReferencedInBody", BindingFlags.Static | BindingFlags.NonPublic);
+                string[] html = { "<img src='cid:logo'>", "<div style='background-image:url(cid:logo)'>text</div>",
+                    "<!--[if mso]><v:imagedata src='cid:logo'></v:imagedata><![endif]-->" };
+                foreach (string body in html)
+                {
+                    if (!(bool)match.Invoke(null, new object[] { body, "logo", "" }) ||
+                        (bool)match.Invoke(null, new object[] { body, "real-file", "" }))
+                    { throw new InvalidOperationException("Packaged attachment classification failed."); }
+                }
+            }
+            Console.WriteLine("[OK] Cold attachment parsing in an external .NET Framework host without binding redirects");
+            return 0;
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+}
+'@
+    $hostPath = Join-Path $classificationRoot 'AttachmentHost.cs'
+    [IO.File]::WriteAllText($hostPath, $hostSource, [Text.UTF8Encoding]::new($false))
+    $exe = Join-Path $classificationRoot 'AttachmentHost.exe'
+    & $csc /nologo /optimize+ /target:exe "/out:$exe" $hostPath
+    if ($LASTEXITCODE -ne 0) { throw 'Attachment host failed to compile.' }
+    & $exe $library
     if ($LASTEXITCODE -ne 0) { throw 'Attachment classification regression failed.' }
+    if (-not [string]::IsNullOrWhiteSpace($BuiltAddInPath)) {
+        & $exe (Resolve-Path -LiteralPath $BuiltAddInPath).Path
+        if ($LASTEXITCODE -ne 0) { throw 'Built add-in cold attachment classification failed.' }
+    }
 }
 finally {
     $resolvedClassificationRoot = (Resolve-Path -LiteralPath $classificationRoot).Path

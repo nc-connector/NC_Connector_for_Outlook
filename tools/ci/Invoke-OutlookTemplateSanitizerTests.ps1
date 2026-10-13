@@ -49,6 +49,7 @@ internal static class OutlookTemplateSanitizerTests
     public static int Main()
     {
         TestResolverBoundaries();
+        TestDependencyScopes();
         TestShareTemplateSanitizer();
         TestDeeplyNestedTemplateSanitizer();
         TestEmailSignatureSanitizer();
@@ -163,6 +164,35 @@ internal static class OutlookTemplateSanitizerTests
                 resolver,
                 "Unrelated.Dependency, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
                 codePages) == null);
+    }
+
+    private static void TestDependencyScopes()
+    {
+        MethodInfo resolver = typeof(HtmlTemplateSanitizer).GetMethod(
+            "ResolveSanitizerDependency", BindingFlags.NonPublic | BindingFlags.Static);
+        const string request = "AngleSharp, Version=0.17.0.0, Culture=neutral, PublicKeyToken=e83494dcdc6d31ea";
+        Check("Scoped requester-less HTML dependency resolves", HtmlTemplateSanitizer.RunWithHtmlDependencies(
+            () => InvokeResolver(resolver, request, null)) != null);
+        Check("Completed HTML scope does not enable unrelated resolution", InvokeResolver(resolver, request, null) == null);
+        HtmlTemplateSanitizer.RunWithHtmlDependencies(() =>
+        {
+            try
+            {
+                HtmlTemplateSanitizer.RunWithHtmlDependencies<bool>(() => { throw new InvalidOperationException("test"); });
+            }
+            catch (InvalidOperationException) { }
+            Check("Nested failed HTML operation retains the outer scope", InvokeResolver(resolver, request, null) != null);
+            Check("Scoped HTML work cannot redirect a higher version", InvokeResolver(resolver,
+                request.Replace("0.17.0.0", "99.0.0.0"), null) == null);
+            return true;
+        });
+        Check("Nested HTML scopes restore requester restrictions", InvokeResolver(resolver, request, null) == null);
+        try
+        {
+            HtmlTemplateSanitizer.RunWithHtmlDependencies<bool>(() => { throw new InvalidOperationException("test"); });
+        }
+        catch (InvalidOperationException) { }
+        Check("Failed HTML scope restores requester restrictions", InvokeResolver(resolver, request, null) == null);
     }
 
     private static Assembly InvokeResolver(MethodInfo resolver, string requestedName, Assembly requester)
