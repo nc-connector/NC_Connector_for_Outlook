@@ -123,9 +123,9 @@ $beforeAttachmentAdd = Get-MethodSlice `
 $snapshotAttachments = Get-MethodSlice `
     $attachmentMaterialization `
     "private List<AttachmentSnapshot> SnapshotAttachments()"
-$hiddenAttachment = Get-MethodSlice `
+$automationFileAttachment = Get-MethodSlice `
     $attachmentMaterialization `
-    "private static bool IsHiddenAttachment("
+    "private bool IsAutomationFileAttachment("
 $collectAttachments = Get-MethodSlice `
     $attachmentMaterialization `
     "private void CollectAttachmentSelectionsForShare("
@@ -173,32 +173,32 @@ $reserveQueueSelection = Get-MethodSlice `
     "private bool TryReserveSelection("
 
 Assert-Precedes `
-    "Hidden attachments are ignored before post-add batching" `
+    "Body resources are ignored before post-add batching" `
     $attachmentAdd `
-    "IsHiddenAttachment(attachment)" `
+    "IsAutomationFileAttachment(attachment, true)" `
     "_pendingAddedBatch.Add("
 Assert-Precedes `
-    "Hidden attachments are allowed before automation preflight" `
+    "Body resources are allowed before automation preflight" `
     $beforeAttachmentAdd `
-    "IsHiddenAttachment(attachment)" `
+    "IsAutomationFileAttachment(attachment, true)" `
     "ReadAttachmentAutomationSettings()"
 Assert-Precedes `
-    "Hidden attachments are excluded from threshold snapshots" `
+    "Body resources are excluded from threshold snapshots" `
     $snapshotAttachments `
-    "IsHiddenAttachment(attachment)" `
+    "IsAutomationFileAttachment(attachment)" `
     "snapshots.Add("
 Assert-Contains `
-    "Hidden attachment detection reads PR_ATTACHMENT_HIDDEN" `
-    $hiddenAttachment `
-    "http://schemas.microsoft.com/mapi/proptag/0x7FFE000B"
+    "Attachment classification reads PR_ATTACHMENT_HIDDEN" `
+    $automationFileAttachment `
+    "0x7FFE000B"
 Assert-Contains `
-    "Hidden attachment PropertyAccessor is released" `
-    $hiddenAttachment `
+    "Attachment classification releases its PropertyAccessor" `
+    $automationFileAttachment `
     "ComInteropScope.TryRelease("
 Assert-Precedes `
-    "Hidden attachments are excluded before FileLink materialization" `
+    "Body resources are excluded before FileLink materialization" `
     $collectAttachments `
-    "IsHiddenAttachment(attachment)" `
+    "IsAutomationFileAttachment(attachment)" `
     "TryResolveAttachmentLocalPath("
 Assert-Precedes `
     "Post-add attachments are finalized only after the sharing result" `
@@ -359,9 +359,9 @@ Assert-Precedes `
     "!= FileLinkSelectionType.File" `
     "CancellationToken.None"
 Assert-Precedes `
-    "Successful sharing preserves hidden attachments" `
+    "Successful sharing preserves body resources" `
     $removeAttachmentOriginals `
-    "IsHiddenAttachment(original.Attachment)" `
+    "IsAutomationFileAttachment(original.Attachment)" `
     "original.Attachment.Delete();"
 Assert-Contains `
     "Successful sharing only removes files present in the completed upload plan" `
@@ -868,7 +868,7 @@ public static class AttachmentHandoffRegression
         private void RestartBeforeAddShareTimerIfNeeded() { }
         private void BeginAttachmentAutomationSettingsRefresh() { }
         private void ScheduleEmailSignatureApplication(string reason) { SignatureSchedules++; }
-        private static bool IsHiddenAttachment(Outlook.Attachment item) { return item.Hidden; }
+        private bool IsAutomationFileAttachment(Outlook.Attachment item, bool deferBodyReferences = false) { return item != null && !item.Hidden; }
         private static string ReadAttachmentName(Outlook.Attachment item) { return item.Name; }
         private bool TryResolveAttachmentLocalPath(Outlook.Attachment item, string name, List<string> files, out string path)
         { path = item.LocalPath; return !string.IsNullOrEmpty(path); }
@@ -1275,7 +1275,7 @@ namespace AttachmentSendRaceBoundary
             { Shares++; return Task.FromResult(true); }
             private void EndAttachmentSuppression(string reason) { _attachmentSuppressed = false; }
             private void LogFileLink(string message) { }
-            private static bool IsHiddenAttachment(Outlook.Attachment item) { return item.Hidden; }
+            private bool IsAutomationFileAttachment(Outlook.Attachment item, bool deferBodyReferences = false) { return item != null && !item.Hidden; }
             private static string ReadAttachmentName(Outlook.Attachment item) { return item.Name; }
             private static long ReadAttachmentSizeBytes(Outlook.Attachment item) { return item.Size; }
             __EVALUATE__
@@ -1684,4 +1684,202 @@ Add-Type -TypeDefinition $attachmentSendGateHarness -Language CSharp -IgnoreWarn
 Write-Host "[OK] Attachment Send matrix: fail modes, locked threshold, availability, rate limiting, authentication, unknown state, account change and Seat refusal"
 Write-Host "[OK] Missing optional backend permits local automation; managed/remembered backend rules and actual outages retain their enforcement"
 
+$classificationRoot = Join-Path ([IO.Path]::GetTempPath()) ("nc4ol-attachment-classification-" + [Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $classificationRoot | Out-Null
+try {
+    $classificationHarness = @'
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using AngleSharp.Dom;
+using AngleSharp.Html.Parser;
+using AngleSharp.Css.Parser;
+using AngleSharp.Css.Values;
+using Outlook = AttachmentClassificationOutlook;
+namespace AttachmentClassificationOutlook
+{
+    public enum OlBodyFormat { olFormatPlain = 1, olFormatHTML = 2, olFormatRichText = 3 }
+    public sealed class PropertyAccessor
+    {
+        public readonly Dictionary<string, object> Values = new Dictionary<string, object>();
+        public int Failure;
+        public object GetProperty(string name)
+        {
+            if (Failure != 0) { throw new COMException("property failure", Failure); }
+            object value;
+            if (Values.TryGetValue(name.Substring(name.LastIndexOf('/') + 1), out value)) { return value; }
+            throw new COMException("missing optional property", unchecked((int)0x8004010F));
+        }
+    }
+    public sealed class Attachment
+    {
+        public readonly PropertyAccessor PropertyAccessor = new PropertyAccessor();
+        public string Name = "file.jpg";
+        public int Size;
+    }
+    public sealed class Attachments
+    {
+        public readonly List<Attachment> Items = new List<Attachment>();
+        public int Count { get { return Items.Count; } }
+        public Attachment this[int index] { get { return Items[index - 1]; } }
+        public void Remove(int index) { Items.RemoveAt(index - 1); }
+    }
+    public sealed class Mail
+    {
+        public OlBodyFormat BodyFormat = OlBodyFormat.olFormatHTML;
+        public string HTMLBody = "";
+        public readonly Attachments Attachments = new Attachments();
+    }
+}
+public static class AttachmentClassificationRegression
+{
+    private static class LogCategories { internal const string FileLink = "FILELINK"; }
+    private static class DiagnosticsLogger
+    { internal static void LogException(string category, string message, Exception ex) { } }
+    private static class ComInteropScope
+    { internal static void TryRelease(object item, string category, string message) { } }
+    private sealed class Subscription
+    {
+        internal readonly Outlook.Mail _mail = new Outlook.Mail();
+        private readonly string _composeKey = "classification";
+        private bool CanApplyComposeChanges { get { return true; } }
+        private bool _attachmentSuppressed;
+        private readonly List<string> _pendingAddedBatch = new List<string>();
+        private void EndAttachmentSuppression(string reason) { _attachmentSuppressed = false; }
+        private void LogFileLink(string message) { }
+        private static string ReadAttachmentName(Outlook.Attachment item) { return item.Name; }
+        private static long ReadAttachmentSizeBytes(Outlook.Attachment item) { return item.Size; }
+        internal bool IsFile(Outlook.Attachment item, bool defer) { return IsAutomationFileAttachment(item, defer); }
+        internal int Count(out long bytes) { return CountPolicyRelevantAttachments(out bytes); }
+        internal int SnapshotCount() { return SnapshotAttachments().Count; }
+        internal void RemoveAll() { RemoveAttachmentsByIndices(new List<int> { 1, 2, 3 }, "test"); }
+        __METHODS__
+    }
+    private static void Check(bool condition, string message)
+    { if (!condition) { throw new InvalidOperationException(message); } }
+    private static Outlook.Attachment File(string id, int size)
+    {
+        var item = new Outlook.Attachment { Size = size };
+        item.PropertyAccessor.Values["0x37140003"] = 0;
+        if (id != null) { item.PropertyAccessor.Values["0x3712001F"] = id; }
+        return item;
+    }
+    public static void Main()
+    {
+        var compose = new Subscription();
+        var logo = File("logo@example.test", 0);
+        string[] embedded = {
+            "<blockquote><img src='cid:logo@example.test'><img src='cid:logo@example.test'></blockquote>",
+            "<IMG SRC=CiD:logo%40example.test>",
+            "<v:imagedata src='cid:logo@example.test'></v:imagedata>",
+            "<body background='cid:logo@example.test'>body</body>",
+            "<table><tr><td background='cid:logo@example.test'>body</td></tr></table>",
+            "<div style=\"background-image:url('cid:logo@example.test')\">body</div>",
+            "<div style=\"background:url(cid:logo@example.test) no-repeat\">body</div>",
+            "<div style=\"background-image:url(cid:other),url(cid:logo@example.test)\">body</div>",
+            "<!--[if mso]><v:imagedata src='cid:logo@example.test'></v:imagedata><![endif]-->",
+            "<!--[if gte mso 9]><v:fill src='cid:logo@example.test'></v:fill><![endif]-->"
+        };
+        foreach (string html in embedded)
+        {
+            compose._mail.HTMLBody = html;
+            Check(!compose.IsFile(logo, false), "Body resource counted as a file: " + html);
+        }
+        string[] notEmbedded = {
+            "logo@example.test cid:logo@example.test", "<a href='cid:logo@example.test'>file</a>",
+            "<!-- <img src='cid:logo@example.test'> -->", "<img alt='cid:logo@example.test'>",
+            "<img data-src='cid:logo@example.test'>", "<img src='cid:logo@example.test.extra'>",
+            "<img src='https://example.test/logo@example.test'>",
+            "&lt;img src='cid:logo@example.test'&gt;",
+            "<div style=\"content:'url(cid:logo@example.test)'\">body</div>",
+            "<!--[if !mso]><img src='cid:logo@example.test'><![endif]-->"
+        };
+        foreach (string html in notEmbedded)
+        {
+            compose._mail.HTMLBody = html;
+            Check(compose.IsFile(logo, false), "Non-resource text exempted a real file: " + html);
+        }
+        compose._mail.HTMLBody = "<img src='cid:logo@example.test'>";
+        logo.PropertyAccessor.Values["0x7FFE000B"] = false;
+        Check(!compose.IsFile(logo, false), "Explicit non-hidden value masked a body reference.");
+        logo.PropertyAccessor.Values["0x3712001F"] = "<logo@example.test>";
+        Check(!compose.IsFile(logo, false), "Content-ID brackets were not normalized.");
+        logo.PropertyAccessor.Values.Remove("0x3712001F");
+        logo.PropertyAccessor.Values["0x3712001E"] = "logo@example.test";
+        Check(!compose.IsFile(logo, false), "ANSI Content-ID was ignored.");
+        var located = File(null, 100);
+        located.PropertyAccessor.Values["0x3713001F"] = "images/logo.png";
+        compose._mail.HTMLBody = "<img src='images/logo.png'>";
+        Check(!compose.IsFile(located, false), "Content-Location body image counted as file.");
+        compose._mail.HTMLBody = "<img src='cid:a&amp;b@example.test'>";
+        Check(!compose.IsFile(File("a&b@example.test", 10), false), "HTML entity in resource reference was ignored.");
+        compose._mail.HTMLBody = "<img src='cid:logo@example.test'>";
+        foreach (Outlook.OlBodyFormat format in new[] { Outlook.OlBodyFormat.olFormatPlain, Outlook.OlBodyFormat.olFormatRichText })
+        {
+            compose._mail.BodyFormat = format;
+            Check(compose.IsFile(logo, false), "Non-HTML body text exempted a file.");
+        }
+        compose._mail.BodyFormat = Outlook.OlBodyFormat.olFormatHTML;
+        var hidden = File(null, 100);
+        hidden.PropertyAccessor.Values["0x7FFE000B"] = true;
+        Check(!compose.IsFile(hidden, false), "Hidden resource counted as file.");
+        hidden.PropertyAccessor.Values["0x7FFE000B"] = false;
+        hidden.PropertyAccessor.Values["0x37140003"] = 7;
+        Check(!compose.IsFile(hidden, false), "Rendered-in-body bit was ignored with other flags.");
+        Check(compose.IsFile(File(null, 0), false), "Zero-byte file was exempted.");
+        compose._mail.HTMLBody = "";
+        Check(!compose.IsFile(logo, true) && compose.IsFile(logo, false), "Early CID candidate was not deferred and rechecked.");
+        compose._mail.HTMLBody = "<img src='cid:logo@example.test'>";
+        compose._mail.Attachments.Items.Add(logo);
+        compose._mail.Attachments.Items.Add(File(null, 25));
+        compose._mail.Attachments.Items.Add(File("unreferenced@example.test", 75));
+        long bytes;
+        Check(compose.Count(out bytes) == 2 && bytes == 100 && compose.SnapshotCount() == 2,
+            "Real production count/snapshot did not separate inline resources and ordinary files.");
+        compose.RemoveAll();
+        Check(compose._mail.Attachments.Count == 1 && object.ReferenceEquals(compose._mail.Attachments[1], logo),
+            "Removal discarded an inline resource.");
+        logo.PropertyAccessor.Failure = unchecked((int)0x80004005);
+        Check(compose.Count(out bytes) == int.MaxValue && bytes == long.MaxValue,
+            "Unexpected COM failure silently bypassed file policy.");
+        Console.WriteLine("[OK] Production attachment classification: unsaved replies, CID/location, HTML/CSS/VML, true file negatives, deferred events, counts, snapshots and removal");
+    }
+}
+'@
+    $classificationMethods = @(
+        'private sealed class AttachmentSnapshot',
+        'private int CountPolicyRelevantAttachments(',
+        'private bool IsAutomationFileAttachment(',
+        'private static object ReadOptionalAttachmentProperty(',
+        'private static string NormalizeAttachmentContentId(',
+        'private static bool IsAttachmentReferencedInBody(',
+        'private static bool MatchesAttachmentBodyResource(',
+        'private List<AttachmentSnapshot> SnapshotAttachments()',
+        'private void RemoveAttachmentsByIndices('
+    ) | ForEach-Object { Get-MethodSlice $attachmentMaterialization $_ }
+    $classificationHarness = $classificationHarness.Replace('__METHODS__', ($classificationMethods -join "`r`n"))
+    $sourcePath = Join-Path $classificationRoot 'AttachmentClassification.cs'
+    [IO.File]::WriteAllText($sourcePath, $classificationHarness, [Text.UTF8Encoding]::new($false))
+    $exe = Join-Path $classificationRoot 'AttachmentClassification.exe'
+    $vendor = Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/vendor/htmlsanitizer'
+    $references = @('/reference:System.dll', '/reference:System.Core.dll')
+    Get-ChildItem $vendor -Filter '*.dll' | ForEach-Object {
+        $references += "/reference:$($_.FullName)"
+        Copy-Item -LiteralPath $_.FullName -Destination $classificationRoot
+    }
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn/app.config') -Destination ($exe + '.config')
+    & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /nowarn:1702 /target:exe "/out:$exe" @references $sourcePath
+    if ($LASTEXITCODE -ne 0) { throw 'Attachment classification harness failed to compile.' }
+    & $exe
+    if ($LASTEXITCODE -ne 0) { throw 'Attachment classification regression failed.' }
+}
+finally {
+    $resolvedClassificationRoot = (Resolve-Path -LiteralPath $classificationRoot).Path
+    if ([IO.Path]::GetDirectoryName($resolvedClassificationRoot) -eq [IO.Path]::GetTempPath().TrimEnd('\') -and
+        [IO.Path]::GetFileName($resolvedClassificationRoot).StartsWith('nc4ol-attachment-classification-')) {
+        Remove-Item -LiteralPath $resolvedClassificationRoot -Recurse -Force
+    }
+}
 Write-Host "All Outlook compose lifecycle regression checks passed."

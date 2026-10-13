@@ -6,8 +6,14 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AngleSharp.Html.Parser;
+using AngleSharp.Dom;
+using AngleSharp.Css.Parser;
+using AngleSharp.Css.Values;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Settings;
@@ -70,8 +76,7 @@ namespace NcTalkOutlookAddIn
                         try
                         {
                             attachment = attachments[i];
-                            if (attachment != null
-                                && !IsHiddenAttachment(attachment))
+                            if (IsAutomationFileAttachment(attachment))
                             {
                                 relevant++;
                                 totalBytes += Math.Max(0, attachment.Size);
@@ -105,23 +110,35 @@ namespace NcTalkOutlookAddIn
                 return relevant;
             }
 
-            private static bool IsHiddenAttachment(Outlook.Attachment attachment)
+            private bool IsAutomationFileAttachment(Outlook.Attachment attachment, bool deferBodyReferences = false)
             {
+                if (attachment == null) { return false; }
                 Outlook.PropertyAccessor accessor = null;
                 try
                 {
-                    accessor = attachment != null
-                        ? attachment.PropertyAccessor
-                        : null;
-                    object value = accessor != null
-                        ? accessor.GetProperty(
-                            "http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")
-                        : null;
-                    return value is bool && (bool)value;
-                }
-                catch
-                {
-                    return false;
+                    accessor = attachment.PropertyAccessor;
+                    object hidden = ReadOptionalAttachmentProperty(accessor, "0x7FFE000B");
+                    if (hidden is bool && (bool)hidden) { return false; }
+                    object flags = ReadOptionalAttachmentProperty(accessor, "0x37140003");
+                    if (flags is int && ((int)flags & 4) != 0) { return false; }
+
+                    string contentId = ReadOptionalAttachmentProperty(accessor, "0x3712001F") as string
+                        ?? ReadOptionalAttachmentProperty(accessor, "0x3712001E") as string;
+                    string contentLocation = ReadOptionalAttachmentProperty(accessor, "0x3713001F") as string
+                        ?? ReadOptionalAttachmentProperty(accessor, "0x3713001E") as string;
+                    if (string.IsNullOrWhiteSpace(contentId) && string.IsNullOrWhiteSpace(contentLocation))
+                    {
+                        return true;
+                    }
+
+                    // Outlook can raise attachment-add events before inserting the body's CID reference.
+                    // The debounced snapshot rechecks these candidates; an unused CID is still a file.
+                    if (deferBodyReferences) { return false; }
+
+                    // Unsaved replies can omit PR_ATTACHMENT_HIDDEN and report zero flags/size for
+                    // quoted signature images. Match real body resources, never filenames or sizes.
+                    return _mail == null || _mail.BodyFormat != Outlook.OlBodyFormat.olFormatHTML
+                        || !IsAttachmentReferencedInBody(_mail.HTMLBody, contentId, contentLocation);
                 }
                 finally
                 {
@@ -130,6 +147,102 @@ namespace NcTalkOutlookAddIn
                         LogCategories.FileLink,
                         "Failed to release attachment PropertyAccessor.");
                 }
+            }
+
+            private static object ReadOptionalAttachmentProperty(Outlook.PropertyAccessor accessor, string propertyName)
+            {
+                try
+                {
+                    return accessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/" + propertyName);
+                }
+                catch (COMException ex)
+                {
+                    if (ex.ErrorCode == unchecked((int)0x8004010F)) { return null; } // MAPI_E_NOT_FOUND
+                    throw;
+                }
+            }
+
+            private static string NormalizeAttachmentContentId(string value)
+            {
+                string normalized = (value ?? string.Empty).Trim();
+                if (normalized.Length > 1 && normalized[0] == '<' && normalized[normalized.Length - 1] == '>')
+                {
+                    normalized = normalized.Substring(1, normalized.Length - 2);
+                }
+                return normalized;
+            }
+
+            private static bool IsAttachmentReferencedInBody(string html, string contentId, string contentLocation)
+            {
+                if (string.IsNullOrWhiteSpace(html)) { return false; }
+                string expectedId = NormalizeAttachmentContentId(contentId);
+                string expectedLocation = (contentLocation ?? string.Empty).Trim();
+                using (var document = new HtmlParser().ParseDocument(html))
+                {
+                    var nodes = new Stack<INode>();
+                    nodes.Push(document);
+                    while (nodes.Count > 0)
+                    {
+                        INode node = nodes.Pop();
+                        foreach (INode child in node.ChildNodes) { nodes.Push(child); }
+                        var comment = node as IComment;
+                        if (comment != null)
+                        {
+                            // Word renders MSO conditional markup that ordinary HTML parsers leave in comments.
+                            Match conditional = Regex.Match(comment.Data,
+                                @"^\s*\[if\s+(?:(?:gte|gt|lte|lt)\s+)?mso(?:\s+\d+)?\]\s*>([\s\S]*)<!\[endif\]\s*$",
+                                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                            if (conditional.Success)
+                            {
+                                foreach (INode child in new HtmlParser().ParseFragment(conditional.Groups[1].Value, document.Body))
+                                {
+                                    nodes.Push(child);
+                                }
+                            }
+                        }
+                        var element = node as IElement;
+                        if (element == null) { continue; }
+                        string tag = element.LocalName;
+                        string resource = null;
+                        if (tag == "img" || tag == "v:imagedata" || tag == "v:fill"
+                            || (tag == "input" && string.Equals(element.GetAttribute("type"), "image", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            resource = element.GetAttribute("src");
+                        }
+                        else if (tag == "body" || tag == "table" || tag == "td" || tag == "th")
+                        {
+                            resource = element.GetAttribute("background");
+                        }
+                        if (MatchesAttachmentBodyResource(resource, expectedId, expectedLocation)) { return true; }
+                        string style = element.GetAttribute("style");
+                        if (string.IsNullOrWhiteSpace(style)) { continue; }
+                        foreach (var property in new CssParser().ParseDeclaration(style))
+                        {
+                            if (property.Name != "background-image" && property.Name != "list-style-image") { continue; }
+                            var values = property.RawValue as IEnumerable<AngleSharp.Css.Dom.ICssValue>;
+                            if (values != null)
+                            {
+                                foreach (var value in values)
+                                {
+                                    var url = value as CssUrlValue;
+                                    if (url != null && MatchesAttachmentBodyResource(url.Path, expectedId, expectedLocation)) { return true; }
+                                }
+                            }
+                            var singleUrl = property.RawValue as CssUrlValue;
+                            if (singleUrl != null && MatchesAttachmentBodyResource(singleUrl.Path, expectedId, expectedLocation)) { return true; }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            private static bool MatchesAttachmentBodyResource(string resource, string expectedId, string expectedLocation)
+            {
+                if (string.IsNullOrWhiteSpace(resource)) { return false; }
+                resource = resource.Trim();
+                return (expectedId.Length > 0 && resource.StartsWith("cid:", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(expectedId, NormalizeAttachmentContentId(Uri.UnescapeDataString(resource.Substring(4))), StringComparison.OrdinalIgnoreCase))
+                    || (expectedLocation.Length > 0 && string.Equals(expectedLocation, resource, StringComparison.Ordinal));
             }
 
             private List<AttachmentSnapshot> SnapshotAttachments()
@@ -155,7 +268,7 @@ namespace NcTalkOutlookAddIn
                             {
                                 continue;
                             }
-                            if (IsHiddenAttachment(attachment))
+                            if (!IsAutomationFileAttachment(attachment))
                             {
                                 continue;
                             }
@@ -501,7 +614,7 @@ namespace NcTalkOutlookAddIn
                             {
                                 continue;
                             }
-                            if (IsHiddenAttachment(attachment))
+                            if (!IsAutomationFileAttachment(attachment))
                             {
                                 continue;
                             }
@@ -642,7 +755,7 @@ namespace NcTalkOutlookAddIn
                         try
                         {
                             attachment = attachments[index];
-                            if (attachment == null || IsHiddenAttachment(attachment)
+                            if (!IsAutomationFileAttachment(attachment)
                                 || !ComInteropScope.AreSameObject(
                                     attachment, candidate.OriginalAttachment,
                                     LogCategories.FileLink, "Attachment", "BeforeAttachmentAdd"))
@@ -714,13 +827,13 @@ namespace NcTalkOutlookAddIn
                     {
                         if (original.Attachment == null
                             || (!cancelledByUser
-                                && !shared.Contains(new FileLinkSelection(FileLinkSelectionType.File, original.LocalPath)))
-                            || IsHiddenAttachment(original.Attachment))
+                                && !shared.Contains(new FileLinkSelection(FileLinkSelectionType.File, original.LocalPath))))
                         {
                             continue;
                         }
                         try
                         {
+                            if (!IsAutomationFileAttachment(original.Attachment)) { continue; }
                             if (!CanApplyComposeChanges)
                             {
                                 return;
@@ -798,8 +911,19 @@ namespace NcTalkOutlookAddIn
                         {
                             return;
                         }
-                        attachments.Remove(attachmentIndex);
-                        removed++;
+                        Outlook.Attachment attachment = null;
+                        try
+                        {
+                            attachment = attachments[attachmentIndex];
+                            if (!IsAutomationFileAttachment(attachment)) { continue; }
+                            attachments.Remove(attachmentIndex);
+                            removed++;
+                        }
+                        finally
+                        {
+                            ComInteropScope.TryRelease(attachment, LogCategories.FileLink,
+                                "Failed to release compose attachment before removal.");
+                        }
                     }
                 }
                 catch (Exception ex)

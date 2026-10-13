@@ -24,17 +24,27 @@ namespace NcTalkOutlookAddIn
             private void OnAttachmentAdd(Outlook.Attachment attachment)
             {
                 if (!CanApplyComposeChanges
-                    || _attachmentSuppressed
-                    || IsHiddenAttachment(attachment))
+                    || _attachmentSuppressed)
                 {
                     return;
                 }
 
-                _pendingAddedBatch.Add(new AttachmentBatchEntry
+                try
                 {
-                    Name = ReadAttachmentName(attachment),
-                    SizeBytes = ReadAttachmentSizeBytes(attachment)
-                });
+                    if (IsAutomationFileAttachment(attachment, true))
+                    {
+                        _pendingAddedBatch.Add(new AttachmentBatchEntry
+                        {
+                            Name = ReadAttachmentName(attachment),
+                            SizeBytes = ReadAttachmentSizeBytes(attachment)
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.FileLink,
+                        "Failed to classify added compose attachment (composeKey=" + _composeKey + ").", ex);
+                }
 
                 LogFileLink(
                     "Compose attachment added (composeKey="
@@ -49,18 +59,17 @@ namespace NcTalkOutlookAddIn
             {
                 if (!CanApplyComposeChanges
                     || cancel
-                    || _attachmentSuppressed
-                    || IsHiddenAttachment(attachment))
+                    || _attachmentSuppressed)
                 {
                     return;
                 }
-                AttachmentAutomationSettings settings =
-                    ReadAttachmentAutomationSettings();
                 string candidatePath = string.Empty;
                 bool candidatePathIsTemporary = false;
                 bool candidateQueued = false;
                 try
                 {
+                    if (!IsAutomationFileAttachment(attachment, true)) { return; }
+                    AttachmentAutomationSettings settings = ReadAttachmentAutomationSettings();
                     OutlookAttachmentAutomationGuardService.GuardState guardState;
                     if (_owner.TryGetAttachmentAutomationGuardState("before_add", _composeKey, out guardState))
                     {
