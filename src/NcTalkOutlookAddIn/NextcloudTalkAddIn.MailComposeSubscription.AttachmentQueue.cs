@@ -338,6 +338,7 @@ namespace NcTalkOutlookAddIn
             private void EndAttachmentSuppression(string trigger)
             {
                 _attachmentSuppressed = false;
+                if (_attachmentEvaluationPending) { ScheduleAttachmentEvaluation(); }
                 ResumeDeferredEmailSignatureApplication("attachment_" + (trigger ?? string.Empty));
             }
 

@@ -171,6 +171,23 @@ $initialQueueSelections = Get-MethodSlice `
 $reserveQueueSelection = Get-MethodSlice `
     $fileLinkWizardDragDrop `
     "private bool TryReserveSelection("
+$composeConstructor = Get-MethodSlice $subscription "internal MailComposeSubscription("
+$attachmentEvaluation = Get-MethodSlice $attachmentFlow "private async Task EvaluateAttachmentAutomationAsync()"
+
+Assert-Precedes `
+    "Initial attachment evaluation follows compose event registration" `
+    $composeConstructor `
+    "_events.AttachmentAdd += OnAttachmentAdd;" `
+    "ScheduleAttachmentEvaluation();"
+Assert-Precedes `
+    "Initial attachment evaluation reuses the pending policy refresh" `
+    $composeConstructor `
+    "BeginAttachmentAutomationSettingsRefresh();" `
+    "ScheduleAttachmentEvaluation();"
+Assert-Contains `
+    "Attachment evaluation returns to the Outlook UI before inspecting attachments" `
+    $attachmentEvaluation `
+    "EvaluateAttachmentAutomationOnUiAsync(settings)"
 
 Assert-Precedes `
     "Body resources are ignored before post-add batching" `
@@ -1151,6 +1168,7 @@ $attachmentSendRaceHarness = @'
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Outlook = AttachmentSendRaceBoundary.Outlook;
 namespace AttachmentSendRaceBoundary
@@ -1203,6 +1221,13 @@ namespace AttachmentSendRaceBoundary
             }
         }
         private sealed class AddinSettings { }
+        private sealed class Timer
+        {
+            internal int Interval, Starts;
+            internal bool Enabled;
+            internal void Start() { Starts++; Enabled = true; }
+            internal void Stop() { Enabled = false; }
+        }
         private sealed class Mail
         {
             internal readonly Outlook.Attachments Items = new Outlook.Attachments();
@@ -1215,6 +1240,9 @@ namespace AttachmentSendRaceBoundary
         {
             internal readonly MailInterop _mailInteropController = new MailInterop();
             internal Action<string> GuardAction;
+            internal int UiCalls;
+            internal Task<T> RunOnOutlookUiThreadAsync<T>(Func<T> action)
+            { UiCalls++; return Task.FromResult(action()); }
             internal bool TryGetAttachmentAutomationGuardState(string stage, string key, out OutlookAttachmentAutomationGuardService.GuardState state)
             {
                 state = null;
@@ -1228,19 +1256,40 @@ namespace AttachmentSendRaceBoundary
             __SNAPSHOT_CLASS__
             __BATCH_INFO_CLASS__
             __BATCH_ENTRY_CLASS__
+            __SURFACE_STATE__
             internal readonly Mail _mail = new Mail();
             internal readonly Owner _owner = new Owner();
+            internal readonly Timer _attachmentEvalTimer = new Timer();
+            private readonly Timer _emailSignatureTimer = new Timer();
             internal bool _disposed, _sendAccepted, _attachmentSuppressed;
             private bool CanApplyComposeChanges { get { return !_disposed && !_sendAccepted; } }
             private bool _beforeAddShareFlowRunning, _attachmentPromptOpen;
+            private bool _attachmentEvaluationPending, _attachmentEvaluationRunning;
+            private ComposeSurfaceState _composeSurfaceState = ComposeSurfaceState.Inspector;
+            private string _activeInspectorIdentityKey = "inspector", _inlineExplorerIdentityKey = "";
+            private const int EmailSignatureApplyDebounceMs = 900, EmailSignatureInlineApplyDebounceMs = 250;
             private readonly string _composeKey = "race";
             private readonly List<string> _pendingBeforeAddShareEntries = new List<string>();
             private readonly List<AttachmentBatchEntry> _pendingAddedBatch = new List<AttachmentBatchEntry>();
             private readonly TaskCompletionSource<AttachmentAutomationSettings> _settings = new TaskCompletionSource<AttachmentAutomationSettings>();
+            private readonly TaskCompletionSource<bool> _sharing = new TaskCompletionSource<bool>();
             internal Action AvailabilityAction;
-            internal int Shares, BeforeAddCaptures;
+            internal int Shares, BeforeAddCaptures, PolicyReads;
+            internal bool DelayShare;
             internal bool PromptOpen { get { return _attachmentPromptOpen; } }
+            internal bool EvaluationPending { get { return _attachmentEvaluationPending; } }
+            internal bool EvaluationRunning { get { return _attachmentEvaluationRunning; } }
+            internal void RequestEvaluation() { ScheduleAttachmentEvaluation(); }
             internal Task Evaluate() { return EvaluateAttachmentAutomationAsync(); }
+            internal Task Tick() { _attachmentEvalTimer.Stop(); return EvaluateAttachmentAutomationAsync(); }
+            internal void FinishSharing() { _sharing.SetResult(true); }
+            internal void BeforeAddBusy(bool running, bool queued)
+            {
+                _beforeAddShareFlowRunning = running;
+                _pendingBeforeAddShareEntries.Clear();
+                if (queued) { _pendingBeforeAddShareEntries.Add("queued"); }
+            }
+            internal void ReleaseSuppression() { EndAttachmentSuppression("test"); }
             internal void FinishSettings(bool always)
             {
                 _settings.SetResult(new AttachmentAutomationSettings
@@ -1257,7 +1306,7 @@ namespace AttachmentSendRaceBoundary
             internal void BeforeAdd(Outlook.Attachment item, ref bool cancel) { OnBeforeAttachmentAdd(item, ref cancel); }
             private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
             { return new AttachmentAutomationSettings { OfferAboveEnabled = true, ThresholdMb = 1, ThresholdBytes = 1 }; }
-            private Task<AttachmentAutomationSettings> ReadAttachmentAutomationSettingsAsync() { return _settings.Task; }
+            private Task<AttachmentAutomationSettings> ReadAttachmentAutomationSettingsAsync() { PolicyReads++; return _settings.Task; }
             private bool TryBuildBeforeAddAttachmentCandidate(Outlook.Attachment item, out AttachmentBatchEntry candidate, out string path, out bool temporary)
             {
                 BeforeAddCaptures++;
@@ -1272,13 +1321,21 @@ namespace AttachmentSendRaceBoundary
             private bool PauseUnavailableAttachmentAutomation(AttachmentAutomationSettings settings, long bytes)
             { if (AvailabilityAction != null) { AvailabilityAction(); } return false; }
             private Task StartComposeAttachmentShareFlowAsync(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
-            { Shares++; return Task.FromResult(true); }
-            private void EndAttachmentSuppression(string reason) { _attachmentSuppressed = false; }
+            { Shares++; return DelayShare ? _sharing.Task : Task.FromResult(true); }
+            private bool ResumeDeferredEmailSignatureApplication(string trigger) { return false; }
+            private void ScheduleEmailSignatureApplication(string trigger) { }
+            private void LogEmailSignature(string message) { }
             private void LogFileLink(string message) { }
             private bool IsAutomationFileAttachment(Outlook.Attachment item, bool deferBodyReferences = false) { return item != null && !item.Hidden; }
             private static string ReadAttachmentName(Outlook.Attachment item) { return item.Name; }
             private static long ReadAttachmentSizeBytes(Outlook.Attachment item) { return item.Size; }
             __EVALUATE__
+            __EVALUATE_UI__
+            __SCHEDULE__
+            __MARK_INLINE__
+            __MARK_INSPECTOR__
+            __MARK_CLOSED__
+            __END_SUPPRESSION__
             __BEFORE_ADD__
             __SNAPSHOT__
             __SUM__
@@ -1290,8 +1347,136 @@ namespace AttachmentSendRaceBoundary
         { if (!condition) { throw new InvalidOperationException(message); } }
         private static void ResetPrompt(ComposeAttachmentPromptDecision decision)
         { ComposeAttachmentPromptForm.Calls = 0; ComposeAttachmentPromptForm.PromptAction = null; ComposeAttachmentPromptForm.Decision = decision; }
+        private static void CheckInitialAttachmentEvaluation()
+        {
+            foreach (string surface in new[] { "forward_inspector", "forward_inline", "reopened_draft" })
+            foreach (bool always in new[] { false, true })
+            {
+                ResetPrompt(ComposeAttachmentPromptDecision.Share);
+                var compose = new Subscription();
+                var inherited = compose.Add("inherited.pdf", false);
+                var logo = compose.Add("quoted-logo.png", true);
+                if (surface == "forward_inline") { compose.MarkInlineResponse("explorer"); }
+                compose.RequestEvaluation();
+                Check(compose.EvaluationPending && compose._attachmentEvalTimer.Enabled,
+                    "Opening an existing attachment did not schedule evaluation: " + surface);
+                Task evaluation = compose.Tick();
+                Check(compose.EvaluationRunning && !evaluation.IsCompleted && compose._mail.Reads == 0,
+                    "Initial attachment evaluation did not await policy: " + surface);
+                compose.FinishSettings(always);
+                evaluation.GetAwaiter().GetResult();
+                Check(compose.Shares == 1 && ComposeAttachmentPromptForm.Calls == (always ? 0 : 1)
+                    && !inherited.Deleted && !logo.Deleted && !compose.EvaluationPending && !compose.EvaluationRunning,
+                    "Pre-existing files were not evaluated exactly once without an add event: " + surface + "/" + always);
+                Check(compose._owner.UiCalls >= 2, "Initial policy completion did not marshal evaluation and completion to Outlook UI.");
+                compose.MarkInlineResponse("explorer");
+                compose.MarkInlineResponseClosed("explorer");
+                compose.MarkInspector("popout");
+                Check(!compose._attachmentEvalTimer.Enabled && !compose.EvaluationPending && compose.Shares == 1,
+                    "A handled attachment set reopened its wizard after a surface transition.");
+            }
+
+            foreach (bool always in new[] { false, true })
+            {
+                ResetPrompt(ComposeAttachmentPromptDecision.Share);
+                var images = new Subscription();
+                var logo = images.Add("quoted-logo.png", true);
+                images.RequestEvaluation();
+                images.FinishSettings(always);
+                images.Tick().GetAwaiter().GetResult();
+                Check(images.Shares == 0 && ComposeAttachmentPromptForm.Calls == 0 && !logo.Deleted && !images.EvaluationPending,
+                    "An image-only initial compose opened attachment UI.");
+            }
+
+            ResetPrompt(ComposeAttachmentPromptDecision.Share);
+            var coalesced = new Subscription();
+            coalesced.Add("inherited.pdf", false);
+            coalesced.MarkInlineResponse("explorer");
+            coalesced.RequestEvaluation();
+            Task waiting = coalesced.Tick();
+            coalesced.RequestEvaluation();
+            coalesced.MarkInlineResponseClosed("explorer");
+            coalesced.MarkInspector("popout");
+            coalesced.Tick().GetAwaiter().GetResult();
+            Check(coalesced.PolicyReads == 1 && coalesced.EvaluationRunning && !coalesced._attachmentEvalTimer.Enabled,
+                "A surface transition started a second policy evaluation while the first was pending.");
+            coalesced.FinishSettings(true);
+            waiting.GetAwaiter().GetResult();
+            Check(coalesced.Shares == 1 && !coalesced.EvaluationPending && !coalesced._attachmentEvalTimer.Enabled,
+                "Pending policy and pop-out produced duplicate sharing.");
+
+            var detached = new Subscription();
+            detached.Add("inherited.pdf", false);
+            detached.MarkInlineResponse("explorer");
+            detached.RequestEvaluation();
+            Task detachedWait = detached.Tick();
+            detached.MarkInlineResponseClosed("explorer");
+            detached.FinishSettings(true);
+            detachedWait.GetAwaiter().GetResult();
+            Check(detached.EvaluationPending && !detached.EvaluationRunning && !detached._attachmentEvalTimer.Enabled
+                && detached._mail.Reads == 0 && detached.Shares == 0,
+                "Late initial policy completion touched a detached compose or lost its pending evaluation.");
+            detached.MarkInspector("popout");
+            Check(detached._attachmentEvalTimer.Enabled, "Pop-out did not resume the pending initial evaluation.");
+            detached.Tick().GetAwaiter().GetResult();
+            Check(detached.Shares == 1 && !detached.EvaluationPending, "Pop-out did not evaluate the existing attachment once.");
+
+            foreach (string boundary in new[] { "suppression", "preadd_running", "preadd_queued" })
+            {
+                var busy = new Subscription();
+                busy.Add("inherited.pdf", false);
+                busy.RequestEvaluation();
+                Task busyWait = busy.Tick();
+                busy._attachmentSuppressed = boundary == "suppression";
+                busy.BeforeAddBusy(boundary == "preadd_running", boundary == "preadd_queued");
+                busy.FinishSettings(true);
+                busyWait.GetAwaiter().GetResult();
+                Check(busy.EvaluationPending && !busy.EvaluationRunning && !busy._attachmentEvalTimer.Enabled
+                    && busy._mail.Reads == 0 && busy.Shares == 0,
+                    "Initial evaluation ignored a busy attachment boundary: " + boundary);
+                busy.BeforeAddBusy(false, false);
+                busy.ReleaseSuppression();
+                Check(busy._attachmentEvalTimer.Enabled, "Pending evaluation did not resume after " + boundary);
+                busy.Tick().GetAwaiter().GetResult();
+                Check(busy.Shares == 1 && !busy.EvaluationPending, "Resumed initial evaluation duplicated or lost files: " + boundary);
+            }
+
+            var sharing = new Subscription { DelayShare = true };
+            sharing.Add("inherited.pdf", false);
+            sharing.MarkInlineResponse("explorer");
+            sharing.RequestEvaluation();
+            sharing.FinishSettings(true);
+            Task openWizard = sharing.Tick();
+            Check(sharing.Shares == 1 && sharing.EvaluationRunning && !sharing.EvaluationPending && !openWizard.IsCompleted,
+                "The sharing boundary was not held open.");
+            sharing.MarkInlineResponseClosed("explorer");
+            sharing.MarkInspector("popout");
+            sharing.Tick().GetAwaiter().GetResult();
+            Check(sharing.Shares == 1 && sharing.PolicyReads == 1 && !sharing._attachmentEvalTimer.Enabled,
+                "Pop-out opened a second wizard while the first was running.");
+            sharing.FinishSharing();
+            openWizard.GetAwaiter().GetResult();
+            Check(!sharing.EvaluationRunning && !sharing.EvaluationPending && !sharing._attachmentEvalTimer.Enabled,
+                "Completed sharing rescheduled an already handled initial attachment set.");
+
+            foreach (string terminal in new[] { "sent", "closed" })
+            {
+                var ended = new Subscription();
+                ended.Add("inherited.pdf", false);
+                ended.RequestEvaluation();
+                Task endedWait = ended.Tick();
+                ended._sendAccepted = terminal == "sent";
+                ended._disposed = terminal == "closed";
+                ended.FinishSettings(true);
+                endedWait.GetAwaiter().GetResult();
+                ended.MarkInspector("later");
+                Check(ended.Shares == 0 && ended._mail.Reads == 0 && !ended.EvaluationRunning && !ended._attachmentEvalTimer.Enabled,
+                    "Late initial evaluation touched or restarted a terminal compose: " + terminal);
+            }
+        }
         public static void Run()
         {
+            CheckInitialAttachmentEvaluation();
             foreach (bool always in new[] { false, true })
             foreach (string transition in new[] { "sent", "closed", "suppressed" })
             {
@@ -1406,7 +1591,14 @@ $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SETTINGS_CLAS
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SNAPSHOT_CLASS__", (Get-MethodSlice $attachmentMaterialization "private sealed class AttachmentSnapshot"))
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__BATCH_INFO_CLASS__", (Get-MethodSlice $attachmentMaterialization "private sealed class AttachmentBatchInfo"))
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__BATCH_ENTRY_CLASS__", (Get-MethodSlice $attachmentMaterialization "private sealed class AttachmentBatchEntry"))
-$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__EVALUATE__", (Get-MethodSlice $attachmentFlow "private async Task EvaluateAttachmentAutomationAsync()"))
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SURFACE_STATE__", (Get-MethodSlice $subscription "private enum ComposeSurfaceState"))
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__EVALUATE__", $attachmentEvaluation)
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__EVALUATE_UI__", (Get-MethodSlice $attachmentFlow "private async Task EvaluateAttachmentAutomationOnUiAsync("))
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SCHEDULE__", (Get-MethodSlice $attachmentFlow "private void ScheduleAttachmentEvaluation()"))
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__MARK_INLINE__", (Get-MethodSlice $subscription "internal void MarkInlineResponse("))
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__MARK_INSPECTOR__", (Get-MethodSlice $subscription "internal void MarkInspector("))
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__MARK_CLOSED__", (Get-MethodSlice $subscription "internal void MarkInlineResponseClosed("))
+$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__END_SUPPRESSION__", (Get-MethodSlice $attachmentQueue "private void EndAttachmentSuppression("))
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__BEFORE_ADD__", $beforeAttachmentAdd)
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SNAPSHOT__", $snapshotAttachments)
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SUM__", (Get-MethodSlice $attachmentMaterialization "private static long SumAttachmentBytes("))
@@ -1415,6 +1607,7 @@ $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__REMOVE_LAST__
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__REMOVE_INDICES__", $removeAttachmentsByIndices)
 Add-Type -TypeDefinition $attachmentSendRaceHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
 [AttachmentSendRaceBoundary.AttachmentSendRaceRegression]::Run()
+Write-Host "[OK] Initial forward/draft attachments: inherited files, image-only messages, pending policy, pop-out, detached surfaces, busy flows and single wizard"
 Write-Host "[OK] Delayed attachment policy, prompt completion and direct removal leave accepted Send unchanged"
 
 # Execute the production attachment gate with inert backend and UI boundaries.

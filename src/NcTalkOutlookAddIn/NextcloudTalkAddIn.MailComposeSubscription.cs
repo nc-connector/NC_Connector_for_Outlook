@@ -45,6 +45,8 @@ namespace NcTalkOutlookAddIn
             private readonly List<SeparatePasswordDispatchEntry> _passwordDispatchQueue = new List<SeparatePasswordDispatchEntry>();
             private bool _attachmentSuppressed;
             private bool _attachmentPromptOpen;
+            private bool _attachmentEvaluationPending;
+            private bool _attachmentEvaluationRunning;
             private bool _beforeAddShareFlowRunning;
             private bool _emailSignatureApplying;
             private ComposeSurfaceState _composeSurfaceState;
@@ -116,6 +118,8 @@ namespace NcTalkOutlookAddIn
                     + ").");
 
                 BeginAttachmentAutomationSettingsRefresh();
+                // Forwarded and reopened drafts can already contain files before attachment events are hooked.
+                ScheduleAttachmentEvaluation();
                 ScheduleEmailSignatureApplication("compose_open");
             }
 
@@ -235,6 +239,7 @@ namespace NcTalkOutlookAddIn
                 _activeInspectorIdentityKey = string.Empty;
                 _inlineExplorerIdentityKey = normalizedExplorerIdentityKey;
                 _emailSignatureTimer.Interval = EmailSignatureInlineApplyDebounceMs;
+                if (_attachmentEvaluationPending) { ScheduleAttachmentEvaluation(); }
                 LogEmailSignature(
                     "compose surface changed (from="
                     + previousSurface.ToString()
@@ -271,6 +276,7 @@ namespace NcTalkOutlookAddIn
                 _activeInspectorIdentityKey = normalizedInspectorIdentityKey;
                 _inlineExplorerIdentityKey = string.Empty;
                 _emailSignatureTimer.Interval = EmailSignatureApplyDebounceMs;
+                if (_attachmentEvaluationPending) { ScheduleAttachmentEvaluation(); }
                 LogEmailSignature(
                     "compose surface changed (from="
                     + previousSurface.ToString()
@@ -309,6 +315,7 @@ namespace NcTalkOutlookAddIn
                 }
 
                 _emailSignatureTimer.Stop();
+                _attachmentEvalTimer.Stop();
                 _composeSurfaceState = ComposeSurfaceState.Detached;
                 _activeInspectorIdentityKey = string.Empty;
                 _inlineExplorerIdentityKey = string.Empty;

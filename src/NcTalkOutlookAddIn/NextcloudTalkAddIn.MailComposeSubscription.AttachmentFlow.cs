@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
@@ -264,6 +265,13 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
+                _attachmentEvaluationPending = true;
+                if (_composeSurfaceState == ComposeSurfaceState.Detached
+                    || _attachmentEvaluationRunning || _attachmentSuppressed
+                    || _beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count > 0)
+                {
+                    return;
+                }
                 try
                 {
                     _attachmentEvalTimer.Stop();
@@ -318,7 +326,8 @@ namespace NcTalkOutlookAddIn
 
             private async Task EvaluateAttachmentAutomationAsync()
             {
-                if (!CanApplyComposeChanges || _attachmentSuppressed)
+                if (!CanApplyComposeChanges || _attachmentSuppressed || _attachmentEvaluationRunning
+                    || _composeSurfaceState == ComposeSurfaceState.Detached)
                 {
                     return;
                 }
@@ -329,6 +338,41 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
+                _attachmentEvaluationRunning = true;
+                ExceptionDispatchInfo failure = null;
+                try
+                {
+                    AttachmentAutomationSettings settings = await ReadAttachmentAutomationSettingsAsync().ConfigureAwait(false);
+                    // Policy lookup may finish off the STA; collection reads and prompts belong to Outlook's UI thread.
+                    Task flow = await _owner.RunOnOutlookUiThreadAsync(
+                        () => EvaluateAttachmentAutomationOnUiAsync(settings)).ConfigureAwait(false);
+                    await flow.ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    failure = ExceptionDispatchInfo.Capture(ex);
+                }
+                await _owner.RunOnOutlookUiThreadAsync(() =>
+                {
+                    _attachmentEvaluationRunning = false;
+                    if (failure != null) { _attachmentEvaluationPending = false; }
+                    if (_attachmentEvaluationPending) { ScheduleAttachmentEvaluation(); }
+                    return true;
+                }).ConfigureAwait(false);
+                if (failure != null) { failure.Throw(); }
+            }
+
+            private async Task EvaluateAttachmentAutomationOnUiAsync(AttachmentAutomationSettings settings)
+            {
+                if (!CanApplyComposeChanges || _attachmentSuppressed
+                    || _composeSurfaceState == ComposeSurfaceState.Detached
+                    || _beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count > 0)
+                {
+                    return;
+                }
+
+                // Consume the request only on an attached surface; popping out an assessed draft is not a new batch.
+                _attachmentEvaluationPending = false;
                 OutlookAttachmentAutomationGuardService.GuardState guardState;
                 if (_owner.TryGetAttachmentAutomationGuardState("evaluate", _composeKey, out guardState))
                 {
@@ -336,11 +380,6 @@ namespace NcTalkOutlookAddIn
                     return;
                 }
 
-                AttachmentAutomationSettings settings = await ReadAttachmentAutomationSettingsAsync();
-                if (!CanApplyComposeChanges || _attachmentSuppressed)
-                {
-                    return;
-                }
                 if (!settings.AlwaysConnector && !settings.OfferAboveEnabled)
                 {
                     _pendingAddedBatch.Clear();
