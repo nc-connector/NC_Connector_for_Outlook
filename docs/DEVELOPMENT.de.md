@@ -434,6 +434,12 @@ Die Rollback-Aktion steht vor der verzögerten Bereinigung; entfernte Rohwerte u
 
 Vor der Bereinigung registriert `util:RestartResource` die installierte Add-in-DLL beim Restart Manager von Windows Installer, auch bei Wartung mit unveränderter DLL-Version. `MSIRMSHUTDOWN=0` fordert reguläres Schließen an, kein erzwungenes Prozessende. `InstallValidate` behandelt zunächst laufende Anwendungen; danach prüft `CheckOutlookClosed` vor `RemoveExistingProducts` und `InstallInitialize`. Ein verbleibender Outlook-Prozess in einer beliebigen Sitzung blockiert die Wartung, bevor das alte Paket entfernt oder IFB-Werte geändert werden. Die verzögerte Bereinigung behält ihre wiederholten Prozessprüfungen. Interaktives und stilles Upgrade, Wartung derselben Version, abgelehntes Schließen und eine weitere Windows-Sitzung auf dem Installationstest-Rechner prüfen.
 
+#### Ressourcenplanung (ifb-pro)
+
+`CalendarResourceDirectory` fragt `principals/calendar-rooms/` und `principals/calendar-resources/` per Depth-0-REPORT `principal-property-search` ab: `{http://sabredav.org/ns}email-address` enthält `@`. Nextcloud berücksichtigt auf diesem Suchpfad die Gruppenbeschränkungen der Principals; eine Depth-1-Auflistung bietet diesen Filter nicht. Explizite CalDAV-Identitäts- und `{http://nextcloud.com/ns}`-Metadaten vermeiden die implizite Kalenderanlage. Der Raumort folgt Raumnummer, Etage, Gebäudeadresse; leere Teile entfallen, der separate Gebäudename wird nicht vorangestellt.
+
+Der Arbeitsspeicher-Cache trennt nach konfigurierter URL einschließlich Installationspfad, Anmeldung und Zugangsdaten. Jeder Zugriff prüft den gemeinsamen effektiven Seat-Status sowie Authentifizierungs- und Anfragelimitpausen. Ein fehlgeschlagener Refresh wird nicht durch das vorherige Verzeichnis verdeckt. DAV-XML ist größenbegrenzt und DTD-frei, Properties benötigen erfolgreiche Propstats, und Antwort-URLs müssen innerhalb der erwarteten DAV-Collection derselben Origin bleiben.
+
 ## Netzwerk-Endpunkte
 
 Das Add-in verwendet Nextcloud-**OCS**- und **WebDAV**-Endpunkte.

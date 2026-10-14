@@ -202,6 +202,18 @@ jobs:
         shell: pwsh
         run: .\tools\ci\Invoke-OutlookTalkIfbLifecycleTests.ps1
 
+  resource-planning:
+    name: Resource planning
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run resource discovery and scheduling tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookResourcePlanningTests.ps1
+
   filelink-rendering:
     name: FileLink rendering
     runs-on: windows-latest

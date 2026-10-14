@@ -443,6 +443,12 @@ The rollback action precedes deferred cleanup; removed raw values and registry t
 
 Before cleanup, `util:RestartResource` registers the installed add-in DLL with Windows Installer's Restart Manager, including maintenance where the DLL version is unchanged. `MSIRMSHUTDOWN=0` requests orderly shutdown, not forced termination. `InstallValidate` handles applications in use first; `CheckOutlookClosed` then runs before `RemoveExistingProducts` and `InstallInitialize`. A remaining Outlook process in any session blocks maintenance before the old package is removed or IFB values are changed. Deferred cleanup retains its repeated process checks. Verify interactive and silent upgrades, same-version maintenance, declined shutdown and another Windows session on the installation test machine.
 
+#### Resource planning (ifb-pro)
+
+`CalendarResourceDirectory` requests both `principals/calendar-rooms/` and `principals/calendar-resources/` using depth-zero `principal-property-search` REPORTs for `{http://sabredav.org/ns}email-address` containing `@`. Nextcloud applies principal group restrictions on this search path; depth-one principal enumeration does not provide that filter. Explicit CalDAV identity and `{http://nextcloud.com/ns}` metadata properties avoid implicit calendar creation. Room location follows room number, floor, building address, omitting empty parts without prepending the separate building name.
+
+The in-memory directory is scoped to the configured URL including installation path, login, and credentials. Each access checks the shared effective Seat status and authentication/rate-limit pause. A failed refresh is not hidden by the previous directory. DAV XML is bounded and DTD-free, properties must have successful propstats, and response URLs must remain in the expected same-origin DAV collection.
+
 ## Network endpoints
 
 The add-in uses Nextcloud **OCS** and **WebDAV** endpoints.
