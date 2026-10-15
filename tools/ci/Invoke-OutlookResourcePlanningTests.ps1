@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Security;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
 namespace NcTalkOutlookAddIn.Models {
@@ -64,6 +65,8 @@ internal static class ResourceTests {
             "<x:displayname>"+(room?"Meeting room":"Projector")+"</x:displayname><c:calendar-user-type>"+(room?"ROOM":"RESOURCE")+"</c:calendar-user-type><c:calendar-user-address-set><x:href>mailto:"+(room?"room@example.test":"resource@example.test")+"</x:href></c:calendar-user-address-set>"
             +(room?"<n:room-type>meeting-room</n:room-type><n:room-seating-capacity>18</n:room-seating-capacity><n:room-building-name>House</n:room-building-name><n:room-building-address>House, Street 3</n:room-building-address><n:room-building-story>2</n:room-building-story><n:room-building-room-number>5</n:room-building-room-number><n:room-features>projector</n:room-features>":"<n:resource-type>default</n:resource-type>"));
     }
+    private static string Calendar(string email,bool busy) { return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\nMETHOD:REPLY\r\nBEGIN:VFREEBUSY\r\nUID:test\r\nDTSTAMP:20261014T100000Z\r\nDTSTART:20261023T000000Z\r\nDTEND:20261024T000000Z\r\nATTENDEE;CN=\"Room: 1\":mailto:"+email+"\r\n"+(busy?"FREEBUSY;FBTYPE=BUSY:20261023T130000Z/20261023T140000Z\r\n":"")+"END:VFREEBUSY\r\nEND:VCALENDAR\r\n"; }
+    private static string Schedule(string email,string code,string payload) { return "<z:schedule-response xmlns:z='urn:ietf:params:xml:ns:caldav' xmlns:d='DAV:'><z:response><z:recipient><d:href>mailto:"+email+"</d:href></z:recipient><z:request-status>"+code+"</z:request-status><z:calendar-data>"+SecurityElement.Escape(payload)+"</z:calendar-data></z:response></z:schedule-response>"; }
     private static NcHttpResponse Dispatch(NcHttpRequestOptions o) {
         Check(o.IncludeAuthHeader && !o.ParseJson,"DAV requests authenticated and not JSON");
         Check(o.Url.StartsWith(Root),"Installation subpath retained");
@@ -72,7 +75,17 @@ internal static class ResourceTests {
             Check(o.Payload.Contains("room-building-room-number") && !o.Payload.Contains("schedule-default-calendar"),"Metadata without side-effectful default calendar lookup");
             return new NcHttpResponse {ResponseText=Resource(o.Url.Contains("calendar-rooms"))};
         }
-        throw new InvalidOperationException("Unexpected resource discovery request");
+        if(o.Method=="PROPFIND" && o.Url==Root) return new NcHttpResponse {ResponseText=Multi("/sub/remote.php/dav/","<x:current-user-principal><x:href>/sub/remote.php/dav/principals/users/canonical-user/</x:href></x:current-user-principal>")};
+        if(o.Method=="PROPFIND") return new NcHttpResponse {ResponseText=Multi("/sub/remote.php/dav/principals/users/canonical-user/","<c:calendar-user-address-set><x:href>mailto:organizer@example.test</x:href></c:calendar-user-address-set><c:schedule-outbox-URL><x:href>/sub/remote.php/dav/calendars/canonical-user/outbox/</x:href></c:schedule-outbox-URL>")};
+        if(o.Method=="POST") {
+            Check(o.Url==Root+"calendars/canonical-user/outbox/","Discovered canonical outbox");
+            Check(o.Headers["Originator"]=="mailto:organizer@example.test","Discovered originator");
+            Check(o.Payload.Contains("BEGIN:VFREEBUSY") && !o.Payload.Contains("VEVENT"),"No booking mutation");
+            string email=o.Headers["Recipient"].Substring(7);
+            return new NcHttpResponse {StatusCode=HttpStatusCode.OK,ResponseText=Schedule(email,"2.0;Success",Calendar(email,true))};
+        }
+        Check(o.Method=="REPORT" && o.Url.EndsWith("/canonical-user/personal"),"Existing person route remains personal REPORT");
+        return new NcHttpResponse {StatusCode=HttpStatusCode.OK,ContentType="text/calendar",ResponseText=Calendar("person@example.test",true)};
     }
     public static int Main() {
         NcHttpClient.Dispatch=Dispatch;
@@ -100,6 +113,25 @@ internal static class ResourceTests {
         Check(sharedPause,"Credentials rejected during discovery retain the shared authentication error");
         NextcloudConnectionState.Paused=false;
         NcHttpClient.Dispatch=Dispatch;
+        var addressbook=new IfbAddressBookCache();
+        using(var server=new FreeBusyServer(addressbook,c=>status,directory)) {
+            string payload=server.GetFreeBusyPayload(config,"room@example.test",30,24,false);
+            Check(payload.Contains("METHOD:PUBLISH") && payload.Contains("20261023T130000Z/20261023T140000Z"),"Resource busy interval reaches IFB");
+            requests=NcHttpClient.Requests.Count; addressbook.Fail=true;
+            Reject(()=>server.GetFreeBusyPayload(config,"room@example.test",30,24,false),"Addressbook outage does not fall through");
+            Check(NcHttpClient.Requests.Count==requests,"No resource request after addressbook error");
+            addressbook.Fail=false; addressbook.Person=true; status.SeatAssigned=false;
+            Check(server.GetFreeBusyPayload(config,"person@example.test",30,24,false).Contains("VFREEBUSY"),"Unmanaged person route needs no Seat");
+            Reject(()=>server.GetFreeBusyPayload(config,"person@example.test",30,24,true),"Enterprise person route retains Seat gate");
+            addressbook.Person=false;
+            Reject(()=>server.GetFreeBusyPayload(config,"room@example.test",30,24,false),"Resource route always requires Seat"); status.SeatAssigned=true;
+        }
+        string free=Schedule("room@example.test","2.0;Success",Calendar("room@example.test",false));
+        Check(FreeBusyServer.ExtractFreeBusyFromScheduleResponse(free,"room@example.test").Contains("END:VFREEBUSY"),"Successful complete empty VFREEBUSY accepted");
+        Reject(()=>FreeBusyServer.ExtractFreeBusyFromScheduleResponse(free.Replace("2.0;Success","3.7;Invalid calendar user"),"room@example.test"),"Scheduling failure never free");
+        Reject(()=>FreeBusyServer.ExtractFreeBusyFromScheduleResponse(free,"different@example.test"),"Other recipient cannot match");
+        Reject(()=>FreeBusyServer.ExtractFreeBusyFromScheduleResponse(free.Replace("END:VFREEBUSY",""),"room@example.test"),"Truncated calendar rejected");
+        Reject(()=>FreeBusyServer.ExtractFreeBusyFromScheduleResponse(free.Replace("DTEND:20261024T000000Z","DTEND:20261022T000000Z"),"room@example.test"),"Reversed range rejected");
         Reject(()=>CalendarResourceDirectory.ReadXml("<!DOCTYPE x [<!ENTITY a SYSTEM 'file:///private'>]><x>&a;</x>"),"DTD prohibited");
         foreach(string href in new[]{"https://other.example/sub/remote.php/dav/principals/calendar-rooms/a/","/remote.php/dav/principals/calendar-rooms/a/","/sub/remote.php/dav/principals/calendar-rooms/%2fescape/","/sub/remote.php/dav/principals/calendar-rooms/a/?secret=x"})
             Reject(()=>CalendarResourceDirectory.ValidateDavHref(config,Root,href,"principals/calendar-rooms/",true),"Untrusted principal path rejected");

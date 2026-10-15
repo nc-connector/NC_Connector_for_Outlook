@@ -436,9 +436,13 @@ Vor der Bereinigung registriert `util:RestartResource` die installierte Add-in-D
 
 #### Ressourcenplanung (ifb-pro)
 
+`FreeBusyManager.ResourceDirectory` stellt das Ressourcenverzeichnis für IFB bereit und verwendet die vorhandene Cache-Dauer.
+
 `CalendarResourceDirectory` fragt `principals/calendar-rooms/` und `principals/calendar-resources/` per Depth-0-REPORT `principal-property-search` ab: `{http://sabredav.org/ns}email-address` enthält `@`. Nextcloud berücksichtigt auf diesem Suchpfad die Gruppenbeschränkungen der Principals; eine Depth-1-Auflistung bietet diesen Filter nicht. Explizite CalDAV-Identitäts- und `{http://nextcloud.com/ns}`-Metadaten vermeiden die implizite Kalenderanlage. Der Raumort folgt Raumnummer, Etage, Gebäudeadresse; leere Teile entfallen, der separate Gebäudename wird nicht vorangestellt.
 
 Der Arbeitsspeicher-Cache trennt nach konfigurierter URL einschließlich Installationspfad, Anmeldung und Zugangsdaten. Jeder Zugriff prüft den gemeinsamen effektiven Seat-Status sowie Authentifizierungs- und Anfragelimitpausen. Ein fehlgeschlagener Refresh wird nicht durch das vorherige Verzeichnis verdeckt. DAV-XML ist größenbegrenzt und DTD-frei, Properties benötigen erfolgreiche Propstats, und Antwort-URLs müssen innerhalb der erwarteten DAV-Collection derselben Origin bleiben.
+
+`FreeBusyServer.GetFreeBusyPayload` behält den Personenpfad bei. Nur ein bestätigter Fehltreffer der vollständigen Adresse führt zum Seat-geprüften Ressourcenpfad. Ressourcen-Scheduling ermittelt den Current-User-Principal über die DAV-Wurzel und liest dessen calendar-user-address-set und schedule-outbox-URL; das Systemadressbuch liefert nicht den Originator. Scheduling verwendet eine ausschließlich lesende VFREEBUSY-Anfrage. Antworten benötigen den exakten Empfänger, einen erfolgreichen Request-Status und vollständiges VFREEBUSY mit gültigen Zeiten. Fehler und fehlende Daten werden nie als leerer erfolgreicher Kalender ausgegeben. Der Organizer der Scheduling-Hülle ist keine Information über Buchungsorganisatoren.
 
 ## Netzwerk-Endpunkte
 

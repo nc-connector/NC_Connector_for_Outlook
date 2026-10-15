@@ -445,9 +445,13 @@ Before cleanup, `util:RestartResource` registers the installed add-in DLL with W
 
 #### Resource planning (ifb-pro)
 
+`FreeBusyManager.ResourceDirectory` provides the resource directory for IFB, using the existing cache duration.
+
 `CalendarResourceDirectory` requests both `principals/calendar-rooms/` and `principals/calendar-resources/` using depth-zero `principal-property-search` REPORTs for `{http://sabredav.org/ns}email-address` containing `@`. Nextcloud applies principal group restrictions on this search path; depth-one principal enumeration does not provide that filter. Explicit CalDAV identity and `{http://nextcloud.com/ns}` metadata properties avoid implicit calendar creation. Room location follows room number, floor, building address, omitting empty parts without prepending the separate building name.
 
 The in-memory directory is scoped to the configured URL including installation path, login, and credentials. Each access checks the shared effective Seat status and authentication/rate-limit pause. A failed refresh is not hidden by the previous directory. DAV XML is bounded and DTD-free, properties must have successful propstats, and response URLs must remain in the expected same-origin DAV collection.
+
+`FreeBusyServer.GetFreeBusyPayload` retains the person path. Only a confirmed full-address miss enters the Seat-gated resource path. Resource scheduling discovers the current-user principal from the DAV root and reads its calendar-user-address-set and schedule-outbox-URL; the system address book does not supply the originator. Scheduling uses a read-only VFREEBUSY request. Responses must contain the exact recipient, successful request status, and a complete VFREEBUSY with valid times. Errors and missing data never become an empty successful calendar. The organizer in the scheduling envelope is not booking-organizer information.
 
 ## Network endpoints
 

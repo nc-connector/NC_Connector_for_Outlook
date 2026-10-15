@@ -2807,11 +2807,14 @@ namespace NcTalkOutlookAddIn.Services {
         internal bool IsComplete() { return complete; }
     }
     internal sealed class IfbAddressBookCache { internal IfbAddressBookCache(string root, string profile) {} }
+    internal sealed class CalendarResourceDirectory {
+        internal CalendarResourceDirectory(Func<TalkServiceConfiguration, NcTalkOutlookAddIn.Models.BackendPolicyStatus> policy) {}
+    }
     internal sealed class FreeBusyServer {
         internal static int Starts, Stops, Updates, Port, Days, CacheHours;
         internal static bool Rollout;
         internal static string Secret;
-        internal FreeBusyServer(IfbAddressBookCache cache, Func<TalkServiceConfiguration, NcTalkOutlookAddIn.Models.BackendPolicyStatus> policy) {}
+        internal FreeBusyServer(IfbAddressBookCache cache, Func<TalkServiceConfiguration, NcTalkOutlookAddIn.Models.BackendPolicyStatus> policy, CalendarResourceDirectory resources = null) {}
         internal void UpdateSettings(TalkServiceConfiguration config, int days, int cacheHours, string secret, bool rollout) {
             Updates++; Days = days; CacheHours = cacheHours; Secret = secret; Rollout = rollout;
         }
