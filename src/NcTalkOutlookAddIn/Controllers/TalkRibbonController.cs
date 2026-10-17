@@ -59,7 +59,7 @@ namespace NcTalkOutlookAddIn.Controllers
             BackendPolicyStatus policyStatus = policyStatusTask.Result;
             PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
 
-            string rolloutNotice = PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus);
+            string rolloutNotice = PolicyUiHelper.GetActionUnavailableNotice(settings, policyStatus);
             if (!string.IsNullOrEmpty(rolloutNotice))
             {
                 await _owner.RunOnOutlookUiThreadAsync(
@@ -67,8 +67,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     {
                         if (_owner.IsItemOpenForRibbonAction(appointment))
                         {
-                            MessageBox.Show(rolloutNotice, Strings.DialogTitle,
-                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            PolicyUiHelper.ShowActionUnavailableNotice(rolloutNotice);
                         }
                     }).ConfigureAwait(false);
                 return;

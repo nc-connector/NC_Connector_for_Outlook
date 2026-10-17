@@ -16,11 +16,13 @@ namespace NcTalkOutlookAddIn.Utilities
     {
         internal static string GetEnterpriseRolloutNotice(AddinSettings settings, BackendPolicyStatus status)
         {
-            if (settings == null || !settings.IsEnterpriseRollout)
-            {
-                return string.Empty;
-            }
-            if (!settings.IsManagedTransportTlsValid)
+            return settings == null || !settings.IsEnterpriseRollout
+                ? string.Empty : GetActionUnavailableNotice(settings, status);
+        }
+
+        internal static string GetActionUnavailableNotice(AddinSettings settings, BackendPolicyStatus status, bool requiresSeat = false)
+        {
+            if (settings != null && !settings.IsManagedTransportTlsValid)
             {
                 return Strings.ManagedTlsPolicyInvalid;
             }
@@ -29,21 +31,69 @@ namespace NcTalkOutlookAddIn.Utilities
             {
                 return connectionNotice;
             }
-            if (status != null && status.IsEndpointMissing)
+            return requiresSeat || (settings != null && settings.IsEnterpriseRollout)
+                ? GetSeatAccessNotice(status, settings != null && settings.IsEnterpriseRollout) : string.Empty;
+        }
+
+        internal static void ShowActionUnavailableNotice(string notice)
+        {
+            using (Form dialog = CreateActionUnavailableDialog(notice))
             {
-                return Strings.EnterpriseRolloutBackendRequired;
+                dialog.ShowDialog();
             }
-            if (status == null || !status.FetchSucceeded)
+        }
+
+        internal static Form CreateActionUnavailableDialog(string notice)
+        {
+            var dialog = new Form
             {
-                return Strings.EnterpriseRolloutStatusUnavailable;
-            }
-            if (!status.EndpointAvailable)
+                Text = Strings.DialogTitle,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                AutoScaleMode = AutoScaleMode.Dpi,
+                AutoScaleDimensions = new SizeF(96f, 96f),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false,
+                Icon = SystemIcons.Warning
+            };
+            var content = new TableLayoutPanel
             {
-                return Strings.EnterpriseRolloutBackendRequired;
-            }
-            return HasBackendSeatEntitlement(status)
-                ? string.Empty
-                : Strings.EnterpriseRolloutSeatRequired;
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                RowCount = 2,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(16)
+            };
+            var label = new Label
+            {
+                Text = notice ?? string.Empty,
+                AutoSize = true,
+                MaximumSize = new Size(520, 0),
+                UseMnemonic = false,
+                Margin = new Padding(0, 0, 0, 16)
+            };
+            var okButton = new Button
+            {
+                Text = Strings.DialogOk,
+                DialogResult = DialogResult.OK,
+                Anchor = AnchorStyles.Right,
+                Margin = Padding.Empty
+            };
+            int minimumWidth;
+            FooterButtonLayoutHelper.ApplyButtonSize(okButton, out minimumWidth);
+            content.Controls.Add(label, 0, 0);
+            content.Controls.Add(okButton, 0, 1);
+            dialog.Controls.Add(content);
+            dialog.AcceptButton = okButton;
+            dialog.CancelButton = okButton;
+            UiThemeManager.ApplyToForm(dialog);
+            label.ForeColor = SystemInformation.HighContrast
+                ? SystemColors.WindowText : UiThemeManager.DetectPalette().ErrorText;
+            return dialog;
         }
 
         internal static bool ApplyPolicyWarningState(
@@ -257,22 +307,27 @@ namespace NcTalkOutlookAddIn.Utilities
                    && string.Equals(status.SeatState, "active", StringComparison.OrdinalIgnoreCase);
         }
 
-        internal static string GetSeparatePasswordUnavailableTooltip(BackendPolicyStatus status)
+        internal static string GetSeatFeatureUnavailableNotice(BackendPolicyStatus status)
+        {
+            return GetSeatAccessNotice(status, false);
+        }
+
+        private static string GetSeatAccessNotice(BackendPolicyStatus status, bool managed)
         {
             string connectionNotice = GetConnectionNotice(status);
             if (!string.IsNullOrEmpty(connectionNotice)) { return connectionNotice; }
-            if (status == null || !status.EndpointAvailable)
+            if (status != null && status.IsEndpointMissing)
             {
-                return Strings.SharingPasswordSeparateBackendRequiredTooltip;
+                return managed ? Strings.EnterpriseRolloutBackendRequired : Strings.SharingPasswordSeparateBackendRequiredTooltip;
             }
-
-            if (!status.FetchSucceeded)
+            if (status == null || !status.FetchSucceeded)
             {
-                return Strings.PolicyWarningBackendUnavailable;
+                return managed ? Strings.EnterpriseRolloutStatusUnavailable : Strings.PolicyWarningBackendUnavailable;
             }
+            if (!status.EndpointAvailable) { return managed ? Strings.EnterpriseRolloutBackendRequired : Strings.SharingPasswordSeparateBackendRequiredTooltip; }
             if (!status.SeatAssigned)
             {
-                return Strings.SharingPasswordSeparateNoSeatTooltip;
+                return managed ? Strings.EnterpriseRolloutSeatRequired : Strings.SharingPasswordSeparateNoSeatTooltip;
             }
             if (!status.IsValid)
             {
@@ -280,6 +335,11 @@ namespace NcTalkOutlookAddIn.Utilities
             }
 
             return GetSeatNotice(status);
+        }
+
+        internal static string GetSeparatePasswordUnavailableTooltip(BackendPolicyStatus status)
+        {
+            return GetSeatFeatureUnavailableNotice(status);
         }
 
         internal static bool HasPasswordDeliveryMode(BackendPolicyStatus status)

@@ -987,7 +987,7 @@
     "message": "Az NC Connector állapota"
   },
   "policy_warning_license_invalid": {
-    "message": "A kiszolgáló nem tudta megerősíteni a Pro funkciókhoz való hozzáférést. Az alapfunkciók továbbra is elérhetők."
+    "message": "A kiszolgáló nem tudta megerősíteni a funkció használatához szükséges jogosultságot."
   },
   "policy_license_grace_format": {
     "message": "A licenc lejárt. Az aktív, hozzárendelt Seattel rendelkező felhasználók eddig használhatják tovább a Pro funkciókat: $1."

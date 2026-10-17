@@ -987,7 +987,7 @@
     "message": "Status do NC Connector"
   },
   "policy_warning_license_invalid": {
-    "message": "O backend não conseguiu confirmar o acesso aos recursos Pro. Os recursos básicos continuam disponíveis."
+    "message": "O backend não conseguiu confirmar a permissão para usar este recurso."
   },
   "policy_license_grace_format": {
     "message": "Sua licença expirou. Usuários com um Seat atribuído e ativo podem continuar usando os recursos Pro até $1."

@@ -146,10 +146,10 @@ namespace NcTalkOutlookAddIn.Controllers
                 NextcloudTalkAddIn.LogFileLinkMessage("Sharing wizard ended because the original compose item or credentials changed during prefetch.");
                 return false;
             }
-            string rolloutNotice = PolicyUiHelper.GetEnterpriseRolloutNotice(settings, policyStatus);
+            string rolloutNotice = PolicyUiHelper.GetActionUnavailableNotice(settings, policyStatus);
             if (!string.IsNullOrEmpty(rolloutNotice))
             {
-                MessageBox.Show(rolloutNotice, Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                PolicyUiHelper.ShowActionUnavailableNotice(rolloutNotice);
                 return false;
             }
             if (launchOptions != null

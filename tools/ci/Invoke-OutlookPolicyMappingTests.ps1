@@ -100,6 +100,17 @@ namespace NcTalkOutlookAddIn.Services
 
 namespace NcTalkOutlookAddIn.Utilities
 {
+    internal sealed class UiThemePalette
+    {
+        internal System.Drawing.Color ErrorText { get { return System.Drawing.Color.DarkRed; } }
+    }
+
+    internal static class UiThemeManager
+    {
+        internal static void ApplyToForm(Form form) { }
+        internal static UiThemePalette DetectPalette() { return new UiThemePalette(); }
+    }
+
     internal static class DiagnosticsLogger
     {
         internal static bool IsEnabled { get { return false; } }
@@ -151,6 +162,7 @@ internal static class OutlookPolicyMappingTests
         TestLicenseNotices();
         TestLicenseMetadataDoesNotGrantAccess();
         TestSeatAccessMatrix();
+        TestActionUnavailableDialog();
         TestLicenseSeatAndConnectionPrecedence();
         TestSuspendedSeatNoticePrecedence();
         TestLicenseAdminLinks();
@@ -489,6 +501,13 @@ internal static class OutlookPolicyMappingTests
                     && new EmailSignaturePolicyService(status, new AddinSettings()).Resolve().Active == usable);
                 Check(name + " feature tooltip follows personal access", usable ? tooltip == string.Empty
                     : !assigned ? tooltip == Strings.SharingPasswordSeparateNoSeatTooltip : tooltip == banner);
+                Check(name + " managed actions use the same personal cause",
+                    PolicyUiHelper.GetActionUnavailableNotice(new AddinSettings { IsEnterpriseRollout = true }, status)
+                        == (usable ? string.Empty : !assigned ? Strings.EnterpriseRolloutSeatRequired : banner));
+                Check(name + " local Share and Talk remain available",
+                    PolicyUiHelper.GetActionUnavailableNotice(new AddinSettings(), status) == string.Empty);
+                Check(name + " required-seat actions share the feature notice",
+                    PolicyUiHelper.GetActionUnavailableNotice(new AddinSettings(), status, true) == tooltip);
                 if (!assigned)
                 {
                     Check(name + " banner explains missing seat and local settings", banner.Contains(Strings.PolicyWarningNoSeat));
@@ -511,6 +530,24 @@ internal static class OutlookPolicyMappingTests
             }
         }
         Check("Seat access matrix covers 384 paired status combinations", cases == 384);
+    }
+
+    private static void TestActionUnavailableDialog()
+    {
+        using (Form dialog = PolicyUiHelper.CreateActionUnavailableDialog(Strings.EnterpriseRolloutSeatRequired))
+        {
+            var content = dialog.Controls[0] as TableLayoutPanel;
+            var label = content == null ? null : content.GetControlFromPosition(0, 0) as Label;
+            var button = content == null ? null : content.GetControlFromPosition(0, 1) as Button;
+            Check("Blocked dialog retains the managed-seat explanation", label != null
+                && label.Text == Strings.EnterpriseRolloutSeatRequired && !label.UseMnemonic);
+            Check("Blocked dialog uses error color or system high-contrast text", label != null
+                && label.ForeColor == (SystemInformation.HighContrast
+                    ? System.Drawing.SystemColors.WindowText : UiThemeManager.DetectPalette().ErrorText));
+            Check("Blocked dialog has localized keyboard-accessible dismissal", button != null
+                && button.Text == Strings.DialogOk && button.DialogResult == DialogResult.OK
+                && dialog.AcceptButton == button && dialog.CancelButton == button);
+        }
     }
 
     private static void TestLicenseSeatAndConnectionPrecedence()
@@ -552,8 +589,8 @@ internal static class OutlookPolicyMappingTests
             PolicyUiHelper.GetEnterpriseRolloutNotice(new AddinSettings(), missingBackend) == string.Empty);
         Check("An unknown Enterprise Rollout check does not claim the backend is missing",
             PolicyUiHelper.GetEnterpriseRolloutNotice(managedSettings, null) == Strings.EnterpriseRolloutStatusUnavailable);
-        Check("Null backend keeps backend-required tooltip", PolicyUiHelper.GetPolicyWarningMessage(null) == string.Empty
-            && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(null) == Strings.SharingPasswordSeparateBackendRequiredTooltip);
+        Check("Unknown backend does not claim the app is absent", PolicyUiHelper.GetPolicyWarningMessage(null) == string.Empty
+            && PolicyUiHelper.GetSeparatePasswordUnavailableTooltip(null) == Strings.PolicyWarningBackendUnavailable);
         NcHttpClient.NextResponse = new NcHttpResponse
         {
             HasHttpResponse = true,
@@ -902,6 +939,7 @@ internal static class OutlookPolicyMappingTests
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\HttpFailureDiagnostics.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\NextcloudUriValidator.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\PolicyUiHelper.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\FooterButtonLayoutHelper.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\WarningPanelUiHelper.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Utilities\Strings.cs")
     )

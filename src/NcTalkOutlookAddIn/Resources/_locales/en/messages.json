@@ -1014,7 +1014,7 @@
     "message": "NC Connector status"
   },
   "policy_warning_license_invalid": {
-    "message": "The backend could not confirm access to Pro features. Basic features remain available."
+    "message": "The backend could not confirm permission to use this feature."
   },
   "policy_license_grace_format": {
     "message": "Your license has expired. Users with an active assigned Seat can continue using Pro features until $1."

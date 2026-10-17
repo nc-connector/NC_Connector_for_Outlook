@@ -987,7 +987,7 @@
     "message": "NC Connector-status"
   },
   "policy_warning_license_invalid": {
-    "message": "De backend kon de toegang tot Pro-functies niet bevestigen. De basisfuncties blijven beschikbaar."
+    "message": "De backend kon de toestemming om deze functie te gebruiken niet bevestigen."
   },
   "policy_license_grace_format": {
     "message": "Uw licentie is verlopen. Gebruikers met een actief toegewezen Seat kunnen de Pro-functies tot $1 blijven gebruiken."

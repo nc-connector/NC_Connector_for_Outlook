@@ -987,7 +987,7 @@
     "message": "NC Connector の状態"
   },
   "policy_warning_license_invalid": {
-    "message": "バックエンドで Pro 機能へのアクセスを確認できませんでした。基本機能は引き続き利用できます。"
+    "message": "バックエンドでこの機能を利用する権限を確認できませんでした。"
   },
   "policy_license_grace_format": {
     "message": "ライセンスの有効期限が切れています。有効なシートが割り当てられているユーザーは、$1までPro機能を引き続き利用できます。"
