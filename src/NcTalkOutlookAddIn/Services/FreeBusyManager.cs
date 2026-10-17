@@ -21,6 +21,8 @@ namespace NcTalkOutlookAddIn.Services
         private readonly IfbRegistryOwnershipManager _registryOwnership;
         private readonly string _requestSecret;
 
+        internal CalendarResourceDirectory ResourceDirectory { get; private set; }
+
         private Outlook.Application _application;
 
         internal FreeBusyManager(string dataDirectory)
@@ -36,7 +38,8 @@ namespace NcTalkOutlookAddIn.Services
             var addressBookCache = new IfbAddressBookCache(
                 dataDirectory,
                 profileScope);
-            _server = new FreeBusyServer(addressBookCache, fetchRolloutPolicy);
+            ResourceDirectory = new CalendarResourceDirectory(fetchRolloutPolicy);
+            _server = new FreeBusyServer(addressBookCache, fetchRolloutPolicy, ResourceDirectory);
             _registryOwnership =
                 new IfbRegistryOwnershipManager(
                     dataDirectory,

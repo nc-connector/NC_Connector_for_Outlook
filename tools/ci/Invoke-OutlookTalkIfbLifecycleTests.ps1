@@ -374,7 +374,7 @@ Assert-SourceAbsent `
 Assert-SourceContract `
     "IFB server looks up the complete attendee address" `
     $ifbServer `
-    'TryGetUid\(\s*_configuration,\s*_cacheHours,\s*email'
+    'TryGetUid\(\s*configuration,\s*cacheHours,\s*email'
 Assert-SourceContract `
     "IFB server limits concurrent requests directly" `
     $ifbServer `

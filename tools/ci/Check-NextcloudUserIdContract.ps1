@@ -51,7 +51,7 @@ try {
     Assert-Check ([regex]::IsMatch($fileLinkSource, 'NextcloudUserIdentityService\.ResolveCurrentUserId\(\s*_configuration\s*\)')) "FileLink resolves the canonical UID"
     Assert-Check (-not $fileLinkSource.Contains('string username = _configuration.Username')) "FileLink does not use the authentication login as DAV UID"
     Assert-Check ([regex]::IsMatch($addressBookSource, 'NextcloudUserIdentityService\.ResolveCurrentUserId\(\s*configuration\s*\)')) "CardDAV resolves the canonical UID"
-    Assert-Check ($freeBusySource.Contains('NextcloudUserIdentityService.ResolveCurrentUserId(_configuration)')) "CalDAV resolves the canonical UID"
+    Assert-Check ([regex]::IsMatch($freeBusySource, 'NextcloudUserIdentityService\.ResolveCurrentUserId\(\s*(?:_configuration|configuration)\s*\)')) "CalDAV resolves the canonical UID"
     Assert-Check ([regex]::IsMatch($appointmentSource, 'NextcloudUserIdentityService\.ResolveCurrentUserId\(\s*(?:configuration|snapshot\.Configuration)\s*\)')) "Appointment address-book lookup resolves the canonical UID"
     Assert-Check ($httpClientSource.Contains('_username = configuration.Username')) "Basic Auth still uses the configured login"
 

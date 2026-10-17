@@ -10,6 +10,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 using NcTalkOutlookAddIn.Utilities;
 using NcTalkOutlookAddIn.Models;
 
@@ -28,6 +29,7 @@ namespace NcTalkOutlookAddIn.Services
 
         private readonly object _syncRoot = new object();
         private readonly IfbAddressBookCache _addressBookCache;
+        private readonly CalendarResourceDirectory _resourceDirectory;
         private readonly Func<TalkServiceConfiguration, BackendPolicyStatus> _fetchRolloutPolicy;
         private bool _enterpriseRollout;
         private readonly SemaphoreSlim _requestSlots =
@@ -47,7 +49,8 @@ namespace NcTalkOutlookAddIn.Services
         private string _requestSecret = string.Empty;
 
         internal FreeBusyServer(IfbAddressBookCache addressBookCache,
-            Func<TalkServiceConfiguration, BackendPolicyStatus> fetchRolloutPolicy = null)
+            Func<TalkServiceConfiguration, BackendPolicyStatus> fetchRolloutPolicy = null,
+            CalendarResourceDirectory resourceDirectory = null)
         {
             if (addressBookCache == null)
             {
@@ -56,6 +59,7 @@ namespace NcTalkOutlookAddIn.Services
 
             _addressBookCache = addressBookCache;
             _fetchRolloutPolicy = fetchRolloutPolicy;
+            _resourceDirectory = resourceDirectory ?? new CalendarResourceDirectory(fetchRolloutPolicy);
         }
 
         internal void UpdateSettings(
@@ -266,14 +270,24 @@ namespace NcTalkOutlookAddIn.Services
                     WriteError(context, HttpStatusCode.NotFound, "Unsupported path.");
                     return;
                 }
-                string email = Uri.UnescapeDataString(namePart ?? string.Empty).Trim().ToLowerInvariant();
+                string email = CalendarResourceDirectory.NormalizeEmail(Uri.UnescapeDataString(namePart ?? string.Empty));
                 if (string.IsNullOrEmpty(email))
                 {
                     DiagnosticsLogger.Log(LogCategory, "Request rejected without email.");
                     WriteError(context, HttpStatusCode.BadRequest, "Email address is missing.");
                     return;
                 }
-                int days = _defaultDays;
+                TalkServiceConfiguration configuration;
+                int days;
+                int cacheHours;
+                bool enterpriseRollout;
+                lock (_syncRoot)
+                {
+                    configuration = _configuration;
+                    days = _defaultDays;
+                    cacheHours = _cacheHours;
+                    enterpriseRollout = _enterpriseRollout;
+                }
                 string daysParam = context.Request.QueryString["days"];
                 int parsedDays;
                 if (!string.IsNullOrEmpty(daysParam) && int.TryParse(daysParam, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedDays))
@@ -283,71 +297,7 @@ namespace NcTalkOutlookAddIn.Services
                         days = parsedDays;
                     }
                 }
-                if (_enterpriseRollout)
-                {
-                    BackendPolicyStatus status = _fetchRolloutPolicy != null ? _fetchRolloutPolicy(_configuration) : null;
-                    if (status == null || !status.FetchSucceeded || !PolicyUiHelper.HasBackendSeatEntitlement(status))
-                    {
-                        DiagnosticsLogger.Log(LogCategory, "Managed rollout access unavailable; IFB request rejected.");
-                        WriteError(context, HttpStatusCode.Forbidden, "Managed rollout access unavailable.");
-                        return;
-                    }
-                }
-                string uid;
-                if (!_addressBookCache.TryGetUid(_configuration, _cacheHours, email, out uid) || string.IsNullOrEmpty(uid))
-                {
-                    DiagnosticsLogger.Log(LogCategory, "Email not found in address book: " + email);
-                    WriteError(context, HttpStatusCode.NotFound, "User not found.");
-                    return;
-                }
-                DiagnosticsLogger.Log(LogCategory, "IFB-Request: email=" + email + " days=" + days);
-                string freeBusy = null;
-                bool needsFallback = false;
-
-                try
-                {
-                    freeBusy = RequestFreeBusyFromCalendar(uid, days);
-                }
-                catch (FreeBusyRequestException ex)
-                {
-                    DiagnosticsLogger.Log(LogCategory, "REPORT failed: " + ex.Message);
-                    if (ex.ShouldFallback)
-                    {
-                        needsFallback = true;
-                    }
-                    else
-                    {
-                        WriteError(context, ex.StatusCode ?? HttpStatusCode.InternalServerError, ex.Message);
-                        return;
-                    }
-                }
-                if (string.IsNullOrEmpty(freeBusy))
-                {
-                    needsFallback = true;
-                }
-                if (needsFallback)
-                {
-                    DiagnosticsLogger.Log(LogCategory, "Starting fallback via scheduling for " + email + ".");
-                    string originEmail;
-                    string currentUserId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
-                    if (!_addressBookCache.TryGetPrimaryEmailForUid(_configuration, _cacheHours, currentUserId, out originEmail) ||
-                        string.IsNullOrEmpty(originEmail))
-                    {
-                        DiagnosticsLogger.Log(LogCategory, "Own user account not found in address book.");
-                        WriteError(context, HttpStatusCode.PreconditionFailed, "Own user account not found in address book.");
-                        return;
-                    }
-                    try
-                    {
-                        freeBusy = RequestFreeBusyViaScheduling(originEmail, email, days);
-                    }
-                    catch (FreeBusyRequestException ex)
-                    {
-                        DiagnosticsLogger.Log(LogCategory, "Scheduling failed: " + ex.Message);
-                        WriteError(context, ex.StatusCode ?? HttpStatusCode.InternalServerError, ex.Message);
-                        return;
-                    }
-                }
+                string freeBusy = GetFreeBusyPayload(configuration, email, days, cacheHours, enterpriseRollout);
                 if (string.IsNullOrEmpty(freeBusy))
                 {
                     DiagnosticsLogger.Log(LogCategory, "No free/busy data available for " + email);
@@ -364,10 +314,15 @@ namespace NcTalkOutlookAddIn.Services
                     writer.Write(freeBusy);
                 }
             }
+            catch (FreeBusyRequestException ex)
+            {
+                DiagnosticsLogger.Log(LogCategory, "IFB request failed: " + ex.Message);
+                WriteError(context, ex.StatusCode ?? HttpStatusCode.BadGateway, ex.Message);
+            }
             catch (Exception ex)
             {
-                DiagnosticsLogger.Log(LogCategory, "Error while handling request: " + ex);
-                WriteError(context, HttpStatusCode.InternalServerError, ex.Message);
+                DiagnosticsLogger.LogException(LogCategory, "IFB request failed.", ex);
+                WriteError(context, HttpStatusCode.BadGateway, "Free/busy data could not be retrieved.");
             }
             finally
             {
@@ -380,6 +335,51 @@ namespace NcTalkOutlookAddIn.Services
                     DiagnosticsLogger.LogException(LogCategory, "Failed to close response output stream.", ex);
                 }
             }
+        }
+
+        internal string GetFreeBusyPayload(TalkServiceConfiguration configuration, string email, int days, int cacheHours, bool enterpriseRollout)
+        {
+            if (configuration == null || !configuration.IsComplete()) { throw new InvalidOperationException("IFB credentials are incomplete."); }
+            email = CalendarResourceDirectory.NormalizeEmail(email);
+            if (email.Length == 0 || days < 1 || days > 365) { throw new FreeBusyRequestException("Invalid free/busy query.", HttpStatusCode.BadRequest, false); }
+            NextcloudConnectionState.AssertRequestAllowed(configuration);
+            if (enterpriseRollout)
+            {
+                BackendPolicyStatus status = _fetchRolloutPolicy != null ? _fetchRolloutPolicy(configuration) : null;
+                if (status == null || !status.FetchSucceeded || !PolicyUiHelper.HasBackendSeatEntitlement(status))
+                {
+                    throw new FreeBusyRequestException("Managed rollout access unavailable.", HttpStatusCode.Forbidden, false);
+                }
+            }
+            string uid;
+            // A failed address-book read throws. Only a confirmed miss enters resource discovery.
+            if (!_addressBookCache.TryGetUid(configuration, cacheHours, email, out uid) || string.IsNullOrEmpty(uid))
+            {
+                CalendarResource resource = _resourceDirectory.FindByEmail(configuration, cacheHours, email);
+                if (resource == null) { throw new FreeBusyRequestException("Calendar participant not found.", HttpStatusCode.NotFound, false); }
+                string resourceOriginator;
+                string resourceOutbox;
+                _resourceDirectory.GetSchedulingIdentity(configuration, out resourceOriginator, out resourceOutbox);
+                DiagnosticsLogger.Log(LogCategory, "Resource IFB request through the current user's scheduling outbox.");
+                return RequestFreeBusyViaScheduling(configuration, resourceOutbox, resourceOriginator, resource.Email, days);
+            }
+
+            string freeBusy = null;
+            try { freeBusy = RequestFreeBusyFromCalendar(configuration, uid, days); }
+            catch (FreeBusyRequestException ex)
+            {
+                if (!ex.ShouldFallback) { throw; }
+                DiagnosticsLogger.Log(LogCategory, "Person calendar REPORT requires scheduling fallback.");
+            }
+            if (!string.IsNullOrEmpty(freeBusy)) { return freeBusy; }
+            string originEmail;
+            string currentUserId = NextcloudUserIdentityService.ResolveCurrentUserId(configuration);
+            if (!_addressBookCache.TryGetPrimaryEmailForUid(configuration, cacheHours, currentUserId, out originEmail) || string.IsNullOrEmpty(originEmail))
+            {
+                throw new FreeBusyRequestException("Own user account not found in address book.", HttpStatusCode.PreconditionFailed, false);
+            }
+            string outboxUrl = configuration.GetNormalizedBaseUrl() + "/remote.php/dav/calendars/" + Uri.EscapeDataString(currentUserId) + "/outbox/";
+            return RequestFreeBusyViaScheduling(configuration, outboxUrl, originEmail, email, days);
         }
 
         internal bool TryParseAuthorizedEmailPath(
@@ -442,12 +442,12 @@ namespace NcTalkOutlookAddIn.Services
             return difference == 0;
         }
 
-        private string RequestFreeBusyFromCalendar(string uid, int days)
+        private string RequestFreeBusyFromCalendar(TalkServiceConfiguration configuration, string uid, int days)
         {
             DateTime startUtc = DateTime.UtcNow;
             DateTime endUtc = startUtc.AddDays(days);
 
-            string baseUrl = _configuration.GetNormalizedBaseUrl();
+            string baseUrl = configuration.GetNormalizedBaseUrl();
             string calendarUrl = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0}/remote.php/dav/calendars/{1}/personal",
@@ -460,7 +460,7 @@ namespace NcTalkOutlookAddIn.Services
                 startUtc.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture),
                 endUtc.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture));
 
-            var httpClient = new NcHttpClient(_configuration);
+            var httpClient = new NcHttpClient(configuration);
             NcHttpResponse response = httpClient.Send(new NcHttpRequestOptions
             {
                 Method = "REPORT",
@@ -513,8 +513,10 @@ namespace NcTalkOutlookAddIn.Services
             return string.IsNullOrEmpty(extracted) ? payloadText : extracted;
         }
 
-        private string RequestFreeBusyViaScheduling(string originatorEmail, string attendeeEmail, int days)
+        private string RequestFreeBusyViaScheduling(TalkServiceConfiguration configuration, string outboxUrl, string originatorEmail, string attendeeEmail, int days)
         {
+            originatorEmail = CalendarResourceDirectory.NormalizeEmail(originatorEmail);
+            attendeeEmail = CalendarResourceDirectory.NormalizeEmail(attendeeEmail);
             if (string.IsNullOrEmpty(originatorEmail) || string.IsNullOrEmpty(attendeeEmail))
             {
                 throw new FreeBusyRequestException("Invalid email address for scheduling.", HttpStatusCode.BadRequest, false);
@@ -523,18 +525,10 @@ namespace NcTalkOutlookAddIn.Services
             DateTime startUtc = DateTime.UtcNow;
             DateTime endUtc = startUtc.AddDays(days);
 
-            string baseUrl = _configuration.GetNormalizedBaseUrl();
-            string currentUserId = NextcloudUserIdentityService.ResolveCurrentUserId(_configuration);
-            string outboxUrl = string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}/remote.php/dav/calendars/{1}/outbox/",
-                baseUrl,
-                Uri.EscapeDataString(currentUserId));
-
             string uid = Guid.NewGuid().ToString();
             string payload = BuildVFreeBusyRequest(uid, originatorEmail, attendeeEmail, startUtc, endUtc);
 
-            var httpClient = new NcHttpClient(_configuration);
+            var httpClient = new NcHttpClient(configuration);
             NcHttpResponse response = httpClient.Send(new NcHttpRequestOptions
             {
                 Method = "POST",
@@ -545,6 +539,7 @@ namespace NcTalkOutlookAddIn.Services
                 IncludeAuthHeader = true,
                 IncludeOcsApiHeader = false,
                 ParseJson = false,
+                MaximumResponseBytes = 4 * 1024 * 1024,
                 Headers = new Dictionary<string, string>
                 {
                     { "Depth", "0" },
@@ -595,96 +590,147 @@ namespace NcTalkOutlookAddIn.Services
             return builder.ToString();
         }
 
-        private static string ExtractFreeBusyFromScheduleResponse(string responseText, string attendeeEmail)
+        internal static string ExtractFreeBusyFromScheduleResponse(string responseText, string attendeeEmail)
         {
-            if (string.IsNullOrEmpty(responseText))
+            string expected = CalendarResourceDirectory.NormalizeEmail(attendeeEmail);
+            XmlElement root = CalendarResourceDirectory.ReadXml(responseText).DocumentElement;
+            const string cal = CalendarResourceDirectory.CalDavNamespace;
+            if (expected.Length == 0 || root == null || root.LocalName != "schedule-response" || root.NamespaceURI != cal)
             {
-                return null;
+                throw new InvalidDataException("Invalid scheduling response.");
             }
-            try
+            string result = null;
+            foreach (XmlNode node in root.ChildNodes)
             {
-                int index = 0;
-                while (index >= 0 && index < responseText.Length)
+                XmlElement response = node as XmlElement;
+                if (response == null) { continue; }
+                if (response.LocalName != "response" || response.NamespaceURI != cal) { throw new InvalidDataException("Unexpected scheduling response element."); }
+                XmlElement recipient = CalendarResourceDirectory.Child(response, "recipient", cal);
+                string href = recipient == null ? string.Empty : CalendarResourceDirectory.ChildText(recipient, "href", CalendarResourceDirectory.DavNamespace);
+                string email = href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) ? CalendarResourceDirectory.NormalizeEmail(href.Substring(7)) : string.Empty;
+                if (!string.Equals(email, expected, StringComparison.OrdinalIgnoreCase)) { continue; }
+                if (result != null) { throw new InvalidDataException("Duplicate scheduling recipient."); }
+                string status = CalendarResourceDirectory.ChildText(response, "request-status", cal);
+                if (!string.Equals(status.Split(';')[0].Trim(), "2.0", StringComparison.Ordinal))
                 {
-                    int startTag = responseText.IndexOf("<cal:calendar-data", index, StringComparison.OrdinalIgnoreCase);
-                    string endToken = "</cal:calendar-data>";
-                    if (startTag < 0)
-                    {
-                        startTag = responseText.IndexOf("<calendar-data", index, StringComparison.OrdinalIgnoreCase);
-                        endToken = "</calendar-data>";
-                    }
-                    if (startTag < 0)
-                    {
-                        break;
-                    }
-                    int startContent = responseText.IndexOf('>', startTag);
-                    if (startContent < 0)
-                    {
-                        break;
-                    }
-                    startContent++;
-
-                    int endTag = responseText.IndexOf(endToken, startContent, StringComparison.OrdinalIgnoreCase);
-                    if (endTag < 0)
-                    {
-                        break;
-                    }
-                    string raw = responseText.Substring(startContent, endTag - startContent);
-                    string decoded = WebUtility.HtmlDecode(raw ?? string.Empty).Trim();
-
-                    if (!string.IsNullOrEmpty(decoded) &&
-                        decoded.IndexOf(attendeeEmail ?? string.Empty, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        decoded = NormalizeFreeBusyPayload(decoded);
-                        return decoded;
-                    }
-
-                    index = endTag + endToken.Length;
+                    throw new FreeBusyRequestException("Calendar participant availability could not be retrieved.", HttpStatusCode.BadGateway, false);
                 }
+                string payload = CalendarResourceDirectory.ChildText(response, "calendar-data", cal);
+                result = NormalizeFreeBusyPayload(payload, expected);
             }
-            catch (Exception ex)
-            {
-                DiagnosticsLogger.LogException(LogCategory, "Failed to extract free/busy data from scheduling response.", ex);
-            }
-            return null;
+            if (result == null) { throw new InvalidDataException("Scheduling response did not contain the requested participant."); }
+            return result;
         }
 
-        private static string NormalizeFreeBusyPayload(string payload)
+        private static string NormalizeFreeBusyPayload(string payload, string expectedEmail)
         {
-            if (string.IsNullOrEmpty(payload))
+            var lines = new List<string>();
+            foreach (string line in (payload ?? string.Empty).Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
             {
-                return string.Empty;
+                if (line.Length == 0) { continue; }
+                if (line[0] == ' ' || line[0] == '\t')
+                {
+                    if (lines.Count == 0) { throw new InvalidDataException("Invalid folded calendar data."); }
+                    lines[lines.Count - 1] += line.Substring(1);
+                }
+                else { lines.Add(line); }
             }
-            string[] lines = payload.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+            int state = 0;
+            bool freeBusySeen = false;
+            bool attendeeSeen = false;
+            var required = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            DateTime start = DateTime.MinValue;
+            DateTime end = DateTime.MinValue;
             var builder = new StringBuilder();
-            bool methodSet = false;
+            foreach (string line in lines)
+            {
+                if (string.Equals(line, "BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase) && state == 0)
+                {
+                    state = 1;
+                    builder.Append("BEGIN:VCALENDAR\r\nMETHOD:PUBLISH\r\n");
+                    continue;
+                }
+                if (string.Equals(line, "BEGIN:VFREEBUSY", StringComparison.OrdinalIgnoreCase) && state == 1 && !freeBusySeen)
+                {
+                    state = 2;
+                    freeBusySeen = true;
+                }
+                else if (string.Equals(line, "END:VFREEBUSY", StringComparison.OrdinalIgnoreCase) && state == 2) { state = 1; }
+                else if (string.Equals(line, "END:VCALENDAR", StringComparison.OrdinalIgnoreCase) && state == 1 && freeBusySeen) { state = 3; }
+                else
+                {
+                    int separator = CalendarPropertySeparator(line);
+                    if (separator <= 0 || state == 0 || state == 3) { throw new InvalidDataException("Invalid free/busy calendar structure."); }
+                    string name = line.Substring(0, separator).Split(';')[0];
+                    string value = line.Substring(separator + 1);
+                    if (name.Equals("BEGIN", StringComparison.OrdinalIgnoreCase) || name.Equals("END", StringComparison.OrdinalIgnoreCase)) { throw new InvalidDataException("Unexpected calendar component."); }
+                    if (name.Equals("METHOD", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (state != 1) { throw new InvalidDataException("Invalid calendar method position."); }
+                        continue;
+                    }
+                    if (name.Equals("VERSION", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (state != 1 || value != "2.0" || !required.Add("VERSION")) { throw new InvalidDataException("Invalid calendar version."); }
+                    }
+                    else if (name.Equals("ATTENDEE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (state != 2 || !value.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)
+                            || !string.Equals(CalendarResourceDirectory.NormalizeEmail(value.Substring(7)), expectedEmail, StringComparison.OrdinalIgnoreCase))
+                        { throw new InvalidDataException("Calendar attendee did not match the requested participant."); }
+                        attendeeSeen = true;
+                    }
+                    else if (name.Equals("UID", StringComparison.OrdinalIgnoreCase) || name.Equals("DTSTAMP", StringComparison.OrdinalIgnoreCase)
+                        || name.Equals("DTSTART", StringComparison.OrdinalIgnoreCase) || name.Equals("DTEND", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (state != 2 || value.Length == 0 || !required.Add(name)) { throw new InvalidDataException("Invalid free/busy identity or time range."); }
+                        if (!name.Equals("UID", StringComparison.OrdinalIgnoreCase))
+                        {
+                            DateTime date = ParseCalendarUtc(value);
+                            if (name.Equals("DTSTART", StringComparison.OrdinalIgnoreCase)) { start = date; }
+                            if (name.Equals("DTEND", StringComparison.OrdinalIgnoreCase)) { end = date; }
+                        }
+                    }
+                    else if (name.Equals("FREEBUSY", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (state != 2 || value.Length == 0) { throw new InvalidDataException("Invalid busy periods."); }
+                        foreach (string period in value.Split(','))
+                        {
+                            string[] limits = period.Split('/');
+                            if (limits.Length != 2) { throw new InvalidDataException("Invalid busy period."); }
+                            DateTime from = ParseCalendarUtc(limits[0]);
+                            if (limits[1].StartsWith("P", StringComparison.Ordinal))
+                            {
+                                if (XmlConvert.ToTimeSpan(limits[1]) <= TimeSpan.Zero) { throw new InvalidDataException("Invalid busy duration."); }
+                            }
+                            else if (ParseCalendarUtc(limits[1]) <= from) { throw new InvalidDataException("Invalid busy period range."); }
+                        }
+                    }
+                }
+                builder.Append(line).Append("\r\n");
+            }
+            // A successful, complete VFREEBUSY with no periods means free; malformed data never does.
+            if (state != 3 || !attendeeSeen || required.Count != 5 || end <= start)
+            { throw new InvalidDataException("Incomplete free/busy calendar."); }
+            return builder.ToString();
+        }
 
-            foreach (string rawLine in lines)
+        private static int CalendarPropertySeparator(string line)
+        {
+            bool quoted = false;
+            for (int i = 0; i < line.Length; i++)
             {
-                string line = rawLine ?? string.Empty;
-                if (line.StartsWith("METHOD:", StringComparison.OrdinalIgnoreCase))
-                {
-                    builder.AppendLine("METHOD:PUBLISH");
-                    methodSet = true;
-                }
-                else if (line.Length > 0)
-                {
-                    builder.AppendLine(line);
-                }
+                if (line[i] == '"') { quoted = !quoted; }
+                if (line[i] == ':' && !quoted) { return i; }
             }
-            if (!methodSet)
-            {
-                builder.Insert(0, "METHOD:PUBLISH" + Environment.NewLine);
-            }
-            string result = builder.ToString().Trim();
-            if (!result.StartsWith("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase))
-            {
-                result = "BEGIN:VCALENDAR" + Environment.NewLine + result;
-            }
-            if (!result.EndsWith("END:VCALENDAR", StringComparison.OrdinalIgnoreCase))
-            {
-                result = result + Environment.NewLine + "END:VCALENDAR";
-            }
+            return -1;
+        }
+
+        private static DateTime ParseCalendarUtc(string value)
+        {
+            DateTime result;
+            if (!DateTime.TryParseExact(value, "yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out result))
+            { throw new InvalidDataException("Invalid UTC calendar time."); }
             return result;
         }
 

@@ -987,7 +987,7 @@
     "message": "Stan NC Connector"
   },
   "policy_warning_license_invalid": {
-    "message": "Serwer nie mógł potwierdzić dostępu do funkcji Pro. Funkcje podstawowe pozostają dostępne."
+    "message": "Serwer nie mógł potwierdzić uprawnienia do korzystania z tej funkcji."
   },
   "policy_license_grace_format": {
     "message": "Licencja wygasła. Użytkownicy z przypisanym aktywnym stanowiskiem mogą nadal korzystać z funkcji Pro do $1."

@@ -987,7 +987,7 @@
     "message": "État de NC Connector"
   },
   "policy_warning_license_invalid": {
-    "message": "Le backend n’a pas pu confirmer l’accès aux fonctionnalités Pro. Les fonctionnalités de base restent disponibles."
+    "message": "Le backend n’a pas pu confirmer l’autorisation d’utiliser cette fonctionnalité."
   },
   "policy_license_grace_format": {
     "message": "Votre licence a expiré. Les utilisateurs disposant d’un Seat attribué et actif peuvent continuer à utiliser les fonctions Pro jusqu’au $1."

@@ -987,7 +987,7 @@
     "message": "Stav NC Connector"
   },
   "policy_warning_license_invalid": {
-    "message": "Serverová část nemohla potvrdit přístup k funkcím Pro. Základní funkce zůstávají dostupné."
+    "message": "Serverová část nemohla potvrdit oprávnění k používání této funkce."
   },
   "policy_license_grace_format": {
     "message": "Licence vypršela. Uživatelé s aktivně přiřazeným seatem mohou funkce Pro používat do $1."

@@ -987,7 +987,7 @@
     "message": "NC Connector 状态"
   },
   "policy_warning_license_invalid": {
-    "message": "后端无法确认 Pro 功能的访问权限。基本功能仍然可用。"
+    "message": "后端无法确认使用此功能的权限。"
   },
   "policy_license_grace_format": {
     "message": "您的许可证已过期。已分配有效席位的用户可以继续使用 Pro 功能，直到 $1。"
