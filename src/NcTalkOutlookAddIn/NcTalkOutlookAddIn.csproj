@@ -113,6 +113,7 @@
     <Compile Include="Settings\SettingsStorage.cs" />
     <Compile Include="Models\TalkRoomType.cs" />
     <Compile Include="Models\CalendarResource.cs" />
+    <Compile Include="Models\CalendarResourceAvailability.cs" />
     <Compile Include="Models\TalkRoomRequest.cs" />
     <Compile Include="Models\TalkRoomCreationResult.cs" />
     <Compile Include="Models\FileLinkPermissions.cs" />
@@ -164,6 +165,7 @@
     <Compile Include="Services\FreeBusyManager.cs" />
     <Compile Include="Services\FreeBusyServer.cs" />
     <Compile Include="Services\CalendarResourceDirectory.cs" />
+    <Compile Include="Services\CalDavFreeBusyService.cs" />
     <Compile Include="Services\IfbAddressBookCache.cs" />
     <Compile Include="Services\IfbRegistryOwnershipManager.cs" />
     <Compile Include="Services\IfbRegistryEndpoint.cs" />

@@ -455,6 +455,10 @@ The in-memory directory is scoped to the configured URL including installation p
 
 `FreeBusyServer.GetFreeBusyPayload` retains the person path. Only a confirmed full-address miss enters the Seat-gated resource path. Resource scheduling discovers the current-user principal from the DAV root and reads its calendar-user-address-set and schedule-outbox-URL; the system address book does not supply the originator. Scheduling uses a read-only VFREEBUSY request. Responses must contain the exact recipient, successful request status, and a complete VFREEBUSY with valid times. Errors and missing data never become an empty successful calendar. The organizer in the scheduling envelope is not booking-organizer information.
 
+`CalDavFreeBusyService` queries the scheduling outbox directly, without the local IFB listener; IFB reuses its scheduling transport and parser. Direct queries accept visible resources and a positive UTC interval, batch up to 50 recipients per request, and run at most two requests concurrently. Each directory access rechecks the effective Seat status. Cancellation stops queued requests and prevents canceled results from entering the cache.
+
+Only complete, successful responses covering the entire requested interval can mark a resource free or busy. Missing, failed or malformed recipient results remain unknown. The two-minute service cache can answer narrower intervals within confirmed coverage; request sequence numbers prevent older results from replacing newer cache entries. `CalendarResourceAvailability` exposes only availability and busy periods, not private event details. `Invoke-OutlookResourcePlanningTests.ps1` covers parser failures, interval boundaries, Seat checks, cancellation, batching, bounded concurrency and response ordering with isolated transport fixtures.
+
 ## Network endpoints
 
 The add-in uses Nextcloud **OCS** and **WebDAV** endpoints.

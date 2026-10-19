@@ -33,6 +33,7 @@ namespace NcTalkOutlookAddIn.Services {
     internal sealed class NcHttpRequestOptions {
         public string Method,Url,Payload,ContentType,Accept; public int TimeoutMs,MaximumResponseBytes;
         public bool IncludeAuthHeader,IncludeOcsApiHeader,ParseJson; public Dictionary<string,string> Headers;
+        public System.Threading.CancellationToken CancellationToken;
     }
     internal sealed class NcHttpResponse {
         public bool HasHttpResponse = true; public HttpStatusCode StatusCode = (HttpStatusCode)207;
@@ -43,7 +44,7 @@ namespace NcTalkOutlookAddIn.Services {
         internal static Func<NcHttpRequestOptions,NcHttpResponse> Dispatch;
         internal static readonly List<NcHttpRequestOptions> Requests = new List<NcHttpRequestOptions>();
         internal NcHttpClient(TalkServiceConfiguration c) {}
-        internal NcHttpResponse Send(NcHttpRequestOptions o) { Requests.Add(o); return Dispatch(o); }
+        internal NcHttpResponse Send(NcHttpRequestOptions o) { lock(Requests)Requests.Add(o); return Dispatch(o); }
     }
     internal sealed class IfbAddressBookCache {
         internal bool Fail,Person;
@@ -57,7 +58,7 @@ internal static class ResourceTests {
     private const string Root = "https://cloud.example.test/sub/remote.php/dav/";
     private static BackendPolicyStatus status = new BackendPolicyStatus();
     private static TalkServiceConfiguration config = new TalkServiceConfiguration("https://cloud.example.test/sub/", "login@example.test", "test-only");
-    private static void Check(bool ok,string message) { count++; if(!ok) throw new Exception(message); }
+    private static void Check(bool ok,string message) { System.Threading.Interlocked.Increment(ref count); if(!ok) throw new Exception(message); }
     private static void Reject(Action action,string message) { bool failed=false; try { action(); } catch(Exception) {failed=true;} Check(failed,message); }
     private static string Multi(string path,string props) { return "<x:multistatus xmlns:x='DAV:' xmlns:c='urn:ietf:params:xml:ns:caldav' xmlns:n='http://nextcloud.com/ns'><x:response><x:href>"+path+"</x:href><x:propstat><x:prop>"+props+"</x:prop><x:status>HTTP/1.1 200 OK</x:status></x:propstat><x:propstat><x:prop><n:optional/></x:prop><x:status>HTTP/1.1 404 Not Found</x:status></x:propstat></x:response></x:multistatus>"; }
     private static string Resource(bool room) {
@@ -86,6 +87,38 @@ internal static class ResourceTests {
         }
         Check(o.Method=="REPORT" && o.Url.EndsWith("/canonical-user/personal"),"Existing person route remains personal REPORT");
         return new NcHttpResponse {StatusCode=HttpStatusCode.OK,ContentType="text/calendar",ResponseText=Calendar("person@example.test",true)};
+    }
+    private static void CheckCacheOrdering(CalendarResourceDirectory directory, CalendarResource room, DateTime start, DateTime end, bool olderFails) {
+        using(var olderStarted=new System.Threading.ManualResetEventSlim(false))
+        using(var releaseOlder=new System.Threading.ManualResetEventSlim(false)) {
+            int posts=0;
+            var service=new CalDavFreeBusyService(directory,config,24);
+            NcHttpClient.Dispatch=o=> {
+                if(o.Method!="POST")return Dispatch(o);
+                int sequence=System.Threading.Interlocked.Increment(ref posts);
+                if(sequence==1) {
+                    olderStarted.Set();
+                    if(!releaseOlder.Wait(TimeSpan.FromSeconds(10)))throw new TimeoutException("Older request was not released.");
+                    if(olderFails)return new NcHttpResponse{StatusCode=HttpStatusCode.ServiceUnavailable};
+                }
+                return new NcHttpResponse{StatusCode=HttpStatusCode.OK,ResponseText=Schedule(room.Email,"2.0;Success",Calendar(room.Email,sequence!=1))};
+            };
+            var older=service.QueryAsync(new[]{room},start,end,System.Threading.CancellationToken.None);
+            try {
+                Check(olderStarted.Wait(TimeSpan.FromSeconds(10)),"Older interval request reaches transport before the newer day request");
+                var newer=service.QueryAsync(new[]{room},start.Date,start.Date.AddDays(1),System.Threading.CancellationToken.None);
+                Check(newer.Wait(TimeSpan.FromSeconds(10)),"Newer day response completes while the older request remains in flight");
+                Check(newer.GetAwaiter().GetResult()[room.Email].State==CalendarResourceAvailabilityState.Busy,"Newer day response records the booking");
+            } finally {
+                releaseOlder.Set();
+                Check(older.Wait(TimeSpan.FromSeconds(10)),"Older request completes after the newer response");
+            }
+            older.GetAwaiter().GetResult();
+            int completedPosts=posts;
+            var cached=service.QueryAsync(new[]{room},start,end,System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+            Check(cached[room.Email].State==CalendarResourceAvailabilityState.Busy,olderFails?"An older failed response cannot discard the newer busy cache":"An older free response cannot replace the newer busy cache");
+            Check(posts==completedPosts && posts==2,olderFails?"Older request failure preserves the newer day cache without another request":"Newer day cache survives a late older success without another request");
+        }
     }
     public static int Main() {
         NcHttpClient.Dispatch=Dispatch;
@@ -136,6 +169,73 @@ internal static class ResourceTests {
         foreach(string href in new[]{"https://other.example/sub/remote.php/dav/principals/calendar-rooms/a/","/remote.php/dav/principals/calendar-rooms/a/","/sub/remote.php/dav/principals/calendar-rooms/%2fescape/","/sub/remote.php/dav/principals/calendar-rooms/a/?secret=x"})
             Reject(()=>CalendarResourceDirectory.ValidateDavHref(config,Root,href,"principals/calendar-rooms/",true),"Untrusted principal path rejected");
         foreach(string email in new[]{"x@example.test\r\nATTENDEE:evil", "a@example.test,b@example.test", "Display <a@example.test>"}) Check(CalendarResourceDirectory.NormalizeEmail(email)=="","Address/header injection rejected");
+        DateTime start=new DateTime(2026,10,23,13,0,0,DateTimeKind.Utc), end=start.AddHours(1);
+        Func<string,CalendarResourceAvailability> parse=xml=>CalDavFreeBusyService.ParseAvailabilityResponse(xml,new[]{"room@example.test"},start,end)["room@example.test"];
+        Check(parse(free).State==CalendarResourceAvailabilityState.Free,"Complete matching coverage can be free");
+        Check(parse(Schedule("room@example.test","2.0;Success",Calendar("room@example.test",true))).State==CalendarResourceAvailabilityState.Busy,"Overlapping period is busy");
+        Check(parse(free.Replace("DTSTART:20261023T000000Z","DTSTART:20261023T133000Z")).State==CalendarResourceAvailabilityState.Unknown,"Partial coverage is unknown");
+        Check(parse(free.Replace("room@example.test","other@example.test")).State==CalendarResourceAvailabilityState.Unknown,"Missing recipient is unknown");
+        Check(parse(free.Replace("2.0;Success","3.7;Failed")).State==CalendarResourceAvailabilityState.Unknown,"Recipient failure is unknown");
+        Check(parse(free.Replace("END:VFREEBUSY","")).State==CalendarResourceAvailabilityState.Unknown,"Truncation is unknown");
+        string busyCalendar=Calendar("room@example.test",true);
+        Check(parse(Schedule("room@example.test","2.0;Success",busyCalendar.Replace("/20261023T140000Z","/PT1H"))).State==CalendarResourceAvailabilityState.Busy,"Duration periods are supported");
+        Check(parse(Schedule("room@example.test","2.0;Success",busyCalendar.Replace("FBTYPE=BUSY","FBTYPE=FREE"))).State==CalendarResourceAvailabilityState.Free,"Explicit FREE periods are not busy");
+        foreach(string invalidType in new[]{"FBTYPE=FREE;FBTYPE=FREE","FBTYPE=FREE;FBTYPE=BUSY","FBTYPE","FBTYPE=","FBTYPE=FREE,BUSY","FBTYPE=\"FREE,BUSY\""})
+            Check(parse(Schedule("room@example.test","2.0;Success",busyCalendar.Replace("FBTYPE=BUSY",invalidType))).State==CalendarResourceAvailabilityState.Unknown,"Malformed or duplicate FBTYPE must be unknown: "+invalidType);
+        Check(parse(Schedule("room@example.test","2.0;Success",busyCalendar.Replace("FBTYPE=BUSY","X-NOTE=\"note;FBTYPE=FREE;trailing\";FBTYPE=BUSY"))).State==CalendarResourceAvailabilityState.Busy,"Quoted extension text cannot inject a FREE parameter");
+        Check(parse(Schedule("room@example.test","2.0;Success",busyCalendar.Replace("FBTYPE=BUSY","FBTYPE=X-CUSTOM"))).State==CalendarResourceAvailabilityState.Busy,"Unknown valid FBTYPE tokens remain busy");
+        Check(parse(Schedule("room@example.test","2.0;Success",busyCalendar.Replace("20261023T130000Z/20261023T140000Z","20261023T120000Z/20261023T130000Z"))).State==CalendarResourceAvailabilityState.Free,"Adjacent period ending at start does not overlap");
+        Check(parse(Schedule("room@example.test","2.0;Success",busyCalendar.Replace("20261023T130000Z/20261023T140000Z","20261023T140000Z/20261023T150000Z"))).State==CalendarResourceAvailabilityState.Free,"Adjacent period starting at end does not overlap");
+        var day=CalDavFreeBusyService.ParseAvailabilityResponse(Schedule("room@example.test","2.0;Success",busyCalendar),new[]{"room@example.test"},start.Date,start.Date.AddDays(1))["room@example.test"];
+        Check(day.ForInterval(start.AddHours(2),start.AddHours(3)).State==CalendarResourceAvailabilityState.Free && day.ForInterval(start,end).State==CalendarResourceAvailabilityState.Busy,"Day coverage can answer narrower windows");
+        Check(day.ForInterval(start.Date.AddDays(-1),start).State==CalendarResourceAvailabilityState.Unknown,"Cache never invents coverage");
+        var service=new CalDavFreeBusyService(directory,config,24);
+        NcHttpClient.Dispatch=o=> {
+            if(o.Method!="POST")return Dispatch(o);
+            Check(o.Headers["Recipient"].Split(',').Length==2,"One scheduling request batches all visible recipients");
+            Check(o.Payload.Contains("DTSTART:20261023T130000Z") && o.Payload.Contains("DTEND:20261023T140001Z"),"Sub-second query is rounded outwards");
+            string first=Schedule("room@example.test","2.0;Success",Calendar("room@example.test",true));
+            string second=Schedule("resource@example.test","2.0;Success",Calendar("resource@example.test",false));
+            return new NcHttpResponse{StatusCode=HttpStatusCode.OK,ResponseText=first.Replace("</z:schedule-response>",second.Substring(second.IndexOf("<z:response>")).Replace("</z:schedule-response>","")+"</z:schedule-response>")};
+        };
+        var availability=service.QueryAsync(resources,start.AddMilliseconds(100),end.AddMilliseconds(100),System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+        Check(availability["room@example.test"].State==CalendarResourceAvailabilityState.Busy && availability["resource@example.test"].State==CalendarResourceAvailabilityState.Free,"Batched recipients retain independent status");
+        requests=NcHttpClient.Requests.Count;
+        service.QueryAsync(resources,start.AddSeconds(1),end,System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+        Check(NcHttpClient.Requests.Count==requests,"Known interval cache avoids extra scheduling requests");
+        status.SeatState="suspended_overlimit";
+        Reject(()=>service.QueryAsync(resources,start,end,System.Threading.CancellationToken.None).GetAwaiter().GetResult(),"Cached availability remains Seat-gated");status.SeatState="active";
+        var cancelled=new System.Threading.CancellationTokenSource();cancelled.Cancel();
+        Reject(()=>service.QueryAsync(resources,start,end,cancelled.Token).GetAwaiter().GetResult(),"Cancelled query cannot return cached availability");cancelled.Dispose();
+        CheckCacheOrdering(directory,room,start,end,false);
+        CheckCacheOrdering(directory,room,start,end,true);
+        int active=0,peak=0,posts=0;
+        NcHttpClient.Dispatch=o=> {
+            if(o.Method=="REPORT") {
+                if(o.Url.Contains("calendar-resources"))return new NcHttpResponse{ResponseText="<x:multistatus xmlns:x='DAV:'/>"};
+                string listing=Resource(true);
+                string all="";
+                for(int i=0;i<105;i++){string one=listing.Replace("room1/","room"+i+"/").Replace("room@example.test","room"+i+"@example.test");all+=one.Substring(one.IndexOf("<x:response>")).Replace("</x:multistatus>","");}
+                return new NcHttpResponse{ResponseText=listing.Substring(0,listing.IndexOf("<x:response>"))+all+"</x:multistatus>"};
+            }
+            if(o.Method!="POST")return Dispatch(o);
+            System.Threading.Interlocked.Increment(ref posts);
+            int simultaneous=System.Threading.Interlocked.Increment(ref active);
+            lock(NcHttpClient.Requests){peak=Math.Max(peak,simultaneous);}
+            try {
+                System.Threading.Thread.Sleep(50);o.CancellationToken.ThrowIfCancellationRequested();
+                string[] emails=o.Headers["Recipient"].Split(',').Select(s=>s.Trim().Substring(7)).ToArray();
+                Check(emails.Length<=50,"Each scheduling batch is bounded");
+                string response="";
+                foreach(string email in emails){string one=Schedule(email,"2.0;Success",Calendar(email,false));response+=one.Substring(one.IndexOf("<z:response>")).Replace("</z:schedule-response>","");}
+                return new NcHttpResponse{StatusCode=HttpStatusCode.OK,ResponseText="<z:schedule-response xmlns:z='urn:ietf:params:xml:ns:caldav' xmlns:d='DAV:'>"+response+"</z:schedule-response>"};
+            }finally{System.Threading.Interlocked.Decrement(ref active);}
+        };
+        var largeDirectory=new CalendarResourceDirectory(c=>status);var largeResources=largeDirectory.GetResources(config,24);
+        var largeService=new CalDavFreeBusyService(largeDirectory,config,24);
+        var largeResult=largeService.QueryAsync(largeResources,start,end,System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+        Check(largeResult.Count==105 && largeResult.Values.All(v=>v.State==CalendarResourceAvailabilityState.Free),"All visible resources are checked");
+        Check(posts==3 && peak==2,"105 resources use three batches with at most two simultaneous requests");
         Console.WriteLine("Resource planning OK: "+count+" assertions."); return 0;
     }
 }
@@ -143,7 +243,7 @@ internal static class ResourceTests {
     $source = Join-Path $scratch 'ResourceTests.cs'
     [IO.File]::WriteAllText($source, $test, (New-Object Text.UTF8Encoding($false)))
     $root = Join-Path $ProjectRoot 'src/NcTalkOutlookAddIn'
-    $files = @('Models/CalendarResource.cs','Services/CalendarResourceDirectory.cs','Services/FreeBusyServer.cs','Services/TalkServiceConfiguration.cs','Utilities/NextcloudUriValidator.cs') | ForEach-Object { Join-Path $root $_ }
+    $files = @('Models/CalendarResource.cs','Models/CalendarResourceAvailability.cs','Services/CalDavFreeBusyService.cs','Services/CalendarResourceDirectory.cs','Services/FreeBusyServer.cs','Services/TalkServiceConfiguration.cs','Utilities/NextcloudUriValidator.cs') | ForEach-Object { Join-Path $root $_ }
     $exe = Join-Path $scratch 'ResourceTests.exe'
     & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:exe "/out:$exe" /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll $source $files
     if ($LASTEXITCODE -ne 0) { throw 'Resource tests failed to compile.' }

@@ -446,6 +446,10 @@ Der Arbeitsspeicher-Cache trennt nach konfigurierter URL einschließlich Install
 
 `FreeBusyServer.GetFreeBusyPayload` behält den Personenpfad bei. Nur ein bestätigter Fehltreffer der vollständigen Adresse führt zum Seat-geprüften Ressourcenpfad. Ressourcen-Scheduling ermittelt den Current-User-Principal über die DAV-Wurzel und liest dessen calendar-user-address-set und schedule-outbox-URL; das Systemadressbuch liefert nicht den Originator. Scheduling verwendet eine ausschließlich lesende VFREEBUSY-Anfrage. Antworten benötigen den exakten Empfänger, einen erfolgreichen Request-Status und vollständiges VFREEBUSY mit gültigen Zeiten. Fehler und fehlende Daten werden nie als leerer erfolgreicher Kalender ausgegeben. Der Organizer der Scheduling-Hülle ist keine Information über Buchungsorganisatoren.
 
+`CalDavFreeBusyService` fragt die Scheduling-Outbox direkt ab, ohne den lokalen IFB-Listener; IFB verwendet denselben Scheduling-Transport und Parser. Direkte Abfragen übernehmen sichtbare Ressourcen und ein positives UTC-Intervall, bündeln bis zu 50 Empfänger je Anfrage und führen höchstens zwei Anfragen gleichzeitig aus. Jeder Verzeichniszugriff prüft den effektiven Seat-Status erneut. Abbruch stoppt wartende Anfragen und verhindert, dass abgebrochene Ergebnisse in den Cache gelangen.
+
+Nur vollständige, erfolgreiche Antworten für das gesamte angefragte Intervall können eine Ressource als frei oder belegt kennzeichnen. Fehlende, fehlgeschlagene oder fehlerhafte Empfängerantworten bleiben unbekannt. Der zweiminütige Service-Cache beantwortet engere Intervalle innerhalb bestätigter Abdeckung; Anfragefolgenummern verhindern, dass ältere Ergebnisse neuere Cacheeinträge ersetzen. `CalendarResourceAvailability` enthält ausschließlich Verfügbarkeit und belegte Zeiträume, keine privaten Termindetails. `Invoke-OutlookResourcePlanningTests.ps1` prüft Parserfehler, Intervallgrenzen, Seat-Prüfungen, Abbruch, Bündelung, begrenzte Parallelität und Antwortreihenfolge mit isolierten Transport-Fixtures.
+
 ## Netzwerk-Endpunkte
 
 Das Add-in verwendet Nextcloud-**OCS**- und **WebDAV**-Endpunkte.
