@@ -150,6 +150,8 @@
     <Compile Include="Controllers\SettingsWorkflowController.cs" />
     <Compile Include="Controllers\FileLinkLaunchController.cs" />
     <Compile Include="Controllers\TalkRibbonController.cs" />
+    <Compile Include="Controllers\CalendarResourceController.cs" />
+    <Compile Include="Controllers\RibbonActionController.cs" />
     <Compile Include="Controllers\OutlookRecipientResolverController.cs" />
     <Compile Include="Controllers\MailComposeSubscriptionRegistryController.cs" />
     <Compile Include="Controllers\SeparatePasswordDeliveryController.cs" />
@@ -222,6 +224,8 @@
     <Compile Include="UI\SettingsTabControl.cs" />
     <Compile Include="UI\ScaledForm.cs" />
     <Compile Include="UI\TalkLinkForm.cs" />
+    <Compile Include="UI\CalendarResourceForm.cs" />
+    <Compile Include="UI\CalendarResourceAvailabilityForm.cs" />
     <Compile Include="UI\TalkLinkForm.Moderator.cs" />
     <Compile Include="UI\ComposeAttachmentPromptForm.cs" />
     <Compile Include="UI\FileLinkWizardForm.cs" />

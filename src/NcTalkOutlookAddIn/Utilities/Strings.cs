@@ -600,9 +600,6 @@ namespace NcTalkOutlookAddIn.Utilities
                     : "https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#system-address-book";
             }
         }
-        internal static string EnterpriseRolloutSeatRequired { get { return Get("enterprise_rollout_seat_required", "This installation is centrally managed and requires an assigned, valid NC Connector Seat."); } }
-        internal static string EnterpriseRolloutBackendRequired { get { return Get("enterprise_rollout_backend_required", "This installation is centrally managed. The NC Connector Backend must be installed and configured in Nextcloud before you can use NC Connector. Please contact your administrator."); } }
-        internal static string EnterpriseRolloutStatusUnavailable { get { return Get("enterprise_rollout_status_unavailable", "This installation is centrally managed. Access to NC Connector could not be verified. Please check your connection and try again."); } }
         internal static string PolicyWarningTitle { get { return Get("policy_warning_title", "NC Connector status"); } }
         internal static string PolicyWarningNoSeat { get { return Get("policy_warning_no_seat", "No NC Connector seat is assigned to your account. You can continue to use sharing and Talk with your local settings. Pro features require a seat assigned by your administrator."); } }
         internal static string PolicyWarningLicenseInvalid { get { return Get("policy_warning_license_invalid", "The backend could not confirm permission to use this feature."); } }
@@ -638,6 +635,9 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string PolicyAdminControlledTooltip { get { return Get("policy_admin_controlled_tooltip", "Admin controlled"); } }
         internal static string TalkVersionUnknown { get { return Get("outlook_version_unknown", "unknown"); } }
         internal static string DialogOk { get { return Get("ui_button_ok", "OK"); } }
+        internal static string EnterpriseRolloutSeatRequired { get { return Get("enterprise_rollout_seat_required", "This installation is centrally managed and requires an assigned, valid NC Connector Seat."); } }
+        internal static string EnterpriseRolloutBackendRequired { get { return Get("enterprise_rollout_backend_required", "This installation is centrally managed. The NC Connector Backend must be installed and configured in Nextcloud before you can use NC Connector. Please contact your administrator."); } }
+        internal static string EnterpriseRolloutStatusUnavailable { get { return Get("enterprise_rollout_status_unavailable", "This installation is centrally managed. Access to NC Connector could not be verified. Please check your connection and try again."); } }
         internal static string DialogCancel { get { return Get("ui_button_cancel", "Cancel"); } }
 
         internal static string TalkPasswordTooShort { get { return Get("talk_password_policy_error", "Password must be at least {0} characters long."); } }
@@ -1074,6 +1074,65 @@ namespace NcTalkOutlookAddIn.Utilities
         internal static string SharingPasswordMailNotificationTitle { get { return Get("sharing_password_mail_notify_title", "NC Connector"); } }
         internal static string SharingPasswordMailNotificationSuccess { get { return Get("sharing_password_mail_notify_success", "Password email sent to {0} recipient(s)."); } }
         internal static string SharingPasswordSecretsFallbackWarning { get { return Get("sharing_password_secrets_fallback_warning", "Nextcloud Secrets is not available. The password will instead be provided in a separate plain-text email."); } }
+
+        internal static string ResourceRibbonLabel { get { return Get("outlook_resource_ribbon_label", "Add Nextcloud resource"); } }
+        internal static string ResourceRibbonTooltip { get { return Get("outlook_resource_ribbon_tooltip", "Select a Nextcloud room and resources for this appointment."); } }
+        internal static string ResourceDialogTitle { get { return Get("outlook_resource_dialog_title", "Nextcloud rooms and resources"); } }
+        internal static string ResourceSearchLabel { get { return Get("outlook_resource_search_label", "Search"); } }
+        internal static string ResourceGroupByLabel { get { return Get("outlook_resource_group_by_label", "Group by"); } }
+        internal static string ResourceGroupingNone { get { return Get("outlook_resource_grouping_none", "None"); } }
+        internal static string ResourceFilterAny { get { return Get("outlook_resource_filter_any", "Any"); } }
+        internal static string ResourceMinimumCapacity { get { return Get("outlook_resource_minimum_capacity", "Minimum capacity"); } }
+        internal static string ResourceExpandAll { get { return Get("outlook_resource_expand_all", "Expand all"); } }
+        internal static string ResourceCollapseAll { get { return Get("outlook_resource_collapse_all", "Collapse all"); } }
+        internal static string ResourceExpandGroup { get { return Get("outlook_resource_expand_group", "Expand group"); } }
+        internal static string ResourceCollapseGroup { get { return Get("outlook_resource_collapse_group", "Collapse group"); } }
+        internal static string ResourceFeaturesFilter { get { return Get("outlook_resource_features_filter", "Features (all required)"); } }
+        internal static string ResourceFeaturesSelected { get { return Get("outlook_resource_features_selected", "{0} selected"); } }
+        internal static string ResourceClearFilters { get { return Get("outlook_resource_clear_filters", "Reset filters"); } }
+        internal static string ResourceWithoutInformation { get { return Get("outlook_resource_without_information", "Not specified"); } }
+        internal static string ResourceOnlyAvailable { get { return Get("outlook_resource_only_available", "Only available"); } }
+        internal static string ResourceAvailabilityLabel { get { return Get("outlook_resource_availability_label", "Availability"); } }
+        internal static string ResourceAvailable { get { return Get("outlook_resource_available", "Available"); } }
+        internal static string ResourceBusy { get { return Get("outlook_resource_busy", "Busy"); } }
+        internal static string ResourceUnknown { get { return Get("outlook_resource_unknown", "Unknown"); } }
+        internal static string ResourceChecking { get { return Get("outlook_resource_checking", "Checking…"); } }
+        internal static string ResourceShowAvailability { get { return Get("outlook_resource_show_availability", "Show availability"); } }
+        internal static string ResourceAppointmentIntervalLabel { get { return Get("outlook_resource_appointment_interval_label", "Appointment"); } }
+        internal static string ResourceAvailabilityTitle { get { return Get("outlook_resource_availability_title", "Resource availability"); } }
+        internal static string ResourceDateLabel { get { return Get("outlook_resource_date_label", "Date"); } }
+        internal static string ResourcePreviousDay { get { return Get("outlook_resource_previous_day", "Previous day"); } }
+        internal static string ResourceNextDay { get { return Get("outlook_resource_next_day", "Next day"); } }
+        internal static string ResourceTimeZoneLabel { get { return Get("outlook_resource_time_zone_label", "Time zone"); } }
+        internal static string ResourceToday { get { return Get("outlook_resource_today", "Today"); } }
+        internal static string ResourceAvailabilityFailed { get { return Get("outlook_resource_availability_failed", "Availability could not be retrieved."); } }
+        internal static string ResourceGroupingSaveFailed { get { return Get("outlook_resource_grouping_save_failed", "The grouping preference could not be saved."); } }
+        internal static string ResourceCloseButton { get { return Get("outlook_resource_close_button", "Close"); } }
+        internal static string ResourceAppointmentChanged { get { return Get("outlook_resource_appointment_changed", "The appointment time has changed. Open the resource picker again to check availability."); } }
+        internal static string ResourceRoomsLabel { get { return Get("outlook_resource_rooms_label", "Rooms"); } }
+        internal static string ResourceResourcesLabel { get { return Get("outlook_resource_resources_label", "Resources"); } }
+        internal static string ResourceNameLabel { get { return Get("outlook_resource_name_label", "Name"); } }
+        internal static string ResourceKindLabel { get { return Get("outlook_resource_kind_label", "Type"); } }
+        internal static string ResourceCalendarAddressLabel { get { return Get("outlook_resource_calendar_address_label", "Calendar address"); } }
+        internal static string ResourceRoomTypeLabel { get { return Get("outlook_resource_room_type_label", "Room type"); } }
+        internal static string ResourceTypeLabel { get { return Get("outlook_resource_type_label", "Resource type"); } }
+        internal static string ResourceCapacityLabel { get { return Get("outlook_resource_capacity_label", "Seats"); } }
+        internal static string ResourceBuildingLabel { get { return Get("outlook_resource_building_label", "Building"); } }
+        internal static string ResourceAddressLabel { get { return Get("outlook_resource_address_label", "Address"); } }
+        internal static string ResourceFloorLabel { get { return Get("outlook_resource_floor_label", "Floor"); } }
+        internal static string ResourceRoomNumberLabel { get { return Get("outlook_resource_room_number_label", "Room number"); } }
+        internal static string ResourceFeaturesLabel { get { return Get("outlook_resource_features_label", "Equipment"); } }
+        internal static string ResourceRoomKind { get { return Get("outlook_resource_room_kind", "Room"); } }
+        internal static string ResourceOtherKind { get { return Get("outlook_resource_other_kind", "Resource"); } }
+        internal static string ResourceNotProvided { get { return Get("outlook_resource_not_provided", "Not provided"); } }
+        internal static string ResourceSelectionHint { get { return Get("outlook_resource_selection_hint", "Select at most one room and any number of resources."); } }
+        internal static string ResourceIfbDisabledHint { get { return Get("outlook_resource_ifb_disabled_hint", "Internet Free/Busy is disabled. Enable it in Settings to see availability in the Scheduling Assistant."); } }
+        internal static string ResourceNoResults { get { return Get("outlook_resource_no_results", "No matching rooms or resources."); } }
+        internal static string ResourceApplyButton { get { return Get("outlook_resource_apply_button", "Apply"); } }
+        internal static string ResourceLoadFailed { get { return Get("outlook_resource_load_failed", "The Nextcloud rooms and resources could not be loaded. Please check the connection and try again."); } }
+        internal static string ResourceApplyFailed { get { return Get("outlook_resource_apply_failed", "The selection could not be applied completely. Check the appointment's resources and location before saving."); } }
+        internal static string ResourceEditableAppointmentRequired { get { return Get("outlook_resource_editable_appointment_required", "Open an editable appointment that you organize to add Nextcloud resources."); } }
+        internal static string ResourceBookingHint { get { return Get("outlook_resource_booking_hint", "Booking requires CalDAV Synchronizer configured for this Nextcloud calendar. NC Connector adds the selection to the appointment but does not make a booking."); } }
 
         // Generic dialog title
         internal static string DialogTitle { get { return Get("extName", "NC Connector for Outlook"); } }

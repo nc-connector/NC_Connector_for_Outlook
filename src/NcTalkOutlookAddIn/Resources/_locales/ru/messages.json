@@ -1,4 +1,178 @@
 {
+  "outlook_resource_group_by_label": {
+    "message": "Группировать по"
+  },
+  "outlook_resource_grouping_none": {
+    "message": "Без группировки"
+  },
+  "outlook_resource_filter_any": {
+    "message": "Любое"
+  },
+  "outlook_resource_minimum_capacity": {
+    "message": "Минимальная вместимость"
+  },
+  "outlook_resource_expand_all": {
+    "message": "Развернуть всё"
+  },
+  "outlook_resource_collapse_all": {
+    "message": "Свернуть всё"
+  },
+  "outlook_resource_expand_group": {
+    "message": "Развернуть группу"
+  },
+  "outlook_resource_collapse_group": {
+    "message": "Свернуть группу"
+  },
+  "outlook_resource_features_filter": {
+    "message": "Оборудование (требуется всё)"
+  },
+  "outlook_resource_features_selected": {
+    "message": "Выбрано: {0}"
+  },
+  "outlook_resource_clear_filters": {
+    "message": "Сбросить фильтры"
+  },
+  "outlook_resource_without_information": {
+    "message": "Не указано"
+  },
+  "outlook_resource_only_available": {
+    "message": "Только доступные"
+  },
+  "outlook_resource_availability_label": {
+    "message": "Доступность"
+  },
+  "outlook_resource_available": {
+    "message": "Доступно"
+  },
+  "outlook_resource_busy": {
+    "message": "Занято"
+  },
+  "outlook_resource_unknown": {
+    "message": "Неизвестно"
+  },
+  "outlook_resource_checking": {
+    "message": "Проверка…"
+  },
+  "outlook_resource_show_availability": {
+    "message": "Показать доступность"
+  },
+  "outlook_resource_appointment_interval_label": {
+    "message": "Событие"
+  },
+  "outlook_resource_availability_title": {
+    "message": "Доступность ресурса"
+  },
+  "outlook_resource_date_label": {
+    "message": "Дата"
+  },
+  "outlook_resource_previous_day": {
+    "message": "Предыдущий день"
+  },
+  "outlook_resource_next_day": {
+    "message": "Следующий день"
+  },
+  "outlook_resource_time_zone_label": {
+    "message": "Часовой пояс"
+  },
+  "outlook_resource_today": {
+    "message": "Сегодня"
+  },
+  "outlook_resource_availability_failed": {
+    "message": "Не удалось получить сведения о доступности."
+  },
+  "outlook_resource_grouping_save_failed": {
+    "message": "Не удалось сохранить настройку группировки."
+  },
+  "outlook_resource_close_button": {
+    "message": "Закрыть"
+  },
+  "outlook_resource_appointment_changed": {
+    "message": "Время события изменилось. Снова откройте окно выбора ресурсов, чтобы проверить доступность."
+  },
+  "outlook_resource_ribbon_label": {
+    "message": "Добавить ресурс Nextcloud"
+  },
+  "outlook_resource_ribbon_tooltip": {
+    "message": "Выберите помещение и ресурсы Nextcloud для этой встречи."
+  },
+  "outlook_resource_dialog_title": {
+    "message": "Помещения и ресурсы Nextcloud"
+  },
+  "outlook_resource_search_label": {
+    "message": "Поиск"
+  },
+  "outlook_resource_rooms_label": {
+    "message": "Помещения"
+  },
+  "outlook_resource_resources_label": {
+    "message": "Ресурсы"
+  },
+  "outlook_resource_name_label": {
+    "message": "Название"
+  },
+  "outlook_resource_kind_label": {
+    "message": "Тип"
+  },
+  "outlook_resource_calendar_address_label": {
+    "message": "Адрес календаря"
+  },
+  "outlook_resource_room_type_label": {
+    "message": "Тип помещения"
+  },
+  "outlook_resource_type_label": {
+    "message": "Тип ресурса"
+  },
+  "outlook_resource_capacity_label": {
+    "message": "Места"
+  },
+  "outlook_resource_building_label": {
+    "message": "Здание"
+  },
+  "outlook_resource_address_label": {
+    "message": "Адрес"
+  },
+  "outlook_resource_floor_label": {
+    "message": "Этаж"
+  },
+  "outlook_resource_room_number_label": {
+    "message": "Номер помещения"
+  },
+  "outlook_resource_features_label": {
+    "message": "Оборудование"
+  },
+  "outlook_resource_room_kind": {
+    "message": "Помещение"
+  },
+  "outlook_resource_other_kind": {
+    "message": "Ресурс"
+  },
+  "outlook_resource_not_provided": {
+    "message": "Не указано"
+  },
+  "outlook_resource_selection_hint": {
+    "message": "Выберите не более одного помещения и любое количество ресурсов."
+  },
+  "outlook_resource_ifb_disabled_hint": {
+    "message": "Internet Free/Busy отключён. Включите его в настройках, чтобы видеть доступность в помощнике по планированию."
+  },
+  "outlook_resource_no_results": {
+    "message": "Подходящие помещения или ресурсы не найдены."
+  },
+  "outlook_resource_apply_button": {
+    "message": "Применить"
+  },
+  "outlook_resource_load_failed": {
+    "message": "Не удалось загрузить помещения и ресурсы Nextcloud. Проверьте подключение и повторите попытку."
+  },
+  "outlook_resource_apply_failed": {
+    "message": "Не удалось полностью применить выбор. Перед сохранением проверьте ресурсы и место встречи."
+  },
+  "outlook_resource_editable_appointment_required": {
+    "message": "Чтобы добавить ресурсы Nextcloud, откройте редактируемую встречу, организатором которой вы являетесь."
+  },
+  "outlook_resource_booking_hint": {
+    "message": "Для бронирования требуется CalDAV Synchronizer, настроенный для этого календаря Nextcloud. NC Connector добавляет выбранные ресурсы во встречу, но не выполняет бронирование."
+  },
   "options_remove_credentials_failed": {
     "message": "Не удалось удалить сохранённые учётные данные. Повторите попытку."
   },

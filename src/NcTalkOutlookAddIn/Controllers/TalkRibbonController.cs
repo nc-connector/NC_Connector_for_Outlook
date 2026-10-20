@@ -55,9 +55,28 @@ namespace NcTalkOutlookAddIn.Controllers
                 ? _owner.FetchEnterpriseRolloutPolicyStatus(configuration, "talk_wizard_open")
                 : _owner.FetchBackendPolicyStatus(configuration, "talk_wizard_open"));
             Task<PasswordPolicyInfo> passwordPolicyTask = Task.Run(() => _owner.FetchPasswordPolicyForTalkWizard(configuration));
-            await Task.WhenAll(policyStatusTask, passwordPolicyTask).ConfigureAwait(false);
-            BackendPolicyStatus policyStatus = policyStatusTask.Result;
-            PasswordPolicyInfo passwordPolicy = passwordPolicyTask.Result;
+            Exception launchFailure = null;
+            try
+            {
+                await Task.WhenAll(policyStatusTask, passwordPolicyTask).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex) { launchFailure = ex; }
+            if (launchFailure != null)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Talk, "Talk prefetch failed.", launchFailure);
+                await _owner.RunOnOutlookUiThreadAsync(() =>
+                {
+                    if (_owner.IsItemOpenForRibbonAction(appointment))
+                    {
+                        MessageBox.Show(SettingsWorkflowController.GetActionConnectionFailureMessage(launchFailure),
+                            Strings.DialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }).ConfigureAwait(false);
+                return;
+            }
+            BackendPolicyStatus policyStatus = await policyStatusTask.ConfigureAwait(false);
+            PasswordPolicyInfo passwordPolicy = await passwordPolicyTask.ConfigureAwait(false);
 
             string rolloutNotice = PolicyUiHelper.GetActionUnavailableNotice(settings, policyStatus);
             if (!string.IsNullOrEmpty(rolloutNotice))

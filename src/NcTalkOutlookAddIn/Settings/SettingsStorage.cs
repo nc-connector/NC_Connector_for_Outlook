@@ -96,6 +96,39 @@ namespace NcTalkOutlookAddIn.Settings
             SaveCore(settings, true);
         }
 
+        internal bool SaveCalendarResourceGrouping(string grouping)
+        {
+            return SaveCalendarResourcePreference("CalendarResourceGrouping", AddinSettings.NormalizeCalendarResourceGrouping(grouping));
+        }
+
+        internal bool SaveCalendarResourceGroupsExpanded(bool expanded)
+        {
+            return SaveCalendarResourcePreference("CalendarResourceGroupsExpanded", expanded.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private bool SaveCalendarResourcePreference(string name, string value)
+        {
+            using (_settingsFileTransaction.AcquireLock())
+            {
+                if (!File.Exists(_filePath) || !IsSettingsFileHealthy(_filePath))
+                {
+                    return false;
+                }
+                var document = new XmlDocument();
+                document.Load(_filePath);
+                XmlElement root = document.DocumentElement;
+                XmlElement element = root[name];
+                if (element == null)
+                {
+                    element = document.CreateElement(name);
+                    root.AppendChild(element);
+                }
+                element.InnerText = value;
+                _settingsFileTransaction.Commit(stream => document.Save(stream), IsSettingsFileHealthy);
+                return true;
+            }
+        }
+
         internal void RemoveSavedCredentials(AddinSettings settings)
         {
             if (settings == null || !string.IsNullOrEmpty(settings.Username)
@@ -209,6 +242,7 @@ namespace NcTalkOutlookAddIn.Settings
                     {
                         return;
                     }
+                    PreserveCalendarResourcePreferences(persistedSettings);
                     _settingsFileTransaction.Commit(
                         stream => SaveToXmlStream(stream, persistedSettings, _profileName),
                         IsSettingsFileHealthy,
@@ -263,6 +297,39 @@ namespace NcTalkOutlookAddIn.Settings
                 DiagnosticsLogger.LogException(LogCategories.Core,
                     "Automatic settings save skipped because the current saved connection could not be read.", ex);
                 return false;
+            }
+        }
+
+        private void PreserveCalendarResourcePreferences(AddinSettings settings)
+        {
+            if (!File.Exists(_filePath))
+            {
+                return;
+            }
+            var document = new XmlDocument();
+            try
+            {
+                document.Load(_filePath);
+            }
+            catch (XmlException)
+            {
+                // An explicit settings save may replace an unrecoverable profile file.
+                return;
+            }
+            XmlElement root = document.DocumentElement;
+            if (root != null && string.Equals(root.Name, "Settings", StringComparison.OrdinalIgnoreCase))
+            {
+                // Picker choices are saved separately from older settings-dialog and background snapshots.
+                if (root["CalendarResourceGrouping"] != null)
+                {
+                    settings.CalendarResourceGrouping = root["CalendarResourceGrouping"].InnerText;
+                }
+                bool expanded;
+                if (root["CalendarResourceGroupsExpanded"] != null
+                    && bool.TryParse(root["CalendarResourceGroupsExpanded"].InnerText, out expanded))
+                {
+                    settings.CalendarResourceGroupsExpanded = expanded;
+                }
             }
         }
 
@@ -682,6 +749,8 @@ namespace NcTalkOutlookAddIn.Settings
             AppendElement(document, root, "IfbPort", AddinSettings.NormalizeIfbPort(settings.LocalIfbPort).ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "IfbPreviousFreeBusyPath", Safe(settings.IfbPreviousFreeBusyPath));
             AppendElement(document, root, "IfbUserDecisionRecorded", settings.IfbUserDecisionRecorded.ToString(CultureInfo.InvariantCulture));
+            AppendElement(document, root, "CalendarResourceGrouping", settings.CalendarResourceGrouping);
+            AppendElement(document, root, "CalendarResourceGroupsExpanded", settings.CalendarResourceGroupsExpanded.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "DebugLoggingEnabled", settings.LocalDebugLoggingEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "LogAnonymizationEnabled", settings.LocalLogAnonymizationEnabled.ToString(CultureInfo.InvariantCulture));
             AppendElement(document, root, "TransportTlsUseSystemDefault", settings.LocalTransportTlsUseSystemDefault.ToString(CultureInfo.InvariantCulture));
@@ -821,6 +890,16 @@ namespace NcTalkOutlookAddIn.Settings
                     if (bool.TryParse(value, out ifbUserDecisionRecorded))
                     {
                         settings.IfbUserDecisionRecorded = ifbUserDecisionRecorded;
+                    }
+                    break;
+                case "CalendarResourceGrouping":
+                    settings.CalendarResourceGrouping = value;
+                    break;
+                case "CalendarResourceGroupsExpanded":
+                    bool calendarResourceGroupsExpanded;
+                    if (bool.TryParse(value, out calendarResourceGroupsExpanded))
+                    {
+                        settings.CalendarResourceGroupsExpanded = calendarResourceGroupsExpanded;
                     }
                     break;
                 case "DebugLoggingEnabled":

@@ -1,4 +1,178 @@
 {
+  "outlook_resource_group_by_label": {
+    "message": "Csoportosítás"
+  },
+  "outlook_resource_grouping_none": {
+    "message": "Nincs"
+  },
+  "outlook_resource_filter_any": {
+    "message": "Bármely"
+  },
+  "outlook_resource_minimum_capacity": {
+    "message": "Minimális kapacitás"
+  },
+  "outlook_resource_expand_all": {
+    "message": "Összes kibontása"
+  },
+  "outlook_resource_collapse_all": {
+    "message": "Összes összecsukása"
+  },
+  "outlook_resource_expand_group": {
+    "message": "Csoport kibontása"
+  },
+  "outlook_resource_collapse_group": {
+    "message": "Csoport összecsukása"
+  },
+  "outlook_resource_features_filter": {
+    "message": "Felszereltség (mind szükséges)"
+  },
+  "outlook_resource_features_selected": {
+    "message": "{0} kiválasztva"
+  },
+  "outlook_resource_clear_filters": {
+    "message": "Szűrők alaphelyzetbe állítása"
+  },
+  "outlook_resource_without_information": {
+    "message": "Nincs megadva"
+  },
+  "outlook_resource_only_available": {
+    "message": "Csak elérhetők"
+  },
+  "outlook_resource_availability_label": {
+    "message": "Elérhetőség"
+  },
+  "outlook_resource_available": {
+    "message": "Elérhető"
+  },
+  "outlook_resource_busy": {
+    "message": "Foglalt"
+  },
+  "outlook_resource_unknown": {
+    "message": "Ismeretlen"
+  },
+  "outlook_resource_checking": {
+    "message": "Ellenőrzés folyamatban"
+  },
+  "outlook_resource_show_availability": {
+    "message": "Elérhetőség megtekintése"
+  },
+  "outlook_resource_appointment_interval_label": {
+    "message": "Esemény"
+  },
+  "outlook_resource_availability_title": {
+    "message": "Erőforrás elérhetősége"
+  },
+  "outlook_resource_date_label": {
+    "message": "Dátum"
+  },
+  "outlook_resource_previous_day": {
+    "message": "Előző nap"
+  },
+  "outlook_resource_next_day": {
+    "message": "Következő nap"
+  },
+  "outlook_resource_time_zone_label": {
+    "message": "Időzóna"
+  },
+  "outlook_resource_today": {
+    "message": "Ma"
+  },
+  "outlook_resource_availability_failed": {
+    "message": "Az elérhetőséget nem sikerült lekérni."
+  },
+  "outlook_resource_grouping_save_failed": {
+    "message": "A csoportosítási beállítást nem sikerült menteni."
+  },
+  "outlook_resource_close_button": {
+    "message": "Bezárás"
+  },
+  "outlook_resource_appointment_changed": {
+    "message": "Az esemény időpontja megváltozott. Az elérhetőség ellenőrzéséhez nyissa meg újra az erőforrás-választót."
+  },
+  "outlook_resource_ribbon_label": {
+    "message": "Nextcloud-erőforrás hozzáadása"
+  },
+  "outlook_resource_ribbon_tooltip": {
+    "message": "Nextcloud-terem és erőforrások kiválasztása ehhez a találkozóhoz."
+  },
+  "outlook_resource_dialog_title": {
+    "message": "Nextcloud-termek és erőforrások"
+  },
+  "outlook_resource_search_label": {
+    "message": "Keresés"
+  },
+  "outlook_resource_rooms_label": {
+    "message": "Termek"
+  },
+  "outlook_resource_resources_label": {
+    "message": "Erőforrások"
+  },
+  "outlook_resource_name_label": {
+    "message": "Név"
+  },
+  "outlook_resource_kind_label": {
+    "message": "Típus"
+  },
+  "outlook_resource_calendar_address_label": {
+    "message": "Naptárcím"
+  },
+  "outlook_resource_room_type_label": {
+    "message": "Terem típusa"
+  },
+  "outlook_resource_type_label": {
+    "message": "Erőforrás típusa"
+  },
+  "outlook_resource_capacity_label": {
+    "message": "Férőhelyek"
+  },
+  "outlook_resource_building_label": {
+    "message": "Épület"
+  },
+  "outlook_resource_address_label": {
+    "message": "Cím"
+  },
+  "outlook_resource_floor_label": {
+    "message": "Emelet"
+  },
+  "outlook_resource_room_number_label": {
+    "message": "Terem száma"
+  },
+  "outlook_resource_features_label": {
+    "message": "Felszereltség"
+  },
+  "outlook_resource_room_kind": {
+    "message": "Terem"
+  },
+  "outlook_resource_other_kind": {
+    "message": "Erőforrás"
+  },
+  "outlook_resource_not_provided": {
+    "message": "Nincs megadva"
+  },
+  "outlook_resource_selection_hint": {
+    "message": "Legfeljebb egy termet és tetszőleges számú erőforrást válasszon."
+  },
+  "outlook_resource_ifb_disabled_hint": {
+    "message": "Az Internet Free/Busy ki van kapcsolva. Kapcsolja be a beállításokban, hogy az Ütemezési segéd megjelenítse az elérhetőséget."
+  },
+  "outlook_resource_no_results": {
+    "message": "Nincs megfelelő terem vagy erőforrás."
+  },
+  "outlook_resource_apply_button": {
+    "message": "Alkalmaz"
+  },
+  "outlook_resource_load_failed": {
+    "message": "Nem sikerült betölteni a Nextcloud termeit és erőforrásait. Ellenőrizze a kapcsolatot, és próbálja újra."
+  },
+  "outlook_resource_apply_failed": {
+    "message": "A kiválasztás nem alkalmazható teljesen. Mentés előtt ellenőrizze a találkozó erőforrásait és helyét."
+  },
+  "outlook_resource_editable_appointment_required": {
+    "message": "Nextcloud-erőforrások hozzáadásához nyisson meg egy szerkeszthető találkozót, amelynek Ön a szervezője."
+  },
+  "outlook_resource_booking_hint": {
+    "message": "A foglaláshoz a CalDAV Synchronizer alkalmazást ehhez a Nextcloud-naptárhoz kell beállítani. Az NC Connector hozzáadja a kiválasztást a találkozóhoz, de nem végez foglalást."
+  },
   "options_remove_credentials_failed": {
     "message": "A mentett bejelentkezési adatokat nem sikerült eltávolítani. Próbálja újra."
   },

@@ -18,6 +18,7 @@ Installation, zentrale Konfiguration und Fehlerbehandlung für Version 3.4.5.
 - [Backend-Vorgaben und Signaturen](#backend-vorgaben-und-signaturen)
 - [Hinweise für den Betrieb](#hinweise-für-den-betrieb)
 - [Internet Free/Busy einrichten](#internet-freebusy-einrichten)
+- [Räume und Ressourcen (ifb-pro)](#räume-und-ressourcen-ifb-pro)
 - [Update, Sicherung und Deinstallation](#update-sicherung-und-deinstallation)
 - [Fehlerbehandlung](#fehlerbehandlung)
 - [Logs und Support](#logs-und-support)
@@ -44,6 +45,7 @@ Installation, zentrale Konfiguration und Fehlerbehandlung für Version 3.4.5.
 | Benutzersuche und Verfügbarkeiten | Freigegebenes Nextcloud-Systemadressbuch |
 | Zentrale Einstellungen und Signaturen, separate Passwort-Mail, Enterprise Rollout | NC Connector Backend und ein gültig zugeteilter NC Connector Seat für den jeweiligen Benutzer |
 | Einmalige Passwort-Links | Zusätzlich die Nextcloud-App Secrets |
+| Räume und Ressourcen (`ifb-pro`) | Gültig zugeteilter Seat, in Nextcloud bereitgestellte Ressourcen und CalDAV Synchronizer für den Nextcloud-Kalender des Termins |
 
 Ohne zentrale Verwaltung lassen sich Freigaben, Talk und Internet Free/Busy auch ohne Backend mit lokalen Einstellungen nutzen.
 
@@ -107,14 +109,14 @@ Mit Registry-Vorgaben können Sie Serveradresse und Einstellungen verteilen, ein
 3. MSI installieren beziehungsweise aktualisieren und Outlook neu starten.
 4. Die Erstanmeldung mit einem vorgesehenen Benutzerkonto prüfen.
 
-Für eine weitgehend vorbereitete Anmeldung setzen Sie `NextcloudUrl`, `NextcloudUrlLocked=1` und `AuthMode=LoginFlow`. Soll der Haupttab samt Einstellungen verborgen bleiben, zusätzlich `ShowMainRibbonTab=0` setzen. Freigabe- und Talk-Schaltflächen bleiben in Mails und Terminen erreichbar.
+Für eine weitgehend vorbereitete Anmeldung setzen Sie `NextcloudUrl`, `NextcloudUrlLocked=1` und `AuthMode=LoginFlow`. Soll der Haupttab samt Einstellungen verborgen bleiben, zusätzlich `ShowMainRibbonTab=0` setzen. Freigabe-, Talk- und Ressourcen-Schaltflächen bleiben im jeweiligen Mail- oder Termin-Ribbon sichtbar.
 
 <a id="verwaltete-anmeldeart"></a>
 <a id="managed-sign-in-method"></a>
 
 ### Anmeldung bei ausgeblendeten Einstellungen
 
-Fehlen Zugangsdaten, öffnet **Nextcloud-Freigabe einfügen** oder **Talk-Link einfügen** den Anmeldedialog. Bei `AuthMode=LoginFlow` und passender Registry-URL startet die Browseranmeldung automatisch.
+Bei fehlenden oder zurückgewiesenen Zugangsdaten können sich Benutzer über **Nextcloud-Freigabe einfügen**, **Talk-Link einfügen** oder **Nextcloud Ressource hinzufügen** anmelden, auch bei ausgeblendeten Einstellungen. Bei unvollständigen Zugangsdaten, `AuthMode=LoginFlow` und passender Registry-URL startet die Browseranmeldung automatisch.
 
 Ist `AuthMode=LoginFlow` gültig vorgegeben, werden nach erfolgreicher Anmeldung und Verbindungsprüfung die Zugangsdaten automatisch gespeichert und der Dialog geschlossen – auch wenn der Benutzer die Browseranmeldung selbst gestartet hat. Ohne diese Vorgabe speichert er selbst. Bei `AuthMode=Manual` trägt er Benutzername und App-Passwort ein.
 
@@ -168,7 +170,7 @@ Für Schalter `REG_DWORD` mit `0` = aus und `1` = an verwenden. Die Texte `false
 | `ShowMainRibbonTab` | `REG_DWORD`, `0` / `1` | `0` blendet Haupttab und Einstellungsbutton aus. | Haupttab sichtbar |
 | `DefaultsSource` | `REG_SZ`, `local` / `backend` | Legt die Quelle der Standardwerte fest und sperrt die Auswahl. Eine ausdrückliche Backend-Vorgabe hat Vorrang. | Backend-Vorgabe, sonst Benutzerauswahl, sonst `local` |
 
-Der automatische Login startet nur über Freigabe oder Talk bei unvollständigen Zugangsdaten. Die verwendete URL muss der Registry-URL entsprechen. Das normale Öffnen der Einstellungen startet keine Anmeldung und schließt den Dialog auch nicht automatisch.
+Der automatische Login startet nur über Freigabe, Talk oder Ressourcenauswahl bei unvollständigen Zugangsdaten. Die verwendete URL muss der Registry-URL entsprechen. Das normale Öffnen der Einstellungen startet keine Anmeldung und schließt den Dialog auch nicht automatisch.
 
 <a id="versand-bei-dienstausfällen"></a>
 <a id="sending-during-service-outages"></a>
@@ -390,6 +392,21 @@ Wird der eigene Port nicht mehr genutzt, die selbst angelegte Reservierung entfe
 ```powershell
 netsh http delete urlacl url=http://127.0.0.1:8888/nc-ifb/
 ```
+
+## Räume und Ressourcen (ifb-pro)
+
+Räume und Ressourcen in Nextcloud über Calendar Resource Management oder RoomVox bereitstellen und den vorgesehenen Benutzern Zugriff gewähren. Jedem Benutzer einen gültigen Seat zuweisen, auch bei Installationen ohne Enterprise Rollout.
+
+1. CalDAV Synchronizer für den zur Buchung verwendeten Outlook-Kalender einrichten. Teilnehmersynchronisation aktivieren und serverseitiges Scheduling zulassen; **SCHEDULE-AGENT=CLIENT** darf es nicht unterdrücken. Siehe [Scheduling-Einstellungen von CalDAV Synchronizer](https://caldavsynchronizer.org/help/documentation/). NC Connector richtet das Profil nicht ein.
+2. [Internet Free/Busy](#internet-freebusy-einrichten) für Outlooks Terminplanungs-Assistenten aktivieren. Der Picker prüft die Verfügbarkeit unabhängig von IFB direkt über CalDAV.
+3. Als Organisator einen Testtermin erstellen. Im Termin-Ribbon oder Terminplanungs-Assistenten **Nextcloud Ressource hinzufügen** wählen und einen Raum sowie die benötigten Ressourcen übernehmen. Teilnehmer und übernommenen Raumort prüfen.
+4. Termin speichern beziehungsweise senden und synchronisieren. Buchungsantwort in Nextcloud und Einladungszustellung an einen Testteilnehmer prüfen. Scheduling-Einstellungen betreffen auch normale Teilnehmer; vor dem Rollout auf fehlende oder doppelte Einladungen prüfen.
+
+Eine ausgewählte Ressource oder angezeigte freie Zeit ist keine Buchungsbestätigung. Bei fehlgeschlagener Buchung Synchronisation, Ressourcenberechtigungen, Konflikte und Genehmigungsvorgaben in Nextcloud prüfen.
+
+Der Picker prüft das aktuelle Terminzeitfenster. **Nur verfügbare** blendet belegte und unbekannte Einträge aus; fehlgeschlagene Prüfungen bleiben unbekannt. **Gruppieren nach** merkt sich die letzte lokale Benutzerauswahl. Per Rechtsklick auf einen Eintrag (oder **Umschalt+F10**) und **Verfügbarkeit anzeigen** lässt sich dessen Tag ohne private Termindetails prüfen.
+
+NC Connector unterdrückt Outlook-Einladungen nur für Ressourcen, die über den Auswahldialog neu hinzugefügt werden. Vorhandene Empfänger, auch durch Synchronisation neu erzeugte, behalten ihre Einladungseinstellungen. Diese beim Test bestehender Termine prüfen; Änderungen an bereits eingeladenen Empfängern können eine Absage auslösen.
 
 ## Update, Sicherung und Deinstallation
 

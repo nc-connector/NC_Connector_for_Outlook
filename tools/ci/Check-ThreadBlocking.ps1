@@ -97,6 +97,14 @@ Add-UiDialogBoundaryFailures `
     -FlowName "Talk"
 
 Add-UiDialogBoundaryFailures `
+    -ControllerRelativePath "Controllers\CalendarResourceController.cs" `
+    -AsyncMethodPattern 'private\s+async\s+Task\s+OpenCoreAsync' `
+    -UiMethodPattern 'private\s+Selection\s+SelectOnUiThread' `
+    -DispatcherPattern '\.RunOnOutlookUiThreadAsync\s*\(\s*\(\)\s*=>\s*SelectOnUiThread' `
+    -DialogType "CalendarResourceForm" `
+    -FlowName "resource selection"
+
+Add-UiDialogBoundaryFailures `
     -ControllerRelativePath "Controllers\SettingsWorkflowController.cs" `
     -AsyncMethodPattern 'internal\s+async\s+Task<bool>\s+RunAsync' `
     -UiMethodPattern 'private\s+bool\s+RunSettingsDialogOnUiThread' `

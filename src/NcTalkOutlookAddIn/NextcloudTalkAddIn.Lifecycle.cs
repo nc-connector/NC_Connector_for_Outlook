@@ -33,6 +33,7 @@ namespace NcTalkOutlookAddIn
             TryApplyOfficeUiLanguage();
             NextcloudConnectionState.Initialize(_settingsStorage.DataDirectory, outlookProfileName,
                 new TalkServiceConfiguration(_currentSettings.ServerUrl, _currentSettings.Username, _currentSettings.AppPassword));
+            _ribbonActionController.Start();
             InitializeComposeShareCleanup(_settingsStorage.DataDirectory, outlookProfileName);
             LogCore("Add-in connected (Outlook version=" + (_outlookApplication != null ? _outlookApplication.Version : "unknown") + ").");
             if (!string.IsNullOrWhiteSpace(outlookProfileName))
@@ -273,6 +274,7 @@ namespace NcTalkOutlookAddIn
         // Outlook can call both shutdown callbacks, so teardown must stay idempotent
         private void TearDownAddInState(string origin, bool clearOutlookApplication)
         {
+            _ribbonActionController.Stop();
             UnhookApplication();
             UnhookInspector();
             UnhookMailComposeSubscriptions();
@@ -302,7 +304,6 @@ namespace NcTalkOutlookAddIn
                 _outlookApplication = null;
             }
 
-            _ribbonUi = null;
             OutlookUiSynchronizationContext uiSynchronizationContext = _uiSynchronizationContext;
             _uiSynchronizationContext = null;
             if (uiSynchronizationContext != null)

@@ -97,6 +97,15 @@ if (-not ($storage -match 'TryRestorePrimaryFromBackup') -or -not ($storage -mat
     $failures.Add("SettingsStorage must use backup recovery and atomic commits.")
 }
 
+if ($settings -notmatch 'CalendarResourceGroupsExpanded\s*=\s*true;' -or
+    $storage -notmatch 'SaveCalendarResourceGroupsExpanded\(bool expanded\)[\s\S]{0,240}?SaveCalendarResourcePreference\("CalendarResourceGroupsExpanded"' -or
+    $storage -notmatch 'PreserveCalendarResourcePreferences\(persistedSettings\);') {
+    $failures.Add('Resource group expansion must default to expanded and save through the shared picker preference transaction.')
+}
+if ($storage -notmatch 'private void PreserveCalendarResourcePreferences[\s\S]{0,1600}?settings\.CalendarResourceGroupsExpanded = expanded;') {
+    $failures.Add('A stale settings save must preserve the latest separately saved resource group expansion preference.')
+}
+
 if (-not ($transaction -match 'new Mutex') -or -not ($transaction -match 'FileOptions\.WriteThrough') -or -not ($transaction -match 'Flush\(true\)')) {
     $failures.Add("Settings file commits must be profile-locked and flushed durably.")
 }

@@ -214,6 +214,14 @@ jobs:
         shell: pwsh
         run: .\tools\ci\Invoke-OutlookResourcePlanningTests.ps1
 
+      - name: Run resource selection tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookResourceSelectionTests.ps1
+
+      - name: Run shared ribbon access tests
+        shell: pwsh
+        run: .\tools\ci\Invoke-OutlookRibbonAccessTests.ps1 -SkipBuild
+
   filelink-rendering:
     name: FileLink rendering
     runs-on: windows-latest

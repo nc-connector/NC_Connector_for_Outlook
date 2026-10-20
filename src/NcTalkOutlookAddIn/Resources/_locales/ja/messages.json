@@ -1,4 +1,178 @@
 {
+  "outlook_resource_group_by_label": {
+    "message": "グループ化"
+  },
+  "outlook_resource_grouping_none": {
+    "message": "なし"
+  },
+  "outlook_resource_filter_any": {
+    "message": "指定なし"
+  },
+  "outlook_resource_minimum_capacity": {
+    "message": "最小収容人数"
+  },
+  "outlook_resource_expand_all": {
+    "message": "すべて展開"
+  },
+  "outlook_resource_collapse_all": {
+    "message": "すべて折りたたむ"
+  },
+  "outlook_resource_expand_group": {
+    "message": "グループを展開"
+  },
+  "outlook_resource_collapse_group": {
+    "message": "グループを折りたたむ"
+  },
+  "outlook_resource_features_filter": {
+    "message": "設備（すべて必須）"
+  },
+  "outlook_resource_features_selected": {
+    "message": "{0} 件選択済み"
+  },
+  "outlook_resource_clear_filters": {
+    "message": "フィルターをリセット"
+  },
+  "outlook_resource_without_information": {
+    "message": "未設定"
+  },
+  "outlook_resource_only_available": {
+    "message": "利用可能のみ"
+  },
+  "outlook_resource_availability_label": {
+    "message": "空き状況"
+  },
+  "outlook_resource_available": {
+    "message": "利用可能"
+  },
+  "outlook_resource_busy": {
+    "message": "使用中"
+  },
+  "outlook_resource_unknown": {
+    "message": "不明"
+  },
+  "outlook_resource_checking": {
+    "message": "確認中"
+  },
+  "outlook_resource_show_availability": {
+    "message": "空き状況を表示"
+  },
+  "outlook_resource_appointment_interval_label": {
+    "message": "予定"
+  },
+  "outlook_resource_availability_title": {
+    "message": "リソースの空き状況"
+  },
+  "outlook_resource_date_label": {
+    "message": "日付"
+  },
+  "outlook_resource_previous_day": {
+    "message": "前日"
+  },
+  "outlook_resource_next_day": {
+    "message": "翌日"
+  },
+  "outlook_resource_time_zone_label": {
+    "message": "タイムゾーン"
+  },
+  "outlook_resource_today": {
+    "message": "今日"
+  },
+  "outlook_resource_availability_failed": {
+    "message": "空き状況を取得できませんでした。"
+  },
+  "outlook_resource_grouping_save_failed": {
+    "message": "グループ化の設定を保存できませんでした。"
+  },
+  "outlook_resource_close_button": {
+    "message": "閉じる"
+  },
+  "outlook_resource_appointment_changed": {
+    "message": "予定の日時が変更されました。リソース選択画面を開き直して空き状況を確認してください。"
+  },
+  "outlook_resource_ribbon_label": {
+    "message": "Nextcloud リソースを追加"
+  },
+  "outlook_resource_ribbon_tooltip": {
+    "message": "この予定に Nextcloud の会議室とリソースを選択します。"
+  },
+  "outlook_resource_dialog_title": {
+    "message": "Nextcloud の会議室とリソース"
+  },
+  "outlook_resource_search_label": {
+    "message": "検索"
+  },
+  "outlook_resource_rooms_label": {
+    "message": "会議室"
+  },
+  "outlook_resource_resources_label": {
+    "message": "リソース"
+  },
+  "outlook_resource_name_label": {
+    "message": "名前"
+  },
+  "outlook_resource_kind_label": {
+    "message": "種類"
+  },
+  "outlook_resource_calendar_address_label": {
+    "message": "カレンダーアドレス"
+  },
+  "outlook_resource_room_type_label": {
+    "message": "会議室の種類"
+  },
+  "outlook_resource_type_label": {
+    "message": "リソースの種類"
+  },
+  "outlook_resource_capacity_label": {
+    "message": "定員"
+  },
+  "outlook_resource_building_label": {
+    "message": "建物"
+  },
+  "outlook_resource_address_label": {
+    "message": "住所"
+  },
+  "outlook_resource_floor_label": {
+    "message": "階"
+  },
+  "outlook_resource_room_number_label": {
+    "message": "部屋番号"
+  },
+  "outlook_resource_features_label": {
+    "message": "設備"
+  },
+  "outlook_resource_room_kind": {
+    "message": "会議室"
+  },
+  "outlook_resource_other_kind": {
+    "message": "リソース"
+  },
+  "outlook_resource_not_provided": {
+    "message": "未登録"
+  },
+  "outlook_resource_selection_hint": {
+    "message": "会議室は最大1つ、その他のリソースは複数選択できます。"
+  },
+  "outlook_resource_ifb_disabled_hint": {
+    "message": "Internet Free/Busy が無効です。スケジュール アシスタントで空き時間を確認するには、設定で有効にしてください。"
+  },
+  "outlook_resource_no_results": {
+    "message": "一致する会議室またはリソースがありません。"
+  },
+  "outlook_resource_apply_button": {
+    "message": "適用"
+  },
+  "outlook_resource_load_failed": {
+    "message": "Nextcloud の会議室とリソースを読み込めませんでした。接続を確認して再試行してください。"
+  },
+  "outlook_resource_apply_failed": {
+    "message": "選択内容を完全に適用できませんでした。保存する前に、予定のリソースと場所を確認してください。"
+  },
+  "outlook_resource_editable_appointment_required": {
+    "message": "Nextcloud リソースを追加するには、自分が主催者である編集可能な予定を開いてください。"
+  },
+  "outlook_resource_booking_hint": {
+    "message": "予約には、この Nextcloud カレンダー用に設定された CalDAV Synchronizer が必要です。NC Connector は選択内容を予定に追加しますが、予約は行いません。"
+  },
   "options_remove_credentials_failed": {
     "message": "保存済みの認証情報を削除できませんでした。もう一度お試しください。"
   },

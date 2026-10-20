@@ -16,6 +16,7 @@ Installation, managed configuration, and troubleshooting for version 3.4.5.
 - [Backend defaults and signatures](#backend-defaults-and-signatures)
 - [Operating notes](#operating-notes)
 - [Configure Internet Free/Busy](#configure-internet-freebusy)
+- [Rooms and resources (ifb-pro)](#rooms-and-resources-ifb-pro)
 - [Update, backup, and uninstall](#update-backup-and-uninstall)
 - [Troubleshooting](#troubleshooting)
 - [Logs and support](#logs-and-support)
@@ -42,6 +43,7 @@ Installation, managed configuration, and troubleshooting for version 3.4.5.
 | User search and availability | An exposed Nextcloud system address book |
 | Managed settings and signatures, separate password mail, Enterprise Rollout | NC Connector Backend and a valid assigned NC Connector Seat for each user |
 | One-time password links | The Nextcloud Secrets app in addition |
+| Rooms and resources (`ifb-pro`) | A valid assigned Seat, resources published in Nextcloud, and CalDAV Synchronizer configured for the appointment's Nextcloud calendar |
 
 Without central management, sharing, Talk, and Internet Free/Busy can use local settings without the backend.
 
@@ -105,14 +107,14 @@ Registry settings can distribute the server address and settings, lock selected 
 3. Install or update the MSI and restart Outlook.
 4. Test initial sign-in with an intended user account.
 
-For a mostly prepared sign-in, set `NextcloudUrl`, `NextcloudUrlLocked=1`, and `AuthMode=LoginFlow`. To hide the main tab and Settings, also set `ShowMainRibbonTab=0`. The Share and Talk buttons remain available in messages and appointments.
+For a mostly prepared sign-in, set `NextcloudUrl`, `NextcloudUrlLocked=1`, and `AuthMode=LoginFlow`. To hide the main tab and Settings, also set `ShowMainRibbonTab=0`. The Share, Talk, and resource buttons remain visible in their message or appointment ribbons.
 
 <a id="verwaltete-anmeldeart"></a>
 <a id="managed-sign-in-method"></a>
 
 ### Sign in when Settings is hidden
 
-If credentials are missing, **Insert Nextcloud share** or **Insert Talk link** opens the sign-in dialog. With `AuthMode=LoginFlow` and a matching registry URL, browser sign-in starts automatically.
+If credentials are missing or have been rejected, users can sign in through **Insert Nextcloud share**, **Insert Talk link**, or **Add Nextcloud resource**, even when Settings is hidden. With incomplete credentials, `AuthMode=LoginFlow`, and a matching registry URL, browser sign-in starts automatically.
 
 When `AuthMode=LoginFlow` is a valid managed value, a successful sign-in and connection test saves the credentials and closes the dialog, including when the user started browser sign-in manually. Without that managed value, the user saves the settings. With `AuthMode=Manual`, the user enters a username and app password.
 
@@ -165,7 +167,7 @@ For switches, use `REG_DWORD` with `0` for off and `1` for on. The strings `fals
 | `ShowMainRibbonTab` | `REG_DWORD`, `0` / `1` | `0` hides the main tab and Settings button. | Main tab is visible |
 | `DefaultsSource` | `REG_SZ`, `local` / `backend` | Selects and locks the default-values source. An explicit backend setting takes priority. | Backend setting, then user selection, then `local` |
 
-Automatic sign-in starts only from Share or Talk when credentials are incomplete. The active URL must match the registry URL. Opening Settings normally does not start sign-in or close the dialog automatically.
+Automatic sign-in starts only from Share, Talk, or resource selection when credentials are incomplete. The active URL must match the registry URL. Opening Settings normally does not start sign-in or close the dialog automatically.
 
 <a id="versand-bei-dienstausfällen"></a>
 <a id="sending-during-service-outages"></a>
@@ -382,6 +384,21 @@ When the custom port is no longer used, remove the reservation you created:
 ```powershell
 netsh http delete urlacl url=http://127.0.0.1:8888/nc-ifb/
 ```
+
+## Rooms and resources (ifb-pro)
+
+Publish the rooms and resources in Nextcloud using Calendar Resource Management or RoomVox and grant the intended users access. Assign each user a valid Seat, including installations without Enterprise Rollout.
+
+1. Configure CalDAV Synchronizer for the Outlook calendar used for bookings. Enable attendee synchronization and allow server-side scheduling; **SCHEDULE-AGENT=CLIENT** must not suppress it. See [CalDAV Synchronizer's scheduling settings](https://caldavsynchronizer.org/help/documentation/). NC Connector does not configure the profile.
+2. Enable [Internet Free/Busy](#configure-internet-freebusy) for Outlook's Scheduling Assistant. The picker checks availability directly through CalDAV, independently of IFB.
+3. Create a test appointment as organizer. In the appointment ribbon or Scheduling Assistant, choose **Add Nextcloud resource** and apply one room and the required resources. Check the attendees and the copied room location.
+4. Save/send and synchronize the appointment. Verify the booking response in Nextcloud and invitation delivery to a test participant. Scheduling settings affect normal participants too; check for missing or duplicate invitations before rollout.
+
+Selecting a resource or seeing free time is not a booking confirmation. If the booking fails, check synchronization, resource permissions, conflicts, and approval requirements in Nextcloud.
+
+The picker checks the current appointment interval. **Only available** excludes busy and unknown entries; failed checks remain unknown. **Group by** remembers the local user's last choice. Right-click an entry (or press **Shift+F10**) and choose **Show availability** to inspect its day without exposing appointment details.
+
+NC Connector suppresses Outlook invitations only for resources newly added through the picker. Existing recipients, including those recreated by synchronization, keep their invitation settings. Check these when testing existing appointments; changing an already invited recipient can trigger a cancellation.
 
 ## Update, backup, and uninstall
 

@@ -37,6 +37,7 @@ namespace NcTalkOutlookAddIn.Settings
         private int _localIfbDays;
         private int _localIfbCacheHours;
         private int _localIfbPort;
+        private string _calendarResourceGrouping = "none";
 
         public AddinSettings()
         {
@@ -75,6 +76,7 @@ namespace NcTalkOutlookAddIn.Settings
             ManagedNextcloudUrlLocked = false;
             IsEnterpriseRollout = false;
             ShowMainRibbonTab = true;
+            CalendarResourceGroupsExpanded = true;
         }
 
         public string ServerUrl { get; set; }
@@ -174,6 +176,25 @@ namespace NcTalkOutlookAddIn.Settings
         public string IfbPreviousFreeBusyPath { get; set; }
 
         public bool IfbUserDecisionRecorded { get; set; }
+
+        public string CalendarResourceGrouping
+        {
+            get { return _calendarResourceGrouping; }
+            set { _calendarResourceGrouping = NormalizeCalendarResourceGrouping(value); }
+        }
+
+        public bool CalendarResourceGroupsExpanded { get; set; }
+
+        internal static string NormalizeCalendarResourceGrouping(string value)
+        {
+            switch ((value ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "building": return "building";
+                case "floor": return "floor";
+                case "room-type": return "room-type";
+                default: return "none";
+            }
+        }
 
         public bool DebugLoggingEnabled
         {

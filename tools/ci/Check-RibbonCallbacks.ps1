@@ -111,6 +111,17 @@ foreach ($callback in $uniqueCallbacks) {
     }
 }
 
+# Outlook uses the group image when the ribbon collapses in a narrow window.
+$groups = [regex]::Matches($entryText, "<group\b[^>]*\bid='(?<id>Nc[^']+)'[^>]*>")
+if ($groups.Count -eq 0) {
+    $failures.Add("No NC Connector ribbon groups were found.")
+}
+foreach ($group in $groups) {
+    if ($group.Value -notmatch "\bgetImage='OnGetButtonImage'") {
+        $failures.Add("Collapsed ribbon group '$($group.Groups['id'].Value)' must use the NC Connector image callback.")
+    }
+}
+
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Error $_ }
     throw "Ribbon callback contract check failed with $($failures.Count) issue(s)."

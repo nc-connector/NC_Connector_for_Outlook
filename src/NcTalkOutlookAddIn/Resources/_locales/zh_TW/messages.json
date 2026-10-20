@@ -1,4 +1,178 @@
 {
+  "outlook_resource_group_by_label": {
+    "message": "分組依據"
+  },
+  "outlook_resource_grouping_none": {
+    "message": "無"
+  },
+  "outlook_resource_filter_any": {
+    "message": "不限"
+  },
+  "outlook_resource_minimum_capacity": {
+    "message": "最少容納人數"
+  },
+  "outlook_resource_expand_all": {
+    "message": "全部展開"
+  },
+  "outlook_resource_collapse_all": {
+    "message": "全部摺疊"
+  },
+  "outlook_resource_expand_group": {
+    "message": "展開群組"
+  },
+  "outlook_resource_collapse_group": {
+    "message": "摺疊群組"
+  },
+  "outlook_resource_features_filter": {
+    "message": "設備（全部必須）"
+  },
+  "outlook_resource_features_selected": {
+    "message": "已選取 {0} 項"
+  },
+  "outlook_resource_clear_filters": {
+    "message": "重設篩選條件"
+  },
+  "outlook_resource_without_information": {
+    "message": "未指定"
+  },
+  "outlook_resource_only_available": {
+    "message": "僅顯示可用項目"
+  },
+  "outlook_resource_availability_label": {
+    "message": "可用狀態"
+  },
+  "outlook_resource_available": {
+    "message": "可用"
+  },
+  "outlook_resource_busy": {
+    "message": "忙碌"
+  },
+  "outlook_resource_unknown": {
+    "message": "未知"
+  },
+  "outlook_resource_checking": {
+    "message": "正在檢查"
+  },
+  "outlook_resource_show_availability": {
+    "message": "顯示可用狀態"
+  },
+  "outlook_resource_appointment_interval_label": {
+    "message": "行程"
+  },
+  "outlook_resource_availability_title": {
+    "message": "資源可用狀態"
+  },
+  "outlook_resource_date_label": {
+    "message": "日期"
+  },
+  "outlook_resource_previous_day": {
+    "message": "前一天"
+  },
+  "outlook_resource_next_day": {
+    "message": "後一天"
+  },
+  "outlook_resource_time_zone_label": {
+    "message": "時區"
+  },
+  "outlook_resource_today": {
+    "message": "今天"
+  },
+  "outlook_resource_availability_failed": {
+    "message": "無法取得可用狀態。"
+  },
+  "outlook_resource_grouping_save_failed": {
+    "message": "無法儲存分組設定。"
+  },
+  "outlook_resource_close_button": {
+    "message": "關閉"
+  },
+  "outlook_resource_appointment_changed": {
+    "message": "行程時間已變更。請重新開啟資源選擇器以檢查可用狀態。"
+  },
+  "outlook_resource_ribbon_label": {
+    "message": "新增 Nextcloud 資源"
+  },
+  "outlook_resource_ribbon_tooltip": {
+    "message": "為此約會選擇 Nextcloud 會議室及資源。"
+  },
+  "outlook_resource_dialog_title": {
+    "message": "Nextcloud 會議室及資源"
+  },
+  "outlook_resource_search_label": {
+    "message": "搜尋"
+  },
+  "outlook_resource_rooms_label": {
+    "message": "會議室"
+  },
+  "outlook_resource_resources_label": {
+    "message": "資源"
+  },
+  "outlook_resource_name_label": {
+    "message": "名稱"
+  },
+  "outlook_resource_kind_label": {
+    "message": "類型"
+  },
+  "outlook_resource_calendar_address_label": {
+    "message": "行事曆位址"
+  },
+  "outlook_resource_room_type_label": {
+    "message": "會議室類型"
+  },
+  "outlook_resource_type_label": {
+    "message": "資源類型"
+  },
+  "outlook_resource_capacity_label": {
+    "message": "座位數"
+  },
+  "outlook_resource_building_label": {
+    "message": "建築物"
+  },
+  "outlook_resource_address_label": {
+    "message": "地址"
+  },
+  "outlook_resource_floor_label": {
+    "message": "樓層"
+  },
+  "outlook_resource_room_number_label": {
+    "message": "房間號碼"
+  },
+  "outlook_resource_features_label": {
+    "message": "設備"
+  },
+  "outlook_resource_room_kind": {
+    "message": "會議室"
+  },
+  "outlook_resource_other_kind": {
+    "message": "資源"
+  },
+  "outlook_resource_not_provided": {
+    "message": "未提供"
+  },
+  "outlook_resource_selection_hint": {
+    "message": "最多選擇一個會議室，其他資源可複選。"
+  },
+  "outlook_resource_ifb_disabled_hint": {
+    "message": "Internet Free/Busy 已停用。請在設定中啟用，以在排程小幫手中查看可用性。"
+  },
+  "outlook_resource_no_results": {
+    "message": "沒有符合的會議室或資源。"
+  },
+  "outlook_resource_apply_button": {
+    "message": "套用"
+  },
+  "outlook_resource_load_failed": {
+    "message": "無法載入 Nextcloud 會議室及資源。請檢查連線並重試。"
+  },
+  "outlook_resource_apply_failed": {
+    "message": "無法完整套用所選內容。儲存前請檢查約會的資源和地點。"
+  },
+  "outlook_resource_editable_appointment_required": {
+    "message": "若要新增 Nextcloud 資源，請開啟由您組織的可編輯約會。"
+  },
+  "outlook_resource_booking_hint": {
+    "message": "預訂需要為此 Nextcloud 行事曆設定 CalDAV Synchronizer。NC Connector 將所選內容加入約會，但不會執行預訂。"
+  },
   "options_remove_credentials_failed": {
     "message": "無法移除已儲存的登入憑證。請再試一次。"
   },

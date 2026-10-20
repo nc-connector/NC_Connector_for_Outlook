@@ -1,4 +1,178 @@
 {
+  "outlook_resource_group_by_label": {
+    "message": "Groeperen op"
+  },
+  "outlook_resource_grouping_none": {
+    "message": "Geen"
+  },
+  "outlook_resource_filter_any": {
+    "message": "Alle"
+  },
+  "outlook_resource_minimum_capacity": {
+    "message": "Minimale capaciteit"
+  },
+  "outlook_resource_expand_all": {
+    "message": "Alles uitklappen"
+  },
+  "outlook_resource_collapse_all": {
+    "message": "Alles inklappen"
+  },
+  "outlook_resource_expand_group": {
+    "message": "Groep uitklappen"
+  },
+  "outlook_resource_collapse_group": {
+    "message": "Groep inklappen"
+  },
+  "outlook_resource_features_filter": {
+    "message": "Voorzieningen (alle vereist)"
+  },
+  "outlook_resource_features_selected": {
+    "message": "{0} geselecteerd"
+  },
+  "outlook_resource_clear_filters": {
+    "message": "Filters herstellen"
+  },
+  "outlook_resource_without_information": {
+    "message": "Niet opgegeven"
+  },
+  "outlook_resource_only_available": {
+    "message": "Alleen beschikbaar"
+  },
+  "outlook_resource_availability_label": {
+    "message": "Beschikbaarheid"
+  },
+  "outlook_resource_available": {
+    "message": "Beschikbaar"
+  },
+  "outlook_resource_busy": {
+    "message": "Bezet"
+  },
+  "outlook_resource_unknown": {
+    "message": "Onbekend"
+  },
+  "outlook_resource_checking": {
+    "message": "Wordt gecontroleerd"
+  },
+  "outlook_resource_show_availability": {
+    "message": "Beschikbaarheid tonen"
+  },
+  "outlook_resource_appointment_interval_label": {
+    "message": "Afspraak"
+  },
+  "outlook_resource_availability_title": {
+    "message": "Beschikbaarheid van resource"
+  },
+  "outlook_resource_date_label": {
+    "message": "Datum"
+  },
+  "outlook_resource_previous_day": {
+    "message": "Vorige dag"
+  },
+  "outlook_resource_next_day": {
+    "message": "Volgende dag"
+  },
+  "outlook_resource_time_zone_label": {
+    "message": "Tijdzone"
+  },
+  "outlook_resource_today": {
+    "message": "Vandaag"
+  },
+  "outlook_resource_availability_failed": {
+    "message": "De beschikbaarheid kon niet worden opgehaald."
+  },
+  "outlook_resource_grouping_save_failed": {
+    "message": "De groeperingsvoorkeur kon niet worden opgeslagen."
+  },
+  "outlook_resource_close_button": {
+    "message": "Sluiten"
+  },
+  "outlook_resource_appointment_changed": {
+    "message": "Het tijdstip van de afspraak is gewijzigd. Open de resourceselectie opnieuw om de beschikbaarheid te controleren."
+  },
+  "outlook_resource_ribbon_label": {
+    "message": "Nextcloud-resource toevoegen"
+  },
+  "outlook_resource_ribbon_tooltip": {
+    "message": "Selecteer een Nextcloud-ruimte en resources voor deze afspraak."
+  },
+  "outlook_resource_dialog_title": {
+    "message": "Nextcloud-ruimtes en resources"
+  },
+  "outlook_resource_search_label": {
+    "message": "Zoeken"
+  },
+  "outlook_resource_rooms_label": {
+    "message": "Ruimtes"
+  },
+  "outlook_resource_resources_label": {
+    "message": "Resources"
+  },
+  "outlook_resource_name_label": {
+    "message": "Naam"
+  },
+  "outlook_resource_kind_label": {
+    "message": "Type"
+  },
+  "outlook_resource_calendar_address_label": {
+    "message": "Kalenderadres"
+  },
+  "outlook_resource_room_type_label": {
+    "message": "Ruimtetype"
+  },
+  "outlook_resource_type_label": {
+    "message": "Resourcetype"
+  },
+  "outlook_resource_capacity_label": {
+    "message": "Plaatsen"
+  },
+  "outlook_resource_building_label": {
+    "message": "Gebouw"
+  },
+  "outlook_resource_address_label": {
+    "message": "Adres"
+  },
+  "outlook_resource_floor_label": {
+    "message": "Verdieping"
+  },
+  "outlook_resource_room_number_label": {
+    "message": "Ruimtenummer"
+  },
+  "outlook_resource_features_label": {
+    "message": "Voorzieningen"
+  },
+  "outlook_resource_room_kind": {
+    "message": "Ruimte"
+  },
+  "outlook_resource_other_kind": {
+    "message": "Resource"
+  },
+  "outlook_resource_not_provided": {
+    "message": "Niet opgegeven"
+  },
+  "outlook_resource_selection_hint": {
+    "message": "Selecteer maximaal één ruimte en zoveel resources als nodig."
+  },
+  "outlook_resource_ifb_disabled_hint": {
+    "message": "Internet Free/Busy is uitgeschakeld. Schakel het in bij Instellingen om beschikbaarheid in de Planningsassistent te zien."
+  },
+  "outlook_resource_no_results": {
+    "message": "Geen overeenkomende ruimtes of resources."
+  },
+  "outlook_resource_apply_button": {
+    "message": "Toepassen"
+  },
+  "outlook_resource_load_failed": {
+    "message": "De Nextcloud-ruimtes en resources konden niet worden geladen. Controleer de verbinding en probeer het opnieuw."
+  },
+  "outlook_resource_apply_failed": {
+    "message": "De selectie kon niet volledig worden toegepast. Controleer de resources en locatie van de afspraak voordat u opslaat."
+  },
+  "outlook_resource_editable_appointment_required": {
+    "message": "Open een bewerkbare afspraak die u organiseert om Nextcloud-resources toe te voegen."
+  },
+  "outlook_resource_booking_hint": {
+    "message": "Voor boekingen moet CalDAV Synchronizer voor deze Nextcloud-kalender zijn ingesteld. NC Connector voegt de selectie toe aan de afspraak, maar maakt geen boeking."
+  },
   "options_remove_credentials_failed": {
     "message": "De opgeslagen inloggegevens konden niet worden verwijderd. Probeer het opnieuw."
   },

@@ -53,6 +53,8 @@ foreach ($file in $sourceFiles) {
 
 $asyncVoidAllowList = @(
     'OnTalkButtonPressed',
+    'OnResourceButtonPressed',
+    'OnConnectionStateChanged',
     'OnSettingsButtonPressed',
     'OnFileLinkButtonPressed',
     'OnAttachmentEvalTimerTick',

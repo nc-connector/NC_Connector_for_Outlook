@@ -1,4 +1,178 @@
 {
+  "outlook_resource_group_by_label": {
+    "message": "Gruppieren nach"
+  },
+  "outlook_resource_grouping_none": {
+    "message": "Keine"
+  },
+  "outlook_resource_filter_any": {
+    "message": "Beliebig"
+  },
+  "outlook_resource_minimum_capacity": {
+    "message": "Mindestkapazität"
+  },
+  "outlook_resource_expand_all": {
+    "message": "Alles aufklappen"
+  },
+  "outlook_resource_collapse_all": {
+    "message": "Alles zuklappen"
+  },
+  "outlook_resource_expand_group": {
+    "message": "Gruppe aufklappen"
+  },
+  "outlook_resource_collapse_group": {
+    "message": "Gruppe zuklappen"
+  },
+  "outlook_resource_features_filter": {
+    "message": "Ausstattung (alle erforderlich)"
+  },
+  "outlook_resource_features_selected": {
+    "message": "{0} ausgewählt"
+  },
+  "outlook_resource_clear_filters": {
+    "message": "Filter zurücksetzen"
+  },
+  "outlook_resource_without_information": {
+    "message": "Ohne Angabe"
+  },
+  "outlook_resource_only_available": {
+    "message": "Nur verfügbare"
+  },
+  "outlook_resource_availability_label": {
+    "message": "Verfügbarkeit"
+  },
+  "outlook_resource_available": {
+    "message": "Verfügbar"
+  },
+  "outlook_resource_busy": {
+    "message": "Belegt"
+  },
+  "outlook_resource_unknown": {
+    "message": "Unbekannt"
+  },
+  "outlook_resource_checking": {
+    "message": "Wird geprüft"
+  },
+  "outlook_resource_show_availability": {
+    "message": "Verfügbarkeit anzeigen"
+  },
+  "outlook_resource_appointment_interval_label": {
+    "message": "Termin"
+  },
+  "outlook_resource_availability_title": {
+    "message": "Ressourcenverfügbarkeit"
+  },
+  "outlook_resource_date_label": {
+    "message": "Datum"
+  },
+  "outlook_resource_previous_day": {
+    "message": "Vorheriger Tag"
+  },
+  "outlook_resource_next_day": {
+    "message": "Nächster Tag"
+  },
+  "outlook_resource_time_zone_label": {
+    "message": "Zeitzone"
+  },
+  "outlook_resource_today": {
+    "message": "Heute"
+  },
+  "outlook_resource_availability_failed": {
+    "message": "Die Verfügbarkeit konnte nicht abgerufen werden."
+  },
+  "outlook_resource_grouping_save_failed": {
+    "message": "Die Gruppierung konnte nicht gespeichert werden."
+  },
+  "outlook_resource_close_button": {
+    "message": "Schließen"
+  },
+  "outlook_resource_appointment_changed": {
+    "message": "Die Terminzeit hat sich geändert. Öffnen Sie die Ressourcenauswahl erneut, um die Verfügbarkeit zu prüfen."
+  },
+  "outlook_resource_ribbon_label": {
+    "message": "Nextcloud Ressource hinzufügen"
+  },
+  "outlook_resource_ribbon_tooltip": {
+    "message": "Einen Nextcloud-Raum und Ressourcen für diesen Termin auswählen."
+  },
+  "outlook_resource_dialog_title": {
+    "message": "Nextcloud-Räume und Ressourcen"
+  },
+  "outlook_resource_search_label": {
+    "message": "Suchen"
+  },
+  "outlook_resource_rooms_label": {
+    "message": "Räume"
+  },
+  "outlook_resource_resources_label": {
+    "message": "Ressourcen"
+  },
+  "outlook_resource_name_label": {
+    "message": "Name"
+  },
+  "outlook_resource_kind_label": {
+    "message": "Typ"
+  },
+  "outlook_resource_calendar_address_label": {
+    "message": "Kalenderadresse"
+  },
+  "outlook_resource_room_type_label": {
+    "message": "Raumart"
+  },
+  "outlook_resource_type_label": {
+    "message": "Ressourcenart"
+  },
+  "outlook_resource_capacity_label": {
+    "message": "Plätze"
+  },
+  "outlook_resource_building_label": {
+    "message": "Gebäude"
+  },
+  "outlook_resource_address_label": {
+    "message": "Adresse"
+  },
+  "outlook_resource_floor_label": {
+    "message": "Etage"
+  },
+  "outlook_resource_room_number_label": {
+    "message": "Raumnummer"
+  },
+  "outlook_resource_features_label": {
+    "message": "Ausstattung"
+  },
+  "outlook_resource_room_kind": {
+    "message": "Raum"
+  },
+  "outlook_resource_other_kind": {
+    "message": "Ressource"
+  },
+  "outlook_resource_not_provided": {
+    "message": "Nicht hinterlegt"
+  },
+  "outlook_resource_selection_hint": {
+    "message": "Wählen Sie höchstens einen Raum und beliebig viele Ressourcen aus."
+  },
+  "outlook_resource_ifb_disabled_hint": {
+    "message": "Internet Free/Busy ist deaktiviert. Aktivieren Sie es in den Einstellungen, um Verfügbarkeiten im Terminplanungs-Assistenten zu sehen."
+  },
+  "outlook_resource_no_results": {
+    "message": "Keine passenden Räume oder Ressourcen."
+  },
+  "outlook_resource_apply_button": {
+    "message": "Übernehmen"
+  },
+  "outlook_resource_load_failed": {
+    "message": "Die Nextcloud-Räume und Ressourcen konnten nicht geladen werden. Prüfen Sie die Verbindung und versuchen Sie es erneut."
+  },
+  "outlook_resource_apply_failed": {
+    "message": "Die Auswahl konnte nicht vollständig übernommen werden. Prüfen Sie vor dem Speichern die Ressourcen und den Ort des Termins."
+  },
+  "outlook_resource_editable_appointment_required": {
+    "message": "Öffnen Sie einen bearbeitbaren Termin, den Sie organisieren, um Nextcloud-Ressourcen hinzuzufügen."
+  },
+  "outlook_resource_booking_hint": {
+    "message": "Für die Buchung muss CalDAV Synchronizer für diesen Nextcloud-Kalender eingerichtet sein. NC Connector übernimmt die Auswahl in den Termin, führt aber keine Buchung durch."
+  },
   "options_remove_credentials_failed": {
     "message": "Die gespeicherten Zugangsdaten konnten nicht entfernt werden. Bitte versuchen Sie es erneut."
   },

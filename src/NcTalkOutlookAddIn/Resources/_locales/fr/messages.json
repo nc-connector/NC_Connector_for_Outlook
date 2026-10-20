@@ -1,4 +1,178 @@
 {
+  "outlook_resource_group_by_label": {
+    "message": "Regrouper par"
+  },
+  "outlook_resource_grouping_none": {
+    "message": "Aucun"
+  },
+  "outlook_resource_filter_any": {
+    "message": "Tous"
+  },
+  "outlook_resource_minimum_capacity": {
+    "message": "Capacité minimale"
+  },
+  "outlook_resource_expand_all": {
+    "message": "Tout développer"
+  },
+  "outlook_resource_collapse_all": {
+    "message": "Tout réduire"
+  },
+  "outlook_resource_expand_group": {
+    "message": "Développer le groupe"
+  },
+  "outlook_resource_collapse_group": {
+    "message": "Réduire le groupe"
+  },
+  "outlook_resource_features_filter": {
+    "message": "Équipements (tous requis)"
+  },
+  "outlook_resource_features_selected": {
+    "message": "{0} sélectionnés"
+  },
+  "outlook_resource_clear_filters": {
+    "message": "Réinitialiser les filtres"
+  },
+  "outlook_resource_without_information": {
+    "message": "Non renseigné"
+  },
+  "outlook_resource_only_available": {
+    "message": "Disponibles uniquement"
+  },
+  "outlook_resource_availability_label": {
+    "message": "Disponibilité"
+  },
+  "outlook_resource_available": {
+    "message": "Disponible"
+  },
+  "outlook_resource_busy": {
+    "message": "Occupé"
+  },
+  "outlook_resource_unknown": {
+    "message": "Inconnu"
+  },
+  "outlook_resource_checking": {
+    "message": "Vérification en cours"
+  },
+  "outlook_resource_show_availability": {
+    "message": "Afficher la disponibilité"
+  },
+  "outlook_resource_appointment_interval_label": {
+    "message": "Rendez-vous"
+  },
+  "outlook_resource_availability_title": {
+    "message": "Disponibilité de la ressource"
+  },
+  "outlook_resource_date_label": {
+    "message": "Date"
+  },
+  "outlook_resource_previous_day": {
+    "message": "Jour précédent"
+  },
+  "outlook_resource_next_day": {
+    "message": "Jour suivant"
+  },
+  "outlook_resource_time_zone_label": {
+    "message": "Fuseau horaire"
+  },
+  "outlook_resource_today": {
+    "message": "Aujourd’hui"
+  },
+  "outlook_resource_availability_failed": {
+    "message": "La disponibilité n’a pas pu être récupérée."
+  },
+  "outlook_resource_grouping_save_failed": {
+    "message": "Le regroupement n’a pas pu être enregistré."
+  },
+  "outlook_resource_close_button": {
+    "message": "Fermer"
+  },
+  "outlook_resource_appointment_changed": {
+    "message": "L’horaire du rendez-vous a changé. Rouvrez le sélecteur de ressources pour vérifier la disponibilité."
+  },
+  "outlook_resource_ribbon_label": {
+    "message": "Ajouter une ressource Nextcloud"
+  },
+  "outlook_resource_ribbon_tooltip": {
+    "message": "Sélectionner une salle et des ressources Nextcloud pour ce rendez-vous."
+  },
+  "outlook_resource_dialog_title": {
+    "message": "Salles et ressources Nextcloud"
+  },
+  "outlook_resource_search_label": {
+    "message": "Rechercher"
+  },
+  "outlook_resource_rooms_label": {
+    "message": "Salles"
+  },
+  "outlook_resource_resources_label": {
+    "message": "Ressources"
+  },
+  "outlook_resource_name_label": {
+    "message": "Nom"
+  },
+  "outlook_resource_kind_label": {
+    "message": "Type"
+  },
+  "outlook_resource_calendar_address_label": {
+    "message": "Adresse du calendrier"
+  },
+  "outlook_resource_room_type_label": {
+    "message": "Type de salle"
+  },
+  "outlook_resource_type_label": {
+    "message": "Type de ressource"
+  },
+  "outlook_resource_capacity_label": {
+    "message": "Places"
+  },
+  "outlook_resource_building_label": {
+    "message": "Bâtiment"
+  },
+  "outlook_resource_address_label": {
+    "message": "Adresse"
+  },
+  "outlook_resource_floor_label": {
+    "message": "Étage"
+  },
+  "outlook_resource_room_number_label": {
+    "message": "Numéro de salle"
+  },
+  "outlook_resource_features_label": {
+    "message": "Équipement"
+  },
+  "outlook_resource_room_kind": {
+    "message": "Salle"
+  },
+  "outlook_resource_other_kind": {
+    "message": "Ressource"
+  },
+  "outlook_resource_not_provided": {
+    "message": "Non renseigné"
+  },
+  "outlook_resource_selection_hint": {
+    "message": "Sélectionnez au maximum une salle et autant de ressources que nécessaire."
+  },
+  "outlook_resource_ifb_disabled_hint": {
+    "message": "Internet Free/Busy est désactivé. Activez-le dans les paramètres pour afficher les disponibilités dans l’Assistant Planification."
+  },
+  "outlook_resource_no_results": {
+    "message": "Aucune salle ou ressource correspondante."
+  },
+  "outlook_resource_apply_button": {
+    "message": "Appliquer"
+  },
+  "outlook_resource_load_failed": {
+    "message": "Impossible de charger les salles et ressources Nextcloud. Vérifiez la connexion et réessayez."
+  },
+  "outlook_resource_apply_failed": {
+    "message": "La sélection n’a pas pu être entièrement appliquée. Vérifiez les ressources et le lieu du rendez-vous avant d’enregistrer."
+  },
+  "outlook_resource_editable_appointment_required": {
+    "message": "Pour ajouter des ressources Nextcloud, ouvrez un rendez-vous modifiable dont vous êtes l’organisateur."
+  },
+  "outlook_resource_booking_hint": {
+    "message": "La réservation nécessite CalDAV Synchronizer configuré pour ce calendrier Nextcloud. NC Connector ajoute la sélection au rendez-vous, mais n’effectue aucune réservation."
+  },
   "options_remove_credentials_failed": {
     "message": "Impossible de supprimer les identifiants enregistrés. Veuillez réessayer."
   },

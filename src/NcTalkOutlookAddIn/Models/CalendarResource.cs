@@ -7,6 +7,27 @@ using System.Collections.Generic;
 
 namespace NcTalkOutlookAddIn.Models
 {
+    internal sealed class CalendarResourceTimeWindow
+    {
+        internal DateTime StartUtc { get; private set; }
+        internal DateTime EndUtc { get; private set; }
+        internal TimeZoneInfo TimeZone { get; private set; }
+
+        internal CalendarResourceTimeWindow(DateTime startUtc, DateTime endUtc, TimeZoneInfo timeZone)
+        {
+            StartUtc = DateTime.SpecifyKind(startUtc, DateTimeKind.Utc);
+            EndUtc = DateTime.SpecifyKind(endUtc, DateTimeKind.Utc);
+            if (EndUtc <= StartUtc) { throw new ArgumentException("The appointment end must follow its start."); }
+            if (timeZone == null) { throw new ArgumentNullException("timeZone"); }
+            TimeZone = timeZone;
+        }
+
+        internal bool Matches(CalendarResourceTimeWindow other)
+        {
+            return other != null && StartUtc == other.StartUtc && EndUtc == other.EndUtc && TimeZone.Id == other.TimeZone.Id;
+        }
+    }
+
     internal sealed class CalendarResource
     {
         public string PrincipalPath { get; set; }

@@ -54,13 +54,14 @@ namespace NcTalkOutlookAddIn
         private readonly SeparatePasswordDeliveryController _separatePasswordDeliveryController;
         private readonly FileLinkLaunchController _fileLinkLaunchController;
         private readonly TalkRibbonController _talkRibbonController;
+        private readonly CalendarResourceController _calendarResourceController;
+        private readonly RibbonActionController _ribbonActionController;
         private readonly MailInteropController _mailInteropController;
         private readonly MailBodyInsertionController _mailBodyInsertionController;
         private readonly ManagedEmailSignatureController _managedEmailSignatureController;
         private readonly UpdateCheckService _updateCheckService = new UpdateCheckService();
         private readonly DeferredAppointmentEnsureState _deferredAppointmentEnsureState = new DeferredAppointmentEnsureState();
         private OutlookUiSynchronizationContext _uiSynchronizationContext;
-        private IRibbonUI _ribbonUi;
         private const int ComposeAttachmentEvalDebounceMs = 250;
         internal const string IcalToken = "X-NCTALK-TOKEN";
         internal const string IcalUrl = "X-NCTALK-URL";
@@ -82,6 +83,8 @@ namespace NcTalkOutlookAddIn
                 new SeparatePasswordDeliveryController(this);
             _fileLinkLaunchController = new FileLinkLaunchController(this);
             _talkRibbonController = new TalkRibbonController(this);
+            _calendarResourceController = new CalendarResourceController(this);
+            _ribbonActionController = new RibbonActionController(this, _calendarResourceController);
             _mailInteropController = new MailInteropController(this);
             _mailBodyInsertionController = new MailBodyInsertionController(this, _mailInteropController);
             _managedEmailSignatureController = new ManagedEmailSignatureController(this);
@@ -102,6 +105,38 @@ namespace NcTalkOutlookAddIn
             get { return _outlookApplication; }
         }
 
+        internal CalendarResourceDirectory CalendarResources
+        {
+            get { return _freeBusyManager != null ? _freeBusyManager.ResourceDirectory : null; }
+        }
+
+        internal void InvalidateActionRibbons()
+        {
+            _ribbonActionController.Invalidate();
+        }
+
+        public bool OnGetActionEnabled(IRibbonControl control)
+        {
+            EnsureSettingsLoaded();
+            return _ribbonActionController.IsEnabled(control);
+        }
+
+        public string OnGetActionTooltip(IRibbonControl control)
+        {
+            EnsureSettingsLoaded();
+            return _ribbonActionController.GetTooltip(control);
+        }
+
+        public async void OnResourceButtonPressed(IRibbonControl control)
+        {
+            try
+            {
+                EnsureSettingsLoaded();
+                await _calendarResourceController.OpenAsync(control);
+            }
+            catch (Exception ex) { DiagnosticsLogger.LogException(LogCategories.Ifb, "Resource ribbon handler failed.", ex); }
+        }
+
         public string GetCustomUI(string ribbonID)
         {
             if (string.Equals(ribbonID, "Microsoft.Outlook.Appointment", StringComparison.OrdinalIgnoreCase))
@@ -112,14 +147,24 @@ namespace NcTalkOutlookAddIn
   <ribbon>
     <tabs>
       <tab idMso='TabAppointment'>
-        <group id='NcTalkGroup' label='{0}'>
+        <group id='NcTalkGroup' label='{0}' getImage='OnGetButtonImage'>
           <button id='NcTalkCreateButton'
                   label='{1}'
                   size='large'
                   getImage='OnGetButtonImage'
                   onAction='OnTalkButtonPressed'
                   screentip='{2}'
-                  supertip='{3}' />
+                  getEnabled='OnGetActionEnabled' getSupertip='OnGetActionTooltip' />
+          <button id='NcResourceAppointmentButton' label='{3}' size='large'
+                  getImage='OnGetButtonImage' onAction='OnResourceButtonPressed'
+                  getEnabled='OnGetActionEnabled' getSupertip='OnGetActionTooltip' />
+        </group>
+      </tab>
+      <tab idMso='TabSchedulingAssistant'>
+        <group id='NcResourceSchedulingGroup' label='{0}' getImage='OnGetButtonImage'>
+          <button id='NcResourceSchedulingButton' label='{3}' size='large'
+                  getImage='OnGetButtonImage' onAction='OnResourceButtonPressed'
+                  getEnabled='OnGetActionEnabled' getSupertip='OnGetActionTooltip' />
         </group>
       </tab>
     </tabs>
@@ -128,7 +173,7 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonAppointmentGroupLabel),
                     EscapeXml(Strings.RibbonTalkButtonLabel),
                     EscapeXml(Strings.RibbonTalkButtonScreenTip),
-                    EscapeXml(Strings.RibbonTalkButtonSuperTip));
+                    EscapeXml(Strings.ResourceRibbonLabel));
             }
             if (string.Equals(ribbonID, "Microsoft.Outlook.Explorer", StringComparison.OrdinalIgnoreCase))
             {
@@ -138,7 +183,7 @@ namespace NcTalkOutlookAddIn
   <ribbon>
     <tabs>
       <tab id='NcTalkExplorerTab' label='{0}' insertAfterMso='TabMail' getVisible='OnGetMainRibbonTabVisible'>
-        <group id='NcTalkExplorerGroup' label='{1}'>
+        <group id='NcTalkExplorerGroup' label='{1}' getImage='OnGetButtonImage'>
           <button id='NcTalkSettingsExplorerButton'
                   label='{2}'
                   size='large'
@@ -152,14 +197,14 @@ namespace NcTalkOutlookAddIn
     <contextualTabs>
       <tabSet idMso='TabComposeTools'>
         <tab idMso='TabMessage'>
-          <group id='NcTalkInlineMailGroup' label='{1}'>
+          <group id='NcTalkInlineMailGroup' label='{1}' getImage='OnGetButtonImage'>
             <button id='NcTalkInlineFileLinkButton'
                     label='{5}'
                     size='large'
                     getImage='OnGetButtonImage'
                     onAction='OnFileLinkButtonPressed'
                     screentip='{6}'
-                    supertip='{7}' />
+                    getEnabled='OnGetActionEnabled' getSupertip='OnGetActionTooltip' />
           </group>
         </tab>
       </tabSet>
@@ -172,8 +217,7 @@ namespace NcTalkOutlookAddIn
                     EscapeXml(Strings.RibbonSettingsScreenTip),
                     EscapeXml(Strings.RibbonSettingsSuperTip),
                     EscapeXml(Strings.RibbonFileLinkButtonLabel),
-                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
-                    EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
+                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip));
             }
             if (string.Equals(ribbonID, "Microsoft.Outlook.Mail.Compose", StringComparison.OrdinalIgnoreCase))
             {
@@ -183,14 +227,14 @@ namespace NcTalkOutlookAddIn
   <ribbon>
     <tabs>
       <tab idMso='TabNewMailMessage'>
-        <group id='NcTalkMailGroup' label='{0}'>
+        <group id='NcTalkMailGroup' label='{0}' getImage='OnGetButtonImage'>
           <button id='NcTalkFileLinkButton'
                   label='{1}'
                   size='large'
                   getImage='OnGetButtonImage'
                   onAction='OnFileLinkButtonPressed'
                   screentip='{2}'
-                  supertip='{3}' />
+                  getEnabled='OnGetActionEnabled' getSupertip='OnGetActionTooltip' />
         </group>
       </tab>
     </tabs>
@@ -198,21 +242,14 @@ namespace NcTalkOutlookAddIn
 </customUI>",
                     EscapeXml(Strings.RibbonMailGroupLabel),
                     EscapeXml(Strings.RibbonFileLinkButtonLabel),
-                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip),
-                    EscapeXml(Strings.RibbonFileLinkButtonSuperTip));
+                    EscapeXml(Strings.RibbonFileLinkButtonScreenTip));
             }
             return null;
         }
 
-                // Outlook passes the ribbon handle right after loading.
-        // Stores the instance for later refresh operations.
         public void OnRibbonLoad(IRibbonUI ribbonUI)
         {
-            // Keep a stable handle so future dynamic ribbon refreshes can call Invalidate/InvalidateControl.
-            if (!ReferenceEquals(_ribbonUi, ribbonUI))
-            {
-                _ribbonUi = ribbonUI;
-            }
+            _ribbonActionController.Register(ribbonUI);
         }
 
         public async void OnTalkButtonPressed(IRibbonControl control)
@@ -255,6 +292,7 @@ namespace NcTalkOutlookAddIn
                     _currentSettings = settings;
                     _mailComposeSubscriptionRegistry
                         .RefreshAttachmentAutomationSettings();
+                    InvalidateActionRibbons();
                 },
                 (configuration, trigger) => FetchBackendPolicyStatus(configuration, trigger),
                 settings => ConfigureDiagnosticsLogger(settings),
