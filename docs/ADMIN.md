@@ -443,7 +443,7 @@ If you distribute an XML template instead of registry values, create only profil
 
 ### Uninstall and reinstall
 
-Close Outlook in every session and uninstall the add-in through **Windows Settings → Apps**. The MSI removes program files, add-in registration, the default IFB reservation, and owned Free/Busy remnants. Installation, upgrade, and repair also remove such old IFB values even if the data directory was deleted earlier.
+Close Outlook in every session and uninstall the add-in through **Windows Settings → Apps**. The MSI removes program files, add-in registration, the default IFB reservation, and owned Free/Busy remnants. Installation, upgrade, repair, and rerunning the same MSI also remove such old IFB values even if the data directory was deleted earlier.
 
 For an unattended uninstall with a log:
 

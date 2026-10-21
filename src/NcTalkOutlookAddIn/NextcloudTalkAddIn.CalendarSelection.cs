@@ -15,6 +15,7 @@ namespace NcTalkOutlookAddIn
     {
         private void OnExplorerSelectionChanged(string explorerKey)
         {
+            if (!TryInitializeProfileRuntime()) { return; }
             Outlook.Explorer explorer;
             if (string.IsNullOrWhiteSpace(explorerKey)
                 || !_hookedExplorers.TryGetValue(explorerKey, out explorer)

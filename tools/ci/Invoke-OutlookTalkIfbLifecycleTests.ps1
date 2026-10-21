@@ -411,6 +411,19 @@ Assert-SourceContract `
     $ifbStore `
     'ProtectedJsonStateStore<IfbRegistryState>'
 
+$profileInitializationSource = Get-SourceSlice $lifecycle '        private void InitializeProfileRuntime(' '        private void InitializeOutlookUiSynchronizationContext('
+Assert-LiteralOrder `
+    "Confirmed profile initialization retries application hooks after profile services exist" `
+    $profileInitializationSource `
+    @('SettingsStorage(outlookProfileName)', '_freeBusyManager.Initialize(_outlookApplication)',
+        'if (!_profileRuntimeStopped)', 'EnsureApplicationHook()', 'EnsureInspectorHook()')
+$profileStartupSource = Get-SourceSlice $lifecycle '        private bool TryInitializeProfileRuntime(' '        private void InitializeProfileRuntime('
+Assert-LiteralOrder `
+    "Profile initialization and hook retry finish before IFB and surface refresh" `
+    $profileStartupSource `
+    @('InitializeProfileRuntime(outlookProfileName)', 'if (_profileRuntimeStopped)',
+        '_profileRuntimeInitialized = true', 'ApplyIfbSettings(false)', 'RefreshProfileRuntimeSurfaces()')
+
 $TempRoot = Join-Path ([System.IO.Path]::GetTempPath()) (
     "nc4ol-talk-ifb-tests-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force -Path $TempRoot | Out-Null
@@ -420,6 +433,7 @@ try {
     $testCode = @'
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -459,6 +473,7 @@ namespace NcTalkOutlookAddIn.Utilities
         internal const string ErrorMissingCredentials = "Missing credentials";
         internal const string TalkSystemAddressbookInvalidResponse = "Invalid address book";
         internal const string TalkSystemAddressbookFetchFailed = "Address book fetch failed";
+        internal const string WarningIfbStartFailed = "IFB failed: {0}";
     }
 
     internal static class PolicyUiHelper
@@ -483,6 +498,10 @@ namespace NcTalkOutlookAddIn.Settings
         public string AppPassword { get; set; }
         public string IfbPreviousFreeBusyPath { get; set; }
         public bool IsEnterpriseRollout { get; set; }
+        public bool IfbEnabled { get; set; }
+        public int IfbDays { get; set; }
+        public int IfbPort { get; set; }
+        public int IfbCacheHours { get; set; }
     }
 }
 
@@ -522,6 +541,7 @@ namespace NcTalkOutlookAddIn.Services
             if (handler != null) { handler(identity); }
         }
         internal static void Reset() { Status = new ConnectionPauseStatus(string.Empty, DateTime.MinValue); Identity = ResolvedIdentity = null; }
+        internal static void Shutdown() { Reset(); }
     }
 
     internal sealed class FileLinkService
@@ -662,6 +682,7 @@ internal sealed class TalkIfbLifecycleTests
         TestSystemAddressbookCacheRecovery();
         TestSystemAddressbookScope();
         TestSystemAddressbookParticipants();
+        TestProfileStartup();
 
         if (failures > 0)
         {
@@ -669,6 +690,171 @@ internal sealed class TalkIfbLifecycleTests
         }
         Console.WriteLine("All Talk/IFB lifecycle tests passed.");
         return 0;
+    }
+
+    private sealed class ProfileStartup
+    {
+        internal sealed class Session
+        {
+            internal string Name;
+            internal bool RejectRead;
+            public string CurrentProfileName { get { if (RejectRead) throw new InvalidOperationException("Session not ready"); return Name; } }
+        }
+        internal sealed class Application
+        {
+            internal object CurrentSession;
+            internal Action OnSessionRead;
+            internal int Reads;
+            internal object Session { get { Reads++; if (OnSessionRead != null) OnSessionRead(); return CurrentSession; } }
+        }
+        private sealed class SettingsStore
+        {
+            internal int Saves;
+            internal void Save(AddinSettings settings) { Saves++; }
+        }
+        private sealed class IfbManager : IDisposable
+        {
+            internal int Applies, Disposals;
+            internal bool Fail;
+            internal Action OnDispose;
+            internal void ApplySettings(AddinSettings settings)
+            {
+                Applies++;
+                if (Fail) throw new InvalidOperationException("Ownership conflict");
+            }
+            public void Dispose() { Disposals++; if (OnDispose != null) OnDispose(); }
+        }
+        private sealed class RibbonController { internal void Stop() {} }
+        private sealed class DeferredState { internal void ClearPendingKeys() {} }
+        private sealed class OutlookUiSynchronizationContext : IDisposable { public void Dispose() {} }
+        private static class ComInteropScope { internal static void TryRelease(object value, string category, string message) {} }
+
+        private bool _profileRuntimeInitialized, _profileRuntimeInitializing, _profileRuntimeStopped;
+        private Application _outlookApplication;
+        private AddinSettings _currentSettings = new AddinSettings();
+        private SettingsStore _settingsStorage;
+        private IfbManager _freeBusyManager;
+        private readonly RibbonController _ribbonActionController = new RibbonController();
+        private readonly DeferredState _deferredAppointmentEnsureState = new DeferredState();
+        private OutlookUiSynchronizationContext _uiSynchronizationContext = new OutlookUiSynchronizationContext();
+        internal readonly List<string> Profiles = new List<string>();
+        internal readonly List<string> Logs = new List<string>();
+        internal int Warnings, Refreshes, UpdateChecks, Unhooks;
+        internal int IfbDisposals;
+        internal Action OnInitialize;
+        internal bool StartupIfbFailure;
+        internal ProfileStartup(Application application) { _outlookApplication = application; }
+        internal bool Start() { return TryInitializeProfileRuntime(); }
+        internal void Stop(bool clearApplication) { TearDownAddInState("test", clearApplication); }
+        internal void ApplyExplicitIfb() { ApplyIfbSettings(true); }
+        internal int IfbApplies { get { return _freeBusyManager == null ? 0 : _freeBusyManager.Applies; } }
+        internal bool HasProfileState { get { return _settingsStorage != null || _freeBusyManager != null; } }
+        private void InitializeProfileRuntime(string profile)
+        {
+            Profiles.Add(profile);
+            _settingsStorage = new SettingsStore();
+            _currentSettings = new AddinSettings { IfbEnabled = true, IfbDays = 30, IfbPort = 7777, IfbCacheHours = 24 };
+            _freeBusyManager = new IfbManager { Fail = StartupIfbFailure, OnDispose = () => IfbDisposals++ };
+            if (OnInitialize != null) OnInitialize();
+        }
+        private void RefreshProfileRuntimeSurfaces() { Refreshes++; }
+        private void StartUpdateCheckIfDue() { UpdateChecks++; }
+        private void LogCore(string message) { Logs.Add(message); }
+        private void ShowWarning(string message) { Warnings++; }
+        private void UnhookApplication() { Unhooks++; }
+        private void UnhookInspector() {}
+        private void UnhookMailComposeSubscriptions() {}
+        private void DisposeTalkAppointmentSync() {}
+        private void DisposeTalkAppointmentSubscriptions() {}
+        private void DisposeTalkRoomLifecycle() {}
+        private void DisposeComposeShareCleanup() {}
+
+        // PROFILE_START_SOURCE
+        // PROFILE_RESOLVE_SOURCE
+        // PROFILE_TEARDOWN_SOURCE
+        // PROFILE_APPLY_IFB_SOURCE
+    }
+
+    private static void TestProfileStartup()
+    {
+        foreach (string name in new[] { "Outlook", "Company Mail", "default", "  Named Profile  " })
+        {
+            var app = new ProfileStartup.Application { CurrentSession = new ProfileStartup.Session { Name = name } };
+            var runtime = new ProfileStartup(app);
+            Check("An immediately available Outlook profile starts without requiring a profile prompt", runtime.Start());
+            Check("Startup uses the exact confirmed profile, including a real profile named default",
+                runtime.Profiles.Count == 1 && runtime.Profiles[0] == name.Trim() && runtime.IfbApplies == 1);
+            for (int callback = 0; callback < 5; callback++) { Check("Warm Send-to and repeated ready callbacks reuse the initialized profile", runtime.Start()); }
+            Check("Repeated callbacks do not reload settings, restart IFB or repeat update checks",
+                runtime.Profiles.Count == 1 && runtime.IfbApplies == 1 && runtime.Refreshes == 1 && runtime.UpdateChecks == 1 && app.Reads == 1);
+            runtime.Stop(false);
+            runtime.Stop(true);
+            Check("Repeated shutdown and late ready callbacks cannot restart profile services", !runtime.Start() && runtime.Profiles.Count == 1);
+        }
+
+        foreach (object unavailable in new object[] { null, new ProfileStartup.Session { Name = "" },
+            new ProfileStartup.Session { Name = "  " }, new ProfileStartup.Session { RejectRead = true } })
+        {
+            var app = new ProfileStartup.Application { CurrentSession = unavailable };
+            var runtime = new ProfileStartup(app);
+            for (int callback = 0; callback < 5; callback++) { Check("An unconfirmed profile defers cold Send-to startup", !runtime.Start()); }
+            Check("An unavailable profile creates no default-profile settings, ownership, IFB or update work",
+                !runtime.HasProfileState && runtime.Profiles.Count == 0 && runtime.UpdateChecks == 0 && runtime.Warnings == 0);
+            app.CurrentSession = new ProfileStartup.Session { Name = "Later Selected" };
+            Check("A later confirmed profile completes the same deferred startup", runtime.Start());
+            Check("Deferred startup binds once to the selected profile", runtime.Profiles.Count == 1 && runtime.Profiles[0] == "Later Selected" && runtime.IfbApplies == 1);
+        }
+
+        var unresolvedApp = new ProfileStartup.Application();
+        var unresolved = new ProfileStartup(unresolvedApp);
+        Check("A permanently unavailable profile remains uninitialized", !unresolved.Start());
+        unresolved.Stop(false);
+        unresolvedApp.CurrentSession = new ProfileStartup.Session { Name = "Too Late" };
+        Check("A queued profile-ready callback after shutdown cannot initialize services", !unresolved.Start() && !unresolved.HasProfileState);
+        Check("Missing application never starts a fallback profile", !new ProfileStartup(null).Start());
+
+        var reentrantApp = new ProfileStartup.Application { CurrentSession = new ProfileStartup.Session { Name = "Selected" } };
+        var reentrant = new ProfileStartup(reentrantApp);
+        reentrantApp.OnSessionRead = () => Check("Profile-picker reentry is blocked before another Session read", !reentrant.Start());
+        Check("Outer profile resolution still initializes once after reentry", reentrant.Start() && reentrant.Profiles.Count == 1 && reentrantApp.Reads == 1);
+
+        foreach (bool clearApplication in new[] { false, true })
+        {
+            var stoppingApp = new ProfileStartup.Application { CurrentSession = new ProfileStartup.Session { Name = "Selected" } };
+            var stopping = new ProfileStartup(stoppingApp);
+            stoppingApp.OnSessionRead = () => stopping.Stop(clearApplication);
+            Check("Shutdown during profile resolution prevents initialization even after a name is returned",
+                !stopping.Start() && !stopping.HasProfileState && stopping.Profiles.Count == 0);
+
+            var bootstrapping = new ProfileStartup(new ProfileStartup.Application { CurrentSession = new ProfileStartup.Session { Name = "Selected" } });
+            bootstrapping.OnInitialize = () => bootstrapping.Stop(clearApplication);
+            Check("Shutdown during profile bootstrap disposes the partial runtime without applying IFB",
+                !bootstrapping.Start() && bootstrapping.Profiles.Count == 1 && bootstrapping.IfbDisposals == 1
+                && bootstrapping.IfbApplies == 0 && bootstrapping.Refreshes == 0 && bootstrapping.UpdateChecks == 0);
+            Check("A late callback cannot recreate services after shutdown during profile bootstrap",
+                !bootstrapping.Start() && bootstrapping.Profiles.Count == 1 && bootstrapping.IfbDisposals == 1);
+        }
+
+        var bootstrapReentry = new ProfileStartup(new ProfileStartup.Application { CurrentSession = new ProfileStartup.Session { Name = "Selected" } });
+        bootstrapReentry.OnInitialize = () => Check("A callback during profile bootstrap cannot initialize a second runtime", !bootstrapReentry.Start());
+        Check("Outer bootstrap completes once after a reentrant callback", bootstrapReentry.Start()
+            && bootstrapReentry.Profiles.Count == 1 && bootstrapReentry.IfbApplies == 1);
+
+        var interrupted = new ProfileStartup(new ProfileStartup.Application { CurrentSession = new ProfileStartup.Session { Name = "Selected" } });
+        interrupted.OnInitialize = () => { throw new InvalidOperationException("Bootstrap interrupted"); };
+        Check("An interrupted profile bootstrap tears down partially created services", !interrupted.Start()
+            && interrupted.IfbDisposals == 1 && interrupted.IfbApplies == 0 && interrupted.UpdateChecks == 0);
+        Check("A later callback cannot duplicate workers after a bootstrap exception", !interrupted.Start()
+            && interrupted.Profiles.Count == 1 && interrupted.IfbDisposals == 1);
+
+        var failing = new ProfileStartup(new ProfileStartup.Application { CurrentSession = new ProfileStartup.Session { Name = "Company Mail" } }) { StartupIfbFailure = true };
+        int priorIfbErrors = DiagnosticsLogger.Messages.FindAll(message => message.Contains("Failed to start IFB")).Count;
+        Check("An IFB ownership failure does not abort startup", failing.Start());
+        Check("Startup IFB failure is logged without a modal warning", failing.Warnings == 0
+            && DiagnosticsLogger.Messages.FindAll(message => message.Contains("Failed to start IFB")).Count == priorIfbErrors + 1);
+        Check("Warm callbacks do not retry the failed startup listener", failing.Start() && failing.IfbApplies == 1);
+        failing.ApplyExplicitIfb();
+        Check("Explicit Settings still reports an IFB failure", failing.Warnings == 1 && failing.IfbApplies == 2);
     }
 
     private const string AddressbookExport =
@@ -2273,9 +2459,17 @@ internal sealed class TalkIfbLifecycleTests
         $appointmentSyncController `
         '        private static void ExecuteRoomNameSync(' `
         '        private static void ExecuteParticipantSync('
+    $profileStartSource = Get-SourceSlice $lifecycle '        private bool TryInitializeProfileRuntime(' '        private void InitializeProfileRuntime('
+    $profileResolveSource = Get-SourceSlice $lifecycle '        private string ResolveCurrentOutlookProfileName(' '        public void OnDisconnection('
+    $profileTeardownSource = Get-SourceSlice $lifecycle '        private void TearDownAddInState(' "`r`n    }`r`n}"
+    $profileApplyIfbSource = Get-SourceSlice $addin '        private void ApplyIfbSettings(' '        internal TalkService CreateTalkService('
     $testCode.Replace('// EXECUTE_PARTICIPANT_SYNC_SOURCE', $participantSyncSource).
         Replace('// EXECUTE_REMOTE_SYNC_SOURCE', $executeRemoteSyncSource).
-        Replace('// EXECUTE_ROOM_SYNC_SOURCE', $executeRoomSyncSource) |
+        Replace('// EXECUTE_ROOM_SYNC_SOURCE', $executeRoomSyncSource).
+        Replace('// PROFILE_START_SOURCE', $profileStartSource).
+        Replace('// PROFILE_RESOLVE_SOURCE', $profileResolveSource).
+        Replace('// PROFILE_TEARDOWN_SOURCE', $profileTeardownSource).
+        Replace('// PROFILE_APPLY_IFB_SOURCE', $profileApplyIfbSource) |
         Set-Content -LiteralPath $testSource -Encoding UTF8
 
     $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"

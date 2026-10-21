@@ -11,9 +11,11 @@ namespace NcTalkOutlookAddIn
         // Outlook hook lifecycle for inspector/application events and compose-tracking entry points.
     public sealed partial class NextcloudTalkAddIn
     {
+        private Outlook.ApplicationEvents_11_Event _profileLogonEvents;
+
         private void EnsureInspectorHook()
         {
-            if (_outlookApplication == null || _inspectors != null)
+            if (_profileRuntimeStopped || _outlookApplication == null || _inspectors != null)
             {
                 return;
             }
@@ -34,12 +36,20 @@ namespace NcTalkOutlookAddIn
 
         private void EnsureApplicationHook()
         {
-            if (_outlookApplication == null)
+            if (_profileRuntimeStopped || _outlookApplication == null)
             {
                 return;
             }
             try
             {
+                if (_profileLogonEvents == null)
+                {
+                    _profileLogonEvents = _outlookApplication as Outlook.ApplicationEvents_11_Event;
+                    if (_profileLogonEvents != null)
+                    {
+                        _profileLogonEvents.MAPILogonComplete += OnMapiLogonComplete;
+                    }
+                }
                 EnsureExplorerHooks();
             }
             catch (Exception ex)
@@ -50,7 +60,65 @@ namespace NcTalkOutlookAddIn
 
         private void UnhookApplication()
         {
+            if (_profileLogonEvents != null)
+            {
+                try { _profileLogonEvents.MAPILogonComplete -= OnMapiLogonComplete; }
+                catch (Exception ex)
+                {
+                    DiagnosticsLogger.LogException(LogCategories.Core, "Failed to unhook Outlook profile logon completion.", ex);
+                }
+                _profileLogonEvents = null;
+            }
             UnhookExplorerHooks();
+        }
+
+        private void OnMapiLogonComplete()
+        {
+            try { TryInitializeProfileRuntime(); }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to initialize the selected Outlook profile.", ex);
+            }
+        }
+
+        private void RefreshProfileRuntimeSurfaces()
+        {
+            // A Simple MAPI Inspector may already exist when logon finally completes.
+            try
+            {
+                int count = _inspectors != null ? _inspectors.Count : 0;
+                for (int index = 1; index <= count; index++)
+                {
+                    Outlook.Inspector inspector = null;
+                    bool retained = false;
+                    try
+                    {
+                        inspector = _inspectors[index];
+                        retained = BindInspectorItem(inspector);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticsLogger.LogException(LogCategories.Core, "Failed to bind an Inspector after profile initialization.", ex);
+                    }
+                    finally
+                    {
+                        if (!retained)
+                        {
+                            ComInteropScope.TryRelease(inspector, LogCategories.Core, "Failed to release an untracked existing Inspector.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticsLogger.LogException(LogCategories.Core, "Failed to enumerate Inspectors after profile initialization.", ex);
+            }
+            foreach (string explorerKey in new System.Collections.Generic.List<string>(_hookedExplorers.Keys))
+            {
+                OnExplorerSelectionChanged(explorerKey);
+            }
+            _mailComposeSubscriptionRegistry.RefreshAttachmentAutomationSettings();
+            InvalidateActionRibbons();
         }
 
         private void EnsureExplorerHooks()
@@ -119,7 +187,7 @@ namespace NcTalkOutlookAddIn
 
         private bool HookExplorer(Outlook.Explorer explorer)
         {
-            if (explorer == null)
+            if (_profileRuntimeStopped || explorer == null)
             {
                 return false;
             }
@@ -308,29 +376,8 @@ namespace NcTalkOutlookAddIn
             }
             try
             {
-                var appointment = inspector.CurrentItem as Outlook.AppointmentItem;
-                if (appointment != null)
-                {
-                    EnsureSubscriptionForAppointment(appointment);
-                }
-                var mail = inspector.CurrentItem as Outlook.MailItem;
-                if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
-                {
-                    string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
-                    MailComposeSubscription subscription = EnsureMailComposeSubscription(
-                        mail,
-                        inspectorIdentityKey,
-                        false,
-                        null,
-                        inspector);
-                    if (subscription != null && DiagnosticsLogger.IsEnabled)
-                    {
-                        LogFileLink(
-                            "Compose subscription associated with Inspector surface (inspectorKey="
-                            + (inspectorIdentityKey ?? string.Empty)
-                            + ").");
-                    }
-                }
+                if (!TryInitializeProfileRuntime()) { return; }
+                BindInspectorItem(inspector);
             }
             catch (Exception ex)
             {
@@ -338,10 +385,42 @@ namespace NcTalkOutlookAddIn
             }
         }
 
+        private bool BindInspectorItem(Outlook.Inspector inspector)
+        {
+            if (inspector == null) { return false; }
+            var appointment = inspector.CurrentItem as Outlook.AppointmentItem;
+            if (appointment != null)
+            {
+                EnsureSubscriptionForAppointment(appointment);
+            }
+            var mail = inspector.CurrentItem as Outlook.MailItem;
+            if (mail != null && IsMailComposeCandidate(mail, "new_inspector"))
+            {
+                string inspectorIdentityKey = ComInteropScope.ResolveIdentityKey(inspector, LogCategories.FileLink, "Inspector");
+                MailComposeSubscription subscription = EnsureMailComposeSubscription(
+                    mail,
+                    inspectorIdentityKey,
+                    false,
+                    null,
+                    inspector);
+                if (subscription != null && DiagnosticsLogger.IsEnabled)
+                {
+                    LogFileLink(
+                        "Compose subscription associated with Inspector surface (inspectorKey="
+                        + (inspectorIdentityKey ?? string.Empty)
+                        + ").");
+                }
+                return subscription != null;
+            }
+            return false;
+        }
+
         private void OnNewExplorer(Outlook.Explorer explorer)
         {
             try
             {
+                TryInitializeProfileRuntime();
+                if (_profileRuntimeStopped) { return; }
                 HookExplorer(explorer);
             }
             catch (Exception ex)
@@ -352,6 +431,7 @@ namespace NcTalkOutlookAddIn
 
         private void OnExplorerInlineResponse(string explorerKey, object item)
         {
+            if (!TryInitializeProfileRuntime()) { return; }
             var mail = item as Outlook.MailItem;
             if (mail == null || !IsMailComposeCandidate(mail, "inline_response"))
             {

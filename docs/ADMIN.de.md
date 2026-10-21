@@ -451,7 +451,7 @@ Falls Sie statt Registry-Werten eine XML-Vorlage verteilen, nur noch nicht vorha
 
 ### Deinstallation und Neuinstallation
 
-Outlook in allen Sitzungen schließen und das Add-in über **Windows-Einstellungen → Apps** deinstallieren. Die MSI entfernt Programmdateien, Add-in-Registrierung, die Standard-IFB-Reservierung und eigene Free/Busy-Restwerte. Auch Installation, Upgrade und Reparatur bereinigen solche alten IFB-Werte, selbst wenn der Datenordner zuvor gelöscht wurde.
+Outlook in allen Sitzungen schließen und das Add-in über **Windows-Einstellungen → Apps** deinstallieren. Die MSI entfernt Programmdateien, Add-in-Registrierung, die Standard-IFB-Reservierung und eigene Free/Busy-Restwerte. Auch Installation, Upgrade, Reparatur und erneutes Ausführen derselben MSI bereinigen solche alten IFB-Werte, selbst wenn der Datenordner zuvor gelöscht wurde.
 
 Für die unbeaufsichtigte Deinstallation mit Protokoll:
 

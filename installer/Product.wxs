@@ -37,14 +37,15 @@
                   ExeCommand="commit &quot;[ProductCode]&quot;"
                   Execute="commit" Impersonate="no" Return="check" />
     <InstallExecuteSequence>
+      <!-- Also run for same-version maintenance without REINSTALL; only the incoming upgrade package owns cleanup. -->
       <Custom Action="CheckOutlookClosed" Before="RemoveExistingProducts"
-              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+              Condition="NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="RollbackIfbRegistry" Before="CleanupIfbRegistry"
-              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+              Condition="NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="CleanupIfbRegistry" After="InstallInitialize"
-              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+              Condition="NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="CommitIfbRegistry" After="CleanupIfbRegistry"
-              Condition="NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~=&quot;ALL&quot;)" />
+              Condition="NOT UPGRADINGPRODUCTCODE" />
     </InstallExecuteSequence>
 
     <StandardDirectory Id="ProgramFiles6432Folder">

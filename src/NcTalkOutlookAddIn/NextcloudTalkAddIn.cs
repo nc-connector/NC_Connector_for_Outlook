@@ -118,7 +118,7 @@ namespace NcTalkOutlookAddIn
         public bool OnGetActionEnabled(IRibbonControl control)
         {
             EnsureSettingsLoaded();
-            return _ribbonActionController.IsEnabled(control);
+            return _profileRuntimeInitialized && _ribbonActionController.IsEnabled(control);
         }
 
         public string OnGetActionTooltip(IRibbonControl control)
@@ -131,7 +131,7 @@ namespace NcTalkOutlookAddIn
         {
             try
             {
-                EnsureSettingsLoaded();
+                if (!TryInitializeProfileRuntime()) { return; }
                 await _calendarResourceController.OpenAsync(control);
             }
             catch (Exception ex) { DiagnosticsLogger.LogException(LogCategories.Ifb, "Resource ribbon handler failed.", ex); }
@@ -256,7 +256,7 @@ namespace NcTalkOutlookAddIn
         {
             try
             {
-                EnsureSettingsLoaded();
+                if (!TryInitializeProfileRuntime()) { return; }
                 await _talkRibbonController.OnTalkButtonPressedAsync(control);
             }
             catch (Exception ex)
@@ -269,7 +269,7 @@ namespace NcTalkOutlookAddIn
         {
             try
             {
-                EnsureSettingsLoaded();
+                if (!TryInitializeProfileRuntime()) { return; }
                 if (!_currentSettings.ShowMainRibbonTab)
                 {
                     return;
@@ -301,13 +301,14 @@ namespace NcTalkOutlookAddIn
                         settings,
                         source,
                         showWarning),
-                () => ApplyIfbSettings(),
+                () => ApplyIfbSettings(true),
                 settings =>
                 {
-                    if (_settingsStorage != null)
+                    if (!_profileRuntimeInitialized || _settingsStorage == null)
                     {
-                        _settingsStorage.SaveUserInitiated(settings);
+                        throw new InvalidOperationException("Profile settings storage is unavailable.");
                     }
+                    _settingsStorage.SaveUserInitiated(settings);
                 },
                 callback => RunOnOutlookUiThreadAsync(callback),
                 message => LogSettings(message),
@@ -317,7 +318,7 @@ namespace NcTalkOutlookAddIn
                 OutlookProfileScope,
                 settings =>
                 {
-                    if (_settingsStorage == null)
+                    if (!_profileRuntimeInitialized || _settingsStorage == null)
                     {
                         throw new InvalidOperationException("Profile settings storage is unavailable.");
                     }
@@ -337,7 +338,7 @@ namespace NcTalkOutlookAddIn
             string context,
             Action<Exception> onFailureObserved = null)
         {
-            EnsureSettingsLoaded();
+            if (!TryInitializeProfileRuntime()) { return Task.FromResult<AddinSettings>(null); }
             return CreateSettingsWorkflowController().EnsureConnectionForActionAsync(
                 () => IsItemOpenForRibbonAction(originalItem),
                 allowInteractiveRecovery,
@@ -367,7 +368,7 @@ namespace NcTalkOutlookAddIn
         {
             try
             {
-                EnsureSettingsLoaded();
+                if (!TryInitializeProfileRuntime()) { return; }
                 await _fileLinkLaunchController.OnFileLinkButtonPressedAsync(control);
             }
             catch (Exception ex)
@@ -701,7 +702,7 @@ namespace NcTalkOutlookAddIn
                    && !string.IsNullOrWhiteSpace(_currentSettings.AppPassword);
         }
 
-        private void ApplyIfbSettings()
+        private void ApplyIfbSettings(bool showWarning)
         {
             // Diagnostics logger configuration is intentionally handled by the caller
             // (startup/settings save) to avoid duplicate reconfiguration on normal settings saves.
@@ -723,8 +724,13 @@ namespace NcTalkOutlookAddIn
             }
             catch (Exception ex)
             {
-                LogCore("Failed to start IFB: " + ex.Message);
-                ShowWarning(string.Format(Strings.WarningIfbStartFailed, ex.Message));
+                DiagnosticsLogger.LogException(LogCategories.Ifb, "Failed to start IFB.", ex);
+                // A modal startup warning interrupts Explorer's Simple MAPI send request.
+                // Explicit Settings saves still report an actionable IFB error.
+                if (showWarning)
+                {
+                    ShowWarning(string.Format(Strings.WarningIfbStartFailed, ex.Message));
+                }
             }
         }
 
@@ -1013,18 +1019,12 @@ namespace NcTalkOutlookAddIn
 
         internal void EnsureSettingsLoaded()
         {
+            if (TryInitializeProfileRuntime()) { return; }
             if (_currentSettings == null)
             {
-                if (_settingsStorage != null)
-                {
-                    _currentSettings = _settingsStorage.Load();
-                }
-                if (_currentSettings == null)
-                {
-                    _currentSettings = new AddinSettings();
-                }
-                TryApplyTransportSecurityFromSettings("lazy_load", false);
-                EnsureInspectorHook();
+                // Ribbon queries can run before profile selection; no persisted identity belongs here.
+                _currentSettings = new AddinSettings();
+                _currentSettings.ApplyManagedSetupPolicy(ManagedSetupPolicy.Load());
             }
         }
 

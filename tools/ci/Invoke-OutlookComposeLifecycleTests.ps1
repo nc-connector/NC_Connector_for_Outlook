@@ -633,9 +633,13 @@ Assert-Contains `
     $subscription `
     "(_inspectorEvents != null && inspector == null)"
 Assert-Contains `
-    "NewInspector passes the concrete Inspector to the compose subscription" `
-    ($hooks.Replace("`r`n", "`n")) `
-    "null,`n                        inspector);"
+    "NewInspector binds its concrete Inspector through the shared handler" `
+    (Get-MethodSlice $hooks "private void OnNewInspector(") `
+    "BindInspectorItem(inspector);"
+Assert-True `
+    "Inspector binding passes the concrete Inspector to the compose subscription" `
+    ((Get-MethodSlice $hooks "private bool BindInspectorItem(") -match `
+        'EnsureMailComposeSubscription\(\s*mail,\s*inspectorIdentityKey,\s*false,\s*null,\s*inspector\s*\)')
 
 $composeCleanupSources = $subscription + "`n" + $send + "`n" + $shareCleanup
 foreach ($obsoleteClosePath in @(

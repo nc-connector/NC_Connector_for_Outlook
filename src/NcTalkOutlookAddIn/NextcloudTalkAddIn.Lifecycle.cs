@@ -21,16 +21,85 @@ namespace NcTalkOutlookAddIn
     // Add-in lifecycle and bootstrap/teardown flow.
     public sealed partial class NextcloudTalkAddIn
     {
+        private bool _profileRuntimeInitialized;
+        private bool _profileRuntimeInitializing;
+        private bool _profileRuntimeStopped;
+
         public void OnConnection(object application, ext_ConnectMode connectMode, object addInInst, ref Array custom)
         {
             _outlookApplication = (Outlook.Application)application;
-            string outlookProfileName = ResolveCurrentOutlookProfileName();
+            _profileRuntimeStopped = false;
+            _profileRuntimeInitialized = false;
+            _settingsStorage = null;
+            _outlookProfileScope = string.Empty;
+            _currentSettings = new AddinSettings();
+            _currentSettings.ApplyManagedSetupPolicy(ManagedSetupPolicy.Load());
+            ConfigureDiagnosticsLogger(_currentSettings);
+            InitializeOutlookUiSynchronizationContext();
+            TryApplyOfficeUiLanguage();
+            // Simple MAPI can load the add-in before Outlook has selected its profile.
+            // Subscribe first; never read default-profile credentials or ownership as a substitute.
+            _profileRuntimeInitializing = true;
+            try
+            {
+                EnsureApplicationHook();
+                EnsureInspectorHook();
+            }
+            finally
+            {
+                _profileRuntimeInitializing = false;
+            }
+            TryInitializeProfileRuntime();
+        }
+
+        private bool TryInitializeProfileRuntime()
+        {
+            if (_profileRuntimeStopped) { return false; }
+            if (_profileRuntimeInitialized) { return true; }
+            if (_profileRuntimeInitializing || _outlookApplication == null) { return false; }
+
+            // Profile resolution can show Outlook's profile picker and pump reentrant callbacks.
+            _profileRuntimeInitializing = true;
+            try
+            {
+                string outlookProfileName = ResolveCurrentOutlookProfileName();
+                if (string.IsNullOrWhiteSpace(outlookProfileName) || _profileRuntimeStopped)
+                {
+                    LogCore("Profile-bound startup deferred until Outlook confirms its current profile.");
+                    return false;
+                }
+
+                InitializeProfileRuntime(outlookProfileName);
+                if (_profileRuntimeStopped)
+                {
+                    TearDownAddInState("shutdown during profile initialization", false);
+                    return false;
+                }
+                _profileRuntimeInitialized = true;
+                ApplyIfbSettings(false);
+                RefreshProfileRuntimeSurfaces();
+                StartUpdateCheckIfDue();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // A partially started worker must not be initialized twice by a later window callback.
+                DiagnosticsLogger.LogException(LogCategories.Core, "Profile-bound startup failed; restart Outlook to retry.", ex);
+                TearDownAddInState("profile initialization failure", false);
+                return false;
+            }
+            finally
+            {
+                _profileRuntimeInitializing = false;
+            }
+        }
+
+        private void InitializeProfileRuntime(string outlookProfileName)
+        {
             _settingsStorage = new NcTalkOutlookAddIn.Settings.SettingsStorage(outlookProfileName);
             _currentSettings = _settingsStorage.Load();
             ConfigureDiagnosticsLogger(_currentSettings);
-            InitializeOutlookUiSynchronizationContext();
             TryApplyTransportSecurityFromSettings("startup", false);
-            TryApplyOfficeUiLanguage();
             NextcloudConnectionState.Initialize(_settingsStorage.DataDirectory, outlookProfileName,
                 new TalkServiceConfiguration(_currentSettings.ServerUrl, _currentSettings.Username, _currentSettings.AppPassword));
             _ribbonActionController.Start();
@@ -56,10 +125,12 @@ namespace NcTalkOutlookAddIn
             InitializeTalkRoomLifecycle(
                 _settingsStorage.DataDirectory,
                 outlookProfileName);
-            EnsureApplicationHook();
-            EnsureInspectorHook();
-            ApplyIfbSettings();
-            StartUpdateCheckIfDue();
+            // Early MAPI startup may not expose window collections until a profile is selected.
+            if (!_profileRuntimeStopped)
+            {
+                EnsureApplicationHook();
+                EnsureInspectorHook();
+            }
         }
 
         private void InitializeOutlookUiSynchronizationContext()
@@ -261,9 +332,9 @@ namespace NcTalkOutlookAddIn
         {
         }
 
-        // IDTExtensibility2 requires this callback; startup work happens in OnConnection
         public void OnStartupComplete(ref Array custom)
         {
+            TryInitializeProfileRuntime();
         }
 
         public void OnBeginShutdown(ref Array custom)
@@ -274,6 +345,9 @@ namespace NcTalkOutlookAddIn
         // Outlook can call both shutdown callbacks, so teardown must stay idempotent
         private void TearDownAddInState(string origin, bool clearOutlookApplication)
         {
+            // Late login/window callbacks must not recreate profile workers during shutdown.
+            _profileRuntimeStopped = true;
+            _profileRuntimeInitialized = false;
             _ribbonActionController.Stop();
             UnhookApplication();
             UnhookInspector();

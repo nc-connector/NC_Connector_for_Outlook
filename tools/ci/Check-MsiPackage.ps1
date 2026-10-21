@@ -72,12 +72,12 @@ Assert-Check ($resources.Count -eq 1 -and $resources[0][0] -eq "OutlookAddinReso
     [string]::IsNullOrEmpty($resources[0][1]) -and $resources[0][2] -eq "[INSTALLFOLDER]NcTalkOutlookAddIn.dll" -and
     $resources[0][3] -eq "1") "The installed add-in DLL must be registered independently of component replacement."
 $expectedTypes = @{ CheckOutlookClosed = 2; RollbackIfbRegistry = 3330; CleanupIfbRegistry = 3074; CommitIfbRegistry = 3586 }
-$condition = 'NOT UPGRADINGPRODUCTCODE AND (NOT Installed OR REINSTALL OR REMOVE~="ALL")'
+$condition = 'NOT UPGRADINGPRODUCTCODE'
 foreach ($name in $expectedTypes.Keys) {
     $action = @($actions | Where-Object { $_[0] -eq $name })
     Assert-Check ($action.Count -eq 1 -and [int]$action[0][1] -eq $expectedTypes[$name] -and $action[0][2] -eq "IfbCleanupExe") "Incorrect IFB action type or binary: $name"
     $sequence = @($sequences | Where-Object { $_[0] -eq $name })
-    Assert-Check ($sequence.Count -eq 1 -and $sequence[0][1] -eq $condition) "IFB action must cover install, upgrade, repair and uninstall: $name"
+    Assert-Check ($sequence.Count -eq 1 -and $sequence[0][1] -eq $condition) "IFB action must cover install, upgrade, reconfiguration, repair and uninstall: $name"
 }
 $previous = -1
 foreach ($name in @("CostFinalize", "Wix4RegisterRestartResources_X64", "InstallValidate", "CheckOutlookClosed", "RemoveExistingProducts", "InstallInitialize", "RollbackIfbRegistry", "CleanupIfbRegistry", "CommitIfbRegistry", "InstallFinalize")) {
@@ -91,7 +91,9 @@ $session = $installer.GetType().InvokeMember("OpenPackage", "InvokeMethod", $nul
 foreach ($scenario in @(
     @{ Name = "fresh install"; Installed = ""; REINSTALL = ""; REMOVE = ""; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
     @{ Name = "new side of upgrade"; Installed = ""; REINSTALL = ""; REMOVE = ""; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
+    @{ Name = "same-version reconfiguration without REINSTALL"; Installed = "1"; REINSTALL = ""; REMOVE = ""; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
     @{ Name = "repair"; Installed = "1"; REINSTALL = "ALL"; REMOVE = ""; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
+    @{ Name = "feature maintenance"; Installed = "1"; REINSTALL = ""; REMOVE = "MainFeature"; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
     @{ Name = "full uninstall"; Installed = "1"; REINSTALL = ""; REMOVE = "ALL"; UPGRADINGPRODUCTCODE = ""; Expected = 1 },
     @{ Name = "retiring upgrade package"; Installed = "1"; REINSTALL = ""; REMOVE = "ALL"; UPGRADINGPRODUCTCODE = "1"; Expected = 0 }
 )) {
