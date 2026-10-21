@@ -19,6 +19,7 @@ namespace NcTalkOutlookAddIn
         private BackendPolicyStatus _emailSignaturePolicyCache;
         private DateTime _emailSignaturePolicyCacheFetchedAtUtc;
         private string _emailSignaturePolicyCacheKey = string.Empty;
+        private long _emailSignaturePolicyCacheSequence;
         private Task<BackendPolicyStatus> _emailSignaturePolicyFetchTask;
         private string _emailSignaturePolicyFetchKey = string.Empty;
         private BackendPolicyStatus _backendPolicyLastCheck;
@@ -45,7 +46,9 @@ namespace NcTalkOutlookAddIn
                     if (requestSequence < _backendPolicyStoredSequence
                         && string.Equals(_backendPolicyLastCheckKey, BuildEmailSignaturePolicyCacheKey(configuration), StringComparison.Ordinal))
                     {
-                        status = _backendPolicyLastCheck;
+                        status = _emailSignaturePolicyCacheSequence >= requestSequence
+                            && string.Equals(_emailSignaturePolicyCacheKey, _backendPolicyLastCheckKey, StringComparison.Ordinal)
+                            ? _emailSignaturePolicyCache : _backendPolicyLastCheck;
                     }
                 }
                 LogCore(
@@ -185,22 +188,30 @@ namespace NcTalkOutlookAddIn
             string cacheKey = BuildEmailSignaturePolicyCacheKey(configuration);
             lock (_emailSignaturePolicyCacheSync)
             {
-                if (requestSequence < _backendPolicyStoredSequence)
+                bool currentCheck = requestSequence >= _backendPolicyStoredSequence;
+                // A newer failed check must not discard a confirmation newer than the cached policy.
+                if (!currentCheck && (fetched == null || !fetched.FetchSucceeded
+                    || requestSequence <= _emailSignaturePolicyCacheSequence
+                    || !string.Equals(_backendPolicyLastCheckKey, cacheKey, StringComparison.Ordinal)))
                 {
                     return string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal)
                         ? _emailSignaturePolicyCache : fetched;
                 }
-                _backendPolicyStoredSequence = requestSequence;
-                _backendPolicyLastCheck = fetched ?? new BackendPolicyStatus(
-                    true, false, false, "local", "check_failed", false, false,
-                    string.Empty, null, null, null, null, null, null);
-                _backendPolicyLastCheckKey = cacheKey;
-                _backendPolicyLastCheckedAtUtc = DateTime.UtcNow;
+                if (currentCheck)
+                {
+                    _backendPolicyStoredSequence = requestSequence;
+                    _backendPolicyLastCheck = fetched ?? new BackendPolicyStatus(
+                        true, false, false, "local", "check_failed", false, false,
+                        string.Empty, null, null, null, null, null, null);
+                    _backendPolicyLastCheckKey = cacheKey;
+                    _backendPolicyLastCheckedAtUtc = DateTime.UtcNow;
+                }
                 if (fetched != null && fetched.FetchSucceeded)
                 {
                     _emailSignaturePolicyCache = fetched;
                     _emailSignaturePolicyCacheFetchedAtUtc = DateTime.UtcNow;
                     _emailSignaturePolicyCacheKey = cacheKey;
+                    _emailSignaturePolicyCacheSequence = requestSequence;
                 }
                 else if (_emailSignaturePolicyCache != null
                          && string.Equals(_emailSignaturePolicyCacheKey, cacheKey, StringComparison.Ordinal))

@@ -516,6 +516,7 @@ if ($Failures.Count -gt 0) {
 $signatureNoticeHarness = @'
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 public static class SignatureSendNoticeRegression
@@ -539,8 +540,10 @@ public static class SignatureSendNoticeRegression
         internal BackendPolicyStatus() {}
         internal BackendPolicyStatus(bool endpoint, bool fetched, bool active, string mode, string reason, bool assigned, bool valid, string seat,
             object share, object talk, object signature, object shareEditable, object talkEditable, object signatureEditable)
-        { FetchSucceeded = fetched; Mode = mode; Reason = reason; }
+        { FetchSucceeded = fetched; Mode = mode; Reason = reason; SeatAssigned = assigned; IsValid = valid; SeatState = seat; }
         internal bool FetchSucceeded;
+        internal bool SeatAssigned, IsValid;
+        internal string SeatState;
         internal DateTime RetryAfterUtc;
         internal bool PolicyActive { get { return false; } }
         internal string AccessStatus = "test", Mode = "local", Reason = "test";
@@ -551,14 +554,16 @@ public static class SignatureSendNoticeRegression
     private sealed class BackendPolicyService
     {
         internal static BackendPolicyStatus Result;
+        internal static Func<BackendPolicyStatus> FetchHandler;
         internal BackendPolicyService(TalkServiceConfiguration configuration) {}
-        internal BackendPolicyStatus FetchStatus() { return Result; }
+        internal BackendPolicyStatus FetchStatus() { return FetchHandler != null ? FetchHandler() : Result; }
     }
     private sealed class TalkServiceConfiguration
     {
         internal string Username = "user";
         internal string AppPassword = "test-password";
-        internal string GetNormalizedBaseUrl() { return "https://cloud.example.test"; }
+        internal string BaseUrl = "https://cloud.example.test";
+        internal string GetNormalizedBaseUrl() { return BaseUrl; }
     }
     private sealed class SignatureRuntime
     {
@@ -567,6 +572,7 @@ public static class SignatureSendNoticeRegression
         private BackendPolicyStatus _emailSignaturePolicyCache;
         private DateTime _emailSignaturePolicyCacheFetchedAtUtc;
         private string _emailSignaturePolicyCacheKey = string.Empty;
+        private long _emailSignaturePolicyCacheSequence;
         private Task<BackendPolicyStatus> _emailSignaturePolicyFetchTask;
         private string _emailSignaturePolicyFetchKey = string.Empty;
         private BackendPolicyStatus _backendPolicyLastCheck;
@@ -577,6 +583,7 @@ public static class SignatureSendNoticeRegression
         private bool _emailSignatureStateStable = true;
         internal BackendPolicyStatus FetchResult { get { return BackendPolicyService.Result; } set { BackendPolicyService.Result = value; } }
         internal DateTime SnapshotTime { get { return _emailSignaturePolicyCacheFetchedAtUtc; } }
+        internal DateTime CheckTime { get { return _backendPolicyLastCheckedAtUtc; } }
         internal readonly List<string> Log = new List<string>();
         private void LogCore(string text) { Log.Add(text); }
         private void LogEmailSignature(string text) { Log.Add(text); }
@@ -624,6 +631,123 @@ public static class SignatureSendNoticeRegression
     {
         if (!condition) { throw new InvalidOperationException(message); }
     }
+
+    private static int policyRaceCases;
+    private static void VerifyPolicyFetchRace(BackendPolicyStatus seed, BackendPolicyStatus older,
+        BackendPolicyStatus newer, BackendPolicyStatus expected, string label,
+        TalkServiceConfiguration changedConfiguration = null, bool failureAfterNewerConfirmation = false)
+    {
+        var configuration = new TalkServiceConfiguration();
+        var latestConfiguration = changedConfiguration ?? configuration;
+        var runtime = new SignatureRuntime { FetchResult = seed };
+        if (seed != null) { runtime.FetchBackendPolicyStatus(configuration, "race_seed"); }
+        DateTime originalSnapshotTime = runtime.SnapshotTime;
+        var laterFailure = new BackendPolicyStatus { FetchSucceeded = false, Reason = "backend_unavailable" };
+        int calls = 0;
+        Task<BackendPolicyStatus> pending = null;
+        using (var started = new ManualResetEventSlim(false))
+        using (var release = new ManualResetEventSlim(false))
+        {
+            BackendPolicyService.FetchHandler = () =>
+            {
+                int call = Interlocked.Increment(ref calls);
+                if (call != 1) { return call == 2 ? newer : laterFailure; }
+                started.Set();
+                if (!release.Wait(TimeSpan.FromSeconds(5))) { throw new TimeoutException("Pending policy fetch was not released."); }
+                return older;
+            };
+            try
+            {
+                pending = Task.Run(() => runtime.FetchBackendPolicyStatus(configuration, "race_older"));
+                Check(started.Wait(TimeSpan.FromSeconds(5)), label + ": older fetch starts.");
+                Check(object.ReferenceEquals(runtime.FetchBackendPolicyStatus(latestConfiguration, "race_newer"), newer),
+                    label + ": newest direct fetch returns its actual result.");
+                if (failureAfterNewerConfirmation)
+                {
+                    runtime.FetchBackendPolicyStatus(latestConfiguration, "race_latest_failure");
+                }
+                BackendPolicyStatus latestCheck;
+                Check(runtime.TryGetCurrentBackendPolicyCheck(latestConfiguration, out latestCheck), label + ": latest check is available.");
+                DateTime latestCheckTime = runtime.CheckTime;
+                DateTime latestRetryAfter = latestCheck.RetryAfterUtc;
+                release.Set();
+                Check(pending.Wait(TimeSpan.FromSeconds(5)), label + ": pending fetch completes.");
+                BackendPolicyStatus expectedReturn = changedConfiguration != null ? older
+                    : ((older != null && older.FetchSucceeded) || (newer != null && newer.FetchSucceeded) ? expected : latestCheck);
+                Check(object.ReferenceEquals(pending.Result, expectedReturn), label + ": pending caller receives the effective ordered result.");
+                BackendPolicyStatus cached;
+                Check(runtime.TryGetCachedEmailSignaturePolicyStatus(configuration, out cached) == (expected != null)
+                    && object.ReferenceEquals(cached, expected), label + ": last confirmed snapshot follows successful request order.");
+                if (object.ReferenceEquals(expected, seed))
+                {
+                    Check(runtime.SnapshotTime == originalSnapshotTime, label + ": failures and ignored completions do not renew the snapshot.");
+                }
+                BackendPolicyStatus checkAfter;
+                Check(runtime.TryGetCurrentBackendPolicyCheck(latestConfiguration, out checkAfter)
+                    && object.ReferenceEquals(checkAfter, latestCheck) && runtime.CheckTime == latestCheckTime
+                    && checkAfter.RetryAfterUtc == latestRetryAfter, label + ": older completion preserves current availability and retry time.");
+                BackendPolicyStatus expectedLatestSnapshot = changedConfiguration == null ? expected : null;
+                Check(runtime.TryGetCachedEmailSignaturePolicyStatus(latestConfiguration, out cached) == (expectedLatestSnapshot != null)
+                    && object.ReferenceEquals(cached, expectedLatestSnapshot), label + ": credentials cannot borrow another snapshot.");
+                Check(object.ReferenceEquals(runtime.GetEmailSignaturePolicyStatusAsync(latestConfiguration, "race_cached").GetAwaiter().GetResult(),
+                    expectedLatestSnapshot ?? latestCheck), label + ": asynchronous cache readers use the corrected snapshot.");
+                if (!latestCheck.FetchSucceeded)
+                {
+                    Check(object.ReferenceEquals(runtime.FetchEnterpriseRolloutPolicyStatus(latestConfiguration, "race_ifb"),
+                        expectedLatestSnapshot ?? latestCheck), label + ": IFB and managed actions retain the confirmed decision during cooldown.");
+                }
+                Check(calls == (failureAfterNewerConfirmation ? 3 : 2), label + ": cache reads do not bypass retry cooldown.");
+                policyRaceCases++;
+            }
+            finally
+            {
+                release.Set();
+                if (pending != null) { pending.Wait(TimeSpan.FromSeconds(5)); }
+                BackendPolicyService.FetchHandler = null;
+            }
+        }
+    }
+
+    private static void VerifyPolicyFetchOrdering()
+    {
+        foreach (string mode in new[] { "community", "pro" })
+        {
+            var allowed = new BackendPolicyStatus { FetchSucceeded = true, SeatAssigned = true, IsValid = true, SeatState = "active", Mode = mode };
+            var failure = new BackendPolicyStatus { FetchSucceeded = false, Reason = "backend_unavailable", RetryAfterUtc = DateTime.UtcNow.AddMinutes(2) };
+            var missing = new BackendPolicyStatus { FetchSucceeded = true, SeatAssigned = false, IsValid = true, SeatState = "none", Mode = mode };
+            foreach (string reason in new[] { "none", "suspended_overlimit", "EXPIRED", "INVALID" })
+            {
+                var denied = new BackendPolicyStatus {
+                    FetchSucceeded = true, SeatAssigned = reason != "none",
+                    IsValid = reason == "none" || reason == "suspended_overlimit",
+                    SeatState = reason == "none" || reason == "suspended_overlimit" ? reason : "active",
+                    AccessStatus = reason == "EXPIRED" || reason == "INVALID" ? reason : "ACTIVE", Mode = mode
+                };
+                VerifyPolicyFetchRace(allowed, denied, failure, denied, mode + " " + reason + " before newer failure");
+            }
+            foreach (bool failureAfterConfirmation in new[] { false, true })
+            {
+                VerifyPolicyFetchRace(allowed, allowed, missing, missing, mode + " newer denial wins", null, failureAfterConfirmation);
+                VerifyPolicyFetchRace(missing, missing, allowed, allowed, mode + " newer approval wins", null, failureAfterConfirmation);
+            }
+            VerifyPolicyFetchRace(allowed, failure, failure, allowed, mode + " failures retain known access");
+            VerifyPolicyFetchRace(allowed, failure, null, allowed, mode + " null failure retains known access");
+            VerifyPolicyFetchRace(null, failure, failure, null, mode + " initial failures cannot grant access");
+            VerifyPolicyFetchRace(null, failure, null, null, mode + " initial null failure cannot grant access");
+            VerifyPolicyFetchRace(null, allowed, failure, allowed, mode + " first real confirmation survives newer failure");
+            foreach (TalkServiceConfiguration changed in new[] {
+                new TalkServiceConfiguration { BaseUrl = "https://other.example.test" },
+                new TalkServiceConfiguration { BaseUrl = "https://cloud.example.test/subpath" },
+                new TalkServiceConfiguration { Username = "other-user" },
+                new TalkServiceConfiguration { AppPassword = "different-test-password" }
+            })
+            {
+                VerifyPolicyFetchRace(allowed, missing, failure, allowed, mode + " changed account scope", changed);
+            }
+        }
+        Console.WriteLine("[OK] " + policyRaceCases + " concurrent production policy-fetch/cache ordering cases");
+    }
+
     public static void Run()
     {
         var configuration = new TalkServiceConfiguration();
@@ -678,6 +802,7 @@ public static class SignatureSendNoticeRegression
             Check(object.ReferenceEquals(runtime.FetchEnterpriseRolloutPolicyStatus(configuration, trigger), refusal)
                 && runtime.SnapshotTime == confirmedAt, "Managed failures retain the existing matching fallback without marking it fresh.");
         }
+        VerifyPolicyFetchOrdering();
     }
 }
 '@
