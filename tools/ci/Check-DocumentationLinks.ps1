@@ -42,7 +42,7 @@ Test-Contains "Strings.cs" $strings "docs/ADMIN.de.md"
 Test-Contains "ADMIN.md" $admin "### System address book"
 Test-Contains "ADMIN.de.md" $adminDe "### Systemadressbuch"
 
-Test-Contains "README.md" $readme "Windows 10 or Windows 11 (64-bit)"
+Test-Contains "README.md" $readme "64-bit Windows 10 or 11"
 Test-Contains "README.de.md" $readmeDe "Windows 10 oder Windows 11 (64-Bit)"
 Test-Contains "README.md" $readme "docs/ADMIN.md"
 Test-Contains "README.de.md" $readmeDe "docs/ADMIN.de.md"

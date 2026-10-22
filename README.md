@@ -1,139 +1,151 @@
-<div align="center" style="background:#0082C9; padding:1px 0;"><img src="assets/header-solid-blue-1920x480.png" alt="Add-in" height="80"></div>
-
-[English](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/README.md) | [Deutsch](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/README.de.md)
-[Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md) | [Development Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md) | [Translations](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md) | [VENDOR](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md)
+<div align="center"><img src="assets/header-solid-blue-1920x480.png" alt="NC Connector for Outlook" height="80"></div>
 
 # NC Connector for Outlook
 
-NC Connector brings Nextcloud shares, Talk meetings, managed signatures, and Free/Busy data into Outlook classic. It is built for organizations that keep Outlook and use Nextcloud as their own infrastructure.
+<p align="center">
+  <strong>Your Nextcloud, inside Outlook Classic.</strong><br/>
+  Share files, create Talk meetings, find rooms and resources, and keep your team’s signatures consistent, all from your mail and calendar.
+</p>
 
-## What the add-in does
+<p align="center">
+  <a href="https://github.com/nc-connector/NC_Connector_for_Outlook/releases/latest"><strong>Download the installer</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#contents">Admin guide</a>
+  &nbsp;·&nbsp;
+  <a href="https://nc-connector.de/">Website</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/README.de.md">Deutsch</a>
+</p>
 
-- create Nextcloud shares directly from new mails, replies, and forwards
-- upload large files with Nextcloud chunked WebDAV upload v2 and send links instead of attachments
-- control password, expiration date, permissions, and separate password delivery
-- send passwords either as plain follow-up mail or as a Nextcloud Secret link
-- create and update Talk rooms directly from Outlook appointments
-- apply managed email signatures from the optional backend
-- provide Outlook Free/Busy data through a local Nextcloud proxy
-- write debug logs for support cases, with optional anonymization
+For **Outlook Classic on Windows**, including new messages, replies, forwards, and inline replies. The new Outlook is not supported. Looking for Thunderbird? [Get the Thunderbird add-on](https://github.com/nc-connector/NC_Connector_for_Thunderbird).
 
-## Optional backend
+---
 
-Without the backend, sharing, Talk, and IFB work locally in Outlook. With NC Connector Backend, teams get central management:
+## See it in action
 
-- seat assignment and policies
-- defaults for sharing, Talk, and signatures
-- custom HTML templates for shares, password mails, and Talk invitations
-- separate password delivery and optional Nextcloud Secret links
-- admin locks for selected options
-
-## Sharing
-
-The sharing wizard combines local files and folders with existing items from your own Nextcloud, then inserts the finished share block into the mail. HTML/RTF receives a formatted block, plain text receives a clean text block.
-
-Key points:
-
-- available in compose windows, replies, forwards, and inline replies
-- the queue groups `Local` and `My Nextcloud` items and shows folders as an expandable tree
-- the `My Nextcloud` picker provides Explorer-style back, forward, up, refresh and clickable path navigation, familiar file icons, clear multi-selection feedback, and on-demand previews for images and documents supported by the Nextcloud server
-- existing Nextcloud files and folders are copied into the new share inside Nextcloud; the originals remain unchanged and are not downloaded to Outlook for the transfer
-- optional expiration date and custom permissions per share
-- attachment automation for large attachments or always through NC Connector, with a selectable `ZIP download` (default) or `Nextcloud share page` link target
-- one local scan builds a root-relative upload plan; the destination root is created atomically, and attachment automation tries numbered names after a collision without a preliminary server probe
-- folders are prepared once; up to three direct transfers run in parallel, files over 20 MiB use chunked upload v2, and small-file sets use DAV bulk upload only when Nextcloud advertises version `1.0` and the complete plan saves at least 20 percent of its requests
-- optional separate password delivery through NC Connector Backend
-
-## Talk
-
-An Outlook appointment can create a Nextcloud Talk room directly. The dialog supports lobby, password, room type, and moderation.
-
-NC Connector can sync appointment changes back to the room and add invited attendees. When room deletion is explicitly enabled, Outlook's appointment deletion event queues the associated room for removal. Pending removals resume after an Outlook restart; startup does not scan calendars.
-
-## Signatures
-
-With the backend, Outlook can insert managed email signatures or remove local signatures when the policy says so. NC Connector only touches the signature for the matching sender address. Signatures from other accounts stay untouched.
-
-## Installation
-
-1. Close Outlook.
-2. Install the latest MSI from [GitHub Releases](https://github.com/nc-connector/NC_Connector_for_Outlook/releases).
-3. Start Outlook and open **NC Connector -> Settings**.
-4. Enter the Nextcloud URL.
-5. Use Login with Nextcloud or enter an app password manually.
-6. Test the connection and save.
-
-Updates are installed by running the new MSI over the existing installation. Personal settings are kept.
-
-## Requirements
-
-- Windows 10 or Windows 11 (64-bit)
-- Outlook classic 2019 or newer
-- .NET Framework 4.7.2
-- Nextcloud 32 or newer
-- Nextcloud with Files Sharing
-- for Talk features: Nextcloud Talk
-- for Secret-link password delivery: Nextcloud Secrets and NC Connector Backend
-
-## Language
-
-The UI language follows the Outlook/Office language. Supported languages are documented in [`Translations.md`](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md). Fallback is German, then English.
-
-Text blocks for shares and Talk can be configured independently from the UI language. Backend templates are used only when the backend is available and the policy allows them.
-
-## Troubleshooting
-
-Debug logs can be enabled in Settings. Files are written to:
-
-`%LOCALAPPDATA%\NC4OL\addin-runtime.log_YYYYMMDD`
-
-Anonymization is enabled by default and masks server URL, credentials, email addresses, and local user path fragments.
-
-For common setup, IFB, and backend policy issues, see the [Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md).
-
-## More documentation
-
-- [Changelog](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/CHANGELOG.md)
-- [Admin Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md)
-- [Development Guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md)
-- [Third-party licenses](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md)
-
-## Roadmap
-
-Planned work across Thunderbird, Outlook, and the Backend is tracked in the public [NC Connector Roadmap](https://github.com/orgs/nc-connector/projects/1).
-
-## Screenshots
+Four workflows, shown in Outlook Classic. Expand a section to watch the demo.
 
 <details>
-<summary><strong>Settings</strong></summary>
+<summary><strong>Share files instead of sending large attachments</strong></summary>
 
-| <a href="Screenshots/settings.jpg"><img src="Screenshots/settings.jpg" alt="Settings" width="230"></a> |
-| --- |
+Combine files and folders from your computer and **My Nextcloud** in one share. Add a password, expiration date, and access permissions, then insert the link into your message. Existing Nextcloud files are copied into the share; the originals stay unchanged.
+
+<p align="center">
+  <a href="Screenshots/gif/nc-connector_filelink_outlook_en_1200x900.gif">
+    <img src="Screenshots/gif/nc-connector_filelink_outlook_en_1200x900.gif" alt="Outlook demo: choose files, configure a Nextcloud share, and insert its link into an email" width="900" />
+  </a>
+</p>
+
+Attachment rules can offer sharing when a size limit is reached or handle attachments automatically. Choose a share-page link or a direct ZIP download. Share blocks adapt to HTML, RTF, and plain-text messages.
+
+*Works with local settings, without NC Connector Backend.*
 
 </details>
 
 <details>
-<summary><strong>Talk link</strong></summary>
+<summary><strong>Create a Nextcloud Talk meeting from your calendar</strong></summary>
 
-| <a href="Screenshots/1_talk.jpg"><img src="Screenshots/1_talk.jpg" alt="Talk step 1" width="230"></a> | <a href="Screenshots/2_talk.jpg"><img src="Screenshots/2_talk.jpg" alt="Talk step 2" width="230"></a> |
-| --- | --- |
+Create a Talk room from an Outlook appointment and insert the meeting link. Configure password protection, a lobby, and moderation options without switching to the browser. Keep the Talk meeting in sync when the appointment changes.
 
-</details>
+<p align="center">
+  <a href="Screenshots/gif/nc-connector_talk_outlook_en_1200x900.gif">
+    <img src="Screenshots/gif/nc-connector_talk_outlook_en_1200x900.gif" alt="Outlook demo: open the Talk wizard, configure a meeting, and add its link to an appointment" width="900" />
+  </a>
+</p>
 
-<details open>
-<summary><strong>Sharing wizard</strong></summary>
-
-| <a href="Screenshots/1_filelink.jpg"><img src="Screenshots/1_filelink.jpg" alt="Sharing step 1" width="230"></a> | <a href="Screenshots/2_filelink.jpg"><img src="Screenshots/2_filelink.jpg" alt="Sharing step 2" width="230"></a> |
-| --- | --- |
-| <a href="Screenshots/3_filelink.jpg"><img src="Screenshots/3_filelink.jpg" alt="Sharing step 3" width="230"></a> | <a href="Screenshots/4_filelink.jpg"><img src="Screenshots/4_filelink.jpg" alt="Sharing step 4" width="230"></a> |
-| <a href="Screenshots/5_filelink.jpg"><img src="Screenshots/5_filelink.jpg" alt="Sharing step 5" width="230"></a> | |
+*Works with local settings, without NC Connector Backend. Requires Nextcloud Talk.*
 
 </details>
 
 <details>
-<summary><strong>Internet Free/Busy</strong></summary>
+<summary><strong>Keep your team's email signatures consistent</strong></summary>
 
-| <a href="Screenshots/ifb.jpg"><img src="Screenshots/ifb.jpg" alt="IFB settings" width="230"></a> |
-| --- |
+Design signature templates centrally in Nextcloud, use placeholders for user details, and apply the result to matching sender identities in Outlook. Signatures for unrelated accounts stay untouched.
+
+<p align="center">
+  <a href="Screenshots/gif/nc-connector_signatur_outlook_en_1200x900.gif">
+    <img src="Screenshots/gif/nc-connector_signatur_outlook_en_1200x900.gif" alt="Outlook demo: design a signature in NC Connector Backend and apply it to a matching sender account" width="900" />
+  </a>
+</p>
+
+*Requires the optional backend and a valid assigned seat. The free Community seat is sufficient.*
 
 </details>
+
+<details>
+<summary><strong>Find rooms and resources for your next meeting</strong></summary>
+
+Find rooms and equipment published through Nextcloud, including RoomVox and Calendar Resource Management. Filter by building, floor, capacity, equipment, and availability. Add one room and multiple resources to the appointment, or open a resource's day view to inspect free/busy times.
+
+<p align="center">
+  <a href="Screenshots/gif/nc-connector_resources_outlook_en_1200x900.gif">
+    <img src="Screenshots/gif/nc-connector_resources_outlook_en_1200x900.gif" alt="Outlook demo: filter rooms and resources, inspect availability, and add the selection to an appointment" width="900" />
+  </a>
+</p>
+
+*Requires the backend and a valid assigned seat.*
+
+Selection is not a booking confirmation. Use a Nextcloud calendar configured in **CalDAV Synchronizer**, save and synchronize the appointment, then check the resource's response.
+
+</details>
+
+## Optional backend. One full-featured seat included.
+
+File sharing, **My Nextcloud**, Talk, attachment rules, and Internet Free/Busy work without the backend using local settings.
+
+For centrally managed installations, add [NC Connector Backend](https://apps.nextcloud.com/apps/ncc_backend_4mc) to Nextcloud. It includes **one free Community seat**, assigned to one Nextcloud user. That seat unlocks the **same seat-based features as paid seats**; paid plans add seats for more users.
+
+- Central settings, administrator locks, and delegated management
+- Low-touch enterprise rollout with user-friendly sign-in
+- Managed signatures, custom templates, and branding
+- Room and resource picker with filters and availability checks
+- Separate password delivery by email or one-time Nextcloud Secrets links; Secrets links also require the Secrets app
+
+Users in a centrally managed setup need the corresponding backend access and assigned seat.
+
+[Install the free backend](https://apps.nextcloud.com/apps/ncc_backend_4mc) · [Plans and licensing](https://nc-connector.de/preise-lizenzierung/)
+
+## Get started
+
+1. Save your work and close Outlook.
+2. Download and run the **MSI installer** from the [latest release](https://github.com/nc-connector/NC_Connector_for_Outlook/releases/latest).
+3. Start Outlook and open **NC Connector → Settings**.
+4. Enter your Nextcloud URL and sign in with **Nextcloud Login** or an app password.
+5. Test the connection and save your settings.
+
+The installer upgrades an existing installation while retaining personal settings. For managed deployment, follow the [enterprise rollout guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#enterprise-rollout).
+
+### What you need
+
+- **Outlook Classic 2019 or newer**, 32-bit or 64-bit, on 64-bit Windows 10 or 11
+- **.NET Framework 4.7.2** and administrator rights for installation
+- **Nextcloud 32 or newer** over HTTPS, with Files Sharing enabled, permission to create public links, and sufficient storage
+- **Nextcloud Talk** for online meetings
+- **CalDAV Synchronizer** configured for the Nextcloud calendar when booking rooms and resources
+
+### Free/busy in Outlook's Scheduling Assistant
+
+NC Connector can provide Nextcloud free/busy data through a local **Internet Free/Busy (IFB)** proxy. This is separate from the seat-based room and resource picker and works with local settings without the backend when the installation is not centrally managed.
+
+See [Configure Internet Free/Busy](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#configure-internet-freebusy) for setup and troubleshooting.
+
+## Documentation
+
+- [Admin guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/ADMIN.md#contents): setup, rollout, policies, updates, and troubleshooting
+- [Development guide](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/docs/DEVELOPMENT.md): build, tests, and architecture
+- [Changelog](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/CHANGELOG.md) · [Supported languages](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/Translations.md) · [Screenshots](https://github.com/nc-connector/NC_Connector_for_Outlook/tree/main/Screenshots)
+- [License](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/LICENSE.txt) · [Third-party components](https://github.com/nc-connector/NC_Connector_for_Outlook/blob/main/VENDOR.md)
+
+## Open source, with clear data paths
+
+File sharing and Talk use your own Nextcloud. File contents are not relayed through an NC Connector-hosted service.
+
+The daily update check also provides an anonymous count of active users. Backend license checks are separate from file transfers.
+
+[Trust and transparency](https://nc-connector.de/vertrauen-transparenz/) · [Public roadmap](https://github.com/orgs/nc-connector/projects/1)
+
+## Help and feedback
+
+Found a bug or have a feature request? [Open an issue](https://github.com/nc-connector/NC_Connector_for_Outlook/issues). Include your Outlook, add-in, and Nextcloud versions, plus steps to reproduce. Remove credentials and personal information from logs and screenshots.
+
+For rollout questions, [get in touch](https://nc-connector.de/kontakt/). If NC Connector helps you, a GitHub star helps others find it.
