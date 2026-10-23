@@ -48,13 +48,15 @@ namespace NcTalkOutlookAddIn.Services
         {
             if (startUtc.Kind != DateTimeKind.Utc || endUtc.Kind != DateTimeKind.Utc || endUtc <= startUtc)
             { throw new ArgumentException("A positive UTC interval is required."); }
-            List<CalendarResource> requested = resources.GroupBy(r => r.Email, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
+            List<CalendarResource> requested = resources.Where(r => r.CanSchedule)
+                .GroupBy(r => r.Email, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
             long sequence = Interlocked.Increment(ref _querySequence);
             await Task.Run(() =>
             {
                 token.ThrowIfCancellationRequested();
-                var allowed = new HashSet<string>(_directory.GetResources(_configuration, _cacheHours).Select(r => r.Email), StringComparer.OrdinalIgnoreCase);
+                var allowed = new HashSet<string>(_directory.GetResources(_configuration, _cacheHours).Where(r => r.CanSchedule).Select(r => r.Email), StringComparer.OrdinalIgnoreCase);
                 if (requested.Any(r => !allowed.Contains(r.Email))) { throw new InvalidDataException("Resource is not in the visible directory."); }
+                if (requested.Count == 0) { return; }
                 lock (_sync)
                 {
                     if (_outbox == null) { _directory.GetSchedulingIdentity(_configuration, out _originator, out _outbox); }
@@ -250,9 +252,25 @@ namespace NcTalkOutlookAddIn.Services
             {
                 XmlElement response = node as XmlElement;
                 if (response == null) { continue; }
-                if (response.LocalName != "response" || response.NamespaceURI != cal) { throw new InvalidDataException("Unexpected scheduling response element."); }
-                XmlElement recipient = CalendarResourceDirectory.Child(response, "recipient", cal);
-                string href = recipient == null ? string.Empty : CalendarResourceDirectory.ChildText(recipient, "href", CalendarResourceDirectory.DavNamespace);
+                if (response.LocalName != "response" || response.NamespaceURI != cal) { continue; }
+                string href;
+                try
+                {
+                    XmlElement recipient = CalendarResourceDirectory.Child(response, "recipient", cal);
+                    href = recipient == null ? string.Empty : CalendarResourceDirectory.ChildText(recipient, "href", CalendarResourceDirectory.DavNamespace);
+                }
+                catch (InvalidDataException ex)
+                {
+                    // An ambiguous envelope affects only addresses it claims, not the other batch recipients.
+                    foreach (XmlElement candidate in response.GetElementsByTagName("href", CalendarResourceDirectory.DavNamespace))
+                    {
+                        string address = candidate.InnerText.Trim();
+                        if (address.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(CalendarResourceDirectory.NormalizeEmail(address.Substring(7)), expected, StringComparison.OrdinalIgnoreCase)) { throw; }
+                    }
+                    DiagnosticsLogger.Log(LogCategories.Ifb, "Skipped invalid scheduling recipient: " + ex.Message);
+                    continue;
+                }
                 string email = href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) ? CalendarResourceDirectory.NormalizeEmail(href.Substring(7)) : string.Empty;
                 if (!string.Equals(email, expected, StringComparison.OrdinalIgnoreCase)) { continue; }
                 if (result != null) { throw new InvalidDataException("Duplicate scheduling recipient."); }

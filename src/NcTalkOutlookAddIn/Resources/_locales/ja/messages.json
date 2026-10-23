@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "このメッセージには既に Nextcloud の共有が含まれています。追加のファイルにも添付ファイルのルールが適用されます。共有が必須の場合は、その添付ファイルを削除し、新しいメッセージで共有してください。"
+  },
+  "sharing_finish_before_send": {
+    "message": "このメッセージを送信する前に、開いているNextcloud共有ウィザードを完了するか、キャンセルしてください。"
+  },
   "outlook_resource_group_by_label": {
     "message": "グループ化"
   },

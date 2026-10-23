@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "This message already contains a Nextcloud share. Attachment rules still apply to additional files. If sharing is required, remove those attachments and share them in a new message."
+  },
+  "sharing_finish_before_send": {
+    "message": "Finish or cancel the open Nextcloud sharing wizard before sending this message."
+  },
   "outlook_resource_group_by_label": {
     "message": "Group by"
   },

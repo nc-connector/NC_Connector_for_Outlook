@@ -786,62 +786,77 @@ namespace NcTalkOutlookAddIn.UI
             }
         }
 
-        private void AddInitialSelections(
-            IEnumerable<FileLinkSelection> selections)
+        internal bool TryAdoptComposeSelections(
+            IReadOnlyList<FileLinkSelection> selections)
         {
-            if (selections == null)
+            if (IsDisposed || Disposing || _closeRequested || _shareFinalized
+                || selections == null || selections.Count == 0)
             {
-                return;
+                return false;
             }
-            var pendingSelections = selections
-                .Where(
-                    selection => selection != null
-                                 && (selection.Source
-                                     == FileLinkSelectionSource.Nextcloud
-                                     || !string.IsNullOrWhiteSpace(
-                                         selection.LocalPath)))
-                .ToList();
-            if (pendingSelections.Count == 0)
+            if (InvokeRequired)
             {
-                return;
+                throw new InvalidOperationException("Compose queue adoption requires the wizard thread.");
             }
-            var existingSelections = _attachmentMode
-                ? null
-                : new HashSet<FileLinkSelection>(
-                    _items,
-                    FileLinkSelection.IdentityComparer);
-
-            int requestedCount = pendingSelections.Count;
-            int addedCount = 0;
-            Exception firstFailure = null;
-            foreach (FileLinkSelection selection in pendingSelections)
+            var snapshots = new Dictionary<FileLinkSelection, FileLinkQueueNode>();
+            var adopted = new List<FileLinkSelection>();
+            var existingSelections = new HashSet<FileLinkSelection>(
+                _items,
+                FileLinkSelection.IdentityComparer);
+            try
             {
-                try
+                foreach (FileLinkSelection selection in selections)
                 {
-                    if (TryAddInitialFileSelection(
-                        selection,
-                        existingSelections))
+                    if (selection == null
+                        || selection.Source != FileLinkSelectionSource.Local
+                        || selection.SelectionType != FileLinkSelectionType.File
+                        || !existingSelections.Add(selection))
                     {
-                        addedCount++;
+                        return false;
                     }
+                    snapshots.Add(selection, FileLinkQueueSnapshotBuilder.Build(
+                        selection, CancellationToken.None));
                 }
-                catch (Exception ex)
+                foreach (KeyValuePair<FileLinkSelection, FileLinkQueueNode> entry in snapshots)
                 {
-                    if (firstFailure == null)
-                    {
-                        firstFailure = ex;
-                    }
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Queue selection could not be read.",
-                        ex);
+                    adopted.Add(entry.Key);
+                    AddPreparedSelection(entry.Key, entry.Value);
+                }
+                CompleteSelectionAdd(selections.Count, snapshots.Count, null);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RollbackComposeSelections(adopted);
+                DiagnosticsLogger.LogException(LogCategories.FileLink,
+                    "Compose attachment queue adoption failed.", ex);
+                return false;
+            }
+        }
+
+        internal void RollbackComposeSelections(
+            IReadOnlyList<FileLinkSelection> selections)
+        {
+            foreach (FileLinkSelection selection in selections)
+            {
+                if (selection == null || _uploadedSelections.Contains(selection))
+                {
+                    continue;
+                }
+                _items.Remove(selection);
+                _queueSnapshots.Remove(selection);
+                SelectionUploadState state;
+                if (_selectionStates.TryGetValue(selection, out state))
+                {
+                    DisposeStateProgressBar(state);
+                    _selectionStates.Remove(selection);
                 }
             }
-
-            CompleteSelectionAdd(
-                requestedCount,
-                addedCount,
-                firstFailure);
+            _uploadCompleted = _uploadContext != null
+                && _items.All(selection => _uploadedSelections.Contains(selection));
+            RebuildQueueView();
+            UpdateNavigationState();
+            UpdateUploadButtonState();
         }
 
         private void CompleteSelectionAdd(
@@ -862,7 +877,21 @@ namespace NcTalkOutlookAddIn.UI
                     + _items.Count.ToString(CultureInfo.InvariantCulture)
                     + ").");
                 RebuildQueueView();
-                InvalidateUpload();
+                _uploadCompleted = false;
+                UpdateNavigationState();
+                UpdateUploadButtonState();
+                if (_uploadContext != null && !_uploadInProgress && !_finalizeInProgress && !_queueScanInProgress
+                    && IsHandleCreated && !_closeRequested)
+                {
+                    BeginInvoke(new Action(async () =>
+                    {
+                        if (!_uploadCompleted && !_uploadInProgress && !_finalizeInProgress && !_queueScanInProgress
+                            && !_closeRequested && !IsDisposed)
+                        {
+                            await StartUploadAsync();
+                        }
+                    }));
+                }
             }
 
             if (firstFailure != null)

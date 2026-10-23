@@ -105,29 +105,6 @@ namespace NcTalkOutlookAddIn.UI
             return selections;
         }
 
-        private bool TryAddInitialFileSelection(
-            FileLinkSelection selection,
-            HashSet<FileLinkSelection> existingSelections)
-        {
-            if (selection == null
-                || selection.SelectionType
-                   != FileLinkSelectionType.File)
-            {
-                return false;
-            }
-            if (!TryReserveSelection(selection, existingSelections))
-            {
-                return false;
-            }
-
-            FileLinkQueueNode snapshot =
-                FileLinkQueueSnapshotBuilder.Build(
-                    selection,
-                    CancellationToken.None);
-            AddPreparedSelection(selection, snapshot);
-            return true;
-        }
-
         private bool TryReserveSelection(
             FileLinkSelection selection,
             HashSet<FileLinkSelection> existingSelections)
@@ -164,26 +141,6 @@ namespace NcTalkOutlookAddIn.UI
 
             var state = new SelectionUploadState(selection);
             _selectionStates[selection] = state;
-        }
-
-        private static bool SelectionPathExists(FileLinkSelection selection)
-        {
-            if (selection == null)
-            {
-                return false;
-            }
-            if (selection.Source == FileLinkSelectionSource.Nextcloud)
-            {
-                return selection.NextcloudEntries != null
-                       && selection.NextcloudEntries.Count > 0;
-            }
-            if (string.IsNullOrWhiteSpace(selection.LocalPath))
-            {
-                return false;
-            }
-            return selection.SelectionType == FileLinkSelectionType.Directory
-                ? Directory.Exists(selection.LocalPath)
-                : File.Exists(selection.LocalPath);
         }
 
         private static bool TryBuildSelectionFromPath(string path, out FileLinkSelection selection)

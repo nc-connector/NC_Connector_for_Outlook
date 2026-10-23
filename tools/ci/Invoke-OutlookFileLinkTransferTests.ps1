@@ -227,6 +227,7 @@ namespace NcTalkOutlookAddIn.Services
         internal string NormalizedBaseUrl { get; set; }
         internal string UserId { get; set; }
         internal string RelativeFolderPath { get; set; }
+        internal bool IsAppend { get; set; }
     }
 
     internal sealed class FileLinkUploadProgressCoordinator
@@ -384,6 +385,19 @@ internal static class FileLinkTransferTests
         Check(
             "Direct upload writes the exact source body",
             content.SequenceEqual(sentBody));
+        context.IsAppend = true;
+        new FileLinkDirectUploader(client).Upload(context, file,
+            new FileLinkUploadProgressCoordinator(), CancellationToken.None);
+        Equal("Appended direct upload cannot overwrite a target", "*", request.Headers["If-None-Match"]);
+        var collision = new FileLinkDavClient(options => Http(HttpStatusCode.PreconditionFailed));
+        bool refused = false;
+        try
+        {
+            new FileLinkDirectUploader(collision).Upload(context, file,
+                new FileLinkUploadProgressCoordinator(), CancellationToken.None);
+        }
+        catch (Exception) { refused = true; }
+        Check("Appended direct upload rejects an occupied target", refused);
     }
 
     private static void TestBulkChecksumProgress(string tempRoot)
@@ -729,6 +743,10 @@ internal static class FileLinkTransferTests
             "Chunk MOVE carries the total length",
             fileSize.ToString(CultureInfo.InvariantCulture),
             requests[3].Headers["OC-Total-Length"]);
+        requests.Clear();
+        new FileLinkChunkUploader(client).MoveIntoPlace(uploadFolderUrl, targetUrl, fileSize,
+            file.LastWriteTimeUtc, CancellationToken.None, true);
+        Equal("Appended chunk MOVE cannot overwrite a target", "F", requests[0].Headers["Overwrite"]);
     }
 
     private static void TestChunkFailureUsesShortCleanup(

@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "Tato zpráva již obsahuje sdílení Nextcloud. Na další soubory se stále vztahují pravidla pro přílohy. Pokud je sdílení povinné, odeberte tyto přílohy a sdílejte je v nové zprávě."
+  },
+  "sharing_finish_before_send": {
+    "message": "Před odesláním této zprávy dokončete nebo zrušte otevřeného průvodce sdílením Nextcloud."
+  },
   "outlook_resource_group_by_label": {
     "message": "Seskupit podle"
   },

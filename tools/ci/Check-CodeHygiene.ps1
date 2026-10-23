@@ -58,7 +58,6 @@ $asyncVoidAllowList = @(
     'OnSettingsButtonPressed',
     'OnFileLinkButtonPressed',
     'OnAttachmentEvalTimerTick',
-    'OnBeforeAddShareTimerTick',
     'OnEmailSignatureTimerTick',
     'OnSaveButtonClick',
     'OnSelectedTabChanged',

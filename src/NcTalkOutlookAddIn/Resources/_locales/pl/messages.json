@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "Ta wiadomość zawiera już udostępnienie Nextcloud. Reguły dotyczące załączników nadal obowiązują dla dodatkowych plików. Jeśli udostępnienie jest wymagane, usuń te załączniki i udostępnij je w nowej wiadomości."
+  },
+  "sharing_finish_before_send": {
+    "message": "Przed wysłaniem tej wiadomości zakończ lub anuluj otwarty kreator udostępniania Nextcloud."
+  },
   "outlook_resource_group_by_label": {
     "message": "Grupuj według"
   },

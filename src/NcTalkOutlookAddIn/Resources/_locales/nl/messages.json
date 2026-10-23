@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "Dit bericht bevat al een Nextcloud-share. De bijlageregels blijven gelden voor extra bestanden. Als delen verplicht is, verwijder dan die bijlagen en deel ze in een nieuw bericht."
+  },
+  "sharing_finish_before_send": {
+    "message": "Rond de geopende Nextcloud-deelwizard af of annuleer deze voordat u dit bericht verzendt."
+  },
   "outlook_resource_group_by_label": {
     "message": "Groeperen op"
   },

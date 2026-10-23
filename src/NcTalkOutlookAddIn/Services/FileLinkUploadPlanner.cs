@@ -20,14 +20,16 @@ namespace NcTalkOutlookAddIn.Services
             bool bulkUploadSupported,
             int fixedRequestCount,
             Func<FileLinkDuplicateInfo, string> duplicateResolver,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            FileLinkUploadContext existingContext = null)
         {
             FileLinkSelectionScanResult scan =
                 FileLinkSelectionScanner.Scan(
                     selections,
                     queueSnapshots,
                     duplicateResolver,
-                    cancellationToken);
+                    cancellationToken,
+                    existingContext);
             IList<FileLinkPlannedFile> files = scan.Files;
             ISet<string> directories = scan.Directories;
 

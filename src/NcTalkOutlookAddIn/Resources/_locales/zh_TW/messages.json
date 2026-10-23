@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "此郵件已包含 Nextcloud 分享。新增檔案仍須遵守附件規則。如果必須透過分享傳送，請移除這些附件，並在新郵件中分享它們。"
+  },
+  "sharing_finish_before_send": {
+    "message": "傳送此郵件前，請完成或取消已開啟的 Nextcloud 分享精靈。"
+  },
   "outlook_resource_group_by_label": {
     "message": "分組依據"
   },

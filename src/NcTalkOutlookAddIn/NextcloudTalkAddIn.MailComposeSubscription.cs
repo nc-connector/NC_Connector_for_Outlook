@@ -36,10 +36,8 @@ namespace NcTalkOutlookAddIn
             private readonly string _inspectorIdentityKey;
             private readonly string _composeKey;
             private readonly System.Windows.Forms.Timer _attachmentEvalTimer = new System.Windows.Forms.Timer();
-            private readonly System.Windows.Forms.Timer _beforeAddShareTimer = new System.Windows.Forms.Timer();
             private readonly System.Windows.Forms.Timer _emailSignatureTimer = new System.Windows.Forms.Timer();
             private readonly List<AttachmentBatchEntry> _pendingAddedBatch = new List<AttachmentBatchEntry>();
-            private readonly List<BeforeAddShareEntry> _pendingBeforeAddShareEntries = new List<BeforeAddShareEntry>();
             // Final recipients and sender are captured at Send time. A reopened draft can
             // change both, so password follow-ups stay with the live compose subscription.
             private readonly List<SeparatePasswordDispatchEntry> _passwordDispatchQueue = new List<SeparatePasswordDispatchEntry>();
@@ -47,7 +45,6 @@ namespace NcTalkOutlookAddIn
             private bool _attachmentPromptOpen;
             private bool _attachmentEvaluationPending;
             private bool _attachmentEvaluationRunning;
-            private bool _beforeAddShareFlowRunning;
             private bool _emailSignatureApplying;
             private ComposeSurfaceState _composeSurfaceState;
             private string _activeInspectorIdentityKey = string.Empty;
@@ -55,7 +52,6 @@ namespace NcTalkOutlookAddIn
             private string _deferredEmailSignatureReason = string.Empty;
             private string _pendingEmailSignatureReason = string.Empty;
             private bool _disposed;
-            private const int BeforeAddShareBatchDebounceMs = 3000;
             private const int EmailSignatureApplyDebounceMs = 900;
             private const int EmailSignatureInlineApplyDebounceMs = 250;
 
@@ -85,18 +81,12 @@ namespace NcTalkOutlookAddIn
                 _attachmentEvalTimer.Interval = ComposeAttachmentEvalDebounceMs;
                 _attachmentEvalTimer.Tick += OnAttachmentEvalTimerTick;
 
-                // Debounce long enough so Outlook can raise all BeforeAttachmentAdd callbacks
-                // for a multi-select operation before we open the wizard.
-                _beforeAddShareTimer.Interval = BeforeAddShareBatchDebounceMs;
-                _beforeAddShareTimer.Tick += OnBeforeAddShareTimerTick;
-
                 _emailSignatureTimer.Interval = isInlineResponse ? EmailSignatureInlineApplyDebounceMs : EmailSignatureApplyDebounceMs;
                 _emailSignatureTimer.Tick += OnEmailSignatureTimerTick;
 
                 _events = mail as Outlook.ItemEvents_10_Event;
                 if (_events != null)
                 {
-                    _events.BeforeAttachmentAdd += OnBeforeAttachmentAdd;
                     _events.AttachmentAdd += OnAttachmentAdd;
                     _events.PropertyChange += OnPropertyChange;
                     _events.Send += OnSend;
@@ -567,22 +557,6 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private static string ReadAttachmentPathName(Outlook.Attachment attachment)
-            {
-                if (attachment == null)
-                {
-                    return string.Empty;
-                }
-                try
-                {
-                    return attachment.PathName ?? string.Empty;
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(LogCategories.FileLink, "Failed to read Attachment.PathName.", ex);
-                    return string.Empty;
-                }
-            }
 
             public void Dispose()
             {
@@ -626,33 +600,14 @@ namespace NcTalkOutlookAddIn
                 int pendingShareCleanup =
                     _shareCleanupTracker.ReleaseAll();
                 _attachmentEvalTimer.Stop();
-                _beforeAddShareTimer.Stop();
                 _emailSignatureTimer.Stop();
 
-                if (_pendingBeforeAddShareEntries.Count > 0)
-                {
-                    var pendingTemporaryFiles = new List<string>();
-                    for (int i = 0; i < _pendingBeforeAddShareEntries.Count; i++)
-                    {
-                        BeforeAddShareEntry pendingEntry = _pendingBeforeAddShareEntries[i];
-                        if (pendingEntry == null || !pendingEntry.CleanupLocalPathAfterFlow || string.IsNullOrWhiteSpace(pendingEntry.LocalPath))
-                        {
-                            continue;
-                        }
-
-                        pendingTemporaryFiles.Add(pendingEntry.LocalPath);
-                    }
-
-                    CleanupTemporaryFiles(pendingTemporaryFiles);
-                    _pendingBeforeAddShareEntries.Clear();
-                }
+                if (_sharingWizard != null && !_sharingWizard.IsDisposed) { _sharingWizard.Close(); }
                 try
                 {
                     _attachmentEvalTimer.Tick -= OnAttachmentEvalTimerTick;
-                    _beforeAddShareTimer.Tick -= OnBeforeAddShareTimerTick;
                     _emailSignatureTimer.Tick -= OnEmailSignatureTimerTick;
                     _attachmentEvalTimer.Dispose();
-                    _beforeAddShareTimer.Dispose();
                     _emailSignatureTimer.Dispose();
                 }
                 catch (Exception ex)
@@ -664,7 +619,6 @@ namespace NcTalkOutlookAddIn
                 {
                     try
                     {
-                        _events.BeforeAttachmentAdd -= OnBeforeAttachmentAdd;
                         _events.AttachmentAdd -= OnAttachmentAdd;
                         _events.PropertyChange -= OnPropertyChange;
                         _events.Send -= OnSend;

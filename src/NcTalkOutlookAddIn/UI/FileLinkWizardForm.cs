@@ -92,6 +92,7 @@ namespace NcTalkOutlookAddIn.UI
         private readonly Dictionary<FileLinkSelection, SelectionUploadState> _selectionStates = new Dictionary<FileLinkSelection, SelectionUploadState>();
         private readonly Dictionary<FileLinkSelection, FileLinkQueueNode> _queueSnapshots = new Dictionary<FileLinkSelection, FileLinkQueueNode>();
         private readonly HashSet<string> _expandedQueueFolders = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<FileLinkSelection> _uploadedSelections = new HashSet<FileLinkSelection>();
         private int _currentStepIndex;
         private CancellationTokenSource _cancellationSource;
         private FileLinkUploadContext _uploadContext;
@@ -101,6 +102,7 @@ namespace NcTalkOutlookAddIn.UI
         private bool _uploadCompleted;
         private bool _allowEmptyUpload;
         private bool _shareFinalized;
+        private bool _finalizeInProgress;
         private bool _closeAfterCancellation;
         private bool _closeRequested;
         private CancellationTokenSource _queueStorageCancellation;
@@ -178,7 +180,6 @@ namespace NcTalkOutlookAddIn.UI
             UiThemeManager.ApplyToForm(this);
             ApplyQueueTheme();
 
-            LoadInitialSelections();
             if (_attachmentMode)
             {
                 ApplyAttachmentModeDefaults();
@@ -194,39 +195,12 @@ namespace NcTalkOutlookAddIn.UI
 
         internal FileLinkResult Result { get; private set; }
 
-        internal bool UnexpectedFailureObserved { get; private set; }
-
-        internal bool CancelledByUser { get; private set; }
+        internal Func<bool> FlushComposeAttachments { get; set; }
 
         internal FileLinkRequest RequestSnapshot
         {
             get { return _requestSnapshot; }
         }
-
-        internal int QueuedSelectionCount
-        {
-            get { return _items.Count; }
-        }
-
-        internal IList<string> GetSharedLocalPaths()
-        {
-            var paths = new List<string>();
-            if (!_uploadCompleted || !_shareFinalized || Result == null
-                || _uploadContext == null || _uploadContext.Plan == null)
-            {
-                return paths;
-            }
-            foreach (FileLinkPlannedFile file in _uploadContext.Plan.Files)
-            {
-                if (file != null && !string.IsNullOrWhiteSpace(file.LocalPath))
-                {
-                    paths.Add(file.LocalPath);
-                }
-            }
-            return paths;
-        }
-
-
 
         private void ShowStep(int index)
         {
@@ -282,7 +256,8 @@ namespace NcTalkOutlookAddIn.UI
             {
                 return _uploadInProgress
                        || _preflightInProgress
-                       || _queueScanInProgress;
+                       || _queueScanInProgress
+                       || _finalizeInProgress;
             }
         }
 
@@ -359,7 +334,6 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Manual share folder preflight failed with service error.",
@@ -373,7 +347,6 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Manual share folder preflight failed unexpectedly.",
@@ -490,6 +463,11 @@ namespace NcTalkOutlookAddIn.UI
 
         private async Task FinishAsync()
         {
+            if (IsWizardBusy || _shareFinalized || _closeRequested
+                || (FlushComposeAttachments != null && !FlushComposeAttachments()))
+            {
+                return;
+            }
             if (_attachmentMode)
             {
                 if (!ValidateCurrentStep())
@@ -519,11 +497,19 @@ namespace NcTalkOutlookAddIn.UI
                 }
 
                 ApplyFormData();
+                if (_items.Count > 0 && !_uploadCompleted)
+                {
+                    await StartUploadAsync();
+                }
                 if (_allowEmptyUpload && (_uploadContext == null || !_uploadCompleted))
                 {
                     if (!await PrepareEmptyUploadAsync())
                     {
                         return;
+                    }
+                    if (_items.Count > 0)
+                    {
+                        await StartUploadAsync();
                     }
                 }
             }
@@ -544,6 +530,7 @@ namespace NcTalkOutlookAddIn.UI
             SetProgressPanelVisible(true);
             _progressBar.Style = ProgressBarStyle.Marquee;
             _progressLabel.Text = Strings.FileLinkWizardCreatingShare;
+            _finalizeInProgress = true;
 
             _cancellationSource = new CancellationTokenSource();
 
@@ -553,16 +540,36 @@ namespace NcTalkOutlookAddIn.UI
                 Cursor.Current = Cursors.WaitCursor;
                 UseWaitCursor = true;
 
-                Result = await Task.Run(() => _service.FinalizeShare(_uploadContext, _request, _cancellationSource.Token));
+                if (Result == null)
+                {
+                    CancellationToken token = _cancellationSource.Token;
+                    Result = await Task.Run(() => _service.FinalizeShare(_uploadContext, _request, token));
+                }
+                _cancellationSource.Dispose();
+                _cancellationSource = null;
+                while (true)
+                {
+                    if (_closeRequested || (FlushComposeAttachments != null && !FlushComposeAttachments()))
+                    {
+                        return;
+                    }
+                    if (_uploadCompleted)
+                    {
+                        break;
+                    }
+                    await StartUploadAsync();
+                    if (!_uploadCompleted)
+                    {
+                        return;
+                    }
+                }
                 _shareFinalized = true;
                 _requestSnapshot = CloneRequest(_request);
 
                 DialogResult = DialogResult.OK;
-                Close();
             }
             catch (TalkServiceException ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Share creation failed.", ex);
                 MessageBox.Show(
                     PolicyUiHelper.GetConnectionFailureMessage(ex,
@@ -583,7 +590,6 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Share creation failed unexpectedly.", ex);
                 MessageBox.Show(
                     string.Format(CultureInfo.CurrentCulture, Strings.FileLinkWizardCreateFailedFormat, ex.Message),
@@ -595,6 +601,7 @@ namespace NcTalkOutlookAddIn.UI
             }
             finally
             {
+                _finalizeInProgress = false;
                 UseWaitCursor = false;
                 Cursor.Current = previousCursor;
                 if (_cancellationSource != null)
@@ -608,6 +615,7 @@ namespace NcTalkOutlookAddIn.UI
                 UpdateUploadButtonState();
                 CloseAfterCancellation();
             }
+            if (_shareFinalized) { Close(); }
         }
 
         private void ApplyFormData()
@@ -665,31 +673,6 @@ namespace NcTalkOutlookAddIn.UI
             return clone;
         }
 
-
-        private void LoadInitialSelections()
-        {
-            if (_launchOptions == null || _launchOptions.InitialSelections == null)
-            {
-                return;
-            }
-            var validSelections = new List<FileLinkSelection>();
-            foreach (var selection in _launchOptions.InitialSelections)
-            {
-                if (!SelectionPathExists(selection))
-                {
-                    continue;
-                }
-
-                validSelections.Add(
-                    selection.Source == FileLinkSelectionSource.Local
-                        ? new FileLinkSelection(
-                            selection.SelectionType,
-                            selection.LocalPath)
-                        : selection);
-            }
-
-            AddInitialSelections(validSelections);
-        }
 
         private void ApplyAttachmentModeDefaults()
         {
@@ -757,7 +740,6 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Attachment mode finalize guard check failed.", ex);
                 return false;
             }

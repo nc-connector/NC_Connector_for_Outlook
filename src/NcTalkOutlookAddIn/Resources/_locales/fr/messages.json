@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "Ce message contient déjà un partage Nextcloud. Les règles relatives aux pièces jointes restent applicables aux fichiers supplémentaires. Si leur partage est obligatoire, retirez ces pièces jointes et partagez-les dans un nouveau message."
+  },
+  "sharing_finish_before_send": {
+    "message": "Terminez ou annulez l’assistant de partage Nextcloud ouvert avant d’envoyer ce message."
+  },
   "outlook_resource_group_by_label": {
     "message": "Regrouper par"
   },

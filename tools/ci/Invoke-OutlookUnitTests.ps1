@@ -1318,6 +1318,33 @@ internal static class OutlookUtilityTests
         Equal("Nextcloud case variants retain their combined size", 3L, scan.TotalBytes);
         Equal("The first Nextcloud selection retains its own count", 1, scan.SelectionFileCounts[lowerFile]);
         Equal("The second Nextcloud selection retains its own count", 1, scan.SelectionFileCounts[upperFile]);
+
+        var existingContext = new FileLinkUploadContext(
+            "https://cloud.example.test", "user", "share", "share", "root/share",
+            new FileLinkUploadPlan(null, null, null, null, null, 0));
+        existingContext.ReservedFiles.Add("report.pdf");
+        existingContext.ReservedFiles.Add("report-copy.pdf");
+        existingContext.ReservedDirectories.Add("archive");
+        int appendRenames = 0;
+        FileLinkUploadPlan appended = FileLinkUploadPlanBuilder.Build(
+            new List<FileLinkSelection> { upperFile }, snapshots, false, 0,
+            info => { appendRenames++; return "report-appended.pdf"; },
+            CancellationToken.None, existingContext);
+        Equal("Appended queue checks names already uploaded in the same share", 1, appendRenames);
+        Equal("Appended queue contains only the newly selected file", 1, appended.Files.Count);
+        Equal("Appended file uses its conflict-resolved target", "report-appended.pdf", appended.Files[0].RemotePath);
+        Equal("Planning append preserves completed target reservations", 2, existingContext.ReservedFiles.Count);
+        Check("Planning append does not reserve uncommitted new paths", !existingContext.ReservedFiles.Contains("report-appended.pdf"));
+
+        existingContext.ReservedFiles.Clear();
+        existingContext.ReservedDirectories.Add("Report.pdf");
+        appendRenames = 0;
+        FileLinkSelectionScanResult folderCollision = FileLinkSelectionScanner.Scan(
+            new List<FileLinkSelection> { upperFile }, snapshots,
+            info => { appendRenames++; return "report-after-folder.pdf"; },
+            CancellationToken.None, existingContext);
+        Equal("Appended file cannot overwrite an existing share folder", 1, appendRenames);
+        Equal("File versus reserved folder conflict uses the common rename resolver", "report-after-folder.pdf", folderCollision.Files[0].RemotePath);
     }
 
     private static void TestFileLinkSelectionScanner()
@@ -1914,6 +1941,7 @@ $($verificationParts -join "`r`n")
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkQueueSnapshotBuilder.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkSelectionScanner.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkUploadPlanner.cs"),
+        (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\FileLinkUploadContext.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceConfiguration.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\TalkServiceException.cs"),
         (Join-Path $ProjectRoot "src\NcTalkOutlookAddIn\Services\NextcloudCapabilitiesService.cs"),

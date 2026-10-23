@@ -74,11 +74,17 @@ namespace NcTalkOutlookAddIn.Services
             IDictionary<FileLinkSelection, FileLinkQueueNode>
                 queueSnapshots,
             Func<FileLinkDuplicateInfo, string> duplicateResolver,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            FileLinkUploadContext existingContext = null)
         {
             _queueSnapshots = queueSnapshots;
             _duplicateResolver = duplicateResolver;
             _cancellationToken = cancellationToken;
+            if (existingContext != null)
+            {
+                _reservedFiles.UnionWith(existingContext.ReservedFiles);
+                _reservedFolders.UnionWith(existingContext.ReservedDirectories);
+            }
         }
 
         internal static FileLinkSelectionScanResult Scan(
@@ -86,7 +92,8 @@ namespace NcTalkOutlookAddIn.Services
             IDictionary<FileLinkSelection, FileLinkQueueNode>
                 queueSnapshots,
             Func<FileLinkDuplicateInfo, string> duplicateResolver,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            FileLinkUploadContext existingContext = null)
         {
             if (selections == null)
             {
@@ -100,7 +107,8 @@ namespace NcTalkOutlookAddIn.Services
             return new FileLinkSelectionScanner(
                 queueSnapshots,
                 duplicateResolver,
-                cancellationToken)
+                cancellationToken,
+                existingContext)
                 .ScanSelections(selections);
         }
 

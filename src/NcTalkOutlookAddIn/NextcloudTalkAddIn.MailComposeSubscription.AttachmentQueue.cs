@@ -5,13 +5,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
-using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.UI;
 using NcTalkOutlookAddIn.Utilities;
 using Outlook = Microsoft.Office.Interop.Outlook;
@@ -22,280 +19,207 @@ namespace NcTalkOutlookAddIn
     {
         internal sealed partial class MailComposeSubscription
         {
-            private sealed class BeforeAddShareEntry
+            private const string SharingBlockProperty = "X-NCC-SHARE-INSERTED";
+            private bool _sharingWizardOpen;
+            private bool _sharingBlockInserted;
+            private bool _sharingNoticeShown;
+            private bool _sharingHandoffFailed;
+            private FileLinkWizardForm _sharingWizard;
+            private readonly List<string> _sharingTemporaryFiles = new List<string>();
+
+            internal bool SharingWizardOpen { get { return _sharingWizardOpen; } }
+
+            internal bool HasInsertedSharingBlock()
             {
-                internal AttachmentBatchEntry Candidate { get; set; }
-
-                internal string LocalPath { get; set; }
-
-                internal int ThresholdMb { get; set; }
-
-                internal bool CleanupLocalPathAfterFlow { get; set; }
-
-                internal string Trigger { get; set; }
-
+                if (_sharingBlockInserted) { return true; }
+                Outlook.UserProperties properties = null;
+                Outlook.UserProperty property = null;
+                try
+                {
+                    properties = _mail.UserProperties;
+                    property = properties[SharingBlockProperty];
+                    _sharingBlockInserted = property != null && object.Equals((object)property.Value, true);
+                    return _sharingBlockInserted;
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(property, LogCategories.FileLink, "Failed to release share marker.");
+                    ComInteropScope.TryRelease(properties, LogCategories.FileLink, "Failed to release share properties.");
+                }
             }
 
-            private async Task StartComposeAttachmentShareFlowAsync(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
+            internal void SetSharingBlockInserted(bool inserted)
+            {
+                Outlook.UserProperties properties = null;
+                Outlook.UserProperty property = null;
+                try
+                {
+                    properties = _mail.UserProperties;
+                    property = properties[SharingBlockProperty];
+                    if (property == null)
+                    {
+                        if (!inserted) { _sharingBlockInserted = false; return; }
+                        property = properties.Add(SharingBlockProperty, Outlook.OlUserPropertyType.olYesNo, false, Type.Missing);
+                    }
+                    property.Value = inserted;
+                    _sharingBlockInserted = inserted;
+                }
+                finally
+                {
+                    ComInteropScope.TryRelease(property, LogCategories.FileLink, "Failed to release share marker.");
+                    ComInteropScope.TryRelease(properties, LogCategories.FileLink, "Failed to release share properties.");
+                }
+            }
+
+            private void ShowSharingAlreadyInserted()
+            {
+                if (_sharingNoticeShown) { return; }
+                _sharingNoticeShown = true;
+                MessageBox.Show(Strings.SharingAlreadyInserted, Strings.DialogTitle,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+
+            internal void FocusSharingWizard()
+            {
+                if (_sharingWizard == null || _sharingWizard.IsDisposed) { return; }
+                if (_sharingWizard.WindowState == FormWindowState.Minimized)
+                {
+                    _sharingWizard.WindowState = FormWindowState.Normal;
+                }
+                _sharingWizard.Activate();
+            }
+
+            internal bool TryBeginSharingWizard()
+            {
+                if (!CanApplyComposeChanges) { return false; }
+                if (SharingWizardOpen) { FocusSharingWizard(); return false; }
+                if (HasInsertedSharingBlock()) { ShowSharingAlreadyInserted(); return false; }
+                // Reserve before connection or policy work can yield to another entry.
+                _sharingWizardOpen = true;
+                _attachmentEvalTimer.Stop();
+                return true;
+            }
+
+            internal bool BindSharingWizard(FileLinkWizardForm wizard)
+            {
+                if (!CanApplyComposeChanges || !SharingWizardOpen) { return false; }
+                _sharingWizard = wizard;
+                wizard.FlushComposeAttachments = DrainSharingAttachments;
+                return DrainSharingAttachments();
+            }
+
+            internal bool DrainSharingAttachments()
+            {
+                if (!CanApplyComposeChanges || _sharingWizard == null || _sharingWizard.IsDisposed)
+                {
+                    return false;
+                }
+                if (_attachmentSuppressed || _sharingHandoffFailed) { return false; }
+                _attachmentEvaluationPending = false;
+                _pendingAddedBatch.Clear();
+                var selections = new List<FileLinkSelection>();
+                var originals = new List<AttachmentShareOriginal>();
+                var temporaryFiles = new List<string>();
+                var removed = new List<AttachmentShareOriginal>();
+                bool adopted = false;
+                _attachmentSuppressed = true;
+                try
+                {
+                    long expectedBytes;
+                    int expectedCount = CountPolicyRelevantAttachments(out expectedBytes);
+                    CollectAttachmentSelectionsForShare(selections, originals, temporaryFiles);
+                    if (selections.Count != expectedCount) { return false; }
+                    if (selections.Count > 0)
+                    {
+                        adopted = _sharingWizard.TryAdoptComposeSelections(selections);
+                        if (!adopted) { return false; }
+                        // Admission and host removal run without yielding the Outlook STA.
+                        foreach (AttachmentShareOriginal original in originals)
+                        {
+                            if (!IsAutomationFileAttachment(original.Attachment))
+                            {
+                                throw new InvalidOperationException("Attachment classification changed during queue handoff.");
+                            }
+                            original.Attachment.Delete();
+                            removed.Add(original);
+                        }
+                        _sharingTemporaryFiles.AddRange(temporaryFiles);
+                        temporaryFiles.Clear();
+                        LogFileLink("Compose attachments adopted by sharing wizard (composeKey=" + _composeKey
+                            + ", count=" + selections.Count.ToString(CultureInfo.InvariantCulture) + ").");
+                    }
+                    long remainingBytes;
+                    return CountPolicyRelevantAttachments(out remainingBytes) == 0;
+                }
+                catch (Exception ex)
+                {
+                    _sharingHandoffFailed = true;
+                    if (adopted) { _sharingWizard.RollbackComposeSelections(selections); }
+                    foreach (AttachmentShareOriginal original in removed)
+                    {
+                        Outlook.Attachments attachments = null;
+                        Outlook.Attachment restored = null;
+                        try
+                        {
+                            attachments = _mail.Attachments;
+                            restored = attachments.Add(original.LocalPath, Outlook.OlAttachmentType.olByValue,
+                                Type.Missing, Type.Missing);
+                        }
+                        catch (Exception restoreEx)
+                        {
+                            // Preserve the materialized source if Outlook cannot restore it.
+                            temporaryFiles.Remove(original.LocalPath);
+                            DiagnosticsLogger.LogException(LogCategories.FileLink,
+                                "Attachment rollback failed; retained local source: " + original.LocalPath, restoreEx);
+                        }
+                        finally
+                        {
+                            ComInteropScope.TryRelease(restored, LogCategories.FileLink, "Failed to release restored attachment.");
+                            ComInteropScope.TryRelease(attachments, LogCategories.FileLink, "Failed to release restore collection.");
+                        }
+                    }
+                    DiagnosticsLogger.LogException(LogCategories.FileLink,
+                        "Compose queue handoff failed; retained original attachments (composeKey=" + _composeKey + ").", ex);
+                    MessageBox.Show(Strings.FileLinkWizardUploadFailed, Strings.DialogTitle,
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return false;
+                }
+                finally
+                {
+                    ReleaseAttachmentShareOriginals(originals);
+                    CleanupTemporaryFiles(temporaryFiles);
+                    EndAttachmentSuppression("queue_handoff");
+                }
+            }
+
+            internal void EndSharingWizard()
+            {
+                _sharingWizard = null;
+                _sharingWizardOpen = false;
+                _sharingHandoffFailed = false;
+                CleanupTemporaryFiles(_sharingTemporaryFiles);
+                _sharingTemporaryFiles.Clear();
+                _pendingAddedBatch.Clear();
+                _attachmentEvaluationPending = false;
+                ResumeDeferredEmailSignatureApplication("sharing_closed");
+            }
+
+            private Task StartComposeAttachmentShareFlowAsync(string trigger, long totalBytes, int thresholdMb, AttachmentBatchInfo lastAdded)
             {
                 OutlookAttachmentAutomationGuardService.GuardState guardState;
-                if (_beforeAddShareFlowRunning
-                    || _owner.TryGetAttachmentAutomationGuardState("start_flow", _composeKey, out guardState))
+                if (_owner.TryGetAttachmentAutomationGuardState("start_flow", _composeKey, out guardState))
                 {
-                    return;
+                    return Task.CompletedTask;
                 }
-                var originals = new List<AttachmentShareOriginal>();
-                var tempFiles = new List<string>();
-                var launchOptions = new FileLinkWizardLaunchOptions
+                return _owner.RunFileLinkWizardForMailAsync(_mail, new FileLinkWizardLaunchOptions
                 {
                     AttachmentMode = true,
                     AttachmentTrigger = string.IsNullOrWhiteSpace(trigger) ? "always" : trigger,
                     AttachmentTotalBytes = Math.Max(0, totalBytes),
                     AttachmentThresholdMb = Math.Max(1, thresholdMb),
-                    AttachmentLastName = lastAdded != null ? (lastAdded.Name ?? string.Empty) : string.Empty,
+                    AttachmentLastName = lastAdded != null ? lastAdded.Name : string.Empty,
                     AttachmentLastSizeBytes = lastAdded != null ? Math.Max(0, lastAdded.SizeBytes) : 0
-                };
-                launchOptions.PrepareInitialSelections = () =>
-                    PrepareComposeAttachmentSelections(launchOptions, originals, tempFiles);
-
-                _beforeAddShareFlowRunning = true;
-                _attachmentSuppressed = true;
-                bool accepted = false;
-                ExceptionDispatchInfo failure = null;
-                try
-                {
-                    accepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
-                    LogFileLink(
-                        "Compose attachment flow completed (composeKey=" + _composeKey
-                        + ", trigger=" + launchOptions.AttachmentTrigger
-                        + ", wizardAccepted=" + accepted.ToString(CultureInfo.InvariantCulture) + ").");
-                }
-                catch (Exception ex)
-                {
-                    failure = ExceptionDispatchInfo.Capture(ex);
-                    launchOptions.UnexpectedFailureObserved = !(ex is OperationCanceledException);
-                }
-                try
-                {
-                    await FinalizeAttachmentShareFlowAsync(originals, launchOptions, accepted);
-                }
-                catch (Exception ex)
-                {
-                    if (failure == null) { failure = ExceptionDispatchInfo.Capture(ex); }
-                }
-                finally
-                {
-                    CleanupTemporaryFiles(tempFiles);
-                }
-                if (failure != null) { failure.Throw(); }
-            }
-
-            private bool PrepareComposeAttachmentSelections(
-                FileLinkWizardLaunchOptions launchOptions,
-                List<AttachmentShareOriginal> originals,
-                List<string> tempFiles)
-            {
-                if (!CanApplyComposeChanges || _mail == null)
-                {
-                    return false;
-                }
-                // Keep owned attachment identities through the wizard, never stale collection positions.
-                var selections = new List<FileLinkSelection>();
-                CollectAttachmentSelectionsForShare(selections, originals, tempFiles);
-                if (selections.Count == 0)
-                {
-                    LogFileLink("Compose attachment flow skipped (composeKey=" + _composeKey + ", reason=no_collectible_files).");
-                    return false;
-                }
-                foreach (FileLinkSelection selection in selections)
-                {
-                    launchOptions.InitialSelections.Add(selection);
-                }
-                return true;
-            }
-
-            private void QueueBeforeAddAttachmentShareFlow(
-                string trigger,
-                AttachmentBatchEntry candidate,
-                string localPath,
-                int thresholdMb,
-                bool cleanupLocalPathAfterFlow)
-            {
-                if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
-                {
-                    LogFileLink("Compose before-attachment-add share queue skipped (composeKey=" + _composeKey + ", reason=missing_local_path).");
-                    return;
-                }
-
-                _pendingBeforeAddShareEntries.Add(new BeforeAddShareEntry
-                {
-                    Candidate = new AttachmentBatchEntry
-                    {
-                        OriginalAttachment = candidate != null ? candidate.OriginalAttachment : null,
-                        Name = candidate != null ? (candidate.Name ?? string.Empty) : string.Empty,
-                        SizeBytes = Math.Max(0, candidate != null ? candidate.SizeBytes : 0)
-                    },
-                    LocalPath = localPath,
-                    ThresholdMb = Math.Max(1, thresholdMb),
-                    CleanupLocalPathAfterFlow = cleanupLocalPathAfterFlow,
-                    Trigger = string.IsNullOrWhiteSpace(trigger) ? "always_preadd" : trigger
                 });
-
-                LogFileLink(
-                    "Compose before-attachment-add candidate queued (composeKey="
-                    + _composeKey
-                    + ", queued="
-                    + _pendingBeforeAddShareEntries.Count.ToString(CultureInfo.InvariantCulture)
-                    + ", attachment="
-                    + (candidate != null ? (candidate.Name ?? string.Empty) : string.Empty)
-                    + ").");
-
-                if (_beforeAddShareFlowRunning)
-                {
-                    return;
-                }
-                try
-                {
-                    _beforeAddShareTimer.Stop();
-                    _beforeAddShareTimer.Start();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to schedule queued before-attachment-add share flow (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-            }
-
-            private async Task RunQueuedBeforeAddAttachmentShareFlowAsync()
-            {
-                if (_disposed || _beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count == 0)
-                {
-                    return;
-                }
-
-                _beforeAddShareFlowRunning = true;
-                var batch = new List<BeforeAddShareEntry>(_pendingBeforeAddShareEntries);
-                _pendingBeforeAddShareEntries.Clear();
-                var originals = new List<AttachmentShareOriginal>();
-                var temporaryFiles = new List<string>();
-                var launchOptions = new FileLinkWizardLaunchOptions
-                {
-                    AttachmentMode = true,
-                    AttachmentTrigger = batch.TrueForAll(entry => entry != null
-                        && string.Equals(entry.Trigger, "threshold_preadd", StringComparison.OrdinalIgnoreCase))
-                        ? "threshold" : "always"
-                };
-                launchOptions.PrepareInitialSelections = () =>
-                {
-                    if (!CanApplyComposeChanges) { return false; }
-                    var selections = new List<FileLinkSelection>();
-                    foreach (BeforeAddShareEntry entry in batch)
-                    {
-                        CaptureBeforeAddAttachmentOriginal(entry.Candidate, selections, originals, temporaryFiles);
-                    }
-                    foreach (FileLinkSelection selection in selections) { launchOptions.InitialSelections.Add(selection); }
-                    return selections.Count > 0;
-                };
-
-                bool accepted = false;
-                ExceptionDispatchInfo failure = null;
-                try
-                {
-                    foreach (BeforeAddShareEntry entry in batch)
-                    {
-                        if (entry == null) { continue; }
-                        if (entry.CleanupLocalPathAfterFlow) { temporaryFiles.Add(entry.LocalPath); }
-                        launchOptions.AttachmentTotalBytes += Math.Max(0, entry.Candidate != null ? entry.Candidate.SizeBytes : 0);
-                        launchOptions.AttachmentThresholdMb = Math.Max(launchOptions.AttachmentThresholdMb, entry.ThresholdMb);
-                        launchOptions.AttachmentLastName = entry.Candidate != null ? entry.Candidate.Name : string.Empty;
-                        launchOptions.AttachmentLastSizeBytes = Math.Max(0, entry.Candidate != null ? entry.Candidate.SizeBytes : 0);
-                    }
-                    if (batch.Count > 0)
-                    {
-                        _attachmentSuppressed = true;
-                        _pendingAddedBatch.Clear();
-                        accepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);
-                        LogFileLink(
-                            "Compose queued attachment flow completed (composeKey=" + _composeKey
-                            + ", queued=" + batch.Count.ToString(CultureInfo.InvariantCulture)
-                            + ", wizardAccepted=" + accepted.ToString(CultureInfo.InvariantCulture) + ").");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    failure = ExceptionDispatchInfo.Capture(ex);
-                    launchOptions.UnexpectedFailureObserved = !(ex is OperationCanceledException);
-                }
-                try
-                {
-                    await FinalizeAttachmentShareFlowAsync(originals, launchOptions, accepted);
-                }
-                catch (Exception ex)
-                {
-                    if (failure == null) { failure = ExceptionDispatchInfo.Capture(ex); }
-                }
-                finally
-                {
-                    CleanupTemporaryFiles(temporaryFiles);
-                }
-                if (failure != null) { failure.Throw(); }
-            }
-
-            private async Task FinalizeAttachmentShareFlowAsync(
-                List<AttachmentShareOriginal> originals,
-                FileLinkWizardLaunchOptions launchOptions,
-                bool accepted)
-            {
-                bool stateReleased = false;
-                try
-                {
-                    await _owner.RunOnOutlookUiThreadAsync(() =>
-                    {
-                        try
-                        {
-                            if (accepted || launchOptions.CancelledByUser)
-                            {
-                                RemoveAttachmentOriginals(
-                                    originals,
-                                    launchOptions.SharedLocalPaths,
-                                    !accepted && launchOptions.CancelledByUser);
-                            }
-                        }
-                        finally
-                        {
-                            try { ReleaseAttachmentShareOriginals(originals); }
-                            finally
-                            {
-                                _beforeAddShareFlowRunning = false;
-                                stateReleased = true;
-                                EndAttachmentSuppression("share_flow_complete");
-                                if (!accepted && launchOptions.UnexpectedFailureObserved)
-                                {
-                                    AddinSettings current = _owner._currentSettings;
-                                    if (current != null)
-                                    {
-                                        var configuration = new TalkServiceConfiguration(current.ServerUrl, current.Username, current.AppPassword);
-                                        _owner.InvalidateCurrentBackendPolicyCheck(configuration);
-                                        BeginAttachmentAutomationSettingsRefresh();
-                                        ScheduleEmailSignatureApplication("attachment_failure");
-                                    }
-                                }
-                                RestartBeforeAddShareTimerIfNeeded();
-                            }
-                        }
-                        return true;
-                    });
-                }
-                finally
-                {
-                    if (!stateReleased)
-                    {
-                        _attachmentSuppressed = false;
-                        _beforeAddShareFlowRunning = false;
-                    }
-                }
             }
 
             private void RunAttachmentFlowTask(Task task, string failureMessage)
@@ -315,33 +239,12 @@ namespace NcTalkOutlookAddIn
                     TaskContinuationOptions.OnlyOnFaulted);
             }
 
-            private void RestartBeforeAddShareTimerIfNeeded()
-            {
-                if (_pendingBeforeAddShareEntries.Count == 0 || _disposed)
-                {
-                    return;
-                }
-                try
-                {
-                    _beforeAddShareTimer.Stop();
-                    _beforeAddShareTimer.Start();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Failed to restart queued before-attachment-add share flow (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-            }
-
             private void EndAttachmentSuppression(string trigger)
             {
                 _attachmentSuppressed = false;
                 if (_attachmentEvaluationPending) { ScheduleAttachmentEvaluation(); }
                 ResumeDeferredEmailSignatureApplication("attachment_" + (trigger ?? string.Empty));
             }
-
         }
     }
 }

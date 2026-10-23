@@ -93,7 +93,8 @@ namespace NcTalkOutlookAddIn.Services
                     targetUrl,
                     totalSize,
                     file.LastWriteTimeUtc,
-                    cancellationToken);
+                    cancellationToken,
+                    context.IsAppend);
                 FileLinkSourceFile.ValidateSnapshot(file);
                 cleanupRequired = false;
             }
@@ -114,7 +115,8 @@ namespace NcTalkOutlookAddIn.Services
             string targetUrl,
             long totalSize,
             DateTime lastWriteTimeUtc,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool createOnly = false)
         {
             string sourceUrl = uploadFolderUrl + "/.file";
             long modified = TimeUtilities
@@ -137,6 +139,7 @@ namespace NcTalkOutlookAddIn.Services
                     Headers = new Dictionary<string, string>
                     {
                         { "Destination", targetUrl },
+                        { "Overwrite", createOnly ? "F" : "T" },
                         {
                             "OC-Total-Length",
                             totalSize.ToString(

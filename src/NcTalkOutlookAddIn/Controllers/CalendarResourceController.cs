@@ -265,13 +265,13 @@ namespace NcTalkOutlookAddIn.Controllers
         internal static SelectionPlan Plan(List<CalendarResource> directory, List<CalendarResource> selected, List<RecipientState> existing, string currentLocation)
         {
             if (selected.Count(r => r.IsRoom) > 1) { throw new InvalidOperationException("Only one room can be selected."); }
-            var available = directory.ToDictionary(r => r.Email, StringComparer.OrdinalIgnoreCase);
+            var available = directory.Where(r => r.CanSchedule).ToDictionary(r => r.Email, StringComparer.OrdinalIgnoreCase);
             var chosen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var plan = new SelectionPlan { Location = currentLocation };
             foreach (CalendarResource resource in selected)
             {
                 CalendarResource known;
-                if (!available.TryGetValue(resource.Email, out known) || !chosen.Add(resource.Email))
+                if (!resource.CanSchedule || !available.TryGetValue(resource.Email, out known) || !chosen.Add(resource.Email))
                 { throw new InvalidOperationException("Invalid resource selection."); }
                 if (known.IsRoom && known.Location.Length != 0) { plan.Location = known.Location; }
                 if (!existing.Any(r => string.Equals(r.Email, known.Email, StringComparison.OrdinalIgnoreCase))) { plan.Add.Add(known); }

@@ -3,6 +3,8 @@
 // See LICENSE.txt for details.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 namespace NcTalkOutlookAddIn.Services
 {
     // Carries precomputed paths/metadata from upload setup into transfer.
@@ -15,7 +17,8 @@ namespace NcTalkOutlookAddIn.Services
             string sanitizedShareName,
             string folderName,
             string relativeFolderPath,
-            FileLinkUploadPlan plan)
+            FileLinkUploadPlan plan,
+            FileLinkUploadContext previousContext = null)
         {
             if (string.IsNullOrWhiteSpace(normalizedBaseUrl))
             {
@@ -32,6 +35,29 @@ namespace NcTalkOutlookAddIn.Services
             FolderName = folderName ?? string.Empty;
             RelativeFolderPath = relativeFolderPath ?? string.Empty;
             Plan = plan;
+            ReservedFiles = new HashSet<string>(
+                previousContext == null
+                    ? Enumerable.Empty<string>()
+                    : previousContext.ReservedFiles,
+                StringComparer.OrdinalIgnoreCase);
+            ReservedDirectories = new HashSet<string>(
+                previousContext == null
+                    ? Enumerable.Empty<string>()
+                    : previousContext.ReservedDirectories,
+                StringComparer.OrdinalIgnoreCase);
+            ReservedDirectories.UnionWith(plan.DirectoriesToCreate);
+            foreach (FileLinkPlannedFile file in plan.Files)
+            {
+                ReservedFiles.Add(file.RemotePath);
+                string path = file.RemotePath;
+                int separator;
+                while ((separator = path.LastIndexOf('/')) >= 0)
+                {
+                    path = path.Substring(0, separator);
+                    ReservedDirectories.Add(path);
+                }
+            }
+            IsAppend = previousContext != null;
         }
 
         internal string NormalizedBaseUrl { get; private set; }
@@ -45,5 +71,11 @@ namespace NcTalkOutlookAddIn.Services
         internal string RelativeFolderPath { get; private set; }
 
         internal FileLinkUploadPlan Plan { get; private set; }
+
+        internal ISet<string> ReservedFiles { get; private set; }
+
+        internal ISet<string> ReservedDirectories { get; private set; }
+
+        internal bool IsAppend { get; private set; }
     }
 }

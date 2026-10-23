@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "Diese Nachricht enthält bereits eine Nextcloud-Freigabe. Für weitere Dateien gelten weiterhin die Anhangsregeln. Ist das Teilen vorgeschrieben, entfernen Sie diese Anhänge und teilen Sie sie in einer neuen Nachricht."
+  },
+  "sharing_finish_before_send": {
+    "message": "Schließen Sie den geöffneten Nextcloud-Freigabeassistenten ab oder brechen Sie ihn ab, bevor Sie diese Nachricht senden."
+  },
   "outlook_resource_group_by_label": {
     "message": "Gruppieren nach"
   },

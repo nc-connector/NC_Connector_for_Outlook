@@ -52,7 +52,8 @@ namespace NcTalkOutlookAddIn.Services
                     targetUrl,
                     file,
                     coordinator,
-                    cancellationToken),
+                    cancellationToken,
+                    context.IsAppend),
                 "direct_put",
                 cancellationToken,
                 () => coordinator.SetFileBytes(file, 0, true));
@@ -75,9 +76,10 @@ namespace NcTalkOutlookAddIn.Services
             string targetUrl,
             FileLinkPlannedFile file,
             FileLinkUploadProgressCoordinator coordinator,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool createOnly)
         {
-            return new NcHttpRequestOptions
+            var options = new NcHttpRequestOptions
             {
                 Method = "PUT",
                 Url = targetUrl,
@@ -117,6 +119,11 @@ namespace NcTalkOutlookAddIn.Services
                             false));
                 }
             };
+            if (createOnly)
+            {
+                options.Headers["If-None-Match"] = "*";
+            }
+            return options;
         }
     }
 }

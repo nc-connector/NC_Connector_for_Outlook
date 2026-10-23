@@ -89,7 +89,8 @@ namespace NcTalkOutlookAddIn.UI
             internal bool IsCalendarHit(Point point)
             {
                 ListViewHitTestInfo hit = HitTest(point);
-                return hit.Item != null && hit.Item.Tag is CalendarResource && hit.SubItem != null && hit.Item.SubItems.IndexOf(hit.SubItem) == 5;
+                var resource = hit.Item == null ? null : hit.Item.Tag as CalendarResource;
+                return resource != null && resource.CanSchedule && hit.SubItem != null && hit.Item.SubItems.IndexOf(hit.SubItem) == 5;
             }
 
             private bool HandleFloorKey(Keys key)
@@ -202,12 +203,13 @@ namespace NcTalkOutlookAddIn.UI
             [DllImport("user32.dll", CharSet = CharSet.Unicode)]
             private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr parameter, ref NativeItem item);
 
-            internal void HideFloorCheckboxes()
+            internal void HideNonSelectableCheckboxes()
             {
                 if (!IsHandleCreated || ChangingHandle) { return; }
                 foreach (ListViewItem item in Items)
                 {
-                    if (!(item.Tag is FloorGroup)) { continue; }
+                    var resource = item.Tag as CalendarResource;
+                    if (!(item.Tag is FloorGroup) && (resource == null || resource.CanSchedule)) { continue; }
                     // StateImageIndex caches its value; native recreation can reintroduce the checkbox independently.
                     var state = new NativeItem { StateMask = 0xF000 };
                     SendMessage(Handle, 0x102B, new IntPtr(item.Index), ref state);
@@ -306,17 +308,20 @@ namespace NcTalkOutlookAddIn.UI
 
             protected override void WndProc(ref Message message)
             {
-                // Headers have no checkbox state, including changes made by native accessibility actions.
+                // Nonselectable rows have no checkbox state, including native accessibility actions.
                 if (!ChangingHandle && message.Msg == 0x204E && message.LParam != IntPtr.Zero
                     && ((NotificationHeader)Marshal.PtrToStructure(message.LParam, typeof(NotificationHeader))).Code == -100)
                 {
                     var change = (ItemChange)Marshal.PtrToStructure(message.LParam, typeof(ItemChange));
-                    if (change.Item >= 0 && change.Item < Items.Count && Items[change.Item].Tag is FloorGroup
-                        && (change.Changed & 8) != 0)
+                    if (change.Item >= 0 && change.Item < Items.Count && (change.Changed & 8) != 0)
                     {
-                        // WinForms interprets a missing state image as checked; headers must bypass that mapping.
-                        message.Result = (change.NewState & 0xF000) == 0 ? IntPtr.Zero : new IntPtr(1);
-                        return;
+                        var resource = Items[change.Item].Tag as CalendarResource;
+                        if (Items[change.Item].Tag is FloorGroup || (resource != null && !resource.CanSchedule))
+                        {
+                            // WinForms interprets a missing state image as checked; bypass that mapping.
+                            message.Result = (change.NewState & 0xF000) == 0 ? IntPtr.Zero : new IntPtr(1);
+                            return;
+                        }
                     }
                 }
                 if (message.Msg == 0x201 || message.Msg == 0x203) // WM_LBUTTONDOWN / WM_LBUTTONDBLCLK
@@ -579,7 +584,7 @@ namespace NcTalkOutlookAddIn.UI
                 string tip = _list.IsCalendarHit(e.Location) ? Strings.ResourceShowAvailability : string.Empty;
                 if (_calendarTip.GetToolTip(_list) != tip) { _calendarTip.SetToolTip(_list, tip); }
             };
-            _list.HandleReady = delegate { _list.RestoreGroups(_collapsed); _list.HideFloorCheckboxes(); UpdateColumnWidths(); };
+            _list.HandleReady = delegate { _list.RestoreGroups(_collapsed); _list.HideNonSelectableCheckboxes(); UpdateColumnWidths(); };
             _list.Resize += delegate { UpdateColumnWidths(); };
             _list.FontChanged += delegate { UpdateFloorFont(); UpdateColumnWidths(); };
             _list.DpiChangedAfterParent += delegate { UpdateColumnWidths(); };
@@ -599,7 +604,7 @@ namespace NcTalkOutlookAddIn.UI
             var showAvailability = new ToolStripMenuItem(Strings.ResourceShowAvailability);
             showAvailability.Click += async delegate { await ShowAvailabilityAsync(); };
             _resourceMenu.Items.Add(showAvailability);
-            _resourceMenu.Opening += (s, e) => { e.Cancel = _availabilityService == null || _window == null || SelectedResource == null; };
+            _resourceMenu.Opening += (s, e) => { e.Cancel = _availabilityService == null || _window == null || SelectedResource == null || !SelectedResource.CanSchedule; };
             _list.ContextMenuStrip = _resourceMenu;
             _list.MouseDown += (s, e) =>
             {
@@ -971,13 +976,13 @@ namespace NcTalkOutlookAddIn.UI
             var cancellation = new CancellationTokenSource();
             _availabilityCancellation = cancellation;
             int generation = _availabilityGeneration;
-            foreach (CalendarResource resource in _resources) { _availability[resource.Email] = CalendarResourceAvailabilityState.Checking; }
+            foreach (CalendarResource resource in _resources.Where(r => r.CanSchedule)) { _availability[resource.Email] = CalendarResourceAvailabilityState.Checking; }
             RebuildList();
             try
             {
                 var results = await _availabilityService.QueryAsync(_resources, window.StartUtc, window.EndUtc, cancellation.Token);
                 if (_closing || IsDisposed || Disposing || cancellation.IsCancellationRequested || generation != _availabilityGeneration) { return; }
-                foreach (CalendarResource resource in _resources)
+                foreach (CalendarResource resource in _resources.Where(r => r.CanSchedule))
                 {
                     CalendarResourceAvailability result;
                     _availability[resource.Email] = results.TryGetValue(resource.Email, out result) ? result.State : CalendarResourceAvailabilityState.Unknown;
@@ -988,7 +993,7 @@ namespace NcTalkOutlookAddIn.UI
             {
                 if (_closing || IsDisposed || Disposing || generation != _availabilityGeneration) { return; }
                 DiagnosticsLogger.LogException(LogCategories.Ifb, "Picker availability query failed.", ex);
-                foreach (CalendarResource resource in _resources) { _availability[resource.Email] = CalendarResourceAvailabilityState.Unknown; }
+                foreach (CalendarResource resource in _resources.Where(r => r.CanSchedule)) { _availability[resource.Email] = CalendarResourceAvailabilityState.Unknown; }
             }
             finally
             {
@@ -1016,7 +1021,7 @@ namespace NcTalkOutlookAddIn.UI
         {
             if (_closing || IsDisposed || Disposing) { return; }
             CalendarResource resource = SelectedResource;
-            if (_availabilityService == null || _window == null || resource == null || _openingDayView) { return; }
+            if (_availabilityService == null || _window == null || resource == null || !resource.CanSchedule || _openingDayView) { return; }
             _openingDayView = true;
             try
             {
@@ -1069,14 +1074,14 @@ namespace NcTalkOutlookAddIn.UI
 
         internal List<CalendarResource> SelectedResources
         {
-            get { return _resources.Where(r => _selected.Contains(r.Email)).ToList(); }
+            get { return _resources.Where(r => r.CanSchedule && _selected.Contains(r.Email)).ToList(); }
         }
 
         private void RebuildList(bool captureGroups = true)
         {
             if (_closing || IsDisposed || Disposing || _updatingFilters) { return; }
             string query = _search.Text.Trim();
-            string focusedEmail = SelectedResource == null ? null : SelectedResource.Email;
+            CalendarResource focusedResource = SelectedResource;
             var focusedFloor = _list.FocusedItem == null ? null : _list.FocusedItem.Tag as FloorGroup;
             string grouping = ((GroupingOption)_grouping.SelectedItem).Key;
             if (captureGroups) { _list.CaptureGroups(_collapsed); }
@@ -1118,12 +1123,12 @@ namespace NcTalkOutlookAddIn.UI
                         };
                         _list.Items.Add(header);
                         if (focusedFloor != null && focusedFloor.Key == key) { header.Selected = true; header.Focused = true; }
-                        if (!collapsed) { AddResourceRows(floor, group, focusedEmail, palette); }
+                        if (!collapsed) { AddResourceRows(floor, group, focusedResource, palette); }
                     }
                 }
-                else { AddResourceRows(section, group, focusedEmail, palette); }
+                else { AddResourceRows(section, group, focusedResource, palette); }
             }
-            _list.HideFloorCheckboxes();
+            _list.HideNonSelectableCheckboxes();
             _list.RestoreGroups(_collapsed);
             _list.EndUpdate();
             _updating = false;
@@ -1145,25 +1150,25 @@ namespace NcTalkOutlookAddIn.UI
             if (_capacityFilter.Value > 0 && (!resource.Capacity.HasValue || resource.Capacity.Value < _capacityFilter.Value)) { return false; }
             if (_selectedFeatures.Count > 0 && !_selectedFeatures.IsSubsetOf(FeatureValues(resource))) { return false; }
             CalendarResourceAvailabilityState state;
-            return !_onlyAvailable.Checked || (_availability.TryGetValue(resource.Email, out state) && state == CalendarResourceAvailabilityState.Free);
+            return !_onlyAvailable.Checked || (resource.CanSchedule && _availability.TryGetValue(resource.Email, out state) && state == CalendarResourceAvailabilityState.Free);
         }
 
-        private void AddResourceRows(IEnumerable<CalendarResource> resources, ListViewGroup group, string focusedEmail, UiThemePalette palette)
+        private void AddResourceRows(IEnumerable<CalendarResource> resources, ListViewGroup group, CalendarResource focusedResource, UiThemePalette palette)
         {
             foreach (CalendarResource resource in resources.OrderBy(r => !r.IsRoom).ThenBy(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase))
             {
                 CalendarResourceAvailabilityState state;
-                if (!_availability.TryGetValue(resource.Email, out state)) { state = CalendarResourceAvailabilityState.Unknown; }
+                if (!resource.CanSchedule || !_availability.TryGetValue(resource.Email, out state)) { state = CalendarResourceAvailabilityState.Unknown; }
                 var item = new ListViewItem(ResourceColumnValues(resource))
-                { Tag = resource, Checked = _selected.Contains(resource.Email), ImageIndex = resource.IsRoom ? 0 : 1, Group = group,
+                { Tag = resource, Checked = resource.CanSchedule && _selected.Contains(resource.Email), ImageIndex = resource.IsRoom ? 0 : 1, Group = group,
                     IndentCount = ((GroupingOption)_grouping.SelectedItem).Key == "building" ? 1 : 0, UseItemStyleForSubItems = false };
                 ListViewItem.ListViewSubItem status = item.SubItems.Add(AvailabilityText(state));
-                item.SubItems.Add("📅");
+                item.SubItems.Add(resource.CanSchedule ? "📅" : string.Empty);
                 foreach (ListViewItem.ListViewSubItem cell in item.SubItems) { cell.BackColor = _list.BackColor; cell.ForeColor = _list.ForeColor; }
                 status.ForeColor = SystemInformation.HighContrast ? SystemColors.WindowText : state == CalendarResourceAvailabilityState.Free ? palette.SuccessText
                     : state == CalendarResourceAvailabilityState.Busy ? palette.ErrorText : palette.MutedText;
                 _list.Items.Add(item);
-                if (resource.Email == focusedEmail) { item.Selected = true; }
+                if (ReferenceEquals(resource, focusedResource)) { item.Selected = true; }
             }
         }
 
@@ -1280,7 +1285,7 @@ namespace NcTalkOutlookAddIn.UI
             // Native handle/theme creation replays checkbox notifications; it is not user input.
             if (_updating || _list.ChangingHandle) { return; }
             var resource = _list.Items[args.Index].Tag as CalendarResource;
-            if (resource == null) { args.NewValue = args.CurrentValue; return; }
+            if (resource == null || !resource.CanSchedule) { args.NewValue = args.CurrentValue; return; }
             if (args.NewValue == CheckState.Checked)
             {
                 if (resource.IsRoom)
@@ -1311,11 +1316,11 @@ namespace NcTalkOutlookAddIn.UI
             {
                 AddDetail(Strings.ResourceNameLabel, resource.DisplayName);
                 AddDetail(Strings.ResourceKindLabel, resource.IsRoom ? Strings.ResourceRoomKind : Strings.ResourceOtherKind);
-                AddDetail(Strings.ResourceCalendarAddressLabel, resource.Email);
+                AddDetail(Strings.ResourceCalendarAddressLabel, resource.Email, true);
                 AddDetail(resource.IsRoom ? Strings.ResourceRoomTypeLabel : Strings.ResourceTypeLabel, resource.IsRoom ? resource.RoomType : resource.ResourceType);
                 AddDetail(Strings.ResourceCapacityLabel, resource.Capacity.HasValue ? resource.Capacity.Value.ToString(CultureInfo.CurrentCulture) : null);
                 AddDetail(Strings.ResourceBuildingLabel, resource.BuildingName);
-                AddDetail(Strings.ResourceAddressLabel, resource.BuildingAddress);
+                AddDetail(Strings.ResourceAddressLabel, resource.BuildingAddress, true);
                 AddDetail(Strings.ResourceFloorLabel, resource.Floor);
                 AddDetail(Strings.ResourceRoomNumberLabel, resource.RoomNumber);
                 AddDetail(Strings.ResourceFeaturesLabel, resource.Features);
@@ -1334,26 +1339,37 @@ namespace NcTalkOutlookAddIn.UI
             {
                 // Reserve the vertical scrollbar even before it appears, so wrapping cannot change its own width.
                 int available = Math.Max(2, _details.Width - _details.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
-                int labelWidth = _details.Controls.Cast<Control>().Where(c => _details.GetColumn(c) == 0)
+                int labelWidth = _details.Controls.Cast<Control>().Where(c => _details.GetColumn(c) == 0 && _details.GetColumnSpan(c) == 1)
                     .Max(c => TextRenderer.MeasureText(c.Text, c.Font, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + c.Margin.Horizontal);
                 labelWidth = Math.Min(labelWidth, Math.Max(1, available * 2 / 5));
                 _details.ColumnStyles[0].Width = labelWidth;
                 foreach (Control control in _details.Controls)
                 {
-                    int width = Math.Max(1, (_details.GetColumn(control) == 0 ? labelWidth : available - labelWidth) - control.Margin.Horizontal);
+                    int columnWidth = _details.GetColumnSpan(control) == 2 ? available : _details.GetColumn(control) == 0 ? labelWidth : available - labelWidth;
+                    int width = Math.Max(1, columnWidth - control.Margin.Horizontal);
                     if (control.MaximumSize.Width != width) { control.MaximumSize = new Size(width, 0); }
                 }
             }
             finally { _details.ResumeLayout(); _layoutDetails = false; }
         }
 
-        private void AddDetail(string name, string value)
+        private void AddDetail(string name, string value, bool fullWidth = false)
         {
             int row = _details.RowCount++;
             _details.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            _details.Controls.Add(new Label { Text = name, AutoSize = true, Margin = new Padding(0, 4, 8, 8), UseMnemonic = false }, 0, row);
-            _details.Controls.Add(new Label { Text = string.IsNullOrWhiteSpace(value) ? Strings.ResourceNotProvided : value, AutoSize = true,
-                Margin = new Padding(0, 4, 0, 8), UseMnemonic = false }, 1, row);
+            var caption = new Label { Text = name, AutoSize = true, Margin = new Padding(0, 4, 8, fullWidth ? 0 : 8), UseMnemonic = false };
+            var content = new Label { Text = string.IsNullOrWhiteSpace(value) ? Strings.ResourceNotProvided : value, AutoSize = true,
+                Margin = new Padding(0, 4, 0, 8), UseMnemonic = false };
+            _details.Controls.Add(caption, 0, row);
+            if (fullWidth)
+            {
+                _details.SetColumnSpan(caption, 2);
+                row = _details.RowCount++;
+                _details.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                _details.Controls.Add(content, 0, row);
+                _details.SetColumnSpan(content, 2);
+            }
+            else { _details.Controls.Add(content, 1, row); }
         }
 
         private ImageList CreateResourceIcons(int size)

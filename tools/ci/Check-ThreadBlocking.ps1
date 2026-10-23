@@ -83,7 +83,7 @@ foreach ($file in $sourceFiles) {
 Add-UiDialogBoundaryFailures `
     -ControllerRelativePath "Controllers\FileLinkLaunchController.cs" `
     -AsyncMethodPattern 'internal\s+async\s+Task<bool>\s+RunFileLinkWizardForMailAsync' `
-    -UiMethodPattern 'private\s+bool\s+RunFileLinkWizardOnUiThread' `
+    -UiMethodPattern 'private\s+async\s+Task<bool>\s+RunFileLinkWizardOnUiThread' `
     -DispatcherPattern '\.RunOnOutlookUiThreadAsync\s*\(' `
     -DialogType "FileLinkWizardForm" `
     -FlowName "FileLink"

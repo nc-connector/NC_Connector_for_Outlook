@@ -113,14 +113,11 @@ $manualPasswordFallback = Get-MethodSlice `
     "private bool TryOpenSeparatePasswordFallback("
 $fileLinkWizardUi = Get-MethodSlice `
     $fileLink `
-    "private bool RunFileLinkWizardOnUiThread("
+    "private async Task<bool> RunFileLinkWizardOnUiThread("
 
 $attachmentAdd = Get-MethodSlice `
     $attachmentFlow `
     "private void OnAttachmentAdd("
-$beforeAttachmentAdd = Get-MethodSlice `
-    $attachmentFlow `
-    "private void OnBeforeAttachmentAdd("
 $snapshotAttachments = Get-MethodSlice `
     $attachmentMaterialization `
     "private List<AttachmentSnapshot> SnapshotAttachments()"
@@ -132,10 +129,7 @@ $collectAttachments = Get-MethodSlice `
     "private void CollectAttachmentSelectionsForShare("
 $startAttachmentShareFlow = Get-MethodSlice `
     $attachmentQueue `
-    "private async Task StartComposeAttachmentShareFlowAsync("
-$prepareAttachmentSelections = Get-MethodSlice `
-    $attachmentQueue `
-    "private bool PrepareComposeAttachmentSelections("
+    "private Task StartComposeAttachmentShareFlowAsync("
 $removeAttachmentsByIndices = Get-MethodSlice `
     $attachmentMaterialization `
     "private void RemoveAttachmentsByIndices("
@@ -154,21 +148,12 @@ $attachmentSettingsFreshness = Get-MethodSlice `
 $requiredAttachmentNotice = Get-MethodSlice `
     $attachmentPolicy `
     "private static void ShowRequiredAttachmentRoutingNotice()"
-$removeAttachmentOriginals = Get-MethodSlice `
-    $attachmentMaterialization `
-    "private void RemoveAttachmentOriginals("
 $removeLastAttachmentBatch = Get-MethodSlice `
     $attachmentMaterialization `
     "private void RemoveLastAddedAttachmentBatch("
 $queueSelectionScan = Get-MethodSlice `
     $fileLinkWizardFiles `
     "private async Task AddSelectionsAsync("
-$initialFileSelection = Get-MethodSlice `
-    $fileLinkWizardDragDrop `
-    "private bool TryAddInitialFileSelection("
-$initialQueueSelections = Get-MethodSlice `
-    $fileLinkWizardFiles `
-    "private void AddInitialSelections("
 $reserveQueueSelection = Get-MethodSlice `
     $fileLinkWizardDragDrop `
     "private bool TryReserveSelection("
@@ -196,11 +181,6 @@ Assert-Precedes `
     "IsAutomationFileAttachment(attachment, true)" `
     "_pendingAddedBatch.Add("
 Assert-Precedes `
-    "Body resources are allowed before automation preflight" `
-    $beforeAttachmentAdd `
-    "IsAutomationFileAttachment(attachment, true)" `
-    "ReadAttachmentAutomationSettings()"
-Assert-Precedes `
     "Body resources are excluded from threshold snapshots" `
     $snapshotAttachments `
     "IsAutomationFileAttachment(attachment)" `
@@ -218,58 +198,28 @@ Assert-Precedes `
     $collectAttachments `
     "IsAutomationFileAttachment(attachment)" `
     "TryResolveAttachmentLocalPath("
+$drainSharingAttachments = Get-MethodSlice $attachmentQueue "internal bool DrainSharingAttachments()"
 Assert-Precedes `
-    "Post-add attachments are finalized only after the sharing result" `
-    $startAttachmentShareFlow `
-    "accepted = await _owner.RunFileLinkWizardForMailAsync(_mail, launchOptions);" `
-    "await FinalizeAttachmentShareFlowAsync(originals, launchOptions, accepted);"
-Assert-NotContains `
-    "Queue adoption does not remove original Outlook attachments" `
-    $startAttachmentShareFlow `
-    'RemoveAttachmentsByIndices('
+    "Queue acceptance precedes removal of original Outlook attachments" `
+    $drainSharingAttachments `
+    ".TryAdoptComposeSelections(selections)" `
+    "original.Attachment.Delete();"
 Assert-Contains `
-    "Attachment launch options expose the queue-adoption boundary" `
-    $fileLinkLaunchOptions `
-    "internal Action OnInitialQueueAdopted { get; set; }"
+    "A rejected handoff rolls the queue back" `
+    $drainSharingAttachments `
+    ".RollbackComposeSelections(selections)"
 Assert-NotContains `
-    "Attachment positions are not captured before server prefetch" `
-    $startAttachmentShareFlow `
-    "CollectAttachmentSelectionsForShare("
-Assert-Contains `
-    "Post-add capture is deferred until the UI handoff" `
-    $startAttachmentShareFlow `
-    "launchOptions.PrepareInitialSelections = () =>"
-Assert-Contains `
-    "The UI handoff captures the current attachment collection" `
-    $prepareAttachmentSelections `
-    "CollectAttachmentSelectionsForShare(selections, originals, tempFiles);"
+    "One post-add attachment path replaces pre-add interception" `
+    ($subscription + $attachmentFlow + $attachmentQueue + $attachmentMaterialization) `
+    "BeforeAttachmentAdd"
 Assert-NotContains `
-    "Attachment capture cannot yield before queue adoption" `
-    $prepareAttachmentSelections `
-    "await "
-Assert-Precedes `
-    "Current attachments are captured on the STA before wizard construction" `
+    "Sharing does not block the compose window with a modal wizard" `
     $fileLinkWizardUi `
-    "!launchOptions.PrepareInitialSelections()" `
-    "new FileLinkWizardForm("
-Assert-NotContains `
-    "Wizard construction and attachment adoption do not yield" `
-    $fileLinkWizardUi `
-    "await "
+    "wizard.ShowDialog"
 Assert-Contains `
-    "The wizard reports its accepted queue size" `
-    $fileLinkWizard `
-    "internal int QueuedSelectionCount"
-Assert-Precedes `
-    "The complete attachment queue is checked before adoption" `
+    "Manual sharing and automation bind the same compose queue" `
     $fileLinkWizardUi `
-    "wizard.QueuedSelectionCount" `
-    "launchOptions.OnInitialQueueAdopted();"
-Assert-Precedes `
-    "Attachment ownership transfers before the wizard opens" `
-    $fileLinkWizardUi `
-    "launchOptions.OnInitialQueueAdopted();" `
-    "wizard.ShowDialog()"
+    ".BindSharingWizard(wizard)"
 Assert-Precedes `
     "Synchronous attachment events refresh an expired settings snapshot" `
     $readAttachmentSettings `
@@ -348,12 +298,12 @@ Assert-NotContains `
 Assert-Contains `
     "The wizard busy state includes local queue scans" `
     $fileLinkWizard `
-    "|| _queueScanInProgress;"
+    "|| _queueScanInProgress"
 Assert-Contains `
     "Drag and drop awaits the background queue scan" `
     $fileLinkWizardDragDrop `
     "await AddSelectionsAsync(selections);"
-foreach ($selectionAdmission in @($queueSelectionScan, $initialQueueSelections)) {
+foreach ($selectionAdmission in @($queueSelectionScan)) {
     Assert-Contains `
         "Queue admission uses the model's source-aware identity comparer" `
         $selectionAdmission `
@@ -371,33 +321,10 @@ Assert-Contains `
     "Attachment mode still bypasses source deduplication" `
     $reserveQueueSelection `
     "if (!_attachmentMode && existingSelections != null)"
-Assert-Precedes `
-    "Only individual attachment files use synchronous initial capture" `
-    $initialFileSelection `
-    "!= FileLinkSelectionType.File" `
-    "CancellationToken.None"
-Assert-Precedes `
-    "Successful sharing preserves body resources" `
-    $removeAttachmentOriginals `
-    "IsAutomationFileAttachment(original.Attachment)" `
-    "original.Attachment.Delete();"
-Assert-Contains `
-    "Successful sharing only removes files present in the completed upload plan" `
-    $removeAttachmentOriginals `
-    "shared.Contains(new FileLinkSelection(FileLinkSelectionType.File, original.LocalPath))"
-Assert-Precedes `
-    "Completed local paths are published only after body insertion" `
-    $fileLinkWizardUi `
-    "if (!inserted)" `
-    "wizard.GetSharedLocalPaths()"
 Assert-NotContains `
     "Unsafe filename-based removal is no longer present" `
     $attachmentMaterialization `
     "RemoveSuppressedBeforeAddAttachmentByName"
-Assert-Contains `
-    "Threshold pre-add sharing waits until the host can add the native file" `
-    $beforeAttachmentAdd `
-    'QueueBeforeAddAttachmentShareFlow("threshold_preadd"'
 Assert-Contains `
     "Last-batch removal starts from the visible attachment snapshot" `
     $removeLastAttachmentBatch `
@@ -527,7 +454,7 @@ $insertFailureIndex = $fileLink.IndexOf(
     $insertedIndex,
     [StringComparison]::Ordinal)
 $armIndex = $fileLink.IndexOf(
-    "composeSubscription.ArmShareCleanup(",
+    "subscription.ArmShareCleanup(",
     $insertFailureIndex,
     [StringComparison]::Ordinal)
 $passwordRegistrationIndex = $fileLink.IndexOf(
@@ -738,10 +665,7 @@ $attachmentHandoffHarness = @'
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Runtime.ExceptionServices;
-using System.Threading.Tasks;
 using NcTalkOutlookAddIn.Models;
-
 namespace NcTalkOutlookAddIn.Models
 {
     internal enum FileLinkSelectionType { File }
@@ -749,424 +673,227 @@ namespace NcTalkOutlookAddIn.Models
     {
         internal string LocalPath;
         internal FileLinkSelection(FileLinkSelectionType type, string path) { LocalPath = path; }
-        internal static readonly IEqualityComparer<FileLinkSelection> IdentityComparer = new SelectionComparer();
-        private sealed class SelectionComparer : IEqualityComparer<FileLinkSelection>
-        {
-            public bool Equals(FileLinkSelection left, FileLinkSelection right)
-            { return string.Equals(left.LocalPath, right.LocalPath, StringComparison.OrdinalIgnoreCase); }
-            public int GetHashCode(FileLinkSelection item)
-            { return StringComparer.OrdinalIgnoreCase.GetHashCode(item.LocalPath); }
-        }
     }
-    __LAUNCH_OPTIONS__
 }
 namespace Outlook
 {
+    internal enum OlAttachmentType { olByValue }
+    internal enum OlUserPropertyType { olYesNo }
+    internal sealed class UserProperty { internal object Value; }
+    internal sealed class UserProperties
+    {
+        internal readonly Dictionary<string, UserProperty> Items = new Dictionary<string, UserProperty>();
+        internal UserProperty this[string name] { get { UserProperty value; return Items.TryGetValue(name, out value) ? value : null; } }
+        internal UserProperty Add(string name, OlUserPropertyType type, bool folder, object format)
+        { var value = new UserProperty(); Items.Add(name, value); return value; }
+    }
     internal sealed class Attachment
     {
         internal string Name, LocalPath;
-        internal long SizeBytes;
-        internal bool Hidden, Deleted;
-        internal int Releases;
+        internal bool Hidden, Deleted, FailDelete, FailCollect;
         internal Attachments Owner;
-        internal void Delete() { Deleted = true; Owner.Items.Remove(this); }
+        internal void Delete()
+        {
+            if (FailDelete) { throw new InvalidOperationException("delete failure"); }
+            Deleted = true; Owner.Items.Remove(this);
+        }
     }
     internal sealed class Attachments
     {
         internal readonly List<Attachment> Items = new List<Attachment>();
         internal int Count { get { return Items.Count; } }
         internal Attachment this[int index] { get { return Items[index - 1]; } }
-        internal Attachment Add(string name)
+        internal Attachment Add(string path, OlAttachmentType type, object position, object name)
         {
-            var item = new Attachment { Name = name, LocalPath = "temp/" + name, SizeBytes = 1, Owner = this };
-            Items.Add(item);
-            return item;
+            var item = new Attachment { LocalPath = path, Name = path, Owner = this };
+            Items.Add(item); return item;
         }
     }
 }
 public static class AttachmentHandoffRegression
 {
+    private enum FormWindowState { Normal, Minimized }
+    private enum MessageBoxButtons { OK }
+    private enum MessageBoxIcon { Information, Error }
+    private static class MessageBox { internal static void Show(string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon) { } }
     private static class Strings
     {
-        internal const string FileLinkWizardAttachmentModeReasonAlways = "always";
-        internal const string FileLinkWizardAttachmentModeReasonThreshold = "threshold: {0} > {1}; last: {2} ({3})";
-        internal const string AttachmentPromptLastUnknown = "unknown";
+        internal const string SharingAlreadyInserted = "already", DialogTitle = "title", FileLinkWizardUploadFailed = "failed";
     }
-    private static class SizeFormatting
-    {
-        __FORMAT_MEGABYTES__
-    }
-    private sealed class Wizard
-    {
-        private readonly FileLinkWizardLaunchOptions _launchOptions;
-        internal Wizard(FileLinkWizardLaunchOptions options) { _launchOptions = options; }
-        internal string InfoText() { return BuildAttachmentModeInfoText(); }
-        __ATTACHMENT_MODE_INFO__
-    }
-    private static class File { internal static bool Exists(string path) { return !string.IsNullOrEmpty(path); } }
-    private static class OutlookAttachmentAutomationGuardService { internal sealed class GuardState { } }
     private static class DiagnosticsLogger { internal static void LogException(string category, string message, Exception ex) { } }
     private static class LogCategories { internal const string FileLink = "FILELINK"; }
-    private static class ComInteropScope
+    private static class ComInteropScope { internal static void TryRelease(object value, string category, string message) { } }
+    private sealed class Timer { internal void Stop() { } }
+    private sealed class Mail
     {
-        internal static bool AreSameObject(object left, object right, string category, string leftName, string rightName)
-        { return object.ReferenceEquals(left, right); }
-        internal static void TryRelease(object value, string category, string message)
-        {
-            var attachment = value as Outlook.Attachment;
-            if (attachment != null) { attachment.Releases++; }
-        }
+        internal readonly Outlook.Attachments Attachments = new Outlook.Attachments();
+        internal readonly Outlook.UserProperties UserProperties = new Outlook.UserProperties();
     }
-    private sealed class AttachmentBatchInfo { internal string Name; internal long SizeBytes; }
-    private sealed class AddinSettings { internal string ServerUrl, Username, AppPassword; }
-    private sealed class TalkServiceConfiguration
-    { internal TalkServiceConfiguration(string url, string username, string password) { } }
-    private sealed class Mail { internal readonly Outlook.Attachments Attachments = new Outlook.Attachments(); }
-    private sealed class Owner
+    private sealed class FileLinkWizardForm
     {
-        internal readonly TaskCompletionSource<bool> Prefetch = new TaskCompletionSource<bool>();
-        internal readonly List<string> Queue = new List<string>();
-        internal AddinSettings _currentSettings = new AddinSettings();
-        internal bool RejectQueue, Accept, ThrowAfterCapture;
-        internal int Invalidations, UiDispatches;
-        internal FileLinkWizardLaunchOptions LastLaunchOptions;
-        internal string LastInfoText;
-        internal Action<Mail, FileLinkWizardLaunchOptions> WizardAction;
-        internal bool TryGetAttachmentAutomationGuardState(string stage, string key, out OutlookAttachmentAutomationGuardService.GuardState state)
-        { state = null; return false; }
-        internal void InvalidateCurrentBackendPolicyCheck(TalkServiceConfiguration configuration) { Invalidations++; }
-        internal Task<T> RunOnOutlookUiThreadAsync<T>(Func<T> action)
-        { UiDispatches++; return Task.FromResult(action()); }
-        internal async Task<bool> RunFileLinkWizardForMailAsync(Mail mail, FileLinkWizardLaunchOptions options)
-        {
-            await Prefetch.Task;
-            if (options.PrepareInitialSelections != null && !options.PrepareInitialSelections()) { return false; }
-            if (RejectQueue) { return false; }
-            foreach (FileLinkSelection item in options.InitialSelections) { Queue.Add(item.LocalPath); }
-            if (options.OnInitialQueueAdopted != null) { options.OnInitialQueueAdopted(); }
-            LastLaunchOptions = options;
-            LastInfoText = new Wizard(options).InfoText();
-            if (ThrowAfterCapture) { throw new InvalidOperationException("upload failed"); }
-            if (WizardAction != null) { WizardAction(mail, options); }
-            return Accept;
-        }
+        internal bool IsDisposed, Reject;
+        internal int Focuses, Rollbacks;
+        internal FormWindowState WindowState;
+        internal Func<bool> FlushComposeAttachments;
+        internal readonly List<FileLinkSelection> Queue = new List<FileLinkSelection>();
+        internal void Activate() { Focuses++; }
+        internal bool TryAdoptComposeSelections(IReadOnlyList<FileLinkSelection> selections)
+        { if (Reject) { return false; } Queue.AddRange(selections); return true; }
+        internal void RollbackComposeSelections(IReadOnlyList<FileLinkSelection> selections)
+        { Rollbacks++; foreach (var selection in selections) { Queue.Remove(selection); } }
     }
     private sealed class Subscription
     {
-        __ORIGINAL_CLASS__
-        __BATCH_CLASS__
-        __QUEUE_CLASS__
-        internal readonly Mail _mail = new Mail();
-        internal readonly Owner _owner = new Owner();
-        internal bool _disposed;
-        internal bool _sendAccepted;
-        private bool CanApplyComposeChanges { get { return !_disposed && !_sendAccepted; } }
+        private const string SharingBlockProperty = "X-NCC-SHARE-INSERTED";
+        internal Mail _mail;
+        internal bool CanApplyComposeChanges = true;
+        internal bool _sharingWizardOpen, _sharingBlockInserted, _sharingNoticeShown, _sharingHandoffFailed;
+        internal bool _attachmentSuppressed, _attachmentEvaluationPending;
+        internal FileLinkWizardForm _sharingWizard;
+        internal readonly List<string> _sharingTemporaryFiles = new List<string>();
+        private readonly List<object> _pendingAddedBatch = new List<object>();
+        private readonly Timer _attachmentEvalTimer = new Timer();
         private readonly string _composeKey = "test";
-        private bool _attachmentSuppressed, _beforeAddShareFlowRunning;
-        private readonly List<BeforeAddShareEntry> _pendingBeforeAddShareEntries = new List<BeforeAddShareEntry>();
-        private readonly List<string> _pendingAddedBatch = new List<string>();
-        internal int Captures, CleanupCalls, SignatureSchedules;
-        internal Task Start() { return StartComposeAttachmentShareFlowAsync("threshold", 12, 1, null); }
-        internal Task Start(string trigger, long totalBytes, int thresholdMb)
-        { return StartComposeAttachmentShareFlowAsync(trigger, totalBytes, thresholdMb, null); }
-        internal Task StartQueued(Outlook.Attachment item)
-        {
-            QueueNotice(item, "always_preadd", 1);
-            return StartQueued();
-        }
-        internal void QueueNotice(Outlook.Attachment item, string trigger, int thresholdMb)
-        {
-            _pendingBeforeAddShareEntries.Add(new BeforeAddShareEntry
-            {
-                Candidate = new AttachmentBatchEntry { OriginalAttachment = item, Name = item.Name, SizeBytes = item.SizeBytes },
-                LocalPath = item.LocalPath, ThresholdMb = thresholdMb, Trigger = trigger
-            });
-        }
-        internal Task StartQueued() { return RunQueuedBeforeAddAttachmentShareFlowAsync(); }
-        internal bool FlowRunning { get { return _beforeAddShareFlowRunning || _attachmentSuppressed; } }
-        private void LogFileLink(string message) { }
+        internal bool SharingWizardOpen { get { return _sharingWizardOpen; } }
+        internal Subscription(Mail mail) { _mail = mail; }
+        private static void LogFileLink(string message) { }
+        private void CleanupTemporaryFiles(List<string> files) { }
         private void EndAttachmentSuppression(string reason) { _attachmentSuppressed = false; }
-        private void CleanupTemporaryFiles(List<string> files) { CleanupCalls++; }
-        private void RestartBeforeAddShareTimerIfNeeded() { }
-        private void BeginAttachmentAutomationSettingsRefresh() { }
-        private void ScheduleEmailSignatureApplication(string reason) { SignatureSchedules++; }
-        private bool IsAutomationFileAttachment(Outlook.Attachment item, bool deferBodyReferences = false) { return item != null && !item.Hidden; }
+        private void ResumeDeferredEmailSignatureApplication(string reason) { }
+        private bool IsAutomationFileAttachment(Outlook.Attachment item) { return !item.Hidden; }
         private static string ReadAttachmentName(Outlook.Attachment item) { return item.Name; }
+        private int CountPolicyRelevantAttachments(out long total)
+        { total = 0; return _mail.Attachments.Items.FindAll(x => !x.Hidden).Count; }
         private bool TryResolveAttachmentLocalPath(Outlook.Attachment item, string name, List<string> files, out string path)
-        { path = item.LocalPath; return !string.IsNullOrEmpty(path); }
-        __START_FLOW__
-        __PREPARE_SELECTIONS__
-        __QUEUED_FLOW__
-        __FINALIZE_FLOW__
+        { path = item.LocalPath; if (item.FailCollect) { return false; } files.Add(path); return true; }
+        __ORIGINAL_CLASS__
         __COLLECT__
-        __CAPTURE_BEFORE_ADD__
-        __REMOVE_SHARED__
-        __RELEASE_ORIGINALS__
+        __RELEASE__
+        __HAS__
+        __SET__
+        __NOTICE__
+        __FOCUS__
+        __BEGIN__
+        __BIND__
+        __DRAIN__
+        __END__
     }
-    private static void Check(bool condition, string message)
-    { if (!condition) { throw new InvalidOperationException(message); } }
-    private static void CheckQueuedNotice(string[] triggers, long[] sizes, string expectedTrigger, bool thresholdNotice)
-    {
-        var compose = new Subscription();
-        long totalBytes = 0;
-        for (int index = 0; index < triggers.Length; index++)
-        {
-            var attachment = compose._mail.Attachments.Add("notice-" + index + ".pdf");
-            attachment.SizeBytes = sizes[index];
-            totalBytes += sizes[index];
-            compose.QueueNotice(attachment, triggers[index], 20);
-        }
-        Task flow = compose.StartQueued();
-        compose._owner.Prefetch.SetResult(true);
-        flow.GetAwaiter().GetResult();
-        FileLinkWizardLaunchOptions options = compose._owner.LastLaunchOptions;
-        Check(options != null && options.AttachmentTrigger == expectedTrigger,
-            "The before-add batch lost its actual routing reason: " + string.Join(",", triggers));
-        Check(options.AttachmentTotalBytes == totalBytes && options.AttachmentThresholdMb == 20,
-            "The before-add batch changed its size or threshold context.");
-        string expectedNotice = thresholdNotice
-            ? "threshold: " + SizeFormatting.FormatMegabytes(totalBytes) + " > 20 MB; last: notice-"
-                + (sizes.Length - 1) + ".pdf (" + SizeFormatting.FormatMegabytes(sizes[sizes.Length - 1]) + ")"
-            : Strings.FileLinkWizardAttachmentModeReasonAlways;
-        Check(compose._owner.LastInfoText == expectedNotice,
-            "The queued routing reason produced the wrong wizard notice: " + string.Join(",", triggers));
-    }
-    private static void CheckAttachmentModeNotices()
-    {
-        CultureInfo previousCulture = CultureInfo.CurrentCulture;
-        try
-        {
-            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            const long megabyte = 1024L * 1024L;
-            long smallBytes = 21L * megabyte / 10L;
-            var direct = new Subscription();
-            direct._mail.Attachments.Add("direct.pdf").SizeBytes = smallBytes;
-            Task flow = direct.Start("always", smallBytes, 20);
-            direct._owner.Prefetch.SetResult(true);
-            flow.GetAwaiter().GetResult();
-            Check(direct._owner.LastLaunchOptions.AttachmentTrigger == "always"
-                && direct._owner.LastInfoText == Strings.FileLinkWizardAttachmentModeReasonAlways,
-                "Direct always-sharing claimed that 2.1 MB exceeds 20 MB.");
-            Check(new Wizard(null).InfoText() == Strings.FileLinkWizardAttachmentModeReasonAlways,
-                "A missing launch context invented a threshold reason.");
-            foreach (string trigger in new[] { "always", "always_preadd", "threshold_preadd", "preadd_batch", "unknown", "", null })
-            {
-                var options = new FileLinkWizardLaunchOptions
-                { AttachmentTrigger = trigger, AttachmentTotalBytes = 21L * megabyte, AttachmentThresholdMb = 20 };
-                Check(new Wizard(options).InfoText() == Strings.FileLinkWizardAttachmentModeReasonAlways,
-                    "A non-threshold trigger invented a threshold reason: " + trigger);
-            }
-            foreach (long totalBytes in new[] { 0L, smallBytes, 20L * megabyte - 1L, 20L * megabyte })
-            {
-                var options = new FileLinkWizardLaunchOptions
-                { AttachmentTrigger = "threshold", AttachmentTotalBytes = totalBytes, AttachmentThresholdMb = 20 };
-                Check(new Wizard(options).InfoText() == Strings.FileLinkWizardAttachmentModeReasonAlways,
-                    "A threshold notice claimed an unexceeded limit: " + totalBytes);
-            }
-            var exceeded = new FileLinkWizardLaunchOptions
-            {
-                AttachmentTrigger = "ThReShOlD", AttachmentTotalBytes = 21L * megabyte, AttachmentThresholdMb = 20,
-                AttachmentLastName = " last.pdf ", AttachmentLastSizeBytes = smallBytes
-            };
-            Check(new Wizard(exceeded).InfoText() == "threshold: 21.0 MB > 20 MB; last: last.pdf (2.1 MB)",
-                "An actual threshold crossing lost its total, limit, name or last-file size.");
-            foreach (long totalBytes in new[] { megabyte - 1L, megabyte })
-            {
-                var options = new FileLinkWizardLaunchOptions
-                { AttachmentTrigger = "threshold", AttachmentTotalBytes = totalBytes, AttachmentThresholdMb = 0 };
-                Check(new Wizard(options).InfoText() == Strings.FileLinkWizardAttachmentModeReasonAlways,
-                    "The minimum effective threshold was not applied before choosing the notice.");
-            }
-            CheckQueuedNotice(new[] { "always_preadd" }, new[] { smallBytes }, "always", false);
-            CheckQueuedNotice(new[] { "threshold_preadd" }, new[] { 21L * megabyte }, "threshold", true);
-            CheckQueuedNotice(new[] { "threshold_preadd", "THRESHOLD_PREADD" }, new[] { 11L * megabyte, 10L * megabyte }, "threshold", true);
-            CheckQueuedNotice(new[] { "always_preadd", "threshold_preadd" }, new[] { smallBytes, 21L * megabyte }, "always", false);
-            CheckQueuedNotice(new[] { "threshold_preadd", "always_preadd" }, new[] { 21L * megabyte, smallBytes }, "always", false);
-            CheckQueuedNotice(new[] { "unknown", "threshold_preadd" }, new[] { smallBytes, 21L * megabyte }, "always", false);
-            CheckQueuedNotice(new[] { "threshold_preadd" }, new[] { smallBytes }, "threshold", false);
-            CheckQueuedNotice(new[] { "threshold_preadd" }, new[] { 20L * megabyte }, "threshold", false);
-        }
-        finally { CultureInfo.CurrentCulture = previousCulture; }
-    }
+    private static void Check(bool condition, string message) { if (!condition) { throw new Exception(message); } }
+    private static Outlook.Attachment Add(Mail mail, string path)
+    { return mail.Attachments.Add(path, Outlook.OlAttachmentType.olByValue, null, null); }
     public static void Run()
     {
-        CheckAttachmentModeNotices();
-        foreach (string scenario in new[] { "cancel", "cancel-after-error", "cancel-sent", "success", "subset", "queue-rejected", "prefetch-failed", "upload-failed", "closed", "removed", "sent" })
-        {
-            var compose = new Subscription();
-            Outlook.Attachment first = compose._mail.Attachments.Add("A.pdf");
-            Outlook.Attachment second = compose._mail.Attachments.Add("B.pdf");
-            compose._owner.Accept = scenario == "success" || scenario == "subset" || scenario == "sent";
-            compose._owner.RejectQueue = scenario == "queue-rejected";
-            compose._owner.ThrowAfterCapture = scenario == "upload-failed";
-            Outlook.Attachment later = null;
-            compose._owner.WizardAction = (mail, options) =>
-            {
-                if (scenario == "sent" || scenario == "cancel-sent") { compose._sendAccepted = true; }
-                options.CancelledByUser = scenario == "cancel" || scenario == "cancel-after-error" || scenario == "cancel-sent";
-                options.UnexpectedFailureObserved = scenario == "cancel-after-error";
-                later = mail.Attachments.Add("A.pdf"); // Same name must never transfer ownership.
-                foreach (FileLinkSelection item in options.InitialSelections)
-                {
-                    if (scenario != "subset" || item.LocalPath == second.LocalPath) { options.SharedLocalPaths.Add(item.LocalPath); }
-                }
-            };
-            Task flow = compose.Start();
-            Check(compose._owner.Queue.Count == 0, "Capture occurred before prefetch: " + scenario);
-            if (scenario == "closed") { compose._disposed = true; }
-            if (scenario == "removed") { first.Delete(); second.Delete(); }
-            if (scenario == "prefetch-failed") { compose._owner.Prefetch.SetException(new InvalidOperationException("prefetch")); }
-            else { compose._owner.Prefetch.SetResult(true); }
-            try { flow.GetAwaiter().GetResult(); }
-            catch (InvalidOperationException)
-            { Check(scenario == "prefetch-failed" || scenario == "upload-failed", "Unexpected flow error: " + scenario); }
-            if (scenario == "success") { Check(first.Deleted && second.Deleted && !later.Deleted, "Successful sharing did not remove only exact originals."); }
-            else if (scenario == "cancel" || scenario == "cancel-after-error")
-            { Check(first.Deleted && second.Deleted && !later.Deleted, "Cancellation did not discard only the adopted original attachments: " + scenario); }
-            else if (scenario == "subset") { Check(!first.Deleted && second.Deleted && !later.Deleted, "Removing a file from the wizard removed its native original."); }
-            else if (scenario != "removed") { Check(!first.Deleted && !second.Deleted, "Unsuccessful sharing deleted native attachments: " + scenario); }
-            Check(!compose.FlowRunning && compose.CleanupCalls == 1, "Flow state or temporary-file cleanup leaked: " + scenario);
-            Check(compose._owner.UiDispatches == 1, "Original cleanup did not marshal to the Outlook UI: " + scenario);
-            Check(compose._owner.Invalidations == (scenario == "upload-failed" || scenario == "prefetch-failed" || scenario == "cancel-after-error" ? 1 : 0),
-                "User cancellation was confused with service failure: " + scenario);
-        }
+        var mail = new Mail();
+        var first = Add(mail, "first.txt");
+        var logo = Add(mail, "logo.png"); logo.Hidden = true;
+        var sub = new Subscription(mail);
+        Check(sub.TryBeginSharingWizard(), "Initial entry failed");
+        Check(!sub.TryBeginSharingWizard(), "Second entry during prefetch was allowed");
+        Add(mail, "prefetch.txt");
+        var wizard = new FileLinkWizardForm();
+        Check(sub.BindSharingWizard(wizard), "Initial queue bind failed");
+        Check(first.Deleted && !logo.Deleted && wizard.Queue.Count == 2, "Initial attachments or inline exclusion failed");
+        Check(!sub.TryBeginSharingWizard() && wizard.Focuses == 1, "Repeated manual/automatic entry did not focus");
+        var late = Add(mail, "late.txt");
+        Check(sub.DrainSharingAttachments() && late.Deleted && wizard.Queue.Count == 3, "Late compose drop failed");
+        Check(wizard.FlushComposeAttachments(), "Final flush failed");
+        sub.EndSharingWizard();
+        Check(!sub.SharingWizardOpen && mail.Attachments.Count == 1, "Cancel restored committed attachments");
 
-        foreach (string outcome in new[] { "success", "cancel", "failure" })
-        {
-            var compose = new Subscription();
-            var original = compose._mail.Attachments.Add("same.pdf");
-            var unrelated = compose._mail.Attachments.Add("same.pdf");
-            var hidden = compose._mail.Attachments.Add("logo.png");
-            hidden.Hidden = true;
-            compose._owner.Accept = outcome == "success";
-            compose._owner.WizardAction = (mail, options) =>
-            {
-                options.CancelledByUser = outcome == "cancel";
-                if (outcome == "success") { options.SharedLocalPaths.Add(original.LocalPath); }
-            };
-            Task flow = compose.StartQueued(original);
-            compose._owner.Prefetch.SetResult(true);
-            flow.GetAwaiter().GetResult();
-            Check(original.Deleted == (outcome != "failure") && !unrelated.Deleted && !hidden.Deleted,
-                "Before-add sharing used filenames instead of the event attachment identity.");
-            Check(!compose.FlowRunning, "Queued attachment flow did not release state.");
-            Check(original.Releases == 1 && unrelated.Releases == 0, "Owned COM references leaked or borrowed references were released.");
-        }
+        sub.SetSharingBlockInserted(true);
+        var reopened = new Subscription(mail);
+        Check(reopened.HasInsertedSharingBlock() && !reopened.TryBeginSharingWizard(), "Persisted draft marker did not prevent a new wizard");
+        var normal = Add(mail, "after-share.txt");
+        Check(!reopened.TryBeginSharingWizard() && !normal.Deleted, "Post-share file did not remain ordinary");
+        reopened.SetSharingBlockInserted(false);
+        Check(!new Subscription(mail).HasInsertedSharingBlock(), "Failed-insertion marker rollback failed");
 
-        var changing = new Subscription();
-        var old = changing._mail.Attachments.Add("old.pdf");
-        Task changingFlow = changing.Start();
-        old.Delete();
-        var current = changing._mail.Attachments.Add("current.pdf");
-        changing._owner.Prefetch.SetResult(true);
-        changingFlow.GetAwaiter().GetResult();
-        Check(changing._owner.Queue.Count == 1 && changing._owner.Queue[0] == current.LocalPath && !current.Deleted,
-            "Deferred capture used a stale collection position.");
+        mail = new Mail(); first = Add(mail, "reject.txt"); sub = new Subscription(mail);
+        sub.TryBeginSharingWizard(); wizard = new FileLinkWizardForm { Reject = true };
+        Check(!sub.BindSharingWizard(wizard) && !first.Deleted && wizard.Queue.Count == 0, "Rejected admission deleted original");
+        wizard.Reject = false;
+        Check(sub.DrainSharingAttachments() && first.Deleted, "Admission retry failed");
 
-        var resources = new Subscription();
-        var logo = resources._mail.Attachments.Add("logo.png");
-        logo.Hidden = true;
-        var visible = resources._mail.Attachments.Add("doc.pdf");
-        resources._owner.Accept = true;
-        resources._owner.WizardAction = (mail, options) =>
-        { foreach (FileLinkSelection item in options.InitialSelections) { options.SharedLocalPaths.Add(item.LocalPath); } };
-        Task resourceFlow = resources.Start();
-        resources._owner.Prefetch.SetResult(true);
-        resourceFlow.GetAwaiter().GetResult();
-        Check(!logo.Deleted && visible.Deleted && resources._owner.Queue.Count == 1, "Hidden body resources entered sharing.");
+        mail = new Mail(); first = Add(mail, "valid.txt"); var unreadable = Add(mail, "unreadable.txt"); unreadable.FailCollect = true;
+        sub = new Subscription(mail); sub.TryBeginSharingWizard(); wizard = new FileLinkWizardForm();
+        Check(!sub.BindSharingWizard(wizard) && !first.Deleted && !unreadable.Deleted && wizard.Queue.Count == 0,
+            "Partial materialization lost a file");
+
+        mail = new Mail(); Add(mail, "one.txt"); var fails = Add(mail, "two.txt"); fails.FailDelete = true;
+        sub = new Subscription(mail); sub.TryBeginSharingWizard(); wizard = new FileLinkWizardForm();
+        Check(!sub.BindSharingWizard(wizard), "Partial removal unexpectedly succeeded");
+        Check(mail.Attachments.Count == 2 && wizard.Queue.Count == 0 && wizard.Rollbacks == 1,
+            "Partial removal did not restore originals and rollback queue");
+        Check(!sub.DrainSharingAttachments(), "Faulted handoff allowed finalize");
+
+        mail = new Mail(); Add(mail, "same.txt"); Add(mail, "other/same.txt");
+        sub = new Subscription(mail); sub.TryBeginSharingWizard(); wizard = new FileLinkWizardForm();
+        Check(sub.BindSharingWizard(wizard) && wizard.Queue.Count == 2, "Distinct same-name attachments collapsed");
+        var other = new Subscription(new Mail());
+        Check(other.TryBeginSharingWizard(), "One compose blocked another compose");
+        sub.CanApplyComposeChanges = false;
+        Check(!sub.DrainSharingAttachments(), "Closed compose accepted intake");
     }
 }
 '@
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__LAUNCH_OPTIONS__", (Get-MethodSlice $fileLinkLaunchOptions "internal sealed class FileLinkWizardLaunchOptions"))
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__ORIGINAL_CLASS__", (Get-MethodSlice $attachmentMaterialization "private sealed class AttachmentShareOriginal"))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__BATCH_CLASS__", (Get-MethodSlice $attachmentMaterialization "private sealed class AttachmentBatchEntry"))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__QUEUE_CLASS__", (Get-MethodSlice $attachmentQueue "private sealed class BeforeAddShareEntry"))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__START_FLOW__", $startAttachmentShareFlow)
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__PREPARE_SELECTIONS__", $prepareAttachmentSelections)
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__QUEUED_FLOW__", (Get-MethodSlice $attachmentQueue "private async Task RunQueuedBeforeAddAttachmentShareFlowAsync()"))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__FINALIZE_FLOW__", (Get-MethodSlice $attachmentQueue "private async Task FinalizeAttachmentShareFlowAsync("))
 $attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__COLLECT__", $collectAttachments)
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__CAPTURE_BEFORE_ADD__", (Get-MethodSlice $attachmentMaterialization "private void CaptureBeforeAddAttachmentOriginal("))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__REMOVE_SHARED__", $removeAttachmentOriginals)
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__RELEASE_ORIGINALS__", (Get-MethodSlice $attachmentMaterialization "private static void ReleaseAttachmentShareOriginals("))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__ATTACHMENT_MODE_INFO__", (Get-MethodSlice $fileLinkWizard "private string BuildAttachmentModeInfoText()"))
-$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__FORMAT_MEGABYTES__", (Get-MethodSlice (Read-Source "src\NcTalkOutlookAddIn\Utilities\SizeFormatting.cs") "internal static string FormatMegabytes("))
+$attachmentHandoffHarness = $attachmentHandoffHarness.Replace("__RELEASE__", (Get-MethodSlice $attachmentMaterialization "private static void ReleaseAttachmentShareOriginals("))
+foreach ($entry in @{
+    "__HAS__" = "internal bool HasInsertedSharingBlock()"
+    "__SET__" = "internal void SetSharingBlockInserted("
+    "__NOTICE__" = "private void ShowSharingAlreadyInserted()"
+    "__FOCUS__" = "internal void FocusSharingWizard()"
+    "__BEGIN__" = "internal bool TryBeginSharingWizard()"
+    "__BIND__" = "internal bool BindSharingWizard("
+    "__DRAIN__" = "internal bool DrainSharingAttachments()"
+    "__END__" = "internal void EndSharingWizard()"
+}.GetEnumerator()) {
+    $attachmentHandoffHarness = $attachmentHandoffHarness.Replace($entry.Key, (Get-MethodSlice $attachmentQueue $entry.Value))
+}
 Add-Type -TypeDefinition $attachmentHandoffHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
 [AttachmentHandoffRegression]::Run()
-Write-Host "[OK] Exact attachment ownership, successful subset sharing, cancellation, changed collection, hidden resources, queue rejection and failed prefetch/upload"
-Write-Host "[OK] Attachment wizard notices: direct/pre-add always, preserved threshold reason, exact boundary, unknown triggers and mixed batches"
+Write-Host "[OK] Single compose session: prefetch reservation, initial/late intake, inline images, marker, cancel, rejected/partial handoff, rollback and independent windows"
 
 $wizardClosingHarness = @'
 using System;
 using System.Threading;
-
 public static class AttachmentWizardClosingRegression
 {
-    private enum CloseReason { UserClosing, WindowsShutDown, FormOwnerClosing }
-    private sealed class FormClosingEventArgs
-    {
-        internal CloseReason CloseReason;
-        internal bool Cancel;
-    }
-    private class BaseForm
-    {
-        protected virtual void OnFormClosing(FormClosingEventArgs e) { }
-    }
+    private sealed class FormClosingEventArgs { internal bool Cancel; }
+    private class BaseForm { protected virtual void OnFormClosing(FormClosingEventArgs e) { } }
     private sealed class Wizard : BaseForm
     {
         internal bool _shareFinalized, _closeAfterCancellation, _closeRequested;
         internal CancellationTokenSource _cancellationSource;
-        internal bool CancelledByUser { get; private set; }
-        internal bool Close(CloseReason reason)
+        internal bool Close()
         {
-            var args = new FormClosingEventArgs { CloseReason = reason };
-            OnFormClosing(args);
-            return !args.Cancel;
+            var args = new FormClosingEventArgs();
+            OnFormClosing(args); return !args.Cancel;
         }
         __CLOSING__
     }
     public static void Run()
     {
         var cancelled = new Wizard();
-        if (!cancelled.Close(CloseReason.UserClosing) || !cancelled.CancelledByUser)
-        { throw new Exception("Cancel/window X did not record the user's cancellation."); }
-        foreach (CloseReason reason in new[] { CloseReason.WindowsShutDown, CloseReason.FormOwnerClosing })
-        {
-            var shutdown = new Wizard();
-            if (!shutdown.Close(reason) || shutdown.CancelledByUser)
-            { throw new Exception("Host shutdown was mistaken for an attachment cancellation."); }
-        }
-        var finished = new Wizard { _shareFinalized = true };
-        if (!finished.Close(CloseReason.UserClosing) || finished.CancelledByUser)
-        { throw new Exception("Successful sharing was mistaken for cancellation."); }
+        if (!cancelled.Close() || !cancelled._closeRequested) { throw new Exception("Idle close failed"); }
         using (var source = new CancellationTokenSource())
         {
             var uploading = new Wizard { _cancellationSource = source };
-            if (uploading.Close(CloseReason.UserClosing) || !uploading.CancelledByUser
-                || !source.IsCancellationRequested || !uploading._closeAfterCancellation)
-            { throw new Exception("Cancelling an active upload lost the user's intent."); }
+            if (uploading.Close() || !source.IsCancellationRequested || !uploading._closeAfterCancellation)
+            { throw new Exception("Close did not wait for upload cancellation"); }
             uploading._cancellationSource = null;
-            if (!uploading.Close(CloseReason.UserClosing) || !uploading.CancelledByUser)
-            { throw new Exception("Deferred close lost the attachment cancellation."); }
+            if (!uploading.Close()) { throw new Exception("Deferred close failed"); }
         }
-        using (var source = new CancellationTokenSource())
-        {
-            var shutdown = new Wizard { _cancellationSource = source };
-            if (shutdown.Close(CloseReason.FormOwnerClosing) || shutdown.CancelledByUser)
-            { throw new Exception("Host close during upload discarded attachments."); }
-            shutdown._cancellationSource = null;
-            if (!shutdown.Close(CloseReason.UserClosing) || shutdown.CancelledByUser)
-            { throw new Exception("Deferred host close was reclassified as user cancellation."); }
-        }
+        var finished = new Wizard { _shareFinalized = true };
+        if (!finished.Close()) { throw new Exception("Successful sharing could not close"); }
     }
 }
 '@
 $wizardClosingHarness = $wizardClosingHarness.Replace("__CLOSING__", (Get-MethodSlice (Read-Source "src\NcTalkOutlookAddIn\UI\FileLinkWizardForm.Upload.cs") "protected override void OnFormClosing("))
 Add-Type -TypeDefinition $wizardClosingHarness -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue
 [AttachmentWizardClosingRegression]::Run()
-Assert-Contains "Wizard cancellation is propagated separately from failure" $fileLinkWizardUi "&& wizard.CancelledByUser;"
-Assert-Contains "Successful wizard results do not discard unshared originals" $fileLinkWizardUi "launchOptions.CancelledByUser = wizardResult != DialogResult.OK"
-Write-Host "[OK] Attachment cancellation distinguishes user close, active upload, successful completion and host shutdown"
+Write-Host "[OK] Wizard close waits for active upload cancellation and closes after success"
 
 # Exercise delayed attachment evaluation and removal with the production methods.
 $attachmentSendRaceHarness = @'
@@ -1268,18 +995,21 @@ namespace AttachmentSendRaceBoundary
             private readonly Timer _emailSignatureTimer = new Timer();
             internal bool _disposed, _sendAccepted, _attachmentSuppressed;
             private bool CanApplyComposeChanges { get { return !_disposed && !_sendAccepted; } }
-            private bool _beforeAddShareFlowRunning, _attachmentPromptOpen;
+            private bool _attachmentPromptOpen;
+            private bool _sharingWizardOpen;
+            internal bool SharingWizardOpen { get { return _sharingWizardOpen; } }
+            private bool HasInsertedSharingBlock() { return false; }
+            internal bool DrainSharingAttachments() { return true; }
             private bool _attachmentEvaluationPending, _attachmentEvaluationRunning;
             private ComposeSurfaceState _composeSurfaceState = ComposeSurfaceState.Inspector;
             private string _activeInspectorIdentityKey = "inspector", _inlineExplorerIdentityKey = "";
             private const int EmailSignatureApplyDebounceMs = 900, EmailSignatureInlineApplyDebounceMs = 250;
             private readonly string _composeKey = "race";
-            private readonly List<string> _pendingBeforeAddShareEntries = new List<string>();
             private readonly List<AttachmentBatchEntry> _pendingAddedBatch = new List<AttachmentBatchEntry>();
             private readonly TaskCompletionSource<AttachmentAutomationSettings> _settings = new TaskCompletionSource<AttachmentAutomationSettings>();
             private readonly TaskCompletionSource<bool> _sharing = new TaskCompletionSource<bool>();
             internal Action AvailabilityAction;
-            internal int Shares, BeforeAddCaptures, PolicyReads;
+            internal int Shares, PolicyReads;
             internal bool DelayShare;
             internal bool PromptOpen { get { return _attachmentPromptOpen; } }
             internal bool EvaluationPending { get { return _attachmentEvaluationPending; } }
@@ -1288,12 +1018,6 @@ namespace AttachmentSendRaceBoundary
             internal Task Evaluate() { return EvaluateAttachmentAutomationAsync(); }
             internal Task Tick() { _attachmentEvalTimer.Stop(); return EvaluateAttachmentAutomationAsync(); }
             internal void FinishSharing() { _sharing.SetResult(true); }
-            internal void BeforeAddBusy(bool running, bool queued)
-            {
-                _beforeAddShareFlowRunning = running;
-                _pendingBeforeAddShareEntries.Clear();
-                if (queued) { _pendingBeforeAddShareEntries.Add("queued"); }
-            }
             internal void ReleaseSuppression() { EndAttachmentSuppression("test"); }
             internal void FinishSettings(bool always)
             {
@@ -1308,20 +1032,9 @@ namespace AttachmentSendRaceBoundary
             }
             internal void RemoveLast() { RemoveLastAddedAttachmentBatch(new AttachmentBatchInfo { Count = 1 }); }
             internal void RemoveIndices() { RemoveAttachmentsByIndices(new List<int> { 1, 2 }, "race"); }
-            internal void BeforeAdd(Outlook.Attachment item, ref bool cancel) { OnBeforeAttachmentAdd(item, ref cancel); }
             private AttachmentAutomationSettings ReadAttachmentAutomationSettings()
             { return new AttachmentAutomationSettings { OfferAboveEnabled = true, ThresholdMb = 1, ThresholdBytes = 1 }; }
             private Task<AttachmentAutomationSettings> ReadAttachmentAutomationSettingsAsync() { PolicyReads++; return _settings.Task; }
-            private bool TryBuildBeforeAddAttachmentCandidate(Outlook.Attachment item, out AttachmentBatchEntry candidate, out string path, out bool temporary)
-            {
-                BeforeAddCaptures++;
-                candidate = new AttachmentBatchEntry { Name = item.Name, SizeBytes = item.Size };
-                path = "source";
-                temporary = false;
-                return true;
-            }
-            private void QueueBeforeAddAttachmentShareFlow(string trigger, AttachmentBatchEntry candidate, string path, int thresholdMb, bool cleanup)
-            { Shares++; }
             private void CleanupTemporaryFiles(List<string> files) { }
             private bool PauseUnavailableAttachmentAutomation(AttachmentAutomationSettings settings, long bytes)
             { if (AvailabilityAction != null) { AvailabilityAction(); } return false; }
@@ -1341,7 +1054,6 @@ namespace AttachmentSendRaceBoundary
             __MARK_INSPECTOR__
             __MARK_CLOSED__
             __END_SUPPRESSION__
-            __BEFORE_ADD__
             __SNAPSHOT__
             __SUM__
             __LAST_BATCH__
@@ -1426,20 +1138,18 @@ namespace AttachmentSendRaceBoundary
             detached.Tick().GetAwaiter().GetResult();
             Check(detached.Shares == 1 && !detached.EvaluationPending, "Pop-out did not evaluate the existing attachment once.");
 
-            foreach (string boundary in new[] { "suppression", "preadd_running", "preadd_queued" })
+            foreach (string boundary in new[] { "suppression" })
             {
                 var busy = new Subscription();
                 busy.Add("inherited.pdf", false);
                 busy.RequestEvaluation();
                 Task busyWait = busy.Tick();
                 busy._attachmentSuppressed = boundary == "suppression";
-                busy.BeforeAddBusy(boundary == "preadd_running", boundary == "preadd_queued");
                 busy.FinishSettings(true);
                 busyWait.GetAwaiter().GetResult();
                 Check(busy.EvaluationPending && !busy.EvaluationRunning && !busy._attachmentEvalTimer.Enabled
                     && busy._mail.Reads == 0 && busy.Shares == 0,
                     "Initial evaluation ignored a busy attachment boundary: " + boundary);
-                busy.BeforeAddBusy(false, false);
                 busy.ReleaseSuppression();
                 Check(busy._attachmentEvalTimer.Enabled, "Pending evaluation did not resume after " + boundary);
                 busy.Tick().GetAwaiter().GetResult();
@@ -1560,34 +1270,6 @@ namespace AttachmentSendRaceBoundary
             Check(visible.Deleted && !logo.Deleted && ComposeAttachmentPromptForm.Calls == 1 && !active.PromptOpen,
                 "The active optional prompt no longer removes the selected visible attachment.");
 
-            ResetPrompt(ComposeAttachmentPromptDecision.RemoveLast);
-            var beforeAccepted = new Subscription();
-            var candidate = beforeAccepted.Add("document.pdf", false);
-            beforeAccepted._sendAccepted = true;
-            bool cancelled = false;
-            beforeAccepted.BeforeAdd(candidate, ref cancelled);
-            Check(!cancelled && beforeAccepted.BeforeAddCaptures == 0 && ComposeAttachmentPromptForm.Calls == 0,
-                "BeforeAttachmentAdd processed an already accepted Send.");
-
-            foreach (ComposeAttachmentPromptDecision decision in new[] { ComposeAttachmentPromptDecision.RemoveLast, ComposeAttachmentPromptDecision.Share })
-            {
-                ResetPrompt(decision);
-                var beforePrompt = new Subscription();
-                var incoming = beforePrompt.Add("document.pdf", false);
-                ComposeAttachmentPromptForm.PromptAction = () => { beforePrompt._sendAccepted = true; };
-                bool cancel = false;
-                beforePrompt.BeforeAdd(incoming, ref cancel);
-                Check(!cancel && beforePrompt.Shares == 0 && !beforePrompt.PromptOpen,
-                    "A before-add prompt result changed an already accepted Send.");
-            }
-            ResetPrompt(ComposeAttachmentPromptDecision.RemoveLast);
-            var beforeBoundary = new Subscription();
-            var beforeCandidate = beforeBoundary.Add("document.pdf", false);
-            beforeBoundary.AvailabilityAction = () => { beforeBoundary._sendAccepted = true; };
-            bool beforeCancel = false;
-            beforeBoundary.BeforeAdd(beforeCandidate, ref beforeCancel);
-            Check(!beforeCancel && beforeBoundary.Shares == 0 && ComposeAttachmentPromptForm.Calls == 0,
-                "BeforeAttachmentAdd ignored accepted Send before opening its prompt.");
         }
     }
 }
@@ -1604,7 +1286,6 @@ $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__MARK_INLINE__
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__MARK_INSPECTOR__", (Get-MethodSlice $subscription "internal void MarkInspector("))
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__MARK_CLOSED__", (Get-MethodSlice $subscription "internal void MarkInlineResponseClosed("))
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__END_SUPPRESSION__", (Get-MethodSlice $attachmentQueue "private void EndAttachmentSuppression("))
-$attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__BEFORE_ADD__", $beforeAttachmentAdd)
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SNAPSHOT__", $snapshotAttachments)
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__SUM__", (Get-MethodSlice $attachmentMaterialization "private static long SumAttachmentBytes("))
 $attachmentSendRaceHarness = $attachmentSendRaceHarness.Replace("__LAST_BATCH__", $lastAddedBatch)
@@ -1704,6 +1385,8 @@ public static class AttachmentSendGateRegression
         private readonly string _composeKey = "test";
         internal readonly Owner _owner = new Owner();
         internal bool _disposed, LocalAlways;
+        internal bool ShareInserted;
+        private bool HasInsertedSharingBlock() { return ShareInserted; }
         internal int AttachmentCount = 1, CountCalls, RefreshCalls, Warnings, Blocks;
         internal long TotalBytes = 11L * 1024L * 1024L;
         internal readonly List<string> Logs = new List<string>();
@@ -1770,6 +1453,10 @@ public static class AttachmentSendGateRegression
                     bool allow = !required
                         || (check.IsServiceUnavailable && !closed);
                     Check(result == allow && cancel == !allow, "Wrong Send result: " + rule + "/" + checkState + "/" + closed);
+                    compose.ShareInserted = true;
+                    cancel = false;
+                    Check(compose.Validate(ref cancel) == allow && cancel == !allow,
+                        "Existing share bypassed Send policy: " + rule + "/" + checkState + "/" + closed);
                     Check(compose.Warnings == (required && check.IsServiceUnavailable && !closed ? 1 : 0),
                         "Wrong outage warning: " + rule + "/" + checkState + "/" + closed);
                     Check(MessageBox.Notices.Count == (required && (checkState == "online" || (checkState == "pending" && !closed)) ? 1 : 0),
@@ -1848,6 +1535,15 @@ public static class AttachmentSendGateRegression
                 Check(failedLocal.Pause(), "A real failure was mistaken for a missing optional backend: " + failure);
             }
         }
+
+        var completed = new Subscription { ShareInserted = true, LocalAlways = true };
+        bool completedCancel = false;
+        Check(!completed.Validate(ref completedCancel) && completedCancel && completed.CountCalls == 1,
+            "Post-share file attachments bypassed mandatory routing.");
+        completed.AttachmentCount = 0;
+        completedCancel = false;
+        Check(completed.Validate(ref completedCancel) && !completedCancel,
+            "A post-share message without policy-relevant files was blocked.");
 
         var freshRefusal = new Subscription();
         freshRefusal.LocalAlways = true;
@@ -2115,7 +1811,10 @@ internal static class AttachmentHost
                     { throw new InvalidOperationException("Packaged attachment classification failed."); }
                 }
             }
-            Console.WriteLine("[OK] Cold attachment parsing in an external .NET Framework host without binding redirects");
+            var address = new System.Net.Mail.MailAddress("room@example.org");
+            if (address.Address != "room@example.org" || System.Text.Encoding.GetEncoding(1252).CodePage != 1252)
+            { throw new InvalidOperationException("Mail address and code-page lookup failed after HTML parsing."); }
+            Console.WriteLine("[OK] Cold attachment parsing and subsequent mail-address lookup in an external .NET Framework host without binding redirects");
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }

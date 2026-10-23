@@ -195,6 +195,7 @@ namespace NcTalkOutlookAddIn.Services
         internal string NormalizedBaseUrl { get; set; }
         internal string UserId { get; set; }
         internal string RelativeFolderPath { get; set; }
+        internal bool IsAppend { get; set; }
     }
 
     internal sealed class FileLinkUploadPlan

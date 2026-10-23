@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "此邮件已包含 Nextcloud 共享。附加文件仍须遵守附件规则。如果必须通过共享发送，请移除这些附件，并在新邮件中共享它们。"
+  },
+  "sharing_finish_before_send": {
+    "message": "发送此邮件前，请完成或取消已打开的 Nextcloud 共享向导。"
+  },
   "outlook_resource_group_by_label": {
     "message": "分组依据"
   },

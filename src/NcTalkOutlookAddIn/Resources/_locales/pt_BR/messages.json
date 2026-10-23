@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "Esta mensagem já contém um compartilhamento do Nextcloud. As regras de anexos continuam valendo para arquivos adicionais. Se o compartilhamento for obrigatório, remova esses anexos e compartilhe-os em uma nova mensagem."
+  },
+  "sharing_finish_before_send": {
+    "message": "Conclua ou cancele o assistente de compartilhamento do Nextcloud aberto antes de enviar esta mensagem."
+  },
   "outlook_resource_group_by_label": {
     "message": "Agrupar por"
   },

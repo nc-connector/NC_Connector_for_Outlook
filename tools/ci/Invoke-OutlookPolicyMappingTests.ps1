@@ -2752,6 +2752,48 @@ internal static class OutlookPolicyUiTests
         }
         Console.WriteLine("[OK] Settings refresh shares the account snapshot for subsequent compose actions after cancellation");
     }
+    private static void TestComposeQueueAdmission(string root)
+    {
+        Type selectionType = T("Models.FileLinkSelection");
+        object fileKind = Enum.Parse(T("Models.FileLinkSelectionType"), "File");
+        string source = Path.Combine(root, "compose-queue.txt");
+        File.WriteAllText(source, "queue fixture");
+        foreach (bool attachment in new[] { false, true })
+        using (Form form = Share(New("Settings.AddinSettings"), null, attachment))
+        {
+            var items = (System.Collections.IList)Field(form, "_items");
+            for (int step = 0; step < 4; step++)
+            {
+                form.GetType().GetField("_currentStepIndex", Flags).SetValue(form, step);
+                form.GetType().GetField("_uploadInProgress", Flags).SetValue(form, step == 2);
+                form.GetType().GetField("_finalizeInProgress", Flags).SetValue(form, step == 3);
+                string file = Path.Combine(root, "compose-" + attachment + "-" + step + ".txt");
+                File.Copy(source, file, true);
+                object selection = New("Models.FileLinkSelection", fileKind, file);
+                Array batch = Array.CreateInstance(selectionType, 1); batch.SetValue(selection, 0);
+                Check((bool)Call(form, "TryAdoptComposeSelections", (object)batch), "Compose intake accepts every step and active upload/finalize");
+                Check((int)Field(form, "_currentStepIndex") == step && items.Count == step + 1, "Compose intake preserves step and earlier selections");
+            }
+            form.GetType().GetField("_uploadInProgress", Flags).SetValue(form, false);
+            form.GetType().GetField("_finalizeInProgress", Flags).SetValue(form, false);
+            object first = items[0];
+            Call(Field(form, "_uploadedSelections"), "Add", first);
+            object[] captured = { null, null };
+            Method(form.GetType(), "CaptureUploadQueue", 2).Invoke(form, captured);
+            Check(((System.Collections.IList)captured[0]).Count == 3, "Append capture excludes already uploaded files");
+            Array failed = Array.CreateInstance(selectionType, 2);
+            failed.SetValue(New("Models.FileLinkSelection", fileKind, Path.Combine(root, "missing-file")), 0);
+            failed.SetValue(first, 1);
+            Check(!(bool)Call(form, "TryAdoptComposeSelections", (object)failed) && items.Count == 4 && items.Contains(first),
+                "Failed batch validation does not rollback an earlier selection");
+            Array rollback = Array.CreateInstance(selectionType, 1); rollback.SetValue(items[3], 0);
+            Call(form, "RollbackComposeSelections", (object)rollback);
+            Check(items.Count == 3 && items.Contains(first), "Host removal rollback affects only the newly adopted batch");
+            form.GetType().GetField("_closeRequested", Flags).SetValue(form, true);
+            Check(!(bool)Call(form, "TryAdoptComposeSelections", (object)rollback) && items.Count == 3, "Closing wizard rejects late intake");
+        }
+        Console.WriteLine("[OK] Production wizard queue: all steps, upload/finalize, atomic rejection, completed files and batch rollback");
+    }
     [STAThread]
     public static int Main(string[] args)
     {
@@ -2766,6 +2808,7 @@ internal static class OutlookPolicyUiTests
             TestManagedLoginEligibility();
             TestLocalChoices(root);
             TestWizards();
+            TestComposeQueueAdmission(root);
             TestSettingsEdits(root);
             TestSettingsLanguageControls(root);
             TestAttachmentAutomation();

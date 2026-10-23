@@ -1,4 +1,10 @@
 {
+  "sharing_already_inserted": {
+    "message": "Ez az üzenet már tartalmaz Nextcloud-megosztást. A további fájlokra továbbra is érvényesek a mellékletszabályok. Ha a megosztás kötelező, távolítsa el ezeket a mellékleteket, és ossza meg őket egy új üzenetben."
+  },
+  "sharing_finish_before_send": {
+    "message": "Az üzenet elküldése előtt fejezze be vagy szakítsa meg a megnyitott Nextcloud-megosztási varázslót."
+  },
   "outlook_resource_group_by_label": {
     "message": "Csoportosítás"
   },

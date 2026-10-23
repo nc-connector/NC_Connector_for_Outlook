@@ -4,6 +4,7 @@
 
 using System;
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NcTalkOutlookAddIn.Models;
@@ -69,24 +70,39 @@ namespace NcTalkOutlookAddIn.Controllers
             FileLinkWizardLaunchOptions launchOptions,
             bool allowInteractiveRecovery = false)
         {
-            if (launchOptions != null)
+            if (_owner == null || mail == null) { return false; }
+            NextcloudTalkAddIn.MailComposeSubscription subscription = await _owner.RunOnOutlookUiThreadAsync(() =>
             {
-                launchOptions.SharedLocalPaths.Clear();
-                launchOptions.CancelledByUser = false;
-                launchOptions.UnexpectedFailureObserved = false;
-            }
-            if (_owner == null || mail == null)
+                if (!_owner.IsItemOpenForRibbonAction(mail)) { return null; }
+                bool inline = _owner.IsActiveInlineResponse(mail);
+                var current = _owner.EnsureMailComposeSubscription(mail,
+                    inline ? string.Empty : MailInteropController.ResolveMailInspectorIdentityKey(mail), inline);
+                return current != null && current.TryBeginSharingWizard() ? current : null;
+            }).ConfigureAwait(false);
+            if (subscription == null) { return false; }
+            bool accepted = false;
+            ExceptionDispatchInfo failure = null;
+            try
             {
-                return false;
+                accepted = await RunReservedWizardAsync(mail, launchOptions, allowInteractiveRecovery, subscription).ConfigureAwait(false);
             }
+            catch (Exception ex) { failure = ExceptionDispatchInfo.Capture(ex); }
+            await _owner.RunOnOutlookUiThreadAsync(() => { subscription.EndSharingWizard(); }).ConfigureAwait(false);
+            if (failure != null) { failure.Throw(); }
+            return accepted;
+        }
+
+        private async Task<bool> RunReservedWizardAsync(
+            Outlook.MailItem mail,
+            FileLinkWizardLaunchOptions launchOptions,
+            bool allowInteractiveRecovery,
+            NextcloudTalkAddIn.MailComposeSubscription subscription)
+        {
             AddinSettings settings = await _owner.EnsureConnectionForActionAsync(
                 mail,
                 allowInteractiveRecovery,
                 "sharing_wizard_open",
-                failure =>
-                {
-                    if (launchOptions != null) { launchOptions.UnexpectedFailureObserved = true; }
-                }).ConfigureAwait(false);
+                null).ConfigureAwait(false);
             if (settings == null)
             {
                 return false;
@@ -109,7 +125,7 @@ namespace NcTalkOutlookAddIn.Controllers
             catch (Exception ex) { launchFailure = ex; }
             if (launchFailure != null)
             {
-                if (launchOptions != null) { launchOptions.UnexpectedFailureObserved = true; }
+
                 NextcloudTalkAddIn.LogFileLinkMessage("Sharing prefetch failed: " + launchFailure.Message);
                 await _owner.RunOnOutlookUiThreadAsync(() =>
                 {
@@ -125,20 +141,22 @@ namespace NcTalkOutlookAddIn.Controllers
             NextcloudCapabilitiesSnapshot capabilities = await capabilitiesTask.ConfigureAwait(false);
             BackendPolicyStatus policyStatus = await policyStatusTask.ConfigureAwait(false);
             PasswordPolicyInfo passwordPolicy = await passwordPolicyTask.ConfigureAwait(false);
-            return await _owner.RunOnOutlookUiThreadAsync(
+            Task<bool> wizardTask = await _owner.RunOnOutlookUiThreadAsync(
                 () => RunFileLinkWizardOnUiThread(
                     mail, launchOptions, settings, configuration,
-                    capabilities, policyStatus, passwordPolicy)).ConfigureAwait(false);
+                    capabilities, policyStatus, passwordPolicy, subscription)).ConfigureAwait(false);
+            return await wizardTask.ConfigureAwait(false);
         }
 
-        private bool RunFileLinkWizardOnUiThread(
+        private async Task<bool> RunFileLinkWizardOnUiThread(
             Outlook.MailItem mail,
             FileLinkWizardLaunchOptions launchOptions,
             AddinSettings settings,
             TalkServiceConfiguration configuration,
             NextcloudCapabilitiesSnapshot capabilities,
             BackendPolicyStatus policyStatus,
-            PasswordPolicyInfo passwordPolicy)
+            PasswordPolicyInfo passwordPolicy,
+            NextcloudTalkAddIn.MailComposeSubscription subscription)
         {
             if (!_owner.IsItemOpenForRibbonAction(mail)
                 || !SettingsWorkflowController.ConnectionSettingsMatch(_owner.CurrentSettings, settings))
@@ -150,12 +168,6 @@ namespace NcTalkOutlookAddIn.Controllers
             if (!string.IsNullOrEmpty(rolloutNotice))
             {
                 PolicyUiHelper.ShowActionUnavailableNotice(rolloutNotice);
-                return false;
-            }
-            if (launchOptions != null
-                && launchOptions.PrepareInitialSelections != null
-                && !launchOptions.PrepareInitialSelections())
-            {
                 return false;
             }
 
@@ -174,42 +186,19 @@ namespace NcTalkOutlookAddIn.Controllers
                 policyStatus,
                 launchOptions))
             {
-                if (launchOptions != null && launchOptions.AttachmentMode)
-                {
-                    int expectedSelectionCount =
-                        launchOptions.InitialSelections != null
-                            ? launchOptions.InitialSelections.Count
-                            : 0;
-                    if (expectedSelectionCount <= 0
-                        || wizard.QueuedSelectionCount
-                        != expectedSelectionCount)
-                    {
-                        NextcloudTalkAddIn.LogFileLinkMessage(
-                            "Attachment queue handoff rejected (expected="
-                            + expectedSelectionCount.ToString(
-                                CultureInfo.InvariantCulture)
-                            + ", queued="
-                            + wizard.QueuedSelectionCount.ToString(
-                                CultureInfo.InvariantCulture)
-                            + ").");
-                        return false;
-                    }
-
-                    if (launchOptions.OnInitialQueueAdopted != null)
-                    {
-                        launchOptions.OnInitialQueueAdopted();
-                    }
-                }
-
-                DialogResult wizardResult = wizard.ShowDialog();
-                if (launchOptions != null)
-                {
-                    launchOptions.CancelledByUser = wizardResult != DialogResult.OK
-                        && wizard.CancelledByUser;
-                    launchOptions.UnexpectedFailureObserved = wizard.UnexpectedFailureObserved;
-                }
+                if (!subscription.BindSharingWizard(wizard)) { return false; }
+                var closed = new TaskCompletionSource<DialogResult>();
+                wizard.FormClosed += (sender, args) => closed.TrySetResult(wizard.DialogResult);
+                wizard.Show();
+                DialogResult wizardResult = await closed.Task;
                 if (wizardResult == DialogResult.OK && wizard.Result != null)
                 {
+                    if (!subscription.CanApplyComposeChanges)
+                    {
+                        _owner.QueueCreatedShareCleanup(string.Empty, wizard.Result,
+                            ComposeLifecycleOrigin.Create(configuration), "compose_closed_before_insert");
+                        return false;
+                    }
                     string languageOverride = settings.ResolvePolicyDefaults(policyStatus).ShareBlockLang;
                     bool plainTextCompose = MailBodyInsertionController.IsPlainTextMail(mail);
                     NextcloudTalkAddIn.LogFileLinkMessage("Share created (folder=\"" + wizard.Result.FolderName + "\").");
@@ -272,7 +261,7 @@ namespace NcTalkOutlookAddIn.Controllers
                     }
                     catch (Exception ex)
                     {
-                        if (launchOptions != null) { launchOptions.UnexpectedFailureObserved = true; }
+
                         NextcloudTalkAddIn.LogFileLinkMessage("Share template rendering blocked: " + ex.Message);
                         MessageBox.Show(
                             string.Format(CultureInfo.CurrentCulture, Strings.ErrorInsertHtmlFailed, ex.Message),
@@ -287,30 +276,27 @@ namespace NcTalkOutlookAddIn.Controllers
                         return false;
                     }
 
-                    bool isInlineResponse = _owner.IsActiveInlineResponse(mail);
-                    NextcloudTalkAddIn.MailComposeSubscription composeSubscription =
-                        _owner.EnsureMailComposeSubscription(
-                            mail,
-                            isInlineResponse
-                                ? string.Empty
-                                : MailInteropController.ResolveMailInspectorIdentityKey(mail),
-                            isInlineResponse);
-                    if (composeSubscription == null || !composeSubscription.CanApplyComposeChanges)
+                    if (!subscription.CanApplyComposeChanges)
                     {
-                        _owner.QueueCreatedShareCleanup(
-                            composeKey,
-                            wizard.Result,
-                            origin,
-                            "compose_subscription_unavailable");
+                        _owner.QueueCreatedShareCleanup(composeKey, wizard.Result, origin, "compose_subscription_unavailable");
                         return false;
                     }
 
+                    // Write the durable marker before body mutation; a failed marker must not leave an unguarded block.
+                    try { subscription.SetSharingBlockInserted(true); }
+                    catch (Exception ex)
+                    {
+                        NextcloudTalkAddIn.LogFileLinkMessage("Share marker could not be written: " + ex.Message);
+                        _owner.QueueCreatedShareCleanup(composeKey, wizard.Result, origin, "share_marker_failed");
+                        return false;
+                    }
                     bool inserted = plainTextCompose
                         ? _owner.TryInsertPlainTextIntoMail(mail, plainText)
                         : _owner.TryInsertHtmlIntoMail(mail, html);
                     if (!inserted)
                     {
-                        if (launchOptions != null) { launchOptions.UnexpectedFailureObserved = true; }
+                        try { subscription.SetSharingBlockInserted(false); }
+                        catch (Exception ex) { NextcloudTalkAddIn.LogFileLinkMessage("Failed to clear share marker: " + ex.Message); }
                         _owner.QueueCreatedShareCleanup(
                             composeKey,
                             wizard.Result,
@@ -318,12 +304,12 @@ namespace NcTalkOutlookAddIn.Controllers
                             "body_insert_failed");
                         return false;
                     }
-                    composeSubscription.ArmShareCleanup(
+                    subscription.ArmShareCleanup(
                         wizard.Result,
                         origin);
                     if (registerSeparatePassword)
                     {
-                        composeSubscription.RegisterSeparatePasswordDispatch(
+                        subscription.RegisterSeparatePasswordDispatch(
                             wizard.Result,
                             wizard.RequestSnapshot,
                             passwordOnlyHtml,
@@ -334,13 +320,6 @@ namespace NcTalkOutlookAddIn.Controllers
                             languageOverride,
                             policyStatus,
                             origin);
-                    }
-                    if (launchOptions != null)
-                    {
-                        foreach (string localPath in wizard.GetSharedLocalPaths())
-                        {
-                            launchOptions.SharedLocalPaths.Add(localPath);
-                        }
                     }
                     return true;
                 }

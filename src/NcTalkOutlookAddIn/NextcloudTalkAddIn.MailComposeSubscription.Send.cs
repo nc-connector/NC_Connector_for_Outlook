@@ -31,6 +31,14 @@ namespace NcTalkOutlookAddIn
                 {
                     return;
                 }
+                if (SharingWizardOpen)
+                {
+                    cancel = true;
+                    FocusSharingWizard();
+                    MessageBox.Show(Strings.SharingFinishBeforeSend, Strings.DialogTitle,
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
                 _sendPolicySignatureWarning = false;
                 _sendAccepted = false;
                 _sendPolicyAttachmentWarning = false;

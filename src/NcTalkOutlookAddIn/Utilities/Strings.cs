@@ -964,6 +964,8 @@ namespace NcTalkOutlookAddIn.Utilities
         }
 
         // Sharing wizard
+        internal static string SharingAlreadyInserted { get { return Get("sharing_already_inserted", "This message already contains a Nextcloud share. Additional files remain regular attachments."); } }
+        internal static string SharingFinishBeforeSend { get { return Get("sharing_finish_before_send", "Finish or cancel the open Nextcloud sharing wizard before sending this message."); } }
         internal static string FileLinkNoFilesConfirm { get { return Get("sharing_confirm_no_files_message", "No files or folders were added to this share. Recipients can only upload their own files. Do you want to continue?"); } }
         internal static string FileLinkPermissionRead { get { return Get("sharing_permission_read", "Read"); } }
         internal static string FileLinkPermissionCreate { get { return Get("sharing_permission_create", "Upload"); } }

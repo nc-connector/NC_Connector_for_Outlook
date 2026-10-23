@@ -373,6 +373,10 @@ accept action align alt autocapitalize autocomplete autopictureinpicture autopla
             TryLoadDependency(Path.Combine(assemblyDirectory, "System.Numerics.Vectors.dll"));
             TryLoadDependency(Path.Combine(assemblyDirectory, "System.Runtime.CompilerServices.Unsafe.dll"));
             TryLoadDependency(Path.Combine(assemblyDirectory, "System.Text.Encoding.CodePages.dll"));
+
+            // AngleSharp registers this provider process-wide; initialize its lazy data
+            // here so later MailAddress calls do not need an unscoped assembly redirect.
+            RunWithHtmlDependencies(() => CodePagesEncodingProvider.Instance.GetEncoding(1252));
         }
 
         private static Assembly ResolveSanitizerDependency(object sender, ResolveEventArgs args)

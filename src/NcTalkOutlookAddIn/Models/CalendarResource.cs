@@ -42,6 +42,9 @@ namespace NcTalkOutlookAddIn.Models
         public string RoomNumber { get; set; }
         public string Features { get; set; }
         public int? Capacity { get; set; }
+        public bool HasAmbiguousCalendarAddress { get; internal set; }
+
+        public bool CanSchedule { get { return !string.IsNullOrWhiteSpace(Email) && !HasAmbiguousCalendarAddress; } }
 
         public bool IsRoom { get { return string.Equals(Kind, "ROOM", StringComparison.Ordinal); } }
 

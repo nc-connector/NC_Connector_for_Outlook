@@ -318,9 +318,13 @@ Die Anhangsautomatisierung wird unter **Freigabe → Anhänge** eingerichtet. Si
 
 Die lokale Anhangsautomatisierung funktioniert bei erreichbarer Nextcloud auch ohne installiertes Backend. Ein fehlender Backend-Endpunkt pausiert lokale Freigaben nicht. Enterprise Rollout und bereits bestätigte zentrale Freigabevorgaben benötigen weiterhin das Backend und berücksichtigen das konfigurierte Ausfallverhalten.
 
-Outlook oder Exchange kann einen Anhang abweisen, bevor NC Connector ihn erhält. In diesem Fall die Datei direkt über **Nextcloud-Freigabe einfügen** auswählen. Ein zentral gesperrter Größen-Schwellwert macht das Teilen bei Überschreitung verbindlich; ein lokales Uploadangebot nicht. Bei verfügbaren Diensten verhindert eine verbindliche Anhangsregel den Versand, solange eine betroffene Datei noch normal an der Mail hängt. Bei Dienstausfällen gilt [SendPolicyFailureMode](#versand-bei-dienstausfällen).
+Outlook oder Exchange kann einen Anhang abweisen, bevor NC Connector ihn erhält. In diesem Fall die Datei direkt über **Nextcloud-Freigabe einfügen** auswählen. Ein zentral gesperrter Größen-Schwellwert macht das Teilen bei Überschreitung verbindlich; ein lokales Uploadangebot nicht. Eine verbindliche Anhangsregel verhindert auch nach Einfügen einer Freigabe bei verfügbaren Diensten den Versand, solange eine betroffene Datei noch normal an der Mail hängt. Bei Dienstausfällen gilt [SendPolicyFailureMode](#versand-bei-dienstausfällen).
 
-Beim Abbrechen des automatischen Anhangsassistenten werden auch die von ihm übernommenen Anhänge aus der Mail entfernt. Ein Upload- oder Einfügefehler allein erhält die Anhänge. Nach erfolgreichem Teilen werden nur Originale entfernt, deren Dateien geteilt und in der Mail verlinkt wurden. Aus der Assistentenauswahl entfernte Dateien bleiben angehängt, sofern nicht der gesamte Assistent abgebrochen wird; spätere Ergänzungen und andere gleichnamige Dateien bleiben unverändert. Der Abbruch einer manuell gestarteten Freigabe entfernt keine vorhandenen Mailanhänge.
+Pro Nachricht gibt es einen Freigabeassistenten und einen Freigabeblock. Erneutes Öffnen von **Nextcloud-Freigabe einfügen** holt den bestehenden Assistenten nach vorn. Sowohl manuelle Freigaben als auch die Anhangsautomatisierung übernehmen vorhandene normale Anhänge in dessen Warteschlange. Dateien, die bei geöffnetem Assistenten in die Mail gezogen werden, landen in derselben Warteschlange, auch vor dem Dateischritt oder während des Uploads. Der aktuelle Schritt und die Freigabeeinstellungen bleiben erhalten. Eingebettete Bilder und Signaturbilder bleiben in der Mail.
+
+Anhänge verlassen die Mail erst, wenn die Warteschlange sie annimmt. Scheitert die Übergabe, werden entfernte Originale wiederhergestellt und der Batch nicht angenommen. Nach erfolgreicher Übergabe gehören die Dateien zur Warteschlange: Abbrechen des Assistenten oder Entfernen einer Datei aus der Warteschlange stellt ihren Mailanhang nicht wieder her. Bei einem Uploadfehler bleiben die Dateien im geöffneten Assistenten für Korrektur oder Wiederholung erhalten. Vor dem Senden den Assistenten abschließen oder abbrechen.
+
+Nach Einfügen des Freigabeblocks erstellt NC Connector in dieser Nachricht keinen weiteren Assistenten und keine zweite Freigabe. Für später hinzugefügte Dateien gelten weiterhin die Anhangsregeln: **Immer über NC Connector** und überschrittene gesperrte Größenlimits blockieren den Versand betroffener Dateianhänge unter Berücksichtigung des konfigurierten Verhaltens bei Dienstausfällen. Diese Anhänge entfernen und in einer neuen Nachricht teilen. Eingebettete Bilder und Signaturbilder bleiben ausgenommen.
 
 <a id="ungesendete-mail-und-freigabebereinigung"></a>
 <a id="unsent-mail-and-share-cleanup"></a>
@@ -333,7 +337,7 @@ Beim Verwerfen einer noch nicht gespeicherten Mail versucht NC Connector, ihren 
 
 Die Passwortzustellung wird beim Klick auf **Senden** angestoßen und verwendet dasselbe Outlook-Konto wie die Hauptmail. Beachten Sie diese Grenzen:
 
-- **Mail bis zum Versand geöffnet lassen.** Nach Schließen und erneutem Öffnen eines Entwurfs oder einem Outlook-Neustart muss die Freigabe neu erstellt werden. Ein noch sichtbarer Freigabeblock stellt den Passwortversand nicht wieder her. Das gilt auch für Vorlagen mit einem vorhandenen Freigabeblock. Speichern und AutoSave bei weiterhin geöffneter Mail sind möglich.
+- **Mail bis zum Versand geöffnet lassen.** Nach Schließen und erneutem Öffnen eines Entwurfs oder einem Outlook-Neustart stellt der sichtbare Freigabeblock den Passwortversand nicht wieder her. Für die erneute automatische separate Passwortzustellung eine neue Nachricht mit neuer Freigabe erstellen, keine zweite Freigabe in der alten Nachricht. Das gilt auch für Vorlagen mit einem vorhandenen Freigabeblock. Speichern und AutoSave bei weiterhin geöffneter Mail sind möglich.
 - **Bei verzögertem Versand kann das Passwort zuerst ankommen.** Die Passwort-Mail wartet nicht auf die Hauptmail im Postausgang. Sie kann auch schon versendet sein, wenn Outlook die Hauptmail anschließend ablehnt.
 - Scheitert der Versand eindeutig, öffnet sich eine vorbereitete Passwort-Mail zum manuellen Senden. Bei unklarem Ergebnis wird nicht automatisch erneut versendet, um Duplikate zu vermeiden.
 - Mit Secrets erhält jeder Empfänger einen eigenen einmaligen Link. **Scheitert die Erstellung, wird das Passwort mit Warnung als Klartext in der separaten Mail versendet.**
@@ -396,6 +400,12 @@ netsh http delete urlacl url=http://127.0.0.1:8888/nc-ifb/
 ## Räume und Ressourcen (ifb-pro)
 
 Räume und Ressourcen in Nextcloud über Calendar Resource Management oder RoomVox bereitstellen und den vorgesehenen Benutzern Zugriff gewähren. Jedem Benutzer einen gültigen Seat zuweisen, auch bei Installationen ohne Enterprise Rollout.
+
+Räume, Ressourcen und Fahrzeuge verwenden denselben Verzeichnisabruf wie Nextcloud Calendar 6.6.2. Die Sichtbarkeit folgt den serverseitigen Berechtigungen des konfigurierten Nextcloud-Kontos; Fahrzeuge behalten die serverseitige Einordnung als Raum oder Ressource.
+
+Eine unvollständige Ressource verhindert nicht das Öffnen des Pickers. Einträge ohne nutzbare Kalender-E-Mail-Adresse oder mit einer von mehreren Ressourcen verwendeten Adresse bleiben mit unbekannter Verfügbarkeit sichtbar, sind aber nicht auswählbar. Die Ressourcenadresse in Nextcloud oder der zuständigen Ressourcenverwaltungs-App korrigieren; andere Ressourcen bleiben nutzbar.
+
+Die leere RoomVox-E-Mail-Einstellung zur automatischen Adresserzeugung wird unterstützt. Der Picker verwendet die daraus gelieferte DAV-Adresse normal; ein leeres Konfigurationsfeld allein macht den Raum nicht unverfügbar.
 
 1. CalDAV Synchronizer für den zur Buchung verwendeten Outlook-Kalender einrichten. Teilnehmersynchronisation aktivieren und serverseitiges Scheduling zulassen; **SCHEDULE-AGENT=CLIENT** darf es nicht unterdrücken. Siehe [Scheduling-Einstellungen von CalDAV Synchronizer](https://caldavsynchronizer.org/help/documentation/). NC Connector richtet das Profil nicht ein.
 2. [Internet Free/Busy](#internet-freebusy-einrichten) für Outlooks Terminplanungs-Assistenten aktivieren. Der Picker prüft die Verfügbarkeit unabhängig von IFB direkt über CalDAV.
@@ -511,7 +521,7 @@ Unter **Erweitert → Gespeicherte Zugangsdaten entfernen** lassen sich Benutzer
 
 Meldet Enterprise Rollout, dass das Backend erforderlich ist, muss der Administrator es installieren oder aktivieren; ein erneuter Verbindungstest allein hilft dabei nicht.
 
-Beim Klick auf Freigabe oder Talk wird die Nextcloud-Verbindung vor dem Assistenten erneut geprüft. Ein nicht erreichbarer Server zeigt in beiden Aktionen denselben Hinweis mit dem Angebot, die Einstellungen zu öffnen; eine frühere erfolgreiche Verbindung überspringt diese Prüfung nicht. Nach dem Speichern geprüfter Zugangsdaten wird vor der Fortsetzung nochmals geprüft. Einrichtungsabbruch oder Schließen der ursprünglichen Mail/des Termins beendet die Aktion. Die Anhangsautomatisierung öffnet keine Anmeldung automatisch; fehlgeschlagenes Teilen erhält die Originalanhänge. Für den normalen Versand gilt weiterhin der konfigurierte `SendPolicyFailureMode`.
+Beim Klick auf Freigabe oder Talk wird die Nextcloud-Verbindung vor dem Assistenten erneut geprüft. Ein nicht erreichbarer Server zeigt in beiden Aktionen denselben Hinweis mit dem Angebot, die Einstellungen zu öffnen; eine frühere erfolgreiche Verbindung überspringt diese Prüfung nicht. Nach dem Speichern geprüfter Zugangsdaten wird vor der Fortsetzung nochmals geprüft. Einrichtungsabbruch oder Schließen der ursprünglichen Mail/des Termins beendet die Aktion. Die Anhangsautomatisierung öffnet keine Anmeldung automatisch. Eine fehlgeschlagene Verbindungsprüfung lässt Anhänge in der Mail; nach erfolgreicher Queue-Übergabe gehören sie wie unter [Dateien und Anhänge](#sharing-and-uploads) beschrieben zum Assistenten. Für den normalen Versand gilt weiterhin der konfigurierte `SendPolicyFailureMode`.
 
 Keine Zertifikatsprüfung abschalten und nicht versuchsweise computerweite TLS-Einstellungen ändern.
 
@@ -625,7 +635,7 @@ Bei **Apache** Rewrite-Module, `AllowOverride` und Rewrite Base prüfen; nach Ä
 4. Bei ausbleibender Automatisierung die Einstellungen unter **Freigabe → Anhänge** kontrollieren. Hat Outlook den Anhang bereits abgelehnt, die Datei direkt im Freigabe-Assistenten auswählen.
 5. Mit einer kleinen Datei eingrenzen und das zugehörige Zeitfenster im `FILELINK`-Log auswerten.
 
-Wird der Versand wegen ungeprüfter zentraler Vorgaben blockiert, `SendPolicyFailureMode` prüfen, die Dienste wieder verfügbar machen, die Mail geöffnet lassen und nach erfolgreicher Prüfung erneut senden. Der Hinweis bedeutet nicht, dass ein Upload fehlgeschlagen ist. Fehlgeschlagenes Teilen erhält die Originalanhänge; beim Abbrechen des automatischen Anhangsassistenten werden die von ihm übernommenen Anhänge aus der Mail entfernt.
+Wird der Versand wegen ungeprüfter zentraler Vorgaben blockiert, `SendPolicyFailureMode` prüfen, die Dienste wieder verfügbar machen, die Mail geöffnet lassen und nach erfolgreicher Prüfung erneut senden. Der Hinweis bedeutet nicht, dass ein Upload fehlgeschlagen ist. Ein eigener Hinweis fordert dazu auf, einen geöffneten Freigabeassistenten vor dem Senden abzuschließen oder abzubrechen. Bereits in dessen Warteschlange übernommene Dateien bleiben dort nach einem Uploadfehler erhalten; ein Abbruch stellt sie nicht als Mailanhänge wieder her.
 
 <a id="verwaltete-signatur-fehlt-oder-steht-falsch"></a>
 <a id="managed-signature-is-missing-or-misplaced"></a>

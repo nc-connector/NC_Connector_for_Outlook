@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -26,7 +27,6 @@ namespace NcTalkOutlookAddIn.UI
             if (!_closeRequested)
             {
                 _closeRequested = true;
-                CancelledByUser = !_shareFinalized && e.CloseReason == CloseReason.UserClosing;
             }
             if (!_shareFinalized && _cancellationSource != null)
             {
@@ -184,6 +184,8 @@ namespace NcTalkOutlookAddIn.UI
             FileLinkUploadContext previousContext = _uploadContext;
             _uploadCompleted = false;
             _uploadContext = null;
+            _uploadedSelections.Clear();
+            Result = null;
             ResetUploadProgressPump();
             if (_progressPanel.Visible)
             {
@@ -237,7 +239,7 @@ namespace NcTalkOutlookAddIn.UI
             Cursor previousCursor = Cursor.Current;
             Cursor.Current = Cursors.WaitCursor;
             UseWaitCursor = true;
-            FileLinkUploadContext preparedContext = null;
+            FileLinkUploadContext preparedContext = _uploadContext;
             Task cleanupTask = Task.CompletedTask;
 
             try
@@ -245,6 +247,10 @@ namespace NcTalkOutlookAddIn.UI
                 ResetUploadProgressPump();
                 foreach (var state in _selectionStates.Values)
                 {
+                    if (_uploadedSelections.Contains(state.Selection))
+                    {
+                        continue;
+                    }
                     state.TotalBytes = 0;
                     state.UploadedBytes = 0;
                     state.Status = FileLinkUploadStatus.Pending;
@@ -267,28 +273,40 @@ namespace NcTalkOutlookAddIn.UI
                     HandleUploadProgress);
                 var phaseProgress = new Progress<FileLinkUploadPhaseProgress>(
                     HandleUploadPhaseProgress);
-                List<FileLinkSelection> uploadSelections;
-                Dictionary<FileLinkSelection, FileLinkQueueNode>
-                    uploadSnapshots;
-                CaptureUploadQueue(
-                    out uploadSelections,
-                    out uploadSnapshots);
-
-                await Task.Run(() =>
+                while (true)
                 {
-                    preparedContext = _service.PrepareUpload(
-                        _request,
-                        uploadSelections,
-                        uploadSnapshots,
-                        HandleDuplicate,
-                        phaseProgress,
-                        token);
-                    _service.UploadSelections(
-                        preparedContext,
-                        itemProgress,
-                        phaseProgress,
-                        token);
-                });
+                    if (FlushComposeAttachments != null && !FlushComposeAttachments())
+                    {
+                        throw new OperationCanceledException(token);
+                    }
+                    List<FileLinkSelection> uploadSelections;
+                    Dictionary<FileLinkSelection, FileLinkQueueNode> uploadSnapshots;
+                    CaptureUploadQueue(out uploadSelections, out uploadSnapshots);
+                    if (uploadSelections.Count == 0)
+                    {
+                        break;
+                    }
+                    FileLinkUploadContext previousContext = preparedContext;
+                    await Task.Run(() =>
+                    {
+                        preparedContext = _service.PrepareUpload(
+                            _request,
+                            uploadSelections,
+                            uploadSnapshots,
+                            HandleDuplicate,
+                            phaseProgress,
+                            token,
+                            previousContext);
+                        _service.UploadSelections(
+                            preparedContext,
+                            itemProgress,
+                            phaseProgress,
+                            token);
+                    });
+                    token.ThrowIfCancellationRequested();
+                    _uploadContext = preparedContext;
+                    _uploadedSelections.UnionWith(uploadSelections);
+                }
 
                 _uploadContext = preparedContext;
                 _uploadCompleted = true;
@@ -315,14 +333,12 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed with service error.", ex);
                 FlushBufferedUploadProgress();
                 ShowUploadError(PolicyUiHelper.GetConnectionFailureMessage(ex, ex.Message));
             }
             catch (Exception ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(LogCategories.FileLink, "Upload failed unexpectedly.", ex);
                 FlushBufferedUploadProgress();
                 ShowUploadError(ex.Message);
@@ -410,7 +426,6 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (TalkServiceException ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Empty upload preparation failed with service error.",
@@ -419,7 +434,6 @@ namespace NcTalkOutlookAddIn.UI
             }
             catch (Exception ex)
             {
-                UnexpectedFailureObserved = true;
                 DiagnosticsLogger.LogException(
                     LogCategories.FileLink,
                     "Empty upload preparation failed unexpectedly.",
@@ -455,7 +469,7 @@ namespace NcTalkOutlookAddIn.UI
             out Dictionary<FileLinkSelection, FileLinkQueueNode>
                 snapshots)
         {
-            selections = new List<FileLinkSelection>(_items);
+            selections = _items.Where(selection => !_uploadedSelections.Contains(selection)).ToList();
             snapshots =
                 new Dictionary<FileLinkSelection, FileLinkQueueNode>();
             foreach (FileLinkSelection selection in selections)
@@ -596,6 +610,8 @@ namespace NcTalkOutlookAddIn.UI
         {
             _uploadCompleted = false;
             _uploadContext = null;
+            _uploadedSelections.Clear();
+            Result = null;
             ResetUploadProgressPump();
             SetProgressPanelVisible(false);
             foreach (var state in _selectionStates.Values)

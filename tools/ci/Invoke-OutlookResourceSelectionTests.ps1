@@ -224,15 +224,65 @@ internal static class SelectionTests {
         Set(status,"GraceUntilIso","2026-10-29T10:00:00Z");Set(status,"LicenseLastSyncAtIso","2026-10-15T10:00:00Z");Set(status,"LicenseOfflineUntilIso","2026-10-29T10:00:00Z");
         return status;
     }
-    static Form ResourceForm(IList directory,object status,bool ifbEnabled=false) {
+    static Form ResourceForm(IList directory,object status,bool ifbEnabled=false,string[] initialSelection=null) {
         var form=(Form)Activator.CreateInstance(Type("UI.CalendarResourceForm"),All,null,
-            new object[]{directory,new string[]{"room@example.test","eule@example.test"},ifbEnabled,status,"https://cloud.example.test/nextcloud"},null);
+            new object[]{directory,initialSelection??new string[]{"room@example.test","eule@example.test"},ifbEnabled,status,"https://cloud.example.test/nextcloud"},null);
         return form;
     }
     static Delegate FixtureCallback(Type delegateType,Func<object> callback) {
         var invoke=delegateType.GetMethod("Invoke");
         var parameters=invoke.GetParameters().Select(p=>Expression.Parameter(p.ParameterType,p.Name)).ToArray();
         return Expression.Lambda(delegateType,Expression.Convert(Expression.Invoke(Expression.Constant(callback)),invoke.ReturnType),parameters).Compile();
+    }
+    static void TestUnusableResourceAddresses() {
+        var room=Resource("room@example.test","ROOM","Valid room","Valid room address");
+        var equipment=Resource("eule@example.test","RESOURCE","Valid equipment","");
+        var missing=Resource(null,"ROOM","Missing calendar address","Old room address");
+        var blank=Resource("","ROOM","Blank calendar address","");
+        var duplicate=Resource("alias@example.test","ROOM","Ambiguous room","");
+        var alias=Resource("ALIAS@example.test","RESOURCE","Ambiguous equipment","");
+        Set(duplicate,"HasAmbiguousCalendarAddress",true);Set(alias,"HasAmbiguousCalendarAddress",true);
+        var unusable=new[]{missing,blank,duplicate,alias};
+        var directory=List("Models.CalendarResource",room,equipment,missing,blank,duplicate,alias);
+        var existing=List("Controllers.CalendarResourceController+RecipientState",Recipient("person@example.test",1),Recipient("alias@example.test",3),Recipient("",3));
+        var plan=Plan(directory,List("Models.CalendarResource",room,equipment),existing,"Old room address");
+        Check(((IList)Get(plan,"Add")).Count==2 && ((IList)Get(plan,"Remove")).Count==0 && ((IList)Get(plan,"Retype")).Count==0,"Missing and ambiguous addresses do not prevent planning valid resources or alter unrelated existing recipients");
+        foreach(object entry in unusable)Fails(()=>Plan(directory,List("Models.CalendarResource",entry),existing,"Keep"),"An unusable calendar address cannot enter recipient application");
+        var unchanged=Plan(directory,List("Models.CalendarResource"),existing,"Old room address");
+        Check((string)Get(unchanged,"Location")=="Old room address" && ((IList)Get(unchanged,"Remove")).Count==0,"Unusable directory entries do not claim existing recipients or their location");
+        using(var form=ResourceForm(directory,PolicyStatus("ACTIVE",true,true,"active",false,false),false,new[]{null,"","alias@example.test","room@example.test","eule@example.test"})) {
+            form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.Show();Application.DoEvents();
+            var list=(ListView)Get(form,"_list");var search=(TextBox)Get(form,"_search");
+            object window=Activator.CreateInstance(Type("Models.CalendarResourceTimeWindow"),All,null,new object[]{DateTime.UtcNow,DateTime.UtcNow.AddHours(1),TimeZoneInfo.Utc},null);
+            int reads=0;var reader=form.GetType().GetField("_readWindow",All);
+            reader.SetValue(form,FixtureCallback(reader.FieldType,delegate {reads++;return null;}));
+            Set(form,"_window",window);Set(form,"_availabilityService",System.Runtime.Serialization.FormatterServices.GetUninitializedObject(Type("Services.CalDavFreeBusyService")));
+            var availability=(IDictionary)Get(form,"_availability");var stateType=Type("Models.CalendarResourceAvailabilityState");
+            availability[""]=Enum.Parse(stateType,"Free");availability["alias@example.test"]=Enum.Parse(stateType,"Free");availability["room@example.test"]=Enum.Parse(stateType,"Free");
+            form.GetType().GetMethod("RebuildList",All).Invoke(form,new object[]{false});Application.DoEvents();
+            Func<object,ListViewItem> rowFor=entry=>list.Items.Cast<ListViewItem>().Single(i=>ReferenceEquals(i.Tag,entry));
+            Check(list.Items.Count==6 && ((IList)Get(form,"SelectedResources")).Count==2,"All directory entries remain visible while only valid addresses can be preselected");
+            foreach(object entry in unusable) {
+                var row=rowFor(entry);
+                Check(!row.Checked && row.StateImageIndex==-1 && row.SubItems[5].Text=="","An unusable resource has no booking checkbox or day action");
+                Check(row.SubItems[4].Text.Contains((string)Type("Utilities.Strings").GetProperty("ResourceUnknown",All).GetValue(null,null)),"An unusable resource never inherits a Free state from an empty or ambiguous key");
+                row.Checked=true;
+                Check(!row.Checked && ((IList)Get(form,"SelectedResources")).Count==2,"Checking an unusable resource does not replace the valid room selection");
+                list.SelectedItems.Clear();row.Selected=true;
+                form.GetType().GetMethod("RebuildList",All).Invoke(form,new object[]{false});Application.DoEvents();
+                Check(list.SelectedItems.Count==1 && ReferenceEquals(Get(form,"SelectedResource"),entry),"Detail focus identifies the resource, independently of empty or duplicate email");
+                ((Task)form.GetType().GetMethod("ShowAvailabilityAsync",All).Invoke(form,null)).GetAwaiter().GetResult();
+                Check(reads==0 && !(bool)Get(form,"_openingDayView") && Get(form,"_dayView")==null,"An unusable resource cannot start the day view or read the appointment");
+            }
+            list.GetType().GetMethod("RecreateHandle",All).Invoke(list,null);Application.DoEvents();
+            Check(unusable.All(entry=>rowFor(entry).StateImageIndex==-1 && !rowFor(entry).Checked),"Native handle recreation keeps unusable resources nonselectable");
+            var available=(CheckBox)Get(form,"_onlyAvailable");available.Checked=true;
+            Check(list.Items.Count==1 && ReferenceEquals(list.Items[0].Tag,room),"Available-only excludes unusable resources even when an aliased key was marked Free");
+            available.Checked=false;search.Text="Missing calendar address";
+            Check(list.Items.Count==1 && ReferenceEquals(list.Items[0].Tag,missing),"A room without an address remains searchable for inspection");
+            search.Text="";rowFor(room).Checked=false;rowFor(room).Checked=true;
+            Check(((IList)Get(form,"SelectedResources")).Count==2 && ((Button)Get(form,"_apply")).Enabled,"Valid room and equipment selection remains usable beside malformed entries");
+        }
     }
     static void TestAvailabilityLifecycle(IList directory) {
         Type formType=Type("UI.CalendarResourceForm"),windowType=Type("Models.CalendarResourceTimeWindow");
@@ -433,6 +483,23 @@ internal static class SelectionTests {
                             Check(!details.HorizontalScroll.Visible && details.AutoScrollPosition.X==0,description+" needs no horizontal metadata scrollbar");
                             Check(details.Controls.Cast<Control>().All(c=>c.Left>=details.Padding.Left && c.Right<=details.ClientSize.Width),description+" bounds metadata labels and values to the visible width");
                             Check(details.Controls.Cast<Control>().All(c=>c.Height>=c.GetPreferredSize(new Size(c.MaximumSize.Width,0)).Height),description+" preserves all wrapped metadata text");
+                            foreach(string text in new[]{(string)Get(room,"Email"),(string)Get(room,"BuildingAddress")}) {
+                                var value=details.Controls.Cast<Label>().Single(c=>c.Text==text);
+                                var caption=(Label)details.GetControlFromPosition(0,details.GetRow(value)-1);
+                                Check(value.Left==details.Padding.Left && value.MaximumSize.Width>=details.ClientSize.Width-details.Padding.Horizontal-SystemInformation.VerticalScrollBarWidth,description+" gives each complete address the detail width below its caption");
+                                int captionHeight=TextRenderer.MeasureText(caption.Text,caption.Font,Size.Empty,TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix).Height;
+                                Check(caption.Height<=captionHeight+2,description+" keeps address captions on one line");
+                                Check(caption.Bottom<=value.Top,description+" separates address captions from values");
+                            }
+                            var ordinaryRoom=Resource("konferenzraum-12@example.test","ROOM","Konferenzraum","Musterstraße 123\r\n12345 Musterstadt");
+                            form.GetType().GetMethod("ShowDetails",All).Invoke(form,new[]{ordinaryRoom});
+                            host.PerformLayout();Application.DoEvents();
+                            var calendarAddress=details.Controls.Cast<Label>().Single(c=>c.Text==(string)Get(ordinaryRoom,"Email"));
+                            Size unwrapped=TextRenderer.MeasureText(calendarAddress.Text,calendarAddress.Font,Size.Empty,TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix);
+                            if(unwrapped.Width<=calendarAddress.MaximumSize.Width)Check(calendarAddress.Height<=unwrapped.Height+2,description+" avoids wrapping a calendar address that fits the available detail width");
+                            var postalAddress=details.Controls.Cast<Label>().Single(c=>c.Text==(string)Get(ordinaryRoom,"BuildingAddress"));
+                            Check(postalAddress.Height>=postalAddress.GetPreferredSize(new Size(postalAddress.MaximumSize.Width,0)).Height,description+" preserves both lines of a postal address");
+                            form.GetType().GetMethod("ShowDetails",All).Invoke(form,new[]{room});host.PerformLayout();Application.DoEvents();
                             CheckFilterLayout(form,description);
                             var expansion=(Button)Get(form,"_expandAll");int actionWidth=expansion.Width;int searchWidth=((TextBox)Get(form,"_search")).Width;
                             expansion.PerformClick();host.PerformLayout();Application.DoEvents();CheckFilterLayout(form,description+" collapsed");
@@ -546,7 +613,7 @@ internal static class SelectionTests {
             form.GetType().GetMethod("ShowDetails",All).Invoke(form,new[]{room});Application.DoEvents();
             int requestedHeight=initialHeight+panel.Height+panel.Margin.Vertical;
             if(Screen.FromControl(form).WorkingArea.Height>=requestedHeight && Screen.FromControl(form).WorkingArea.Width>=1000) {
-                Check(details.RowCount==10 && details.Controls.Cast<Control>().All(c=>details.ClientRectangle.Contains(c.Bounds)),"Default GRACE/admin dialog with valid IFB shows all ten room metadata rows");
+                Check(details.Controls.Count==20 && details.RowCount==12 && details.Controls.Cast<Control>().All(c=>details.ClientRectangle.Contains(c.Bounds)),"Default GRACE/admin dialog with valid IFB shows all ten room metadata fields including full-width addresses");
                 Check(!details.VerticalScroll.Visible,"Default GRACE/admin dialog needs no metadata scroll when the monitor has room");
             }
             if(!string.IsNullOrEmpty(previewPath))using(var bitmap=new Bitmap(form.Width,form.Height)) {
@@ -771,6 +838,7 @@ internal static class SelectionTests {
             Check((string)compare.Invoke(null,new object[]{List("Controllers.CalendarResourceController+RecipientState",changed),"",0,List("Controllers.CalendarResourceController+RecipientState",original),"",0})=="recipient_details","Recipient "+field+" changes are protected");
         }
         TestRecipientWrites(directory,room,second,resource,extra);
+        TestUnusableResourceAddresses();
         TestAvailabilityLifecycle(directory);
         if(args.Length<3 || args[2]!="True")TestPolicyBanner(directory,args.Length>1?args[1]:"");
         TestPolicySizing(directory,args.Length>1?args[1]:"");

@@ -24,7 +24,14 @@ namespace NcTalkOutlookAddIn.Services
         private const string NextcloudNamespace = "http://nextcloud.com/ns";
         private const string SabreNamespace = "http://sabredav.org/ns";
         private const string Namespaces = " xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:n=\"http://nextcloud.com/ns\" xmlns:s=\"http://sabredav.org/ns\"";
-        private const string ResourceProperties = "<d:displayname/><c:calendar-user-type/><c:calendar-user-address-set/><s:email-address/><n:resource-type/><n:room-type/><n:room-seating-capacity/><n:room-building-name/><n:room-building-address/><n:room-building-story/><n:room-building-room-number/><n:room-features/>";
+        // Calendar 6.6.2: Principal.getPropFindList({ enableCalDAVResourceBooking: true }).
+        private const string ResourceProperties = "<d:displayname/><c:calendar-user-type/><c:calendar-user-address-set/>"
+            + "<d:principal-URL/><d:alternate-URI-set/><s:email-address/><n:language/><n:resource-type/>"
+            + "<n:resource-vehicle-type/><n:resource-vehicle-make/><n:resource-vehicle-model/>"
+            + "<n:resource-vehicle-is-electric/><n:resource-vehicle-range/><n:resource-vehicle-seating-capacity/>"
+            + "<n:resource-contact-person/><n:resource-contact-person-vcard/><n:room-type/><n:room-seating-capacity/>"
+            + "<n:room-building-name/><n:room-building-address/><n:room-building-story/>"
+            + "<n:room-building-room-number/><n:room-features/>";
         private readonly object _syncRoot = new object();
         private readonly Func<TalkServiceConfiguration, BackendPolicyStatus> _fetchPolicy;
         private string _scope = string.Empty;
@@ -58,10 +65,17 @@ namespace NcTalkOutlookAddIn.Services
                         {
                             var resources = ReadCollection(configuration, "calendar-rooms", "ROOM");
                             resources.AddRange(ReadCollection(configuration, "calendar-resources", "RESOURCE"));
-                            var addresses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            var addresses = new Dictionary<string, CalendarResource>(StringComparer.OrdinalIgnoreCase);
                             foreach (CalendarResource resource in resources)
                             {
-                                if (!addresses.Add(resource.Email)) { throw new InvalidDataException("Ambiguous resource email address."); }
+                                if (resource.Email.Length == 0) { continue; }
+                                CalendarResource previous;
+                                if (addresses.TryGetValue(resource.Email, out previous))
+                                {
+                                    previous.HasAmbiguousCalendarAddress = true;
+                                    resource.HasAmbiguousCalendarAddress = true;
+                                }
+                                else { addresses.Add(resource.Email, resource); }
                             }
                             _resources = resources;
                             _generatedUtc = DateTime.UtcNow;
@@ -85,7 +99,7 @@ namespace NcTalkOutlookAddIn.Services
             string normalized = NormalizeEmail(email);
             foreach (CalendarResource resource in GetResources(configuration, cacheHours))
             {
-                if (string.Equals(resource.Email, normalized, StringComparison.OrdinalIgnoreCase)) { return resource; }
+                if (resource.CanSchedule && string.Equals(resource.Email, normalized, StringComparison.OrdinalIgnoreCase)) { return resource; }
             }
             return null;
         }
@@ -104,24 +118,32 @@ namespace NcTalkOutlookAddIn.Services
         private static List<CalendarResource> ReadCollection(TalkServiceConfiguration configuration, string collection, string kind)
         {
             string url = configuration.GetNormalizedBaseUrl() + "/remote.php/dav/principals/" + collection + "/";
-            // Email search applies Nextcloud group restrictions; depth-one PROPFIND does not.
-            string body = "<d:principal-property-search" + Namespaces + "><d:property-search><d:prop><s:email-address/></d:prop><d:match>@</d:match></d:property-search><d:prop>" + ResourceProperties + "</d:prop></d:principal-property-search>";
-            XmlDocument document = SendDav(configuration, "REPORT", url, body);
+            string body = "<d:propfind" + Namespaces + "><d:prop>" + ResourceProperties + "</d:prop></d:propfind>";
+            XmlDocument document = SendDav(configuration, "PROPFIND", url, body, 1);
+            string collectionPath = new Uri(url).AbsolutePath.TrimEnd('/');
             var resources = new List<CalendarResource>();
-            var paths = new HashSet<string>(StringComparer.Ordinal);
+            var paths = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (XmlElement response in GetResponses(document))
             {
-                string href = ChildText(response, "href", DavNamespace);
-                Uri principal = ValidateDavHref(configuration, url, href, "principals/" + collection + "/", true);
-                if (!paths.Add(principal.AbsolutePath)) { throw new InvalidDataException("Duplicate resource principal."); }
-                Dictionary<string, XmlElement> properties = ReadSuccessfulProperties(response);
-                string responseKind = PropertyText(properties, "calendar-user-type", CalDavNamespace);
-                if (!string.Equals(responseKind, kind, StringComparison.Ordinal)) { throw new InvalidDataException("Unexpected resource principal kind."); }
-                string email = ReadEmail(properties);
-                if (email.Length == 0) { throw new InvalidDataException("Resource principal has no usable email address."); }
+                Uri principal;
+                Dictionary<string, XmlElement> properties;
+                try
+                {
+                    string href = ChildText(response, "href", DavNamespace);
+                    principal = ValidateDavHref(configuration, url, href, "principals/" + collection + "/", true, true);
+                    if (string.Equals(principal.AbsolutePath.TrimEnd('/'), collectionPath, StringComparison.Ordinal)) { continue; }
+                    properties = ReadSuccessfulProperties(response, true);
+                }
+                catch (InvalidDataException ex)
+                {
+                    DiagnosticsLogger.Log(LogCategories.Ifb, "Skipped invalid resource principal: " + ex.Message);
+                    continue;
+                }
+                // Calendar classifies by collection and uses the Sabre scheduling address.
+                string email = NormalizeEmail(PropertyText(properties, "email-address", SabreNamespace));
                 string capacityText = PropertyText(properties, "room-seating-capacity", NextcloudNamespace);
                 int capacity;
-                resources.Add(new CalendarResource
+                var resource = new CalendarResource
                 {
                     PrincipalPath = principal.AbsolutePath,
                     Email = email,
@@ -134,8 +156,16 @@ namespace NcTalkOutlookAddIn.Services
                     Floor = PropertyText(properties, "room-building-story", NextcloudNamespace),
                     RoomNumber = PropertyText(properties, "room-building-room-number", NextcloudNamespace),
                     Features = PropertyText(properties, "room-features", NextcloudNamespace),
-                    Capacity = int.TryParse(capacityText, NumberStyles.Integer, CultureInfo.InvariantCulture, out capacity) && capacity >= 0 ? (int?)capacity : null
-                });
+                    Capacity = int.TryParse(capacityText, NumberStyles.Integer, CultureInfo.InvariantCulture, out capacity) && capacity > 0 ? (int?)capacity : null
+                };
+                string path = principal.AbsolutePath.TrimEnd('/');
+                int previous;
+                if (paths.TryGetValue(path, out previous)) { resources[previous] = resource; }
+                else
+                {
+                    paths.Add(path, resources.Count);
+                    resources.Add(resource);
+                }
             }
             return resources;
         }
@@ -185,14 +215,14 @@ namespace NcTalkOutlookAddIn.Services
             return ReadSuccessfulProperties(responses[0]);
         }
 
-        private static XmlDocument SendDav(TalkServiceConfiguration configuration, string method, string url, string payload)
+        private static XmlDocument SendDav(TalkServiceConfiguration configuration, string method, string url, string payload, int depth = 0)
         {
             NcHttpResponse response = new NcHttpClient(configuration).Send(new NcHttpRequestOptions
             {
                 Method = method, Url = url, Payload = payload, ContentType = "application/xml; charset=utf-8",
                 Accept = "application/xml", TimeoutMs = 60000, IncludeAuthHeader = true, IncludeOcsApiHeader = false,
                 ParseJson = false, MaximumResponseBytes = 4 * 1024 * 1024,
-                Headers = new Dictionary<string, string> { { "Depth", "0" } }
+                Headers = new Dictionary<string, string> { { "Depth", depth.ToString(CultureInfo.InvariantCulture) } }
             });
             // The response may have rejected credentials or paused requests after the entry check.
             NextcloudConnectionState.AssertRequestAllowed(configuration);
@@ -223,12 +253,12 @@ namespace NcTalkOutlookAddIn.Services
             {
                 XmlElement element = node as XmlElement;
                 if (element != null && element.LocalName == "response" && element.NamespaceURI == DavNamespace) { result.Add(element); }
-                else if (element != null) { throw new InvalidDataException("Unexpected DAV multistatus element."); }
+                else if (element != null) { DiagnosticsLogger.Log(LogCategories.Ifb, "Skipped unexpected DAV multistatus element."); }
             }
             return result;
         }
 
-        private static Dictionary<string, XmlElement> ReadSuccessfulProperties(XmlElement response)
+        private static Dictionary<string, XmlElement> ReadSuccessfulProperties(XmlElement response, bool allowPartial = false)
         {
             var result = new Dictionary<string, XmlElement>(StringComparer.Ordinal);
             string status = ChildText(response, "status", DavNamespace);
@@ -241,7 +271,7 @@ namespace NcTalkOutlookAddIn.Services
                 string propStatus = ChildText(propstat, "status", DavNamespace);
                 if (!IsSuccessfulDavStatus(propStatus))
                 {
-                    if (string.Equals(propStatus, "HTTP/1.1 404 Not Found", StringComparison.Ordinal)) { continue; }
+                    if (allowPartial || string.Equals(propStatus, "HTTP/1.1 404 Not Found", StringComparison.Ordinal)) { continue; }
                     throw new InvalidDataException("DAV principal properties were rejected.");
                 }
                 XmlElement prop = Child(propstat, "prop", DavNamespace);
@@ -252,11 +282,11 @@ namespace NcTalkOutlookAddIn.Services
                     XmlElement property = propertyNode as XmlElement;
                     if (property == null) { continue; }
                     string key = PropertyKey(property.LocalName, property.NamespaceURI);
-                    if (result.ContainsKey(key)) { throw new InvalidDataException("Duplicate DAV property."); }
-                    result.Add(key, property);
+                    if (!allowPartial && result.ContainsKey(key)) { throw new InvalidDataException("Duplicate DAV property."); }
+                    result[key] = property;
                 }
             }
-            if (!hasProperties) { throw new InvalidDataException("No successful DAV properties."); }
+            if (!allowPartial && !hasProperties) { throw new InvalidDataException("No successful DAV properties."); }
             return result;
         }
 
@@ -297,11 +327,16 @@ namespace NcTalkOutlookAddIn.Services
             catch (FormatException) { return string.Empty; }
         }
 
-        internal static Uri ValidateDavHref(TalkServiceConfiguration configuration, string requestUrl, string href, string davSubpath, bool singleChild)
+        internal static Uri ValidateDavHref(TalkServiceConfiguration configuration, string requestUrl, string href, string davSubpath, bool singleChild, bool allowCollection = false)
         {
             Uri target;
             Uri davRoot = new Uri(configuration.GetNormalizedBaseUrl() + "/remote.php/dav/");
-            if (string.IsNullOrWhiteSpace(href) || href.IndexOf('\\') >= 0 || !Uri.TryCreate(new Uri(requestUrl), href, out target)
+            if (string.IsNullOrWhiteSpace(href) || href.IndexOf('\\') >= 0
+                || Array.Exists(href.Split('/'), segment => segment == "." || segment == "..")
+                || href.IndexOf("%2e", StringComparison.OrdinalIgnoreCase) >= 0
+                || href.IndexOf("%2f", StringComparison.OrdinalIgnoreCase) >= 0
+                || href.IndexOf("%25", StringComparison.OrdinalIgnoreCase) >= 0
+                || !Uri.TryCreate(new Uri(requestUrl), href, out target)
                 || !string.Equals(target.Scheme, davRoot.Scheme, StringComparison.OrdinalIgnoreCase)
                 || !string.Equals(target.Host, davRoot.Host, StringComparison.OrdinalIgnoreCase) || target.Port != davRoot.Port
                 || target.UserInfo.Length > 0 || target.Query.Length > 0 || target.Fragment.Length > 0)
@@ -310,6 +345,8 @@ namespace NcTalkOutlookAddIn.Services
             }
             string prefix = davRoot.AbsolutePath + davSubpath;
             string path = target.AbsolutePath;
+            if (allowCollection && (string.Equals(path, prefix, StringComparison.Ordinal)
+                || string.Equals(path, prefix.TrimEnd('/'), StringComparison.Ordinal))) { return target; }
             string decoded = Uri.UnescapeDataString(path);
             if (!path.StartsWith(prefix, StringComparison.Ordinal) || decoded.IndexOf('\\') >= 0
                 || !string.Equals(Uri.UnescapeDataString(prefix), decoded.Substring(0, Math.Min(decoded.Length, Uri.UnescapeDataString(prefix).Length)), StringComparison.Ordinal)

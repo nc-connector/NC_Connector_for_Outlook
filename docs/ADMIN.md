@@ -312,9 +312,13 @@ Configure attachment automation under **Share → Attachments**. It can always r
 
 Local attachment automation works without an installed backend when Nextcloud is reachable. A missing backend endpoint does not pause local sharing. Enterprise Rollout and previously confirmed central sharing rules still require the backend and follow the configured outage behavior.
 
-Outlook or Exchange can reject an attachment before NC Connector receives it. In that case, select the file directly through **Insert Nextcloud share**. A locked central size threshold makes sharing mandatory when exceeded; a locally configured upload offer does not. While services are available, a mandatory attachment rule blocks sending while an affected file remains attached normally. During service outages, [SendPolicyFailureMode](#sending-during-service-outages) applies.
+Outlook or Exchange can reject an attachment before NC Connector receives it. In that case, select the file directly through **Insert Nextcloud share**. A locked central size threshold makes sharing mandatory when exceeded; a locally configured upload offer does not. A mandatory attachment rule blocks sending even after a share has been inserted while services are available and an affected file remains attached normally. During service outages, [SendPolicyFailureMode](#sending-during-service-outages) applies.
 
-Cancelling the automatic attachment-sharing wizard also removes the attachments adopted by that wizard from the message. An upload or insertion failure alone preserves them. After successful sharing, only originals whose files were shared and linked in the message are removed. Files removed from the wizard selection remain attached unless the whole wizard is cancelled; later additions and unrelated same-name files remain untouched. Cancelling a manually started share does not remove existing mail attachments.
+Each message has one sharing wizard and one share block. Opening **Insert Nextcloud share** again focuses the existing wizard. Manual sharing and attachment automation both take existing ordinary attachments into its queue. Files dropped into the message while the wizard is open join that same queue, even before the file step or during upload, without changing the current step or sharing settings. Inline and signature images remain in the message.
+
+Attachments leave the message only after the queue accepts them. If that handoff fails, removed originals are restored and the batch is not accepted. After a successful handoff, the queue owns those files: cancelling the wizard or removing a file from the queue does not restore its mail attachment. An upload failure keeps the files in the open wizard for correction or retry. Finish or cancel the wizard before sending.
+
+After the share block has been inserted, NC Connector does not create another wizard or share in that message. Attachment rules still apply to later files: **Always handle attachments via NC Connector** and exceeded locked size limits block sending while affected files remain attached, subject to the configured service-outage behavior. Remove those attachments and share them in a new message. Embedded body and signature images remain excluded.
 
 <a id="ungesendete-mail-und-freigabebereinigung"></a>
 <a id="unsent-mail-and-share-cleanup"></a>
@@ -325,7 +329,7 @@ When an unsaved message is discarded, NC Connector tries to remove its newly cre
 
 Separate password delivery starts when the user clicks **Send** and uses the same Outlook account as the primary message. Note these limits:
 
-- **Keep the message open until sending.** After closing and reopening a draft or restarting Outlook, the share must be created again. A visible share block does not restore password delivery. This also applies to templates that already contain a share block. Saving and AutoSave are supported while the message remains open.
+- **Keep the message open until sending.** Closing and reopening a draft or restarting Outlook does not restore password delivery from its visible share block. To use automatic separate password delivery again, create a new message and share; do not add a second share to the old message. This also applies to templates that already contain a share block. Saving and AutoSave are supported while the message remains open.
 - **With delayed delivery, the password may arrive first.** The password message does not wait for the primary message in the Outbox. It may already have been sent when Outlook subsequently rejects the primary message.
 - If delivery clearly fails, a prepared password message opens for manual sending. An ambiguous result is not retried automatically to avoid duplicates.
 - With Secrets, each recipient receives an individual one-time link. **If secret creation fails, the password is sent as plain text in the separate message and a warning is shown.**
@@ -388,6 +392,12 @@ netsh http delete urlacl url=http://127.0.0.1:8888/nc-ifb/
 ## Rooms and resources (ifb-pro)
 
 Publish the rooms and resources in Nextcloud using Calendar Resource Management or RoomVox and grant the intended users access. Assign each user a valid Seat, including installations without Enterprise Rollout.
+
+Rooms, resources, and vehicles use the same directory lookup as Nextcloud Calendar 6.6.2. Visibility follows the configured Nextcloud account's server-side permissions; vehicles retain the server's room/resource category.
+
+An incomplete resource does not prevent the picker from opening. Entries without a usable calendar email address, or with an address shared by several resources, remain visible with unknown availability but cannot be selected. Correct the resource's address in Nextcloud or its resource-management app; other resources remain usable.
+
+Leaving RoomVox's email setting empty to generate an address automatically is supported. The picker uses the resulting DAV address normally; an empty configuration field does not by itself make the room unavailable.
 
 1. Configure CalDAV Synchronizer for the Outlook calendar used for bookings. Enable attendee synchronization and allow server-side scheduling; **SCHEDULE-AGENT=CLIENT** must not suppress it. See [CalDAV Synchronizer's scheduling settings](https://caldavsynchronizer.org/help/documentation/). NC Connector does not configure the profile.
 2. Enable [Internet Free/Busy](#configure-internet-freebusy) for Outlook's Scheduling Assistant. The picker checks availability directly through CalDAV, independently of IFB.
@@ -503,7 +513,7 @@ Under **Advanced → Remove saved credentials**, you can remove the saved userna
 
 An Enterprise Rollout notice that the backend is required means the administrator must install or enable it, not merely repeat the connection test.
 
-Clicking Share or Talk checks the Nextcloud connection again before opening the wizard. An unavailable server produces the same notice and offer to open Settings in both actions; a previous successful connection does not skip this check. After saving verified credentials, the action checks again before continuing. Cancelling setup or closing the original message/appointment ends the action. Attachment automation does not open sign-in Settings automatically; failed sharing preserves the original attachments. Ordinary sending continues to follow the configured `SendPolicyFailureMode`.
+Clicking Share or Talk checks the Nextcloud connection again before opening the wizard. An unavailable server produces the same notice and offer to open Settings in both actions; a previous successful connection does not skip this check. After saving verified credentials, the action checks again before continuing. Cancelling setup or closing the original message/appointment ends the action. Attachment automation does not open sign-in Settings automatically. A failed connection check leaves attachments in the message; after successful queue handoff, the wizard owns them as described under [Files and attachments](#sharing-and-uploads). Ordinary sending continues to follow the configured `SendPolicyFailureMode`.
 
 Do not disable certificate validation or change computer-wide TLS settings as an experiment.
 
@@ -616,7 +626,7 @@ For **Apache**, check the rewrite modules, `AllowOverride`, and the rewrite base
 4. If automation does not start, check **Share → Attachments**. If Outlook has already rejected the attachment, select the file directly in the sharing wizard.
 5. Narrow down the problem with a small file and review the matching time range in the `FILELINK` log.
 
-If sending is blocked because central requirements could not be checked, verify `SendPolicyFailureMode`, restore service availability, keep the message open, and send it again after the check succeeds. This notice does not mean that an upload failed. Failed sharing preserves original attachments; cancelling the automatic sharing wizard removes its adopted attachments from the message.
+If sending is blocked because central requirements could not be checked, verify `SendPolicyFailureMode`, restore service availability, keep the message open, and send it again after the check succeeds. This notice does not mean that an upload failed. A separate notice asks users to finish or cancel an open sharing wizard before sending. Files already accepted by its queue stay there after an upload failure; cancelling the wizard does not restore them as mail attachments.
 
 <a id="verwaltete-signatur-fehlt-oder-steht-falsch"></a>
 <a id="managed-signature-is-missing-or-misplaced"></a>

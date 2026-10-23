@@ -211,7 +211,8 @@ namespace NcTalkOutlookAddIn.Services
                 queueSnapshots,
             Func<FileLinkDuplicateInfo, string> duplicateResolver,
             IProgress<FileLinkUploadPhaseProgress> phaseProgress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            FileLinkUploadContext existingContext = null)
         {
             if (request == null)
             {
@@ -253,15 +254,41 @@ namespace NcTalkOutlookAddIn.Services
                 FileLinkUploadPlan plan = FileLinkUploadPlanBuilder.Build(
                     selections,
                     queueSnapshots,
-                    capabilities.BulkUploadSupported,
-                    FileLinkPath.GetDepth(shareTarget.BasePath) + 1,
+                    capabilities.BulkUploadSupported && existingContext == null,
+                    existingContext == null
+                        ? FileLinkPath.GetDepth(shareTarget.BasePath) + 1
+                        : 0,
                     duplicateResolver,
-                    cancellationToken);
+                    cancellationToken,
+                    existingContext);
                 _transferService.PrepareBulkChecksums(
                     plan,
                     phaseProgress,
                     cancellationToken);
                 LogUploadPlan(selections.Count, plan);
+
+                if (existingContext != null)
+                {
+                    if (!string.Equals(normalizedBaseUrl, existingContext.NormalizedBaseUrl, StringComparison.Ordinal)
+                        || !string.Equals(userId, existingContext.UserId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("The upload account changed during the share.");
+                    }
+                    var appendedContext = new FileLinkUploadContext(
+                        existingContext.NormalizedBaseUrl,
+                        existingContext.UserId,
+                        existingContext.SanitizedShareName,
+                        existingContext.FolderName,
+                        existingContext.RelativeFolderPath,
+                        plan,
+                        existingContext);
+                    _davClient.CreatePlannedDirectories(
+                        appendedContext,
+                        plan,
+                        phaseProgress,
+                        cancellationToken);
+                    return appendedContext;
+                }
 
                 FileLinkUploadContext context = null;
                 bool shareRootCreated = false;

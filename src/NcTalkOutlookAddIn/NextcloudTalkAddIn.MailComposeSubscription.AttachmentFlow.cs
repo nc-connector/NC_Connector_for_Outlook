@@ -5,11 +5,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using NcTalkOutlookAddIn.Models;
 using NcTalkOutlookAddIn.Services;
 using NcTalkOutlookAddIn.Settings;
 using NcTalkOutlookAddIn.UI;
@@ -34,6 +32,11 @@ namespace NcTalkOutlookAddIn
                 {
                     if (IsAutomationFileAttachment(attachment, true))
                     {
+                        if (HasInsertedSharingBlock())
+                        {
+                            ShowSharingAlreadyInserted();
+                            return;
+                        }
                         _pendingAddedBatch.Add(new AttachmentBatchEntry
                         {
                             Name = ReadAttachmentName(attachment),
@@ -56,166 +59,6 @@ namespace NcTalkOutlookAddIn
                 ScheduleAttachmentEvaluation();
             }
 
-            private void OnBeforeAttachmentAdd(Outlook.Attachment attachment, ref bool cancel)
-            {
-                if (!CanApplyComposeChanges
-                    || cancel
-                    || _attachmentSuppressed)
-                {
-                    return;
-                }
-                string candidatePath = string.Empty;
-                bool candidatePathIsTemporary = false;
-                bool candidateQueued = false;
-                try
-                {
-                    if (!IsAutomationFileAttachment(attachment, true)) { return; }
-                    AttachmentAutomationSettings settings = ReadAttachmentAutomationSettings();
-                    OutlookAttachmentAutomationGuardService.GuardState guardState;
-                    if (_owner.TryGetAttachmentAutomationGuardState("before_add", _composeKey, out guardState))
-                    {
-                        return;
-                    }
-
-                    if (!settings.AlwaysConnector && !settings.OfferAboveEnabled)
-                    {
-                        LogFileLink(
-                            "Compose before-attachment-add skipped (composeKey="
-                            + _composeKey
-                            + ", reason=automation_disabled).");
-                        return;
-                    }
-
-                    AttachmentBatchEntry candidate;
-                    if (!TryBuildBeforeAddAttachmentCandidate(attachment, out candidate, out candidatePath, out candidatePathIsTemporary))
-                    {
-                        LogFileLink(
-                            "Compose before-attachment-add preflight skipped (composeKey="
-                            + _composeKey
-                            + ", reason=candidate_unavailable).");
-                        return;
-                    }
-
-                    LogFileLink(
-                        "Compose before-attachment-add candidate resolved (composeKey="
-                        + _composeKey
-                        + ", name="
-                        + (candidate.Name ?? string.Empty)
-                        + ", sizeBytes="
-                        + Math.Max(0, candidate.SizeBytes).ToString(CultureInfo.InvariantCulture)
-                        + ", thresholdBytes="
-                        + Math.Max(0, settings.ThresholdBytes).ToString(CultureInfo.InvariantCulture)
-                        + ", mode="
-                        + (settings.AlwaysConnector ? "always" : "threshold")
-                        + ").");
-
-                    // The event argument is borrowed; acquire an owned reference after the host adds it.
-                    candidate.OriginalAttachment = attachment;
-                    bool shouldIntercept = settings.AlwaysConnector
-                                           || (settings.OfferAboveEnabled && candidate.SizeBytes > settings.ThresholdBytes);
-                    if (!shouldIntercept)
-                    {
-                        LogFileLink(
-                            "Compose before-attachment-add allow host add (composeKey="
-                            + _composeKey
-                            + ", reason=below_threshold, sizeBytes="
-                            + Math.Max(0, candidate.SizeBytes).ToString(CultureInfo.InvariantCulture)
-                            + ", thresholdBytes="
-                            + Math.Max(0, settings.ThresholdBytes).ToString(CultureInfo.InvariantCulture)
-                            + ").");
-                        return;
-                    }
-                    if (PauseUnavailableAttachmentAutomation(settings, candidate.SizeBytes)
-                        || !CanApplyComposeChanges)
-                    {
-                        return;
-                    }
-                    if (settings.AlwaysConnector)
-                    {
-                        QueueBeforeAddAttachmentShareFlow("always_preadd", candidate, candidatePath, settings.ThresholdMb, candidatePathIsTemporary);
-                        candidateQueued = true;
-                        return;
-                    }
-                    if (_attachmentPromptOpen)
-                    {
-                        LogFileLink("Compose before-attachment-add prompt skipped (composeKey=" + _composeKey + ", reason=prompt_already_open).");
-                        return;
-                    }
-                    string reasonText = string.Format(
-                        CultureInfo.CurrentCulture,
-                        Strings.AttachmentPromptReason,
-                        SizeFormatting.FormatMegabytes(Math.Max(0, candidate.SizeBytes)),
-                        SizeFormatting.FormatMegabytes((long)settings.ThresholdMb * 1024L * 1024L),
-                        string.IsNullOrWhiteSpace(candidate.Name) ? Strings.AttachmentPromptLastUnknown : candidate.Name,
-                        SizeFormatting.FormatMegabytes(Math.Max(0, candidate.SizeBytes)));
-
-                    _attachmentPromptOpen = true;
-                    ComposeAttachmentPromptDecision decision;
-                    try
-                    {
-                        if (!CanApplyComposeChanges)
-                        {
-                            return;
-                        }
-                        decision = ComposeAttachmentPromptForm.ShowPrompt(
-                            _owner._mailInteropController.TryCreateMailInspectorDialogOwner(_mail),
-                            reasonText);
-                    }
-                    finally
-                    {
-                        _attachmentPromptOpen = false;
-                    }
-                    if (!CanApplyComposeChanges)
-                    {
-                        return;
-                    }
-                    if (decision == ComposeAttachmentPromptDecision.Share)
-                    {
-                        LogFileLink(
-                            "Compose before-attachment-add threshold decision (composeKey="
-                            + _composeKey
-                            + ", decision=share, attachment="
-                            + (candidate.Name ?? string.Empty)
-                            + ").");
-                        QueueBeforeAddAttachmentShareFlow("threshold_preadd", candidate, candidatePath, settings.ThresholdMb, candidatePathIsTemporary);
-                        candidateQueued = true;
-                        return;
-                    }
-                    if (decision == ComposeAttachmentPromptDecision.RemoveLast)
-                    {
-                        cancel = true;
-                        LogFileLink(
-                            "Compose before-attachment-add threshold decision (composeKey="
-                            + _composeKey
-                            + ", decision=cancel_add, attachment="
-                            + (candidate.Name ?? string.Empty)
-                            + ").");
-                    }
-                    else
-                    {
-                        LogFileLink(
-                            "Compose before-attachment-add threshold decision (composeKey="
-                            + _composeKey
-                            + ", decision=keep_host_add, attachment="
-                            + (candidate.Name ?? string.Empty)
-                            + ").");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Compose before-attachment-add preflight failed; retaining the native attachment (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-                finally
-                {
-                    if (candidatePathIsTemporary && !candidateQueued)
-                    {
-                        CleanupTemporaryFiles(new List<string> { candidatePath });
-                    }
-                }
-            }
 
             private void OnPropertyChange(string name)
             {
@@ -267,8 +110,7 @@ namespace NcTalkOutlookAddIn
                 }
                 _attachmentEvaluationPending = true;
                 if (_composeSurfaceState == ComposeSurfaceState.Detached
-                    || _attachmentEvaluationRunning || _attachmentSuppressed
-                    || _beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count > 0)
+                    || (_attachmentEvaluationRunning && !SharingWizardOpen) || _attachmentSuppressed)
                 {
                     return;
                 }
@@ -292,7 +134,8 @@ namespace NcTalkOutlookAddIn
 
                 try
                 {
-                    await EvaluateAttachmentAutomationAsync();
+                    if (SharingWizardOpen) { DrainSharingAttachments(); }
+                    else { await EvaluateAttachmentAutomationAsync(); }
                 }
                 catch (Exception ex)
                 {
@@ -303,38 +146,12 @@ namespace NcTalkOutlookAddIn
                 }
             }
 
-            private async void OnBeforeAddShareTimerTick(object sender, EventArgs e)
-            {
-                _beforeAddShareTimer.Stop();
-                if (!CanApplyComposeChanges)
-                {
-                    return;
-                }
-
-                try
-                {
-                    await RunQueuedBeforeAddAttachmentShareFlowAsync();
-                }
-                catch (Exception ex)
-                {
-                    DiagnosticsLogger.LogException(
-                        LogCategories.FileLink,
-                        "Queued before-attachment-add share flow failed (composeKey=" + _composeKey + ").",
-                        ex);
-                }
-            }
 
             private async Task EvaluateAttachmentAutomationAsync()
             {
                 if (!CanApplyComposeChanges || _attachmentSuppressed || _attachmentEvaluationRunning
                     || _composeSurfaceState == ComposeSurfaceState.Detached)
                 {
-                    return;
-                }
-                if (_beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count > 0)
-                {
-                    _pendingAddedBatch.Clear();
-                    LogFileLink("Compose attachment evaluation skipped (composeKey=" + _composeKey + ", reason=before_add_flow_pending).");
                     return;
                 }
 
@@ -365,14 +182,15 @@ namespace NcTalkOutlookAddIn
             private async Task EvaluateAttachmentAutomationOnUiAsync(AttachmentAutomationSettings settings)
             {
                 if (!CanApplyComposeChanges || _attachmentSuppressed
-                    || _composeSurfaceState == ComposeSurfaceState.Detached
-                    || _beforeAddShareFlowRunning || _pendingBeforeAddShareEntries.Count > 0)
+                    || _composeSurfaceState == ComposeSurfaceState.Detached)
                 {
                     return;
                 }
 
                 // Consume the request only on an attached surface; popping out an assessed draft is not a new batch.
                 _attachmentEvaluationPending = false;
+                if (SharingWizardOpen) { DrainSharingAttachments(); return; }
+                if (HasInsertedSharingBlock()) { _pendingAddedBatch.Clear(); return; }
                 OutlookAttachmentAutomationGuardService.GuardState guardState;
                 if (_owner.TryGetAttachmentAutomationGuardState("evaluate", _composeKey, out guardState))
                 {

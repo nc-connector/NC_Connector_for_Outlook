@@ -2,21 +2,11 @@
 // Licensed under the GNU Affero General Public License v3.0.
 // See LICENSE.txt for details.
 
-using System;
-using System.Collections.Generic;
-
 namespace NcTalkOutlookAddIn.Models
 {
-        // Optional launch context for the sharing wizard.
-    // Used by compose attachment automation to open directly in attachment mode.
+    // Attachment automation opens the shared wizard directly at the file step.
     internal sealed class FileLinkWizardLaunchOptions
     {
-        internal FileLinkWizardLaunchOptions()
-        {
-            InitialSelections = new List<FileLinkSelection>();
-            SharedLocalPaths = new List<string>();
-        }
-
         internal bool AttachmentMode { get; set; }
 
         internal string AttachmentTrigger { get; set; }
@@ -29,17 +19,6 @@ namespace NcTalkOutlookAddIn.Models
 
         internal long AttachmentLastSizeBytes { get; set; }
 
-        internal Func<bool> PrepareInitialSelections { get; set; }
-
-        internal Action OnInitialQueueAdopted { get; set; }
-
-        internal IList<FileLinkSelection> InitialSelections { get; private set; }
-
-        internal IList<string> SharedLocalPaths { get; private set; }
-
-        internal bool CancelledByUser { get; set; }
-
-        internal bool UnexpectedFailureObserved { get; set; }
     }
 }
 
