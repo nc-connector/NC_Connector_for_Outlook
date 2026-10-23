@@ -4,6 +4,25 @@ All notable changes to **NC Connector for Outlook** will be documented in this f
 
 This project follows the principles of **Keep a Changelog** and **Semantic Versioning**.
 
+## [3.5.0] - 2026-10-23
+
+### Added
+
+- Select Nextcloud rooms and resources from appointments and the Scheduling Assistant, including entries published by RoomVox or Calendar Resource Management. Requires a valid assigned NC Connector Seat and CalDAV Synchronizer for booking.
+- Check availability for the appointment interval and open a per-resource day view without exposing private event details.
+- Filter by building, floor, minimum capacity, equipment and availability; group by building, floor or room type, with saved grouping and expand/collapse preferences.
+
+### Changed
+
+- Use one Sharing wizard and one share block per compose window. Existing attachments and files added while the wizard is open join the same queue, including during upload. Files added after the share block is inserted remain normal attachments.
+- Use consistent access notices and sign-in handling for Sharing, Talk and resources, with visible explanations for blocked actions and non-blocking license warnings in the resource picker.
+
+### Fixed
+
+- Preserve a confirmed Seat refusal when concurrent backend requests complete out of order.
+- Start IFB only after Outlook has selected its profile, including when launched through Explorer's Send to Mail recipient action, without a blocking startup warning.
+- Let Windows Installer close Outlook cleanly before maintenance and stop setup if Outlook remains open, before replacing files or changing IFB settings.
+
 ## [3.4.5] - 2026-10-13
 
 ### Fixed
